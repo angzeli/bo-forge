@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bo-forge"
+version = "0.1.0"
+description = "Notebook-first Bayesian optimisation campaign tooling."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "botorch>=0.17",
+    "gpytorch>=1.14",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
+    "torch>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipykernel>=6.29",
+    "pytest>=8.0",
+    "ruff>=0.8",
+]
+
+[tool.setuptools.packages.find]
+include = ["bo_forge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::botorch.exceptions.warnings.InputDataWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+include = ["bo_forge/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

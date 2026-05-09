@@ -1,0 +1,25 @@
+campaign_name: photocatalyst_loading
+objective:
+  name: activity
+  direction: maximize
+
+variables:
+  - name: precursor_ratio
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+
+  - name: annealing_temperature
+    type: continuous
+    lower: 300
+    upper: 800
+
+bo:
+  batch_size: 1
+  initial_design_size: 8
+  acquisition: log_ei
+  random_seed: 13
+  raw_samples: 128
+  num_restarts: 5
+  mc_samples: 128
+
