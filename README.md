@@ -1,4 +1,4 @@
-# 🧪 BO Forge MVP v0.1.1
+# 🧪 BO Forge MVP v0.1.2
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool. The notebook is the user workflow, while the reusable BO logic lives in the `bo_forge` Python package.
 
@@ -18,7 +18,7 @@ MVP v0.1 deliberately supports only:
 
 It intentionally does not yet cover categorical variables, constraints, noisy BO, multi-objective optimisation, a CLI, or an app UI.
 
-## Workflow
+## 🔁 Workflow
 
 ```mermaid
 flowchart LR
@@ -100,7 +100,7 @@ append_suggestions(log_path, suggestions)
 mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.95)
 ```
 
-## Canonical CSV Schema
+## 🧾 Canonical CSV Schema
 
 Campaign logs use this column order:
 
@@ -117,9 +117,18 @@ Rules:
 - A suggested experiment becomes observed by updating the same row with `mark_observed()`.
 - `row_id`, `iteration`, `source`, and variable values are preserved when a result is entered.
 
+See `CSV_SCHEMA.md` for the full column reference, allowed blank values, and status-transition rules.
+
+## ⚙️ Example Configs
+
+- `configs/simple_2d.yaml`: maximises photocatalyst-style `activity`.
+- `configs/simple_2d_minimize.yaml`: minimises process `defect_rate`.
+
 ## 📓 Example Notebook 
 
-Open `notebooks/01_simulated_campaign.ipynb` for a simulated end-to-end campaign using `configs/simple_2d.yaml` and `examples/simple_2d_campaign_log.csv`.
+Open `notebooks/01_simulated_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/simple_2d.yaml` and `examples/simple_2d_campaign_log.csv`.
+
+Open `notebooks/02_minimization_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimize.yaml` and `examples/simple_2d_minimize_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
 
 From a fresh clone:
 
@@ -157,7 +166,7 @@ from bo_forge.diagnostics import plot_progress
 plot_progress(config, df, filename="progress.png")
 ```
 
-## Troubleshooting CSV/YAML Errors
+## 🛠️ Troubleshooting CSV/YAML Errors
 
 BO Forge is intentionally strict because users edit YAML and CSV files by hand.
 
@@ -182,13 +191,15 @@ df = load_campaign_log("examples/simple_2d_campaign_log.csv", config)
 validate_campaign_data(config, df)
 ```
 
-## Repository Guide
+See `COMMON_ERRORS.md` for a longer error-message reference with fixes.
+
+## 🗂️ Repository Guide
 
 See `REPOSITORY_STRUCTURE.md` for the package layout, file responsibilities, and recommended development workflow.
 
-## Tested Versions
+## 📌 Tested Versions
 
-The primary dependency source is `pyproject.toml`. A direct-dependency snapshot from the v0.1.1 environment is recorded in `requirements-lock.txt`.
+The primary dependency source is `pyproject.toml`. A direct-dependency snapshot from the v0.1.2 environment is recorded in `requirements-lock.txt`.
 
 ## 👤 Author 
 

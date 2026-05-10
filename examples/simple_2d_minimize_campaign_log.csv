@@ -1,0 +1,3 @@
+row_id,iteration,status,source,catalyst_loading,cure_temperature,defect_rate,predicted_mean,predicted_std,acquisition
+manual_min_000,0,observed,manual,0.15,100,0.761419667999157,,,
+manual_min_001,0,observed,manual,0.75,160,1.0884737853048998,,,

@@ -1,8 +1,8 @@
-# BO Forge Repository Structure
+# 🗂️ BO Forge Repository Structure
 
 This repository is organised around one rule: the Bayesian optimisation engine lives in the `bo_forge` Python package, while notebooks and future apps call that package.
 
-## Top-Level Layout
+## 🏗️ Top-Level Layout
 
 ```text
 bo-forge/
@@ -13,6 +13,8 @@ bo-forge/
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Setup, quickstart, and user-facing overview
 ├── ROADMAP.md                        # Planned scope after MVP v0.1
+├── CSV_SCHEMA.md                     # Canonical CSV schema reference
+├── COMMON_ERRORS.md                  # Common validation errors and fixes
 ├── REPOSITORY_STRUCTURE.md           # This guide
 ├── pyproject.toml                    # Package metadata and dependencies
 └── .gitignore                        # Local artifacts excluded from Git
@@ -20,7 +22,7 @@ bo-forge/
 
 The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It is reference material, not package source.
 
-## Backend Package
+## 📦 Backend Package
 
 `bo_forge/` contains the reusable campaign engine:
 
@@ -38,7 +40,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 Most users should call the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
-## How To Use The Repository
+## 🚀 How To Use The Repository
 
 Create a local environment and install the package:
 
@@ -66,16 +68,18 @@ Run checks before committing:
 ./.venv/bin/ruff check .
 ```
 
-## Campaign Files
+## 📁 Campaign Files
 
 A campaign needs two files:
 
 - A YAML config in `configs/`, such as `configs/simple_2d.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
+The repository also includes `configs/simple_2d_minimize.yaml` as a small minimisation example.
+
 The seed log in `examples/simple_2d_campaign_log.csv` should remain small and clean. Example scripts and notebooks copy it to ignored working logs before making changes, so the committed seed data stays reproducible.
 
-## Development Rules
+## 🧭 Development Rules
 
 - Keep variables in original user units in public DataFrames and CSV files.
 - Keep transforms internal to `transforms.py`.

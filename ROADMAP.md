@@ -1,8 +1,8 @@
-# BO Forge Roadmap
+# 🗺️ BO Forge Roadmap
 
 This roadmap is directional, not a release promise. BO Forge should stay useful at each step: a clean backend engine first, then notebook/CLI/app wrappers around it.
 
-## v0.1 - Notebook Sequential Campaign Demo
+## 📓 v0.1 - Notebook Sequential Campaign Demo
 
 Status: current
 
@@ -17,7 +17,7 @@ Status: current
 - Basic progress and design-space diagnostics.
 - Simulated campaign notebook.
 
-## v0.2 - Stronger Notebook Engine
+## 🧰 v0.2 - Stronger Notebook Engine
 
 - Improve CSV ergonomics for manually edited logs.
 - Add clearer notebook cells for common user mistakes and recovery.
@@ -26,7 +26,7 @@ Status: current
 - Add example campaigns beyond the simple 2D case.
 - Add optional figure export paths to the notebook workflow.
 
-## v0.3 - CLI Workflow
+## 💻 v0.3 - CLI Workflow
 
 - Add a small CLI wrapper around the backend package.
 - Commands:
@@ -37,7 +37,7 @@ Status: current
 - Keep CLI behavior equivalent to the notebook API.
 - Preserve the CSV log as the source of truth.
 
-## v0.4 - Practical BO Features
+## 🧪 v0.4 - Practical BO Features
 
 - Observation noise support.
 - Fixed/context variables.
@@ -47,7 +47,7 @@ Status: current
 - Optional objective transforms.
 - More explicit model diagnostics.
 
-## v0.5 - Streamlit Prototype
+## 🖥️ v0.5 - Streamlit Prototype
 
 - Build a thin Streamlit wrapper around the backend package.
 - Support config upload/editing.
@@ -56,7 +56,7 @@ Status: current
 - Display progress and diagnostic plots.
 - Keep BO logic out of the app layer.
 
-## Later
+## 🔮 Later
 
 - FastAPI backend.
 - React frontend.
@@ -66,4 +66,3 @@ Status: current
 - Multi-fidelity or contextual BO.
 - Authentication and multi-user campaign management.
 - Exportable reports for campaign summaries.
-

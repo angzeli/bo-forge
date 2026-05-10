@@ -40,6 +40,17 @@ bo:
     assert config.bo.batch_size == 2
 
 
+def test_example_minimize_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/simple_2d_minimize.yaml")
+
+    assert config.campaign_name == "process_defect_minimisation"
+    assert config.objective.name == "defect_rate"
+    assert config.objective.direction == "minimize"
+    assert config.direction_sign == -1.0
+    assert config.variable_names == ["catalyst_loading", "cure_temperature"]
+    assert config.bo.batch_size == 2
+
+
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",
@@ -122,4 +133,3 @@ variables:
 
     with pytest.raises(ConfigError, match="invalid direction 'largest'"):
         CampaignConfig.from_yaml(path)
-

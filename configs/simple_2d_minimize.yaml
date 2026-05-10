@@ -1,0 +1,24 @@
+campaign_name: process_defect_minimisation
+objective:
+  name: defect_rate
+  direction: minimize
+
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+
+  - name: cure_temperature
+    type: continuous
+    lower: 80
+    upper: 180
+
+bo:
+  batch_size: 2
+  initial_design_size: 6
+  acquisition: log_ei
+  random_seed: 21
+  raw_samples: 128
+  num_restarts: 5
+  mc_samples: 128
