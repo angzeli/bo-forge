@@ -1,4 +1,4 @@
-# 🧪 BO Forge MVP v0.1.2
+# 🧪 BO Forge v0.1.2
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool. The notebook is the user workflow, while the reusable BO logic lives in the `bo_forge` Python package.
 
