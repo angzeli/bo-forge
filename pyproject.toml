@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "0.1.0"
+version = "0.1.1"
 description = "Notebook-first Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +21,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ipykernel>=6.29",
+    "ipywidgets>=8.1",
+    "nbclient>=0.10",
+    "nbformat>=5.10",
+    "notebook>=7.0",
     "pytest>=8.0",
     "ruff>=0.8",
 ]
@@ -30,6 +34,7 @@ include = ["bo_forge*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 filterwarnings = [
     "ignore::botorch.exceptions.warnings.InputDataWarning",
 ]
@@ -37,7 +42,7 @@ filterwarnings = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-include = ["bo_forge/**/*.py", "tests/**/*.py"]
+include = ["bo_forge/**/*.py", "examples/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

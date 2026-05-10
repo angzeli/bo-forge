@@ -1,4 +1,4 @@
-"""BO Forge MVP v0.1."""
+"""BO Forge MVP v0.1.1."""
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import (
@@ -29,4 +29,3 @@ __all__ = [
     "suggest_next",
     "validate_campaign_data",
 ]
-
