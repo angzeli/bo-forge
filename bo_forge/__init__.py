@@ -1,4 +1,4 @@
-"""BO Forge MVP v0.1.2."""
+"""BO Forge MVP v0.1.3."""
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import (

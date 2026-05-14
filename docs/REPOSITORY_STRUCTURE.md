@@ -11,11 +11,12 @@ bo-forge/
 ├── examples/                         # Seed logs and runnable examples
 ├── notebooks/                        # Notebook-first campaign workflows
 ├── tests/                            # Pytest coverage for package behavior
+├── docs/                             # Schema, errors, and repository guides
+│   ├── CSV_SCHEMA.md
+│   ├── COMMON_ERRORS.md
+│   └── REPOSITORY_STRUCTURE.md
 ├── README.md                         # Setup, quickstart, and user-facing overview
 ├── ROADMAP.md                        # Planned scope after MVP v0.1
-├── CSV_SCHEMA.md                     # Canonical CSV schema reference
-├── COMMON_ERRORS.md                  # Common validation errors and fixes
-├── REPOSITORY_STRUCTURE.md           # This guide
 ├── pyproject.toml                    # Package metadata and dependencies
 └── .gitignore                        # Local artifacts excluded from Git
 ```

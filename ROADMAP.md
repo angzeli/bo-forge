@@ -2,6 +2,42 @@
 
 This roadmap is directional, not a release promise. BO Forge should stay useful at each step: a clean backend engine first, then notebook/CLI/app wrappers around it.
 
+## 🧭 Roadmap So Far
+
+```mermaid
+flowchart LR
+    v01["v0.1<br/>MVP foundation"] --> v02["v0.2<br/>Notebook engine"] --> v03["v0.3<br/>CLI workflow"] --> v04["v0.4<br/>Practical BO features"] --> v05["v0.5<br/>Streamlit prototype"]
+
+    v011["v0.1.1<br/>Polish"]
+    v012["v0.1.2<br/>Usability"]
+    v013["v0.1.3<br/>Baseline cleanup"]
+    
+    v01 -.-> v011
+    v01 -.-> v012
+    v01 -.-> v013
+    
+    class v01 majorDone
+    class v02 majorNext
+    class v03,v04,v05 majorFuture
+    class v011,v012,v013 patchDone
+
+    classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
+    classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
+    classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
+    classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
+```
+
+Current baseline: `v0.1.3`. Next planned milestone: `v0.2`, focused on a higher-level notebook campaign/session workflow.
+
+### Patch Notes So Far
+
+| Version | Type | Summary |
+| --- | --- | --- |
+| `v0.1` | Major MVP | Core backend, CSV logs, Sobol, GP, LogEI/qLogEI |
+| `v0.1.1` | Patch | README, quickstart, notebook execution support, repo guide |
+| `v0.1.2` | Patch | CSV schema docs, common errors, minimisation + qLogEI batch demo |
+| `v0.1.3` | Patch | Notebook metadata cleanup, docs links, notebook validation test |
+
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
 Status: current

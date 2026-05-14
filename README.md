@@ -1,4 +1,4 @@
-# 🧪 BO Forge v0.1.2
+# 🧪 BO Forge v0.1.3
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool. The notebook is the user workflow, while the reusable BO logic lives in the `bo_forge` Python package.
 
@@ -117,7 +117,7 @@ Rules:
 - A suggested experiment becomes observed by updating the same row with `mark_observed()`.
 - `row_id`, `iteration`, `source`, and variable values are preserved when a result is entered.
 
-See `CSV_SCHEMA.md` for the full column reference, allowed blank values, and status-transition rules.
+See `docs/CSV_SCHEMA.md` for the full column reference, allowed blank values, and status-transition rules.
 
 ## ⚙️ Example Configs
 
@@ -191,15 +191,15 @@ df = load_campaign_log("examples/simple_2d_campaign_log.csv", config)
 validate_campaign_data(config, df)
 ```
 
-See `COMMON_ERRORS.md` for a longer error-message reference with fixes.
+See `docs/COMMON_ERRORS.md` for a longer error-message reference with fixes.
 
 ## 🗂️ Repository Guide
 
-See `REPOSITORY_STRUCTURE.md` for the package layout, file responsibilities, and recommended development workflow.
+See `docs/REPOSITORY_STRUCTURE.md` for the package layout, file responsibilities, and recommended development workflow.
 
 ## 📌 Tested Versions
 
-The primary dependency source is `pyproject.toml`. A direct-dependency snapshot from the v0.1.2 environment is recorded in `requirements-lock.txt`.
+The primary dependency source is `pyproject.toml`. A direct-dependency snapshot from the v0.1.3 environment is recorded in `requirements-lock.txt`.
 
 ## 👤 Author 
 
