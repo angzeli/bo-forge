@@ -11,12 +11,13 @@ bo-forge/
 ├── examples/                         # Seed logs and runnable examples
 ├── notebooks/                        # Notebook-first campaign workflows
 ├── tests/                            # Pytest coverage for package behavior
-├── docs/                             # Schema, errors, and repository guides
+├── docs/                             # Quickstart, schema, errors, and repository guides
+│   ├── QUICKSTART.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   └── REPOSITORY_STRUCTURE.md
-├── README.md                         # Setup, quickstart, and user-facing overview
-├── ROADMAP.md                        # Planned scope after MVP v0.1
+├── README.md                         # Project overview and documentation links
+├── ROADMAP.md                        # Completed milestones and planned direction
 ├── pyproject.toml                    # Package metadata and dependencies
 └── .gitignore                        # Local artifacts excluded from Git
 ```
@@ -30,6 +31,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `config.py`: dataclasses and strict YAML parsing.
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, and `mark_observed()`.
+- `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
 - `transforms.py`: internal user-space to unit-cube transforms.
 - `models.py`: conversion from campaign logs to tensors and GP fitting.
@@ -39,7 +41,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
 
-Most users should call the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
+Most users should start with `CampaignSession` or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
 ## 🚀 How To Use The Repository
 
@@ -59,7 +61,7 @@ Run the clean quickstart:
 Open the full simulated workflow:
 
 ```bash
-./.venv/bin/jupyter notebook notebooks/01_simulated_campaign.ipynb
+./.venv/bin/jupyter notebook notebooks/01_maximisation_logei_campaign.ipynb
 ```
 
 Run checks before committing:
@@ -76,7 +78,7 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/simple_2d.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/simple_2d_minimize.yaml` as a small minimisation example.
+The repository also includes `configs/simple_2d_minimise.yaml` as a small minimisation example.
 
 The seed log in `examples/simple_2d_campaign_log.csv` should remain small and clean. Example scripts and notebooks copy it to ignored working logs before making changes, so the committed seed data stays reproducible.
 

@@ -1,10 +1,10 @@
-# Tested direct dependency snapshot for BO Forge MVP v0.1.3.
+# Tested direct dependency snapshot for BO Forge v0.2.0.
 #
 # The normal install path is still:
 #   ./.venv/bin/pip install -e ".[dev]"
 #
-# This file records the known-good package versions used during the v0.1.3
-# polish patch. It is intentionally limited to direct runtime/dev packages,
+# This file records the known-good package versions used during the v0.2.0
+# release. It is intentionally limited to direct runtime/dev packages,
 # not every transitive dependency produced by `pip freeze`.
 botorch==0.17.2
 gpytorch==1.15.2

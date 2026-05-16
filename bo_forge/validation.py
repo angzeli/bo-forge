@@ -26,7 +26,7 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
 
 
 def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
-    """Validate a campaign log DataFrame against the MVP v0.1 schema."""
+    """Validate a campaign log DataFrame against the canonical CSV schema."""
     _validate_columns(config, df)
     if df.empty:
         return

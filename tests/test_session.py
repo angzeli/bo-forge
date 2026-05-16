@@ -1,0 +1,224 @@
+from pathlib import Path
+
+import matplotlib
+import pandas as pd
+import pytest
+
+from bo_forge import CampaignSession
+from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.io import empty_campaign_log
+from bo_forge.logs import append_suggestions, mark_observed
+from bo_forge.validation import canonical_columns
+
+matplotlib.use("Agg")
+
+
+def write_config(path: Path, *, direction: str = "maximize", initial_design_size: int = 2) -> Path:
+    path.write_text(
+        f"""
+campaign_name: session_test
+objective:
+  name: score
+  direction: {direction}
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 5
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
+def config(direction: str = "maximize", initial_design_size: int = 2) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="session_test",
+        objective=ObjectiveConfig(name="score", direction=direction),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            random_seed=5,
+            raw_samples=16,
+            num_restarts=2,
+            mc_samples=16,
+        ),
+    )
+
+
+def observed_log(cfg: CampaignConfig, values: list[float]) -> pd.DataFrame:
+    rows = []
+    for index, value in enumerate(values):
+        rows.append(
+            {
+                "row_id": f"obs_{index}",
+                "iteration": index,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.2 + index * 0.2,
+                "score": value,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
+    if df is None:
+        df = empty_campaign_log(cfg)
+    df.to_csv(path, index=False)
+    return path
+
+
+def summary_value(summary: pd.DataFrame, field: str):
+    matches = summary.loc[summary["field"] == field, "value"]
+    assert len(matches) == 1
+    return matches.iloc[0]
+
+
+def test_from_files_loads_config_and_log(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0]))
+
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    assert campaign.config_path == config_path
+    assert campaign.log_path == log_path
+    assert campaign.config.campaign_name == "session_test"
+    assert len(campaign.df) == 1
+
+
+def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=3)
+    cfg = config(initial_design_size=3)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    summary = campaign.summary()
+
+    assert list(summary.columns) == ["field", "value"]
+    assert summary_value(summary, "campaign_status") == "ready_for_initial_design"
+    assert summary_value(summary, "total_rows") == 0
+    assert summary_value(summary, "observed_rows") == 0
+    assert summary_value(summary, "pending_suggestions") == 0
+    assert summary_value(summary, "initial_design_remaining") == 3
+    assert summary_value(summary, "best_row_id") is None
+    assert summary_value(summary, "best_objective_value") is None
+
+
+def test_summary_status_priority_pending_wins(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=3)
+    cfg = config(initial_design_size=3)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    suggestions = campaign.suggest_next(batch_size=1)
+    campaign.append_suggestions(suggestions)
+
+    assert summary_value(campaign.summary(), "campaign_status") == "has_pending_suggestions"
+    assert len(campaign.pending_suggestions()) == 1
+
+
+def test_summary_ready_for_bo_and_best_maximize(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="maximize")
+    cfg = config(direction="maximize")
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 2.5]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    summary = campaign.summary()
+
+    assert summary_value(summary, "campaign_status") == "ready_for_bo"
+    assert summary_value(summary, "best_row_id") == "obs_1"
+    assert summary_value(summary, "best_objective_value") == pytest.approx(2.5)
+
+
+def test_summary_best_minimize(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="minimize")
+    cfg = config(direction="minimize")
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 0.4]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    summary = campaign.summary()
+
+    assert summary_value(summary, "best_row_id") == "obs_1"
+    assert summary_value(summary, "best_objective_value") == pytest.approx(0.4)
+
+
+def test_suggest_next_does_not_mutate_df_or_disk(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_df = campaign.df.copy(deep=True)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    suggestions = campaign.suggest_next(batch_size=1)
+
+    assert len(suggestions) == 1
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_append_suggestions_and_mark_observed_auto_reload(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    suggestions = campaign.suggest_next(batch_size=1)
+    appended = campaign.append_suggestions(suggestions)
+
+    assert appended is campaign.df
+    assert len(campaign.pending_suggestions()) == 1
+
+    row_id = str(suggestions.loc[0, "row_id"])
+    observed = campaign.mark_observed(row_id, 1.2)
+
+    assert observed is campaign.df
+    assert campaign.pending_suggestions().empty
+    assert campaign.df.loc[campaign.df["row_id"] == row_id, "status"].iloc[0] == "observed"
+    observed_value = float(campaign.df.loc[campaign.df["row_id"] == row_id, "score"].iloc[0])
+    assert observed_value == pytest.approx(1.2)
+
+
+def test_reload_reflects_disk_changes(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    suggestions = campaign.suggest_next(batch_size=1)
+    append_suggestions(log_path, suggestions)
+    mark_observed(log_path, str(suggestions.loc[0, "row_id"]), 0.8)
+
+    reloaded = campaign.reload()
+
+    assert reloaded is campaign.df
+    assert len(campaign.observed_data()) == 1
+    assert float(campaign.df.loc[0, "score"]) == pytest.approx(0.8)
+
+
+def test_plot_methods_return_figure_and_axes_like_objects(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 1.4]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    for result in [campaign.plot_progress(), campaign.plot_diagnostics()]:
+        assert isinstance(result, tuple)
+        assert len(result) >= 2
+        figure, axes_like = result[0], result[1]
+        assert hasattr(figure, "savefig")
+        assert axes_like is not None

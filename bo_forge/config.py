@@ -124,7 +124,7 @@ def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
         if variable_type != "continuous":
             raise ConfigError(
                 f"Variable '{name}' has unsupported type '{variable_type}'. "
-                "MVP v0.1 supports only type='continuous'."
+                "BO Forge currently supports only type='continuous'."
             )
         if name in seen_names:
             raise ConfigError(f"Duplicate variable name '{name}'.")
@@ -157,7 +157,8 @@ def _parse_bo(raw: Any) -> BOConfig:
     acquisition = str(raw.get("acquisition", "log_ei"))
     if acquisition != "log_ei":
         raise ConfigError(
-            f"Unsupported acquisition '{acquisition}'. MVP v0.1 supports only 'log_ei'."
+            f"Unsupported acquisition '{acquisition}'. "
+            "BO Forge currently supports only 'log_ei'."
         )
 
     return BOConfig(

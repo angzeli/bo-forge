@@ -16,9 +16,9 @@ flowchart LR
     v01 -.-> v012
     v01 -.-> v013
     
-    class v01 majorDone
-    class v02 majorNext
-    class v03,v04,v05 majorFuture
+    class v01,v02 majorDone
+    class v03 majorNext
+    class v04,v05 majorFuture
     class v011,v012,v013 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
@@ -27,7 +27,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.1.3`. Next planned milestone: `v0.2`, focused on a higher-level notebook campaign/session workflow.
+Current baseline: `v0.2.0`. Next planned milestone: `v0.3`, focused on a small CLI wrapper around the backend package.
 
 ### Patch Notes So Far
 
@@ -37,10 +37,11 @@ Current baseline: `v0.1.3`. Next planned milestone: `v0.2`, focused on a higher-
 | `v0.1.1` | Patch | README, quickstart, notebook execution support, repo guide |
 | `v0.1.2` | Patch | CSV schema docs, common errors, minimisation + qLogEI batch demo |
 | `v0.1.3` | Patch | Notebook metadata cleanup, docs links, notebook validation test |
+| `v0.2.0` | Major | CampaignSession notebook engine |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
-Status: current
+Status: completed
 
 - Continuous variables only.
 - Single-objective maximize/minimize campaigns.
@@ -55,9 +56,12 @@ Status: current
 
 ## 🧰 v0.2 - Stronger Notebook Engine
 
-- Improve CSV ergonomics for manually edited logs.
-- Add clearer notebook cells for common user mistakes and recovery.
-- Add richer validation summaries before model fitting.
+Status: current
+
+- Add `CampaignSession` as the notebook campaign/session workflow.
+- Support one-object session creation from config + log.
+- Add session summary, pending suggestions, safe appends, safe observed transitions, reloads, and diagnostic plotting.
+- Keep the lower-level backend API unchanged for explicit, testable workflows.
 - Add more diagnostic plots, such as best-by-iteration and pending-vs-observed views.
 - Add example campaigns beyond the simple 2D case.
 - Add optional figure export paths to the notebook workflow.

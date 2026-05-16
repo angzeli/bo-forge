@@ -1,4 +1,4 @@
-"""BO Forge MVP v0.1.3."""
+"""BO Forge v0.2.0."""
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import (
@@ -9,6 +9,7 @@ from bo_forge.errors import (
     SuggestionError,
 )
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
+from bo_forge.session import CampaignSession
 from bo_forge.suggestions import suggest_next
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
@@ -16,6 +17,7 @@ __all__ = [
     "BOConfig",
     "BOForgeError",
     "CampaignConfig",
+    "CampaignSession",
     "ConfigError",
     "LogValidationError",
     "LogWriteError",

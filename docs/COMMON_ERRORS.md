@@ -2,6 +2,17 @@
 
 BO Forge tries to fail early with specific messages. Most errors come from hand-edited YAML or CSV files.
 
+## 🚦 Quick Triage
+
+- `Variable 'temperature' has lower >= upper`: check the YAML `lower` and `upper` values.
+- `Campaign log must start with canonical columns`: make sure the CSV begins with `row_id,iteration,status,source`.
+- `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
+- `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
+- `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `log_ei`, or `qlog_ei`.
+- `Duplicate row_id`: every row needs a unique `row_id`.
+- `Variable ... is outside bounds`: check the variable value against the YAML bounds.
+
 ## ⚙️ Config Errors
 
 ### `Config file must contain a YAML mapping at the top level.`
@@ -39,7 +50,7 @@ direction: minimize
 
 ### `Variable 'catalyst' has unsupported type 'categorical'`
 
-MVP v0.1 supports continuous variables only.
+BO Forge currently supports continuous variables only.
 
 Fix: use `type: continuous`, or wait for categorical support in a later version.
 
@@ -138,8 +149,8 @@ Run this from the repository root:
 ```python
 from bo_forge import CampaignConfig, load_campaign_log, validate_campaign_data
 
-config = CampaignConfig.from_yaml("../configs/simple_2d.yaml")
-df = load_campaign_log("../examples/simple_2d_campaign_log.csv", config)
+config = CampaignConfig.from_yaml("configs/simple_2d.yaml")
+df = load_campaign_log("examples/simple_2d_campaign_log.csv", config)
 validate_campaign_data(config, df)
 ```
 
