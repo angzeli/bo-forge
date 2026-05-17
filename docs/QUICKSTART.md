@@ -40,18 +40,20 @@ import shutil
 
 from bo_forge.session import CampaignSession
 
-seed_log_path = Path("examples/simple_2d_campaign_log.csv")
-log_path = Path("examples/simple_2d_working_log.csv")
+seed_log_path = Path("examples/simple_2d_maximise_logei_campaign_log.csv")
+log_path = Path("examples/simple_2d_maximise_logei_working_log.csv")
 shutil.copyfile(seed_log_path, log_path)
 
 campaign = CampaignSession.from_files(
-    config_path="configs/simple_2d.yaml",
+    config_path="configs/simple_2d_maximise_logei.yaml",
     log_path=log_path,
 )
 
 campaign.validate()
 campaign.summary()
 campaign.next_action()
+campaign.report()
+campaign.export_report("reports/latest_campaign_report.txt")
 
 suggestions = campaign.suggest_next(batch_size=1)
 campaign.append_suggestions(suggestions)
@@ -76,6 +78,8 @@ campaign.plot_progress()
 | `campaign.pending_suggestions()` | Return unresolved `status='suggested'` rows. |
 | `campaign.campaign_status()` | Return the current campaign status without mutating state or writing to disk. |
 | `campaign.next_action()` | Return a one-row advisory DataFrame with campaign status, recommended action, reason, and suggested calls. |
+| `campaign.report()` | Return read-only report tables for summary, next action, best observation, and pending suggestions. |
+| `campaign.export_report(path)` | Write a deterministic plain-text campaign report and return the written path. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
@@ -100,9 +104,9 @@ from bo_forge import (
     suggest_next,
 )
 
-config = CampaignConfig.from_yaml("configs/simple_2d.yaml")
-seed_log_path = Path("examples/simple_2d_campaign_log.csv")
-log_path = Path("examples/simple_2d_working_log.csv")
+config = CampaignConfig.from_yaml("configs/simple_2d_maximise_logei.yaml")
+seed_log_path = Path("examples/simple_2d_maximise_logei_campaign_log.csv")
+log_path = Path("examples/simple_2d_maximise_logei_working_log.csv")
 shutil.copyfile(seed_log_path, log_path)
 
 df = load_campaign_log(log_path, config)
@@ -115,14 +119,14 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 
 ## ⚙️ Example Configs
 
-- `configs/simple_2d.yaml`: maximises photocatalyst-style `activity`.
-- `configs/simple_2d_minimise.yaml`: minimises process `defect_rate`.
+- `configs/simple_2d_maximise_logei.yaml`: maximises photocatalyst-style `activity`.
+- `configs/simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
 
 ## 📓 Example Notebooks
 
-Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/simple_2d.yaml` and `examples/simple_2d_campaign_log.csv`.
+Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/simple_2d_maximise_logei.yaml` and `examples/simple_2d_maximise_logei_campaign_log.csv`.
 
-Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimise.yaml` and `examples/simple_2d_minimise_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
+Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimise_qlogei.yaml` and `examples/simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
 
 From a fresh clone:
 
@@ -143,8 +147,8 @@ The main notebook demonstrates the real sequential workflow:
 
 The notebooks write only ignored working files:
 
-- `examples/simple_2d_working_log.csv`
-- `examples/simple_2d_minimise_working_log.csv`
+- `examples/simple_2d_maximise_logei_working_log.csv`
+- `examples/simple_2d_minimise_qlogei_working_log.csv`
 - `examples/latest_suggestions.csv`
 
 ## 📊 Diagnostics

@@ -149,6 +149,35 @@ class CampaignSession:
             columns=["campaign_status", "action", "reason", "suggested_call"],
         )
 
+    def report(self) -> dict[str, pd.DataFrame]:
+        """Return read-only campaign report tables for notebook display."""
+        return {
+            "summary": self.summary(),
+            "next_action": self.next_action(),
+            "best_observation": self.best_observation(),
+            "pending_suggestions": self.pending_suggestions(),
+        }
+
+    def export_report(self, path: str | Path) -> Path:
+        """Write a deterministic plain-text campaign report and return its path."""
+        report_path = Path(path)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        tables = self.report()
+        text = "\n\n".join(
+            [
+                "BO Forge Campaign Report\n========================",
+                "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
+                "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+                "Best Observation\n----------------\n\n" + _format_best_observation(
+                    tables["best_observation"]
+                ),
+                "Pending Suggestions\n-------------------\n\n"
+                + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
+            ]
+        )
+        report_path.write_text(text + "\n", encoding="utf-8")
+        return report_path
+
     def best_observation(self) -> pd.DataFrame:
         """Return the best observed row as a canonical-order copy."""
         observed = self.observed_data()
@@ -185,3 +214,42 @@ class CampaignSession:
     def plot_diagnostics(self, **kwargs: Any) -> Any:
         """Plot campaign diagnostics and return figure/axes objects."""
         return _plot_diagnostics(self.config, self.df, **kwargs)
+
+
+def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
+    if df.empty:
+        return empty_message
+    return df.to_string(index=False)
+
+
+def _format_next_action(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "No next action available."
+
+    row = df.iloc[0]
+    suggested_calls = [
+        call.strip() for call in str(row["suggested_call"]).split(";") if call.strip()
+    ]
+    lines = [
+        f"Campaign status: {_format_report_value(row['campaign_status'])}",
+        f"Action: {_format_report_value(row['action'])}",
+        "Reason:",
+        f"  {_format_report_value(row['reason'])}",
+        "Suggested call:",
+    ]
+    lines.extend(f"  {call}" for call in suggested_calls)
+    return "\n".join(lines)
+
+
+def _format_best_observation(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "No best observation yet."
+
+    row = df.iloc[0]
+    return "\n".join(f"{column}: {_format_report_value(row[column])}" for column in df.columns)
+
+
+def _format_report_value(value: Any) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value)

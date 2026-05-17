@@ -8,7 +8,7 @@ BO Forge campaign logs are plain CSV files. The schema is deliberately strict so
 row_id,iteration,status,source,<variable columns...>,<objective column>,predicted_mean,predicted_std,acquisition
 ```
 
-For `configs/simple_2d.yaml`, the concrete columns are:
+For `configs/simple_2d_maximise_logei.yaml`, the concrete columns are:
 
 ```text
 row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,predicted_mean,predicted_std,acquisition
@@ -52,7 +52,7 @@ Use `mark_observed()`:
 from bo_forge import mark_observed
 
 mark_observed(
-    "../examples/simple_2d_working_log.csv",
+    "../examples/simple_2d_maximise_logei_working_log.csv",
     row_id="suggested_row_id_here",
     objective_value=1.95,
 )

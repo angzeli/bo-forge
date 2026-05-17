@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.2.2
+# 🧪 BO Forge v0.2.3
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool. The notebook is the user workflow, while the reusable BO logic lives in the `bo_forge` Python package.
 
-v0.2 adds a `CampaignSession` notebook engine: define a problem, load a CSV log, validate and summarise campaign state, suggest experiments, enter results, reload from disk, and plot progress through one reusable object. v0.2.2 adds a read-only `next_action()` helper for notebook guidance.
+v0.2 adds a `CampaignSession` notebook engine: define a problem, load a CSV log, validate and summarise campaign state, suggest experiments, enter results, reload from disk, and plot progress through one reusable object. v0.2.3 adds read-only campaign report helpers.
 
 BO Forge deliberately supports only:
 
@@ -18,6 +18,8 @@ BO Forge deliberately supports only:
 - a notebook-first `CampaignSession` workflow
 
 It intentionally does not yet cover categorical variables, constraints, noisy BO, multi-objective optimisation, a CLI, or an app UI.
+
+---
 
 ## 🔁 Workflow
 
@@ -41,6 +43,8 @@ The app/UI layer is intentionally absent in this MVP.
 
 Future interfaces should wrap this backend package rather than moving BO logic into notebooks or app code.
 
+---
+
 ## 🗂️ Repository Structure
 
 ```text
@@ -52,6 +56,7 @@ bo-forge/
 ├── docs/           # quickstart, schema, troubleshooting, repo guide
 └── tests/          # pytest coverage
 ```
+---
 
 ## 📚 Documentation
 
@@ -61,9 +66,15 @@ bo-forge/
 - [docs/REPOSITORY_STRUCTURE.md](docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
 - [ROADMAP.md](ROADMAP.md): completed milestones and planned direction.
 
+---
+
 ## 📌 Tested Versions
 
-The primary dependency source is `pyproject.toml`. A direct-dependency snapshot from the v0.2.2 environment is recorded in `requirements-lock.txt`.
+The primary dependency source is `pyproject.toml`.
+
+A direct-dependency snapshot from the v0.2.3 environment is recorded in `requirements-lock.txt`.
+
+---
 
 ## 👤 Author 
 

@@ -149,8 +149,8 @@ Run this from the repository root:
 ```python
 from bo_forge import CampaignConfig, load_campaign_log, validate_campaign_data
 
-config = CampaignConfig.from_yaml("configs/simple_2d.yaml")
-df = load_campaign_log("examples/simple_2d_campaign_log.csv", config)
+config = CampaignConfig.from_yaml("configs/simple_2d_maximise_logei.yaml")
+df = load_campaign_log("examples/simple_2d_maximise_logei_campaign_log.csv", config)
 validate_campaign_data(config, df)
 ```
 

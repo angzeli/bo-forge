@@ -266,6 +266,74 @@ def test_read_only_helpers_do_not_mutate_df_or_disk(tmp_path: Path) -> None:
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 
+def test_report_returns_read_only_dataframes(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="maximize")
+    cfg = config(direction="maximize")
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 2.5]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_df = campaign.df.copy(deep=True)
+    before_csv = log_path.read_text(encoding="utf-8")
+    before_paths = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*"))
+
+    report = campaign.report()
+
+    assert list(report) == ["summary", "next_action", "best_observation", "pending_suggestions"]
+    assert all(isinstance(value, pd.DataFrame) for value in report.values())
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+    assert log_path.read_text(encoding="utf-8") == before_csv
+    assert sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*")) == before_paths
+
+
+def test_export_report_writes_text_to_nested_path_without_mutating_campaign(
+    tmp_path: Path,
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="maximize")
+    cfg = config(direction="maximize")
+    df = pd.concat([observed_log(cfg, [1.0, 2.5]), pending_log(cfg)], ignore_index=True)
+    log_path = write_log(tmp_path / "campaign.csv", cfg, df)
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_df = campaign.df.copy(deep=True)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    report_path = campaign.export_report(tmp_path / "reports" / "latest_campaign_report.txt")
+
+    assert report_path == tmp_path / "reports" / "latest_campaign_report.txt"
+    assert report_path.exists()
+    text = report_path.read_text(encoding="utf-8")
+    assert "BO Forge Campaign Report\n========================" in text
+    assert "Summary\n-------" in text
+    assert "Next Action\n-----------" in text
+    assert "Best Observation\n----------------" in text
+    assert "Pending Suggestions\n-------------------" in text
+    assert "Campaign status: has_pending_suggestions" in text
+    assert "Action: resolve_pending_suggestions" in text
+    assert "Reason:\n  There are unresolved suggested rows" in text
+    assert "Suggested call:\n  campaign.pending_suggestions()" in text
+    assert "objective" in text
+    assert "score" in text
+    assert "observed_rows" in text
+    assert "pending_suggestions" in text
+    assert "row_id: obs_1" in text
+    assert "status: observed" in text
+    assert "score: 2.5" in text
+    assert "pending_0" in text
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_export_report_renders_empty_sections(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=3)
+    cfg = config(initial_design_size=3)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    report_path = campaign.export_report(tmp_path / "report.txt")
+    text = report_path.read_text(encoding="utf-8")
+
+    assert "No best observation yet." in text
+    assert "No pending suggestions." in text
+
+
 def test_suggest_next_does_not_mutate_df_or_disk(tmp_path: Path) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
     cfg = config()

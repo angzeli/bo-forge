@@ -41,7 +41,7 @@ bo:
 
 
 def test_example_minimize_config_parses() -> None:
-    config = CampaignConfig.from_yaml("configs/simple_2d_minimise.yaml")
+    config = CampaignConfig.from_yaml("configs/simple_2d_minimise_qlogei.yaml")
 
     assert config.campaign_name == "process_defect_minimisation"
     assert config.objective.name == "defect_rate"

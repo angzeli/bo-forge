@@ -75,12 +75,12 @@ Run checks before committing:
 
 A campaign needs two files:
 
-- A YAML config in `configs/`, such as `configs/simple_2d.yaml`.
+- A YAML config in `configs/`, such as `configs/simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/simple_2d_minimise.yaml` as a small minimisation example.
+The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example.
 
-The seed log in `examples/simple_2d_campaign_log.csv` should remain small and clean. Example scripts and notebooks copy it to ignored working logs before making changes, so the committed seed data stays reproducible.
+The seed log in `examples/simple_2d_maximise_logei_campaign_log.csv` should remain small and clean. Example scripts and notebooks copy it to ignored working logs before making changes, so the committed seed data stays reproducible.
 
 ## 🧭 Development Rules
 
