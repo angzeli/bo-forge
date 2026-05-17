@@ -9,6 +9,7 @@ __pycache__/
 .ruff_cache/
 .matplotlib-cache/
 .ipynb_checkpoints/
+graphify-out/
 dist/
 build/
 examples/*_working_log.csv

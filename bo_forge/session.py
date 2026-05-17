@@ -21,7 +21,12 @@ from bo_forge.logs import (
     mark_observed as _mark_observed,
 )
 from bo_forge.suggestions import suggest_next as _suggest_next
-from bo_forge.validation import get_observed_data, next_iteration, validate_campaign_data
+from bo_forge.validation import (
+    canonical_columns,
+    get_observed_data,
+    next_iteration,
+    validate_campaign_data,
+)
 
 
 @dataclass
@@ -64,11 +69,17 @@ class CampaignSession:
         observed_count = len(observed)
         pending_count = len(pending)
         initial_design_remaining = max(self.config.bo.initial_design_size - observed_count, 0)
-        best_row_id, best_objective_value = self._best_observation(observed)
+        best = self.best_observation()
+        if best.empty:
+            best_row_id = None
+            best_objective_value = None
+        else:
+            best_row_id = str(best["row_id"].iloc[0])
+            best_objective_value = float(best[self.config.objective.name].iloc[0])
 
         rows = [
             ("campaign_name", self.config.campaign_name),
-            ("campaign_status", self._campaign_status(observed_count, pending_count)),
+            ("campaign_status", self.campaign_status()),
             ("objective", self.config.objective.name),
             ("direction", self.config.objective.direction),
             ("total_rows", len(self.df)),
@@ -89,6 +100,32 @@ class CampaignSession:
         """Return unresolved suggestions from the current session DataFrame."""
         self.validate()
         return self.df.loc[self.df["status"] == "suggested"].copy()
+
+    def campaign_status(self) -> str:
+        """Return the current campaign status without mutating session state."""
+        self.validate()
+        pending_count = int((self.df["status"] == "suggested").sum())
+        observed_count = int((self.df["status"] == "observed").sum())
+        if pending_count > 0:
+            return "has_pending_suggestions"
+        if observed_count < self.config.bo.initial_design_size:
+            return "ready_for_initial_design"
+        return "ready_for_bo"
+
+    def best_observation(self) -> pd.DataFrame:
+        """Return the best observed row as a canonical-order copy."""
+        observed = self.observed_data()
+        columns = canonical_columns(self.config)
+        if observed.empty:
+            return pd.DataFrame(columns=columns)
+
+        objective = self.config.objective.name
+        values = pd.to_numeric(observed[objective])
+        if self.config.objective.direction == "maximize":
+            best_index = values.idxmax()
+        else:
+            best_index = values.idxmin()
+        return observed.loc[[best_index], columns].copy()
 
     def suggest_next(self, batch_size: int | None = None) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
@@ -111,22 +148,3 @@ class CampaignSession:
     def plot_diagnostics(self, **kwargs: Any) -> Any:
         """Plot campaign diagnostics and return figure/axes objects."""
         return _plot_diagnostics(self.config, self.df, **kwargs)
-
-    def _campaign_status(self, observed_count: int, pending_count: int) -> str:
-        if pending_count > 0:
-            return "has_pending_suggestions"
-        if observed_count < self.config.bo.initial_design_size:
-            return "ready_for_initial_design"
-        return "ready_for_bo"
-
-    def _best_observation(self, observed: pd.DataFrame) -> tuple[str | None, float | None]:
-        if observed.empty:
-            return None, None
-
-        objective = self.config.objective.name
-        values = pd.to_numeric(observed[objective])
-        if self.config.objective.direction == "maximize":
-            best_index = values.idxmax()
-        else:
-            best_index = values.idxmin()
-        return str(observed.loc[best_index, "row_id"]), float(values.loc[best_index])

@@ -109,6 +109,7 @@ def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> Non
     summary = campaign.summary()
 
     assert list(summary.columns) == ["field", "value"]
+    assert campaign.campaign_status() == "ready_for_initial_design"
     assert summary_value(summary, "campaign_status") == "ready_for_initial_design"
     assert summary_value(summary, "total_rows") == 0
     assert summary_value(summary, "observed_rows") == 0
@@ -116,6 +117,10 @@ def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> Non
     assert summary_value(summary, "initial_design_remaining") == 3
     assert summary_value(summary, "best_row_id") is None
     assert summary_value(summary, "best_objective_value") is None
+    pd.testing.assert_frame_equal(
+        campaign.best_observation(),
+        pd.DataFrame(columns=canonical_columns(campaign.config)),
+    )
 
 
 def test_summary_status_priority_pending_wins(tmp_path: Path) -> None:
@@ -127,6 +132,7 @@ def test_summary_status_priority_pending_wins(tmp_path: Path) -> None:
     suggestions = campaign.suggest_next(batch_size=1)
     campaign.append_suggestions(suggestions)
 
+    assert campaign.campaign_status() == "has_pending_suggestions"
     assert summary_value(campaign.summary(), "campaign_status") == "has_pending_suggestions"
     assert len(campaign.pending_suggestions()) == 1
 
@@ -138,10 +144,15 @@ def test_summary_ready_for_bo_and_best_maximize(tmp_path: Path) -> None:
     campaign = CampaignSession.from_files(config_path, log_path)
 
     summary = campaign.summary()
+    best = campaign.best_observation()
 
+    assert campaign.campaign_status() == "ready_for_bo"
     assert summary_value(summary, "campaign_status") == "ready_for_bo"
     assert summary_value(summary, "best_row_id") == "obs_1"
     assert summary_value(summary, "best_objective_value") == pytest.approx(2.5)
+    assert list(best.columns) == canonical_columns(campaign.config)
+    assert best["row_id"].iloc[0] == "obs_1"
+    assert float(best["score"].iloc[0]) == pytest.approx(2.5)
 
 
 def test_summary_best_minimize(tmp_path: Path) -> None:
@@ -151,9 +162,39 @@ def test_summary_best_minimize(tmp_path: Path) -> None:
     campaign = CampaignSession.from_files(config_path, log_path)
 
     summary = campaign.summary()
+    best = campaign.best_observation()
 
     assert summary_value(summary, "best_row_id") == "obs_1"
     assert summary_value(summary, "best_objective_value") == pytest.approx(0.4)
+    assert best["row_id"].iloc[0] == "obs_1"
+    assert float(best["score"].iloc[0]) == pytest.approx(0.4)
+
+
+def test_best_observation_returns_copy(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="maximize")
+    cfg = config(direction="maximize")
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 2.5]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    best = campaign.best_observation()
+    best.loc[best.index[0], "score"] = 99.0
+
+    assert float(campaign.df.loc[campaign.df["row_id"] == "obs_1", "score"].iloc[0]) == 2.5
+
+
+def test_read_only_helpers_do_not_mutate_df_or_disk(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", direction="maximize")
+    cfg = config(direction="maximize")
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 2.5]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_df = campaign.df.copy(deep=True)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert campaign.campaign_status() == "ready_for_bo"
+    assert not campaign.best_observation().empty
+
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+    assert log_path.read_text(encoding="utf-8") == before_csv
 
 
 def test_suggest_next_does_not_mutate_df_or_disk(tmp_path: Path) -> None:

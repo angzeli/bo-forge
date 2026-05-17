@@ -73,6 +73,8 @@ campaign.plot_progress()
 | `campaign.summary()` | Return a two-column DataFrame with campaign counts, status, and best observation. |
 | `campaign.observed_data()` | Return observed rows used for model fitting. |
 | `campaign.pending_suggestions()` | Return unresolved `status='suggested'` rows. |
+| `campaign.campaign_status()` | Return the current campaign status without mutating state or writing to disk. |
+| `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
 | `campaign.mark_observed(row_id, objective_value)` | Mark one pending suggestion observed, write the result, and refresh `campaign.df`. |
