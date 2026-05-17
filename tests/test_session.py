@@ -119,6 +119,21 @@ def test_from_files_loads_config_and_log(tmp_path: Path) -> None:
     assert len(campaign.df) == 1
 
 
+def test_from_files_loads_3d_example_campaign() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/simple_3d_maximise_logei.yaml",
+        "examples/simple_3d_maximise_logei_campaign_log.csv",
+    )
+
+    assert campaign.config.campaign_name == "three_variable_photocatalyst"
+    assert campaign.config.variable_names == [
+        "precursor_ratio",
+        "annealing_temperature",
+        "electrolyte_concentration",
+    ]
+    assert len(campaign.df) == 4
+
+
 def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> None:
     config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=3)
     cfg = config(initial_design_size=3)
@@ -400,3 +415,22 @@ def test_plot_methods_return_figure_and_axes_like_objects(tmp_path: Path) -> Non
         figure, axes_like = result[0], result[1]
         assert hasattr(figure, "savefig")
         assert axes_like is not None
+
+
+def test_plot_methods_save_paths_do_not_mutate_df_or_disk(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 1.4]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_df = campaign.df.copy(deep=True)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    progress = campaign.plot_progress(save_path=tmp_path / "reports" / "progress.png")
+    diagnostics = campaign.plot_diagnostics(save_path=tmp_path / "reports" / "diagnostics.png")
+
+    assert (tmp_path / "reports" / "progress.png").exists()
+    assert (tmp_path / "reports" / "diagnostics.png").exists()
+    assert hasattr(progress[0], "savefig")
+    assert hasattr(diagnostics[0], "savefig")
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+    assert log_path.read_text(encoding="utf-8") == before_csv

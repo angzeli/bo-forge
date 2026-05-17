@@ -14,6 +14,7 @@ flowchart LR
     v021["v0.2.1<br/>Session API polish"]
     v022["v0.2.2<br/>Next action helper"]
     v023["v0.2.3<br/>Campaign report helper"]
+    v024["v0.2.4<br/>3D diagnostics"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -21,11 +22,12 @@ flowchart LR
     v02 -.-> v021
     v02 -.-> v022
     v02 -.-> v023
+    v02 -.-> v024
     
     class v01,v02 majorDone
     class v03 majorNext
     class v04,v05 majorFuture
-    class v011,v012,v013,v021,v022,v023 patchDone
+    class v011,v012,v013,v021,v022,v023,v024 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -33,7 +35,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.2.3`. Next planned milestone: `v0.3`, focused on a small CLI wrapper around the backend package.
+Current baseline: `v0.2.4`. Next planned milestone: `v0.3`, focused on a small CLI wrapper around the backend package.
 
 ### Patch Notes So Far
 
@@ -47,6 +49,7 @@ Current baseline: `v0.2.3`. Next planned milestone: `v0.3`, focused on a small C
 | `v0.2.1` | Patch | Read-only session API helpers and notebook hygiene guards |
 | `v0.2.2` | Patch | Read-only next-action guidance for notebook campaign loops |
 | `v0.2.3` | Patch | Read-only campaign report helper |
+| `v0.2.4` | Patch | 3D example, higher-dimensional diagnostics, and figure export paths |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -73,10 +76,9 @@ Status: current
 - Add read-only `campaign_status()` and `best_observation()` helpers.
 - Add read-only `next_action()` guidance for notebook campaign loops.
 - Add read-only `report()` and `export_report()` helpers for notebook summaries.
-- Keep the lower-level backend API unchanged for explicit, testable workflows.
-- Add more diagnostic plots, such as best-by-iteration and pending-vs-observed views.
-- Add example campaigns beyond the simple 2D case.
+- Add a 3D continuous example and dimension-aware diagnostics.
 - Add optional figure export paths to the notebook workflow.
+- Keep the lower-level backend API unchanged for explicit, testable workflows.
 
 ## 💻 v0.3 - CLI Workflow
 

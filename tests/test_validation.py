@@ -3,6 +3,7 @@ import pytest
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import LogValidationError
+from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns, validate_campaign_data
 
 
@@ -55,6 +56,18 @@ def test_validate_campaign_data_accepts_valid_log() -> None:
     validate_campaign_data(config(), valid_df())
 
 
+def test_validate_campaign_data_accepts_3d_example_log() -> None:
+    config_3d = CampaignConfig.from_yaml("configs/simple_3d_maximise_logei.yaml")
+    df = load_campaign_log("examples/simple_3d_maximise_logei_campaign_log.csv", config_3d)
+
+    validate_campaign_data(config_3d, df)
+    assert config_3d.variable_names == [
+        "precursor_ratio",
+        "annealing_temperature",
+        "electrolyte_concentration",
+    ]
+
+
 def test_validate_campaign_data_rejects_missing_column() -> None:
     df = valid_df().drop(columns=["source"])
 
@@ -100,4 +113,3 @@ def test_validate_campaign_data_rejects_invalid_source() -> None:
 
     with pytest.raises(LogValidationError, match="invalid source 'random'"):
         validate_campaign_data(config(), df)
-

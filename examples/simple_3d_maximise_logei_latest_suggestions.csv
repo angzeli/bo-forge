@@ -1,0 +1,2 @@
+row_id,iteration,status,source,precursor_ratio,annealing_temperature,electrolyte_concentration,activity,predicted_mean,predicted_std,acquisition
+87ca3ffb90164875a67473d02cb72758,1,suggested,sobol,0.08544972538948059,330.8129321783781,0.9058132380247116,,,,

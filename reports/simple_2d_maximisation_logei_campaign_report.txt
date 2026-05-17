@@ -1,0 +1,48 @@
+BO Forge Campaign Report
+========================
+
+Summary
+-------
+
+                   field                 value
+           campaign_name photocatalyst_loading
+         campaign_status          ready_for_bo
+               objective              activity
+               direction              maximize
+              total_rows                    10
+           observed_rows                    10
+     pending_suggestions                     0
+initial_design_remaining                     0
+          next_iteration                     9
+             best_row_id            manual_001
+    best_objective_value                  1.82
+
+Next Action
+-----------
+
+Campaign status: ready_for_bo
+Action: suggest_bo
+Reason:
+  Initial design is complete and no pending suggestions remain.
+Suggested call:
+  suggestions = campaign.suggest_next(batch_size=...)
+  campaign.append_suggestions(suggestions)
+
+Best Observation
+----------------
+
+row_id: manual_001
+iteration: 0
+status: observed
+source: manual
+precursor_ratio: 0.6999999999999998
+annealing_temperature: 650.0
+activity: 1.82
+predicted_mean: 
+predicted_std: 
+acquisition: 
+
+Pending Suggestions
+-------------------
+
+No pending suggestions.

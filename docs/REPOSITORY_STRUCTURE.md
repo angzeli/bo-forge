@@ -8,21 +8,26 @@ This repository is organised around one rule: the Bayesian optimisation engine l
 bo-forge/
 ├── bo_forge/                         # Reusable backend package
 ├── configs/                          # YAML campaign definitions
-├── examples/                         # Seed logs and runnable examples
+├── examples/                         # Seed CSV logs and runnable scripts
 ├── notebooks/                        # Notebook-first campaign workflows
-├── tests/                            # Pytest coverage for package behavior
+├── reports/                          # Generated local reports and figures
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── QUICKSTART.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   └── REPOSITORY_STRUCTURE.md
+├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
 ├── ROADMAP.md                        # Completed milestones and planned direction
 ├── pyproject.toml                    # Package metadata and dependencies
+├── requirements-lock.txt             # Tested direct dependency snapshot
+├── LICENSE                           # Project license
 └── .gitignore                        # Local artifacts excluded from Git
 ```
 
 The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It is reference material, not package source.
+
+`reports/` is for local outputs created by notebooks, such as campaign reports and diagnostic figures. It is not source data.
 
 ## 📦 Backend Package
 
@@ -52,7 +57,7 @@ python3 -m venv .venv
 ./.venv/bin/pip install -e ".[dev]"
 ```
 
-Run the clean quickstart:
+Run the clean quickstart script:
 
 ```bash
 ./.venv/bin/python examples/quickstart.py
@@ -78,9 +83,9 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example.
+The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example and `configs/simple_3d_maximise_logei.yaml` as a three-variable continuous example.
 
-The seed log in `examples/simple_2d_maximise_logei_campaign_log.csv` should remain small and clean. Example scripts and notebooks copy it to ignored working logs before making changes, so the committed seed data stays reproducible.
+Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 
 ## 🧭 Development Rules
 
@@ -90,3 +95,4 @@ The seed log in `examples/simple_2d_maximise_logei_campaign_log.csv` should rema
 - Prefer single-purpose functions with clear error messages.
 - Add tests when changing validation, log transitions, or suggestion behavior.
 - Do not commit `.venv/`, notebook checkpoints, generated working logs, or `PyTorch & BoTorch/`.
+- Put generated reports and figure exports under `reports/`.

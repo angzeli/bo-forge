@@ -1,0 +1,29 @@
+campaign_name: three_variable_photocatalyst
+objective:
+  name: activity
+  direction: maximize
+
+variables:
+  - name: precursor_ratio
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+
+  - name: annealing_temperature
+    type: continuous
+    lower: 300.0
+    upper: 800.0
+
+  - name: electrolyte_concentration
+    type: continuous
+    lower: 0.1
+    upper: 2.0
+
+bo:
+  batch_size: 1
+  initial_design_size: 8
+  acquisition: log_ei
+  random_seed: 31
+  raw_samples: 128
+  num_restarts: 5
+  mc_samples: 128

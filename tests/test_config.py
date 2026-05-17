@@ -51,6 +51,20 @@ def test_example_minimize_config_parses() -> None:
     assert config.bo.batch_size == 2
 
 
+def test_example_3d_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/simple_3d_maximise_logei.yaml")
+
+    assert config.campaign_name == "three_variable_photocatalyst"
+    assert config.objective.name == "activity"
+    assert config.objective.direction == "maximize"
+    assert config.variable_names == [
+        "precursor_ratio",
+        "annealing_temperature",
+        "electrolyte_concentration",
+    ]
+    assert config.bo.batch_size == 1
+
+
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",

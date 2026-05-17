@@ -12,5 +12,3 @@ __pycache__/
 graphify-out/
 dist/
 build/
-examples/*_working_log.csv
-examples/latest_suggestions.csv

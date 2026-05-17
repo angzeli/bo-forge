@@ -1,0 +1,2 @@
+row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,predicted_mean,predicted_std,acquisition
+8074a14c0ce74a19aaa022a85147079b,8,suggested,log_ei,0.0,800.0,,1.753558627755416,0.43470510270173296,-1.950357161425289

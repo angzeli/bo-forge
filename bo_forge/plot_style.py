@@ -45,7 +45,7 @@ def new_figure(figsize: tuple[float, float] = FIGSIZE) -> tuple[Any, Any]:
     return fig, ax
 
 
-def style_axes(ax: Any) -> Any:
+def style_axes(ax: Any, *, tick_label_size: int = TICK_LABEL_SIZE) -> Any:
     """Apply common axis styling used throughout BO Forge diagnostics."""
     configure_plot_style()
     ax.figure.patch.set_facecolor("white")
@@ -55,7 +55,7 @@ def style_axes(ax: Any) -> Any:
         spine.set_linewidth(SPINE_WIDTH)
         spine.set_color("black")
 
-    ax.tick_params(axis="both", labelsize=TICK_LABEL_SIZE, colors="black")
+    ax.tick_params(axis="both", labelsize=tick_label_size, colors="black")
     ax.xaxis.label.set_color("black")
     ax.yaxis.label.set_color("black")
     ax.title.set_color("black")
@@ -169,29 +169,91 @@ def finalise_figure(
     *,
     filename: str | Path | None = None,
     fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
     dpi: int = 300,
     show: bool = False,
+    tick_label_size: int = TICK_LABEL_SIZE,
 ) -> tuple[Any, Any]:
     """Apply final formatting, optionally save, and return the figure and axes."""
-    style_axes(ax)
+    style_axes(ax, tick_label_size=tick_label_size)
     ax.figure.patch.set_facecolor("white")
     ax.set_facecolor("white")
     ax.figure.tight_layout()
 
-    if filename is not None:
-        save_path = Path(filename)
-        if not save_path.parent or str(save_path.parent) == ".":
-            save_path = Path(fig_folder) / save_path
-        os.makedirs(save_path.parent, exist_ok=True)
-        ax.figure.savefig(
-            save_path,
-            dpi=dpi,
-            bbox_inches="tight",
-            facecolor="white",
-            transparent=False,
-        )
+    _save_figure(
+        ax.figure,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        dpi=dpi,
+    )
 
     if show:
         plt.show()
 
     return ax.figure, ax
+
+
+def finalise_axes(
+    fig: Any,
+    axes: Any,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    dpi: int = 300,
+    show: bool = False,
+    tick_label_size: int = TICK_LABEL_SIZE,
+) -> tuple[Any, Any]:
+    """Apply final formatting to multiple axes, optionally save, and return them."""
+    for ax in _iter_axes(axes):
+        style_axes(ax, tick_label_size=tick_label_size)
+    fig.patch.set_facecolor("white")
+    if not (hasattr(fig, "get_constrained_layout") and fig.get_constrained_layout()):
+        fig.tight_layout()
+    _save_figure(
+        fig,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        dpi=dpi,
+    )
+    if show:
+        plt.show()
+    return fig, axes
+
+
+def _iter_axes(axes: Any) -> list[Any]:
+    if isinstance(axes, (list, tuple)):
+        result = []
+        for item in axes:
+            result.extend(_iter_axes(item))
+        return result
+    if hasattr(axes, "flat"):
+        return list(axes.flat)
+    return [axes]
+
+
+def _save_figure(
+    fig: Any,
+    *,
+    filename: str | Path | None,
+    fig_folder: str | Path,
+    save_path: str | Path | None,
+    dpi: int,
+) -> Path | None:
+    if filename is not None and save_path is not None:
+        raise ValueError("Pass either filename or save_path, not both.")
+    if save_path is None and filename is None:
+        return None
+
+    path = Path(save_path) if save_path is not None else Path(fig_folder) / Path(filename)
+    os.makedirs(path.parent, exist_ok=True)
+    fig.savefig(
+        path,
+        dpi=dpi,
+        bbox_inches="tight",
+        facecolor="white",
+        transparent=False,
+    )
+    return path

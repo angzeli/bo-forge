@@ -14,7 +14,7 @@ Summary
      pending_suggestions                                0
 initial_design_remaining                                0
           next_iteration                                8
-             best_row_id 3010270826e44c7482985bd7891fbf18
+             best_row_id e9c0cffa392d48459084aacb7dec9d45
     best_objective_value                         0.081086
 
 Next Action
@@ -31,7 +31,7 @@ Suggested call:
 Best Observation
 ----------------
 
-row_id: 3010270826e44c7482985bd7891fbf18
+row_id: e9c0cffa392d48459084aacb7dec9d45
 iteration: 7
 status: observed
 source: qlog_ei

@@ -64,7 +64,8 @@ campaign.mark_observed(
     objective_value=1.95,
 )
 
-campaign.plot_progress()
+campaign.plot_progress(save_path="reports/progress.png")
+campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 ```
 
 `suggest_next()` does not mutate the session or write to disk. `append_suggestions()`, `mark_observed()`, and `reload()` refresh `campaign.df`.
@@ -85,8 +86,8 @@ campaign.plot_progress()
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
 | `campaign.mark_observed(row_id, objective_value)` | Mark one pending suggestion observed, write the result, and refresh `campaign.df`. |
 | `campaign.reload()` | Reload the CSV log from disk into `campaign.df`. |
-| `campaign.plot_progress()` | Plot objective and best-so-far progress; returns figure/axes objects. |
-| `campaign.plot_diagnostics()` | Plot basic observed design-space diagnostics; returns figure/axes objects. |
+| `campaign.plot_progress(save_path=None)` | Plot objective and best-so-far progress; returns figure/axes objects. |
+| `campaign.plot_diagnostics(save_path=None)` | Plot dimension-aware diagnostics; returns figure/axes objects. |
 
 ## 🧱 Lower-Level API
 
@@ -121,12 +122,15 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 
 - `configs/simple_2d_maximise_logei.yaml`: maximises photocatalyst-style `activity`.
 - `configs/simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
+- `configs/simple_3d_maximise_logei.yaml`: maximises a three-variable synthetic activity.
 
 ## 📓 Example Notebooks
 
 Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/simple_2d_maximise_logei.yaml` and `examples/simple_2d_maximise_logei_campaign_log.csv`.
 
 Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimise_qlogei.yaml` and `examples/simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
+
+Open `notebooks/03_three_variable_campaign.ipynb` for a compact 3D continuous campaign and the higher-dimensional diagnostic view.
 
 From a fresh clone:
 
@@ -149,16 +153,24 @@ The notebooks write only ignored working files:
 
 - `examples/simple_2d_maximise_logei_working_log.csv`
 - `examples/simple_2d_minimise_qlogei_working_log.csv`
+- `examples/simple_3d_maximise_logei_working_log.csv`
 - `examples/latest_suggestions.csv`
+
+Generated reports and figure exports should go under ignored paths such as `reports/`.
 
 ## 📊 Diagnostics
 
-The plotting helpers produce report-ready black-on-white figures, even when the notebook or IDE uses a dark theme. `plot_progress()` shows observed and best-so-far objective values, while `plot_diagnostics()` shows the observed design space for one- or two-variable campaigns.
+The plotting helpers produce report-ready black-on-white figures, even when the notebook or IDE uses a dark theme. `plot_progress()` shows observed and best-so-far objective values.
+
+For one- and two-variable campaigns, `plot_diagnostics()` can show direct design-space plots. For campaigns with three or more variables, BO Forge switches to dimension-agnostic diagnostics: objective history, direction-aware best-so-far progress, and a normalised variable-coverage heatmap. These 3D+ diagnostics show coverage and progress, not full interaction structure.
 
 Both functions return figure/axes objects and can optionally save figures:
 
 ```python
-from bo_forge.diagnostics import plot_progress
+from bo_forge.diagnostics import plot_diagnostics, plot_progress
 
-plot_progress(config, df, filename="progress.png")
+plot_progress(config, df, save_path="reports/progress.png")
+plot_diagnostics(config, df, save_path="reports/diagnostics.png")
 ```
+
+`save_path` writes exactly to the requested path. The older `filename`/`fig_folder` arguments construct a path from `fig_folder` and `filename`. Passing both `filename` and `save_path` is invalid.
