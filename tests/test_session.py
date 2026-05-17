@@ -74,6 +74,25 @@ def observed_log(cfg: CampaignConfig, values: list[float]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
+def pending_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "pending_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "sobol",
+                "x": 0.5,
+                "score": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
     if df is None:
         df = empty_campaign_log(cfg)
@@ -121,6 +140,54 @@ def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> Non
         campaign.best_observation(),
         pd.DataFrame(columns=canonical_columns(campaign.config)),
     )
+
+
+def test_next_action_pending_suggestions(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, pending_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    action = campaign.next_action()
+
+    assert list(action.columns) == ["campaign_status", "action", "reason", "suggested_call"]
+    assert len(action) == 1
+    assert action.loc[0, "campaign_status"] == "has_pending_suggestions"
+    assert action.loc[0, "action"] == "resolve_pending_suggestions"
+    assert "campaign.pending_suggestions()" in action.loc[0, "suggested_call"]
+    assert "campaign.mark_observed(row_id, objective_value)" in action.loc[0, "suggested_call"]
+
+
+def test_next_action_initial_design(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=2)
+    cfg = config(initial_design_size=2)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    action = campaign.next_action()
+
+    assert list(action.columns) == ["campaign_status", "action", "reason", "suggested_call"]
+    assert len(action) == 1
+    assert action.loc[0, "campaign_status"] == "ready_for_initial_design"
+    assert action.loc[0, "action"] == "suggest_initial_design"
+    assert "campaign.suggest_next()" in action.loc[0, "suggested_call"]
+    assert "campaign.append_suggestions(suggestions)" in action.loc[0, "suggested_call"]
+
+
+def test_next_action_ready_for_bo(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=2)
+    cfg = config(initial_design_size=2)
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0, 2.5]))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    action = campaign.next_action()
+
+    assert list(action.columns) == ["campaign_status", "action", "reason", "suggested_call"]
+    assert len(action) == 1
+    assert action.loc[0, "campaign_status"] == "ready_for_bo"
+    assert action.loc[0, "action"] == "suggest_bo"
+    assert "campaign.suggest_next(batch_size=...)" in action.loc[0, "suggested_call"]
+    assert "campaign.append_suggestions(suggestions)" in action.loc[0, "suggested_call"]
 
 
 def test_summary_status_priority_pending_wins(tmp_path: Path) -> None:
@@ -192,6 +259,8 @@ def test_read_only_helpers_do_not_mutate_df_or_disk(tmp_path: Path) -> None:
 
     assert campaign.campaign_status() == "ready_for_bo"
     assert not campaign.best_observation().empty
+    action = campaign.next_action()
+    assert action.loc[0, "action"] == "suggest_bo"
 
     pd.testing.assert_frame_equal(campaign.df, before_df)
     assert log_path.read_text(encoding="utf-8") == before_csv

@@ -112,6 +112,43 @@ class CampaignSession:
             return "ready_for_initial_design"
         return "ready_for_bo"
 
+    def next_action(self) -> pd.DataFrame:
+        """Return the recommended next notebook action without mutating state."""
+        campaign_status = self.campaign_status()
+        if campaign_status == "has_pending_suggestions":
+            action = "resolve_pending_suggestions"
+            reason = "There are unresolved suggested rows; record results before requesting more."
+            suggested_call = (
+                "campaign.pending_suggestions(); "
+                "campaign.mark_observed(row_id, objective_value)"
+            )
+        elif campaign_status == "ready_for_initial_design":
+            action = "suggest_initial_design"
+            reason = "Observed rows are below initial_design_size; request Sobol suggestions."
+            suggested_call = (
+                "suggestions = campaign.suggest_next(); "
+                "campaign.append_suggestions(suggestions)"
+            )
+        else:
+            action = "suggest_bo"
+            reason = "Initial design is complete and no pending suggestions remain."
+            suggested_call = (
+                "suggestions = campaign.suggest_next(batch_size=...); "
+                "campaign.append_suggestions(suggestions)"
+            )
+
+        return pd.DataFrame(
+            [
+                {
+                    "campaign_status": campaign_status,
+                    "action": action,
+                    "reason": reason,
+                    "suggested_call": suggested_call,
+                }
+            ],
+            columns=["campaign_status", "action", "reason", "suggested_call"],
+        )
+
     def best_observation(self) -> pd.DataFrame:
         """Return the best observed row as a canonical-order copy."""
         observed = self.observed_data()

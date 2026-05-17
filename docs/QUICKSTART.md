@@ -51,6 +51,7 @@ campaign = CampaignSession.from_files(
 
 campaign.validate()
 campaign.summary()
+campaign.next_action()
 
 suggestions = campaign.suggest_next(batch_size=1)
 campaign.append_suggestions(suggestions)
@@ -74,6 +75,7 @@ campaign.plot_progress()
 | `campaign.observed_data()` | Return observed rows used for model fitting. |
 | `campaign.pending_suggestions()` | Return unresolved `status='suggested'` rows. |
 | `campaign.campaign_status()` | Return the current campaign status without mutating state or writing to disk. |
+| `campaign.next_action()` | Return a one-row advisory DataFrame with campaign status, recommended action, reason, and suggested calls. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
