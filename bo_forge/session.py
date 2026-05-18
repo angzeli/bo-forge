@@ -9,8 +9,6 @@ from typing import Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
-from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
-from bo_forge.diagnostics import plot_progress as _plot_progress
 from bo_forge.logs import (
     append_suggestions as _append_suggestions,
 )
@@ -162,19 +160,7 @@ class CampaignSession:
         """Write a deterministic plain-text campaign report and return its path."""
         report_path = Path(path)
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        tables = self.report()
-        text = "\n\n".join(
-            [
-                "BO Forge Campaign Report\n========================",
-                "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
-                "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
-                "Best Observation\n----------------\n\n" + _format_best_observation(
-                    tables["best_observation"]
-                ),
-                "Pending Suggestions\n-------------------\n\n"
-                + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
-            ]
-        )
+        text = _format_campaign_report(self.report())
         report_path.write_text(text + "\n", encoding="utf-8")
         return report_path
 
@@ -209,10 +195,14 @@ class CampaignSession:
 
     def plot_progress(self, **kwargs: Any) -> Any:
         """Plot campaign progress and return figure/axes objects."""
+        from bo_forge.diagnostics import plot_progress as _plot_progress
+
         return _plot_progress(self.config, self.df, **kwargs)
 
     def plot_diagnostics(self, **kwargs: Any) -> Any:
         """Plot campaign diagnostics and return figure/axes objects."""
+        from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
+
         return _plot_diagnostics(self.config, self.df, **kwargs)
 
 
@@ -220,6 +210,20 @@ def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
         return empty_message
     return df.to_string(index=False)
+
+
+def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
+    return "\n\n".join(
+        [
+            "BO Forge Campaign Report\n========================",
+            "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
+            "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+            "Best Observation\n----------------\n\n"
+            + _format_best_observation(tables["best_observation"]),
+            "Pending Suggestions\n-------------------\n\n"
+            + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
+        ]
+    )
 
 
 def _format_next_action(df: pd.DataFrame) -> str:

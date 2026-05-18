@@ -24,9 +24,9 @@ flowchart LR
     v02 -.-> v023
     v02 -.-> v024
     
-    class v01,v02 majorDone
-    class v03 majorNext
-    class v04,v05 majorFuture
+    class v01,v02,v03 majorDone
+    class v04 majorNext
+    class v05 majorFuture
     class v011,v012,v013,v021,v022,v023,v024 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
@@ -35,7 +35,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.2.4`. Next planned milestone: `v0.3`, focused on a small CLI wrapper around the backend package.
+Current baseline: `v0.3.0`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
 
 ### Patch Notes So Far
 
@@ -50,6 +50,7 @@ Current baseline: `v0.2.4`. Next planned milestone: `v0.3`, focused on a small C
 | `v0.2.2` | Patch | Read-only next-action guidance for notebook campaign loops |
 | `v0.2.3` | Patch | Read-only campaign report helper |
 | `v0.2.4` | Patch | 3D example, higher-dimensional diagnostics, and figure export paths |
+| `v0.3.0` | Major | CLI workflow around the CampaignSession API |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -68,7 +69,7 @@ Status: completed
 
 ## 🧰 v0.2 - Stronger Notebook Engine
 
-Status: current
+Status: completed
 
 - Add `CampaignSession` as the notebook campaign/session workflow.
 - Support one-object session creation from config + log.
@@ -82,14 +83,22 @@ Status: current
 
 ## 💻 v0.3 - CLI Workflow
 
-- Add a small CLI wrapper around the backend package.
+Status: current
+
+- Add a small CLI wrapper around the `CampaignSession` workflow.
 - Commands:
+  - `bo-forge --version`
   - `bo-forge validate`
+  - `bo-forge summary`
+  - `bo-forge status`
+  - `bo-forge next-action`
+  - `bo-forge report`
   - `bo-forge suggest`
   - `bo-forge mark-observed`
   - `bo-forge plot`
 - Keep CLI behavior equivalent to the notebook API.
 - Preserve the CSV log as the source of truth.
+- Keep `suggest` non-mutating unless `--append` is passed.
 
 ## 🧪 v0.4 - Practical BO Features
 

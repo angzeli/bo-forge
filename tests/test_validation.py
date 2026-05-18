@@ -68,6 +68,19 @@ def test_validate_campaign_data_accepts_3d_example_log() -> None:
     ]
 
 
+def test_validate_campaign_data_accepts_4d_example_log() -> None:
+    config_4d = CampaignConfig.from_yaml("configs/simple_4d_maximise_logei.yaml")
+    df = load_campaign_log("examples/simple_4d_maximise_logei_campaign_log.csv", config_4d)
+
+    validate_campaign_data(config_4d, df)
+    assert config_4d.variable_names == [
+        "precursor_ratio",
+        "annealing_temperature",
+        "electrolyte_concentration",
+        "reaction_time",
+    ]
+
+
 def test_validate_campaign_data_rejects_missing_column() -> None:
     df = valid_df().drop(columns=["source"])
 

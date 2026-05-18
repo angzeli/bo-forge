@@ -1,6 +1,6 @@
 # 🚀 Quickstart And Usage
 
-This page covers setup, the quickstart script, the notebook session API, example notebooks, and diagnostics.
+This page covers setup, the quickstart script, CLI workflow, notebook session API, example notebooks, and diagnostics.
 
 ## 🧰 Setup
 
@@ -29,6 +29,30 @@ Run the clean script example:
 ```
 
 It copies the seed CSV log to an ignored working file, requests one suggestion, simulates one result, records that result with `mark_observed()`, and reloads the campaign log.
+
+## 💻 CLI Quickstart
+
+The v0.3 CLI wraps the same `CampaignSession` workflow used in notebooks.
+
+```bash
+bo-forge validate \
+  --config configs/simple_2d_maximise_logei.yaml \
+  --log examples/simple_2d_maximise_logei_campaign_log.csv
+
+bo-forge summary \
+  --config configs/simple_2d_maximise_logei.yaml \
+  --log examples/simple_2d_maximise_logei_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/simple_2d_maximise_logei.yaml \
+  --log examples/simple_2d_maximise_logei_working_log.csv \
+  --output examples/simple_2d_maximise_logei_latest_suggestions.csv \
+  --append
+```
+
+`bo-forge suggest` is non-mutating unless `--append` is passed. If both `--output` and `--append` are passed, BO Forge writes the suggestions CSV and appends the same suggestions to the canonical campaign log.
+
+See [CLI.md](CLI.md) for the full command reference.
 
 ## 🔁 Session API
 
@@ -123,6 +147,7 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/simple_2d_maximise_logei.yaml`: maximises photocatalyst-style `activity`.
 - `configs/simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
 - `configs/simple_3d_maximise_logei.yaml`: maximises a three-variable synthetic activity.
+- `configs/simple_4d_maximise_logei.yaml`: maximises a four-variable synthetic activity for CLI demos.
 
 ## 📓 Example Notebooks
 
@@ -131,6 +156,8 @@ Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end
 Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimise_qlogei.yaml` and `examples/simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
 
 Open `notebooks/03_three_variable_campaign.ipynb` for a compact 3D continuous campaign and the higher-dimensional diagnostic view.
+
+Open `notebooks/04_cli_four_variable_campaign.ipynb` for a 4D campaign driven through the `bo-forge` CLI command surface.
 
 From a fresh clone:
 
@@ -154,7 +181,8 @@ The notebooks write only ignored working files:
 - `examples/simple_2d_maximise_logei_working_log.csv`
 - `examples/simple_2d_minimise_qlogei_working_log.csv`
 - `examples/simple_3d_maximise_logei_working_log.csv`
-- `examples/latest_suggestions.csv`
+- `examples/simple_4d_maximise_logei_working_log.csv`
+- `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.
 

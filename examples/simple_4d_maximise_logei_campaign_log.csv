@@ -1,0 +1,5 @@
+row_id,iteration,status,source,precursor_ratio,annealing_temperature,electrolyte_concentration,reaction_time,activity,predicted_mean,predicted_std,acquisition
+manual_000,0,observed,manual,0.20,420.0,0.30,25.0,1.104685,,,
+manual_001,0,observed,manual,0.55,570.0,0.85,72.0,1.910589,,,
+manual_002,0,observed,manual,0.78,690.0,1.45,105.0,0.956193,,,
+manual_003,0,observed,manual,0.42,510.0,1.20,48.0,1.132014,,,

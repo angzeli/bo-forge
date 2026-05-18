@@ -1,4 +1,6 @@
-"""BO Forge v0.2.4."""
+"""BO Forge v0.3.0."""
+
+__version__ = "0.3.0"
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import (
@@ -24,6 +26,7 @@ __all__ = [
     "ObjectiveConfig",
     "SuggestionError",
     "VariableConfig",
+    "__version__",
     "append_suggestions",
     "get_observed_data",
     "load_campaign_log",

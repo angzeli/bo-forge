@@ -1,6 +1,6 @@
 # 🗂️ BO Forge Repository Structure
 
-This repository is organised around one rule: the Bayesian optimisation engine lives in the `bo_forge` Python package, while notebooks and future apps call that package.
+This repository is organised around one rule: the Bayesian optimisation engine lives in the `bo_forge` Python package, while notebooks, the CLI, and future apps call that package.
 
 ## 🏗️ Top-Level Layout
 
@@ -13,6 +13,7 @@ bo-forge/
 ├── reports/                          # Generated local reports and figures
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── QUICKSTART.md
+│   ├── CLI.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   └── REPOSITORY_STRUCTURE.md
@@ -34,6 +35,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 `bo_forge/` contains the reusable campaign engine:
 
 - `config.py`: dataclasses and strict YAML parsing.
+- `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, and `mark_observed()`.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
@@ -46,7 +48,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
 
-Most users should start with `CampaignSession` or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
+Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
 ## 🚀 How To Use The Repository
 
@@ -61,6 +63,14 @@ Run the clean quickstart script:
 
 ```bash
 ./.venv/bin/python examples/quickstart.py
+```
+
+Validate a campaign from the terminal:
+
+```bash
+bo-forge validate \
+  --config configs/simple_2d_maximise_logei.yaml \
+  --log examples/simple_2d_maximise_logei_campaign_log.csv
 ```
 
 Open the full simulated workflow:
@@ -83,7 +93,7 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example and `configs/simple_3d_maximise_logei.yaml` as a three-variable continuous example.
+The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/simple_3d_maximise_logei.yaml` as a three-variable continuous example, and `configs/simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 
