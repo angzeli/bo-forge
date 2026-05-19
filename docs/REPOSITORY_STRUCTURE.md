@@ -14,6 +14,7 @@ bo-forge/
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── QUICKSTART.md
 │   ├── CLI.md
+│   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   └── REPOSITORY_STRUCTURE.md

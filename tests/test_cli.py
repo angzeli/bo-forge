@@ -6,6 +6,7 @@ import matplotlib
 import pandas as pd
 import pytest
 
+import bo_forge.cli as cli
 from bo_forge.cli import run
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.io import empty_campaign_log
@@ -97,6 +98,12 @@ def base_args(config_path: Path, log_path: Path) -> list[str]:
     return ["--config", str(config_path), "--log", str(log_path)]
 
 
+def output_under_file_parent(tmp_path: Path, filename: str) -> Path:
+    parent = tmp_path / "not_a_dir"
+    parent.write_text("not a directory", encoding="utf-8")
+    return parent / filename
+
+
 def run_python_module(module: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "-m", module, *args],
@@ -111,7 +118,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.3.1\n"
+    assert captured.out == "bo-forge 0.3.2\n"
     assert captured.err == ""
 
 
@@ -120,7 +127,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.3.1\n"
+    assert completed.stdout == "bo-forge 0.3.2\n"
     assert completed.stderr == ""
 
 
@@ -159,6 +166,22 @@ def test_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert captured.err == ""
 
 
+def test_config_load_failure_returns_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "missing.yaml"
+    log_path = tmp_path / "campaign.csv"
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert "Could not read config file" in captured.err
+    assert "Hint: Check the YAML config path and campaign settings." in captured.err
+
+
 def test_validate_failure_returns_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
     cfg = config()
@@ -172,6 +195,65 @@ def test_validate_failure_returns_error(tmp_path: Path, capsys: pytest.CaptureFi
     assert captured.out == ""
     assert "Error:" in captured.err
     assert "outside bounds" in captured.err
+    assert (
+        "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
+        in captured.err
+    )
+
+
+def test_suggest_with_pending_suggestions_returns_hint_without_mutating_csv(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config())
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 0
+    capsys.readouterr()
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert run(["suggest", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert "unresolved status='suggested'" in captured.err
+    assert (
+        "Hint: Resolve pending suggestions or review the campaign state before "
+        "requesting new suggestions."
+        in captured.err
+    )
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_mark_observed_missing_row_returns_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config())
+
+    assert (
+        run(
+            [
+                "mark-observed",
+                *base_args(config_path, log_path),
+                "--row-id",
+                "missing",
+                "--objective-value",
+                "1.0",
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert "row_id was not found" in captured.err
+    assert (
+        "Hint: Check the row_id, pending status, campaign log path, and file permissions."
+        in captured.err
+    )
 
 
 def test_summary_status_next_action_and_report_outputs(
@@ -217,6 +299,22 @@ def test_report_output_uses_export_path(
     assert captured.out == f"Wrote campaign report: {report_path}\n"
     assert report_path.exists()
     assert "BO Forge Campaign Report" in report_path.read_text(encoding="utf-8")
+
+
+def test_report_output_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg))
+    report_path = output_under_file_parent(tmp_path, "latest.txt")
+
+    assert run(["report", *base_args(config_path, log_path), "--output", str(report_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Error: Could not write campaign report '{report_path}'" in captured.err
 
 
 def test_suggest_without_append_does_not_change_csv(
@@ -282,6 +380,23 @@ def test_suggest_output_and_append_writes_output_and_log(
     assert len(suggestions) == 1
     assert len(log) == 1
     assert suggestions.loc[0, "row_id"] == log.loc[0, "row_id"]
+
+
+def test_suggest_output_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config())
+    output_path = output_under_file_parent(tmp_path, "suggestions.csv")
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert run(["suggest", *base_args(config_path, log_path), "--output", str(output_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    assert f"Error: Could not write suggestions CSV '{output_path}'" in captured.err
+    assert log_path.read_text(encoding="utf-8") == before_csv
 
 
 def test_mark_observed_resolves_only_specified_pending_suggestion(
@@ -350,6 +465,38 @@ def test_plot_writes_nested_output_path(
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 
+@pytest.mark.parametrize("kind", ["progress", "diagnostics"])
+def test_plot_output_write_failure_returns_clear_error(
+    kind: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg))
+    output_path = output_under_file_parent(tmp_path, f"{kind}.png")
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                kind,
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Error: Could not write {kind} plot '{output_path}'" in captured.err
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
 def test_missing_required_arguments_return_argparse_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -359,3 +506,13 @@ def test_missing_required_arguments_return_argparse_error(
     assert captured.out == ""
     assert "usage:" in captured.err
     assert "required" in captured.err
+
+
+def test_unexpected_errors_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_unexpected_error(args: object) -> int:
+        raise RuntimeError("unexpected boom")
+
+    monkeypatch.setattr(cli, "_cmd_validate", raise_unexpected_error)
+
+    with pytest.raises(RuntimeError, match="unexpected boom"):
+        cli.run(["validate", "--config", "campaign.yaml", "--log", "campaign.csv"])

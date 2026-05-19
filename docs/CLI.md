@@ -132,18 +132,28 @@ bo-forge plot \
 
 ## 🧭 Command Reference
 
-| Command                                                                                   | Description |
-|-------------------------------------------------------------------------------------------| --- |
-| `bo-forge --version`                                                                      | Print the installed BO Forge version. |
-| `python -m bo_forge --version`                                                            | Run the same CLI through a specific Python interpreter. |
-| `bo-forge validate --config PATH --log PATH`                                              | Validate a YAML config and CSV campaign log. |
-| `bo-forge summary --config PATH --log PATH`                                               | Print campaign counts, status, and best observation as readable text. |
-| `bo-forge status --config PATH --log PATH`                                                | Print exactly one campaign status line. |
-| `bo-forge next-action --config PATH --log PATH`                                           | Print the recommended next campaign action. |
-| `bo-forge report --config PATH --log PATH [--output PATH]`                                | Print or export a deterministic campaign report. |
-| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]`   | Generate suggestions; append only when `--append` is passed. |
+| Command | Description |
+| --- | --- |
+| `bo-forge --version` | Print the installed BO Forge version. |
+| `python -m bo_forge --version` | Run the same CLI through a specific Python interpreter. |
+| `bo-forge validate --config PATH --log PATH` | Validate a YAML config and CSV campaign log. |
+| `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
+| `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
+| `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
+| `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
+| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE` | Mark one pending suggestion as observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress diagnostics --output PATH`        | Export one progress or diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics --output PATH` | Export one progress or diagnostics figure. |
+
+## 🧯 CLI Error Output
+
+Expected user-facing failures print `Error: ...` to stderr and exit with code `1`.
+Most config, CSV, suggestion, and log-write errors also include a short `Hint: ...` line.
+
+Missing required arguments use normal `argparse` behavior and exit with code `2`.
+
+For detailed YAML and CSV fixes, see [COMMON_ERRORS.md](COMMON_ERRORS.md).
+For copyable intentional failure examples, see [CLI_ERROR_EXAMPLES.md](CLI_ERROR_EXAMPLES.md).
 
 ## ⚠️ Mutation Rules
 

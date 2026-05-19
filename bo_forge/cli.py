@@ -10,8 +10,18 @@ from pathlib import Path
 import pandas as pd
 
 from bo_forge import __version__
-from bo_forge.errors import BOForgeError
+from bo_forge.errors import (
+    BOForgeError,
+    ConfigError,
+    LogValidationError,
+    LogWriteError,
+    SuggestionError,
+)
 from bo_forge.session import CampaignSession, _format_campaign_report
+
+
+class _CLIOutputError(BOForgeError):
+    """Raised when a CLI-owned output file cannot be written."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -100,6 +110,9 @@ def run(argv: Sequence[str] | None = None) -> int:
         return int(args.handler(args))
     except BOForgeError as exc:
         print(f"Error: {exc}", file=sys.stderr)
+        hint = _hint_for_error(exc)
+        if hint is not None:
+            print(hint, file=sys.stderr)
         return 1
 
 
@@ -147,7 +160,12 @@ def _cmd_report(args: argparse.Namespace) -> int:
     if args.output is None:
         print(_format_campaign_report(campaign.report()))
     else:
-        report_path = campaign.export_report(args.output)
+        try:
+            report_path = campaign.export_report(args.output)
+        except OSError as exc:
+            raise _CLIOutputError(
+                f"Could not write campaign report '{args.output}': {exc}"
+            ) from exc
         print(f"Wrote campaign report: {report_path}")
     return 0
 
@@ -178,10 +196,15 @@ def _cmd_mark_observed(args: argparse.Namespace) -> int:
 
 def _cmd_plot(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    if args.kind == "progress":
-        campaign.plot_progress(save_path=args.output)
-    else:
-        campaign.plot_diagnostics(save_path=args.output)
+    try:
+        if args.kind == "progress":
+            campaign.plot_progress(save_path=args.output)
+        else:
+            campaign.plot_diagnostics(save_path=args.output)
+    except OSError as exc:
+        raise _CLIOutputError(
+            f"Could not write {args.kind} plot '{args.output}': {exc}"
+        ) from exc
     print(f"Wrote {args.kind} plot: {args.output}")
     return 0
 
@@ -191,9 +214,29 @@ def _print_table(df: pd.DataFrame) -> None:
 
 
 def _write_csv(df: pd.DataFrame, path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(path, index=False)
+    except OSError as exc:
+        raise _CLIOutputError(f"Could not write suggestions CSV '{path}': {exc}") from exc
     return path
+
+
+def _hint_for_error(exc: BOForgeError) -> str | None:
+    if isinstance(exc, _CLIOutputError):
+        return None
+    if isinstance(exc, ConfigError):
+        return "Hint: Check the YAML config path and campaign settings."
+    if isinstance(exc, LogValidationError):
+        return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
+    if isinstance(exc, SuggestionError):
+        return (
+            "Hint: Resolve pending suggestions or review the campaign state before "
+            "requesting new suggestions."
+        )
+    if isinstance(exc, LogWriteError):
+        return "Hint: Check the row_id, pending status, campaign log path, and file permissions."
+    return None
 
 
 if __name__ == "__main__":

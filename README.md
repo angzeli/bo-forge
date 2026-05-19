@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.3.1
+# 🧪 BO Forge v0.3.2
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow. The reusable BO logic lives in the `bo_forge` Python package, while notebooks and the CLI wrap that package.
 
-v0.3 adds a `bo-forge` CLI around the existing `CampaignSession` workflow: validate campaign logs, inspect state, generate suggestions, append suggestions, mark results observed, export reports, and save plots from the terminal. v0.3.1 adds a robust `python -m bo_forge` module entrypoint for notebooks and editable environments.
+v0.3 adds a `bo-forge` CLI around the existing `CampaignSession` workflow: validate campaign logs, inspect state, generate suggestions, append suggestions, mark results observed, export reports, and save plots from the terminal. v0.3.2 keeps that workflow unchanged and makes expected CLI failures easier to interpret.
 
 BO Forge deliberately supports only:
 
@@ -64,6 +64,7 @@ bo-forge/
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): setup, quickstart commands, session API example, notebooks, and diagnostics.
 - [docs/CLI.md](docs/CLI.md): terminal workflow and command reference.
+- [docs/CLI_ERROR_EXAMPLES.md](docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
 - [docs/CSV_SCHEMA.md](docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
 - [docs/COMMON_ERRORS.md](docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
 - [docs/REPOSITORY_STRUCTURE.md](docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
@@ -75,7 +76,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.3.1 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.3.2 environment is recorded in `requirements-lock.txt`.
 
 ---
 
