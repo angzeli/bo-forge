@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.3.0
+# 🧪 BO Forge v0.3.1
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow. The reusable BO logic lives in the `bo_forge` Python package, while notebooks and the CLI wrap that package.
 
-v0.3 adds a `bo-forge` CLI around the existing `CampaignSession` workflow: validate campaign logs, inspect state, generate suggestions, append suggestions, mark results observed, export reports, and save plots from the terminal.
+v0.3 adds a `bo-forge` CLI around the existing `CampaignSession` workflow: validate campaign logs, inspect state, generate suggestions, append suggestions, mark results observed, export reports, and save plots from the terminal. v0.3.1 adds a robust `python -m bo_forge` module entrypoint for notebooks and editable environments.
 
 BO Forge deliberately supports only:
 
@@ -75,7 +75,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.3.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.3.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

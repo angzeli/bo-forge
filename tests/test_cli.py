@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -95,12 +97,55 @@ def base_args(config_path: Path, log_path: Path) -> list[str]:
     return ["--config", str(config_path), "--log", str(log_path)]
 
 
+def run_python_module(module: str, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", module, *args],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
 def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.3.0\n"
+    assert captured.out == "bo-forge 0.3.1\n"
     assert captured.err == ""
+
+
+@pytest.mark.parametrize("module", ["bo_forge", "bo_forge.cli"])
+def test_python_module_entrypoint_version(module: str) -> None:
+    completed = run_python_module(module, "--version")
+
+    assert completed.returncode == 0
+    assert completed.stdout == "bo-forge 0.3.1\n"
+    assert completed.stderr == ""
+
+
+def test_python_module_entrypoint_validate_success(tmp_path: Path) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config())
+
+    completed = run_python_module(
+        "bo_forge",
+        "validate",
+        *base_args(config_path, log_path),
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "Campaign log is valid.\n"
+    assert completed.stderr == ""
+
+
+def test_python_module_entrypoint_missing_arguments_returns_argparse_error() -> None:
+    completed = run_python_module("bo_forge", "validate")
+
+    assert completed.returncode == 2
+    assert completed.stdout == ""
+    assert "usage:" in completed.stderr
+    assert "required" in completed.stderr
 
 
 def test_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

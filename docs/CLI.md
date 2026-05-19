@@ -18,11 +18,13 @@ Check the installed command:
 bo-forge --version
 ```
 
-If a local editable environment has not refreshed its console scripts yet, use the module form:
+The equivalent module invocation is also supported:
 
 ```bash
-./.venv/bin/python -m bo_forge.cli --version
+python -m bo_forge --version
 ```
+
+Use `bo-forge ...` in a normal terminal. Use `python -m bo_forge ...` when you want to guarantee that the command runs with a specific Python interpreter, such as inside notebooks or editable development environments.
 
 ## 📓 Using The CLI From Notebooks
 
@@ -30,7 +32,7 @@ Inside notebooks, prefer calling the CLI through the current notebook Python:
 
 ```python
 subprocess.run(
-    [sys.executable, "-m", "bo_forge.cli", "next-action", *CAMPAIGN_ARGS],
+    [sys.executable, "-m", "bo_forge", "next-action", *CAMPAIGN_ARGS],
     cwd=PROJECT_ROOT,
     check=True,
 )
@@ -130,17 +132,18 @@ bo-forge plot \
 
 ## 🧭 Command Reference
 
-| Command | Description |
-| --- | --- |
-| `bo-forge --version` | Print the installed BO Forge version. |
-| `bo-forge validate --config PATH --log PATH` | Validate a YAML config and CSV campaign log. |
-| `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
-| `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
-| `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
-| `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
-| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
+| Command                                                                                   | Description |
+|-------------------------------------------------------------------------------------------| --- |
+| `bo-forge --version`                                                                      | Print the installed BO Forge version. |
+| `python -m bo_forge --version`                                                            | Run the same CLI through a specific Python interpreter. |
+| `bo-forge validate --config PATH --log PATH`                                              | Validate a YAML config and CSV campaign log. |
+| `bo-forge summary --config PATH --log PATH`                                               | Print campaign counts, status, and best observation as readable text. |
+| `bo-forge status --config PATH --log PATH`                                                | Print exactly one campaign status line. |
+| `bo-forge next-action --config PATH --log PATH`                                           | Print the recommended next campaign action. |
+| `bo-forge report --config PATH --log PATH [--output PATH]`                                | Print or export a deterministic campaign report. |
+| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]`   | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE` | Mark one pending suggestion as observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress|diagnostics --output PATH` | Export one progress or diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress diagnostics --output PATH`        | Export one progress or diagnostics figure. |
 
 ## ⚠️ Mutation Rules
 

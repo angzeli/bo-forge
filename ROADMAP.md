@@ -15,6 +15,7 @@ flowchart LR
     v022["v0.2.2<br/>Next action helper"]
     v023["v0.2.3<br/>Campaign report helper"]
     v024["v0.2.4<br/>3D diagnostics"]
+    v031["v0.3.1<br/>CLI invocation Hardening"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -23,11 +24,12 @@ flowchart LR
     v02 -.-> v022
     v02 -.-> v023
     v02 -.-> v024
+    v03 -.-> v031
     
     class v01,v02,v03 majorDone
     class v04 majorNext
     class v05 majorFuture
-    class v011,v012,v013,v021,v022,v023,v024 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -35,7 +37,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.3.0`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
+Current baseline: `v0.3.1`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
 
 ### Patch Notes So Far
 
@@ -51,6 +53,7 @@ Current baseline: `v0.3.0`. Next planned milestone: `v0.4`, focused on practical
 | `v0.2.3` | Patch | Read-only campaign report helper |
 | `v0.2.4` | Patch | 3D example, higher-dimensional diagnostics, and figure export paths |
 | `v0.3.0` | Major | CLI workflow around the CampaignSession API |
+| `v0.3.1` | Patch | CLI invocation hardening with package module entrypoint |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -96,6 +99,7 @@ Status: current
   - `bo-forge suggest`
   - `bo-forge mark-observed`
   - `bo-forge plot`
+- Add `python -m bo_forge` as a robust module invocation for notebooks and editable environments.
 - Keep CLI behavior equivalent to the notebook API.
 - Preserve the CSV log as the source of truth.
 - Keep `suggest` non-mutating unless `--append` is passed.
