@@ -10,6 +10,7 @@ import bo_forge.cli as cli
 from bo_forge.cli import run
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.io import empty_campaign_log
+from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
 
 matplotlib.use("Agg")
@@ -118,7 +119,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.3.2\n"
+    assert captured.out == "bo-forge 0.3.3\n"
     assert captured.err == ""
 
 
@@ -127,7 +128,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.3.2\n"
+    assert completed.stdout == "bo-forge 0.3.3\n"
     assert completed.stderr == ""
 
 
@@ -153,6 +154,116 @@ def test_python_module_entrypoint_missing_arguments_returns_argparse_error() -> 
     assert completed.stdout == ""
     assert "usage:" in completed.stderr
     assert "required" in completed.stderr
+
+
+def test_doctor_success_output(capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(["doctor"]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "BO Forge doctor" in captured.out
+    assert "BO Forge version" in captured.out
+    assert "Python executable" in captured.out
+    assert "Python version" in captured.out
+    assert "torch" in captured.out
+    assert "botorch" in captured.out
+    assert "gpytorch" in captured.out
+    assert captured.out.rstrip().endswith("Status: OK")
+
+
+def test_doctor_import_failure_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    original_import_module = cli.importlib.import_module
+
+    def fail_torch_import(module_name: str) -> object:
+        if module_name == "torch":
+            raise ImportError("missing torch")
+        return original_import_module(module_name)
+
+    monkeypatch.setattr(cli.importlib, "import_module", fail_torch_import)
+
+    assert run(["doctor"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: Doctor check failed while importing 'torch': missing torch" in captured.err
+
+
+def test_init_log_creates_empty_canonical_log(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "nested" / "campaign.csv"
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.out == f"Created empty campaign log: {log_path}\n"
+    assert captured.err == ""
+    cfg = CampaignConfig.from_yaml(config_path)
+    df = load_campaign_log(log_path, cfg)
+    assert df.empty
+    assert list(df.columns) == canonical_columns(cfg)
+
+
+def test_init_log_refuses_to_overwrite_existing_file(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "campaign.csv"
+    log_path.write_text("existing", encoding="utf-8")
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert "file already exists" in captured.err
+    assert log_path.read_text(encoding="utf-8") == "existing"
+
+
+def test_init_log_does_not_create_file_when_config_fails(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "missing.yaml"
+    log_path = tmp_path / "campaign.csv"
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Could not read config file" in captured.err
+    assert not log_path.exists()
+
+
+def test_init_log_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = output_under_file_parent(tmp_path, "campaign.csv")
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Error: Could not write empty campaign log '{log_path}'" in captured.err
+
+
+def test_init_log_missing_required_arguments_return_argparse_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert run(["init-log"]) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "usage:" in captured.err
+    assert "required" in captured.err
 
 
 def test_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

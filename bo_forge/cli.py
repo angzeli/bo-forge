@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib
+import importlib.util
+import io
+import os
+import platform
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pandas as pd
 
 from bo_forge import __version__
+from bo_forge.config import CampaignConfig
 from bo_forge.errors import (
     BOForgeError,
     ConfigError,
@@ -17,11 +25,17 @@ from bo_forge.errors import (
     LogWriteError,
     SuggestionError,
 )
+from bo_forge.io import empty_campaign_log
+from bo_forge.logs import load_campaign_log
 from bo_forge.session import CampaignSession, _format_campaign_report
 
 
 class _CLIOutputError(BOForgeError):
     """Raised when a CLI-owned output file cannot be written."""
+
+
+class _CLIDoctorError(BOForgeError):
+    """Raised when an expected doctor check fails."""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +46,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"bo-forge {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check the active BO Forge environment.")
+    doctor_parser.set_defaults(handler=_cmd_doctor)
+
+    init_log_parser = subparsers.add_parser(
+        "init-log",
+        help="Create an empty canonical campaign CSV log from a config.",
+    )
+    _add_config_log_arguments(init_log_parser)
+    init_log_parser.set_defaults(handler=_cmd_init_log)
 
     validate_parser = subparsers.add_parser("validate", help="Validate a campaign CSV log.")
     _add_config_log_arguments(validate_parser)
@@ -130,6 +154,42 @@ def _load_session(args: argparse.Namespace) -> CampaignSession:
     return CampaignSession.from_files(args.config, args.log)
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    lines = [
+        "BO Forge doctor",
+        f"BO Forge version: {__version__}",
+        f"Python executable: {sys.executable}",
+        f"Python version: {platform.python_version()}",
+    ]
+    for module_name in [
+        "torch",
+        "botorch",
+        "gpytorch",
+        "pandas",
+        "yaml",
+        "matplotlib",
+        "bo_forge",
+    ]:
+        _doctor_import(module_name)
+        lines.append(f"{module_name}: OK")
+
+    if importlib.util.find_spec("bo_forge.__main__") is None:
+        raise _CLIDoctorError("Module entrypoint 'bo_forge.__main__' is not available.")
+    lines.append("module entrypoint: OK")
+    lines.append("Status: OK")
+    print("\n".join(lines))
+    return 0
+
+
+def _cmd_init_log(args: argparse.Namespace) -> int:
+    config = CampaignConfig.from_yaml(args.config)
+    log = empty_campaign_log(config)
+    log_path = _write_empty_log(log, args.log)
+    load_campaign_log(log_path, config)
+    print(f"Created empty campaign log: {log_path}")
+    return 0
+
+
 def _cmd_validate(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     campaign.validate()
@@ -220,6 +280,44 @@ def _write_csv(df: pd.DataFrame, path: Path) -> Path:
     except OSError as exc:
         raise _CLIOutputError(f"Could not write suggestions CSV '{path}': {exc}") from exc
     return path
+
+
+def _write_empty_log(df: pd.DataFrame, path: Path) -> Path:
+    temp_path: Path | None = None
+    try:
+        if path.exists():
+            raise _CLIOutputError(
+                f"Cannot create empty campaign log '{path}' because file already exists."
+            )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            df.to_csv(temp_file, index=False)
+        os.link(temp_path, path)
+    except _CLIOutputError:
+        raise
+    except OSError as exc:
+        raise _CLIOutputError(f"Could not write empty campaign log '{path}': {exc}") from exc
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+    return path
+
+
+def _doctor_import(module_name: str) -> None:
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            importlib.import_module(module_name)
+    except ImportError as exc:
+        raise _CLIDoctorError(
+            f"Doctor check failed while importing '{module_name}': {exc}"
+        ) from exc
 
 
 def _hint_for_error(exc: BOForgeError) -> str | None:

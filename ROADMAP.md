@@ -17,6 +17,7 @@ flowchart LR
     v024["v0.2.4<br/>3D diagnostics"]
     v031["v0.3.1<br/>CLI invocation hardening"]
     v032["v0.3.2<br/>CLI error polish"]
+    v033["v0.3.3<br/>CLI bootstrap"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -27,11 +28,12 @@ flowchart LR
     v02 -.-> v024
     v03 -.-> v031
     v03 -.-> v032
+    v03 -.-> v033
     
     class v01,v02,v03 majorDone
     class v04 majorNext
     class v05 majorFuture
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -39,7 +41,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.3.2`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
+Current baseline: `v0.3.3`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
 
 ### Patch Notes So Far
 
@@ -57,6 +59,7 @@ Current baseline: `v0.3.2`. Next planned milestone: `v0.4`, focused on practical
 | `v0.3.0` | Major | CLI workflow around the CampaignSession API |
 | `v0.3.1` | Patch | CLI invocation hardening with package module entrypoint |
 | `v0.3.2` | Patch | CLI error polish for expected failure paths |
+| `v0.3.3` | Patch | Add CLI doctor and init-log commands |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -89,11 +92,13 @@ Status: completed
 
 ## 💻 v0.3 - CLI Workflow
 
-Status: current
+Status: completed
 
 - Add a small CLI wrapper around the `CampaignSession` workflow.
 - Commands:
   - `bo-forge --version`
+  - `bo-forge doctor`
+  - `bo-forge init-log`
   - `bo-forge validate`
   - `bo-forge summary`
   - `bo-forge status`

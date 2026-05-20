@@ -16,6 +16,7 @@ Check the installed command:
 
 ```bash
 bo-forge --version
+bo-forge doctor
 ```
 
 The equivalent module invocation is also supported:
@@ -41,6 +42,14 @@ subprocess.run(
 This is equivalent to running `bo-forge next-action ...` in a terminal, but it avoids relying on a shell alias or console script path. `check=True` makes the notebook stop clearly if the CLI command fails.
 
 ## 🔁 Basic Workflow
+
+Create an empty canonical campaign log from a config:
+
+```bash
+bo-forge init-log \
+  --config configs/simple_2d_maximise_logei.yaml \
+  --log examples/my_new_campaign_log.csv
+```
 
 Validate a campaign log:
 
@@ -135,7 +144,9 @@ bo-forge plot \
 | Command | Description |
 | --- | --- |
 | `bo-forge --version` | Print the installed BO Forge version. |
+| `bo-forge doctor` | Check the active BO Forge environment and key imports. |
 | `python -m bo_forge --version` | Run the same CLI through a specific Python interpreter. |
+| `bo-forge init-log --config PATH --log PATH` | Create an empty canonical campaign CSV log. |
 | `bo-forge validate --config PATH --log PATH` | Validate a YAML config and CSV campaign log. |
 | `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
 | `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
@@ -161,6 +172,7 @@ Most commands are read-only.
 
 The commands that can change files are:
 
+- `bo-forge init-log`: creates a new empty campaign log and refuses to overwrite existing files.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.
 - `bo-forge report --output`: writes a report file.
