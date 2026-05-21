@@ -41,7 +41,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `logs.py`: CSV loading, `append_suggestions()`, and `mark_observed()`.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
-- `transforms.py`: internal user-space to unit-cube transforms.
+- `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.
 - `models.py`: conversion from campaign logs to tensors and GP fitting.
 - `acquisition.py`: LogEI and qLogEI acquisition optimisation.
 - `suggestions.py`: Sobol and model-based candidate generation.

@@ -6,7 +6,7 @@ import torch
 from botorch.acquisition import LogExpectedImprovement
 from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.models.model import Model
-from botorch.optim import optimize_acqf
+from botorch.optim import optimize_acqf, optimize_acqf_mixed
 from botorch.sampling.normal import SobolQMCNormalSampler
 
 from bo_forge.config import CampaignConfig
@@ -17,10 +17,14 @@ def optimize_log_ei(
     model: Model,
     train_y_model: torch.Tensor,
     batch_size: int,
+    *,
+    model_dim: int | None = None,
+    fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
     """Optimize LogEI/qLogEI in unit-cube model space."""
+    dimension = model_dim if model_dim is not None else len(config.variables)
     bounds = torch.tensor(
-        [[0.0] * len(config.variables), [1.0] * len(config.variables)],
+        [[0.0] * dimension, [1.0] * dimension],
         dtype=torch.double,
     )
     best_f = train_y_model.max()
@@ -40,13 +44,19 @@ def optimize_log_ei(
         )
         source = "qlog_ei"
 
-    candidates, acquisition_value = optimize_acqf(
-        acq_function=acquisition,
-        bounds=bounds,
-        q=batch_size,
-        num_restarts=config.bo.num_restarts,
-        raw_samples=config.bo.raw_samples,
-        options={"batch_limit": 5, "maxiter": 200},
-    )
+    optimize_kwargs = {
+        "acq_function": acquisition,
+        "bounds": bounds,
+        "q": batch_size,
+        "num_restarts": config.bo.num_restarts,
+        "raw_samples": config.bo.raw_samples,
+        "options": {"batch_limit": 5, "maxiter": 200},
+    }
+    if fixed_features_list:
+        candidates, acquisition_value = optimize_acqf_mixed(
+            **optimize_kwargs,
+            fixed_features_list=fixed_features_list,
+        )
+    else:
+        candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
     return candidates.detach(), acquisition_value.detach(), source
-

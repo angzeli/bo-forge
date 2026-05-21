@@ -14,7 +14,11 @@ from bo_forge.config import CampaignConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
 from bo_forge.transforms import (
+    categorical_combination_count,
+    categorical_feature_assignments,
+    encoded_dimension,
     objective_from_model_space,
+    unit_cube_to_design_values,
     unit_cube_to_user_values,
     values_to_unit_cube,
 )
@@ -27,6 +31,9 @@ from bo_forge.validation import (
     next_iteration,
     validate_campaign_data,
 )
+
+MAX_CATEGORICAL_COMBINATIONS = 64
+MAX_DECODE_RETRIES = 8
 
 
 def suggest_next(
@@ -96,16 +103,44 @@ def _suggest_model_based(
     batch_size: int,
 ) -> pd.DataFrame:
     torch.manual_seed(config.bo.random_seed)
+    combination_count = categorical_combination_count(config)
+    if combination_count > MAX_CATEGORICAL_COMBINATIONS:
+        raise SuggestionError(
+            "Model-based mixed-variable suggestions support at most "
+            f"{MAX_CATEGORICAL_COMBINATIONS} categorical combinations: "
+            f"configured={combination_count}."
+        )
+
     model = fit_gp_model(config, observed_df)
     _, train_y_model = dataframe_to_tensors(config, observed_df)
-    x_unit_raw, acquisition_value, source = optimize_log_ei(
-        config=config,
-        model=model,
-        train_y_model=train_y_model,
-        batch_size=batch_size,
-    )
-    user_candidates = unit_cube_to_user_values(config, x_unit_raw)
-    _raise_if_duplicate_candidates(config, df, user_candidates)
+    fixed_features_list = categorical_feature_assignments(config)
+    user_candidates: list[tuple[object, ...]] | None = None
+    acquisition_value: torch.Tensor | None = None
+    source: str | None = None
+    duplicate_message = "no candidate was decoded"
+    for attempt in range(MAX_DECODE_RETRIES):
+        torch.manual_seed(config.bo.random_seed + attempt)
+        x_unit_raw, acquisition_value, source = optimize_log_ei(
+            config=config,
+            model=model,
+            train_y_model=train_y_model,
+            batch_size=batch_size,
+            model_dim=encoded_dimension(config),
+            fixed_features_list=fixed_features_list,
+        )
+        decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
+        duplicate_message = _duplicate_candidate_message(config, df, decoded_candidates)
+        if duplicate_message is None:
+            user_candidates = decoded_candidates
+            break
+
+    if user_candidates is None or acquisition_value is None or source is None:
+        raise SuggestionError(
+            "Could not generate non-duplicate model-based suggestions after "
+            f"{MAX_DECODE_RETRIES} decode retries. Last duplicate check: "
+            f"{duplicate_message}"
+        )
+
     x_unit_repaired = values_to_unit_cube(config, user_candidates)
 
     with torch.no_grad():
@@ -178,7 +213,7 @@ def _initial_user_candidates(
                 generator=generator,
                 dtype=torch.double,
             )
-        for candidate in unit_cube_to_user_values(config, unit):
+        for candidate in unit_cube_to_design_values(config, unit):
             candidate_key = design_key_for_values(config, candidate)
             if candidate_key in seen:
                 continue
@@ -195,22 +230,22 @@ def _initial_user_candidates(
     return selected
 
 
-def _raise_if_duplicate_candidates(
+def _duplicate_candidate_message(
     config: CampaignConfig,
     df: pd.DataFrame,
     candidates: list[tuple[object, ...]],
-) -> None:
+) -> str | None:
     existing = design_tuples(config, df)
     seen = set(existing)
     for candidate in candidates:
         candidate_key = design_key_for_values(config, candidate)
         if candidate_key in seen:
-            raise SuggestionError(
+            return (
                 "Model-based suggestion duplicated an existing or batch design exactly "
-                "after decoding: "
-                f"candidate={candidate}."
+                f"after decoding: candidate={candidate}."
             )
         seen.add(candidate_key)
+    return None
 
 
 def _empty_row(config: CampaignConfig) -> dict[str, object]:

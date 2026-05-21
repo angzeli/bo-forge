@@ -18,6 +18,7 @@ flowchart LR
     v031["v0.3.1<br/>CLI invocation hardening"]
     v032["v0.3.2<br/>CLI error polish"]
     v033["v0.3.3<br/>CLI bootstrap"]
+    v041["v0.4.1<br/>One-hot categoricals"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -29,11 +30,12 @@ flowchart LR
     v03 -.-> v031
     v03 -.-> v032
     v03 -.-> v033
+    v04 -.-> v041
     
     class v01,v02,v03 majorDone
     class v04 majorNext
     class v05 majorFuture
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -41,7 +43,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.4.0`. Next planned milestone: `v0.4.1`, focused on constraints, duplicate handling, and batch diversity.
+Current baseline: `v0.4.1`. Next planned milestone: `v0.4.2`, focused on constraints, duplicate handling, and batch diversity.
 
 ### Patch Notes So Far
 
@@ -61,6 +63,7 @@ Current baseline: `v0.4.0`. Next planned milestone: `v0.4.1`, focused on constra
 | `v0.3.2` | Patch | CLI error polish for expected failure paths |
 | `v0.3.3` | Patch | Add CLI doctor and init-log commands |
 | `v0.4.0` | Major | Mixed-variable single-objective BO |
+| `v0.4.1` | Patch | One-hot categorical encoding and mixed-suggestion quality |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -121,10 +124,19 @@ Status: in progress
 - Strict mixed-variable CSV validation.
 - Sobol/random mixed-variable initial suggestions.
 - Latent unit-cube encoding/decoding for mixed-variable model fitting.
+- One-hot categorical model features while public logs keep category labels.
 - Domain repair back to valid user-space rows.
 - Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
 - Mixed-variable duplicate handling using typed user-space design keys.
 - Session, CLI, docs, examples, and notebook coverage.
+
+| Version | Focus |
+| --- | --- |
+| `v0.4.0` | Mixed-variable single-objective BO |
+| `v0.4.1` | One-hot categorical encoding and mixed-suggestion quality |
+| `v0.4.2` | Constraints, duplicate handling, and batch diversity |
+| `v0.4.3` | Cost-aware and human-review support |
+| `v0.4.4` | Noise, replicates, and final practical baseline |
 
 ## 🖥️ v0.5 - Streamlit Prototype
 

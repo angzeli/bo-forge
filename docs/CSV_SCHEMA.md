@@ -76,6 +76,7 @@ Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed be
 - `row_id` values must be unique.
 - Exact duplicate variable rows are avoided when BO Forge generates suggestions.
 - Mixed-variable duplicate checks use typed user-space values, such as `(0.5, 3, 0.1, "MeCN")`.
+- Categorical variables stay as exact labels in CSV logs; v0.4.1 one-hot encoding is internal model-space behavior only.
 - Historical manual duplicates should be cleaned before relying on model-based suggestions.
 
 ## 🧪 Variable Value Rules

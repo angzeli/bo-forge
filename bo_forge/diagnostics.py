@@ -19,7 +19,7 @@ from bo_forge.plot_style import (
     set_title,
     style_colorbar,
 )
-from bo_forge.transforms import dataframe_to_unit_cube, has_mixed_variables
+from bo_forge.transforms import dataframe_to_variable_coverage, has_mixed_variables
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
 _HIGH_DIM_TITLE_SIZE = 16
@@ -293,7 +293,7 @@ def _normalised_variable_coverage(
     config: CampaignConfig,
     observed: pd.DataFrame,
 ) -> pd.DataFrame:
-    unit = dataframe_to_unit_cube(config, observed)
+    unit = dataframe_to_variable_coverage(config, observed)
     data = unit.detach().cpu().numpy()
     return pd.DataFrame(data, columns=config.variable_names, index=observed.index).clip(
         lower=0.0,

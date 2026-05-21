@@ -1,11 +1,14 @@
 import pandas as pd
 import pytest
+import torch
 
+import bo_forge.suggestions as suggestions_module
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
-from bo_forge.suggestions import suggest_next
+from bo_forge.suggestions import MAX_DECODE_RETRIES, suggest_next
+from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
 
 
@@ -217,6 +220,8 @@ def test_mixed_model_based_single_suggestion() -> None:
     assert len(suggestions) == 1
     assert suggestions.loc[0, "source"] == "log_ei"
     assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
+    assert int(suggestions.loc[0, "repeats"]) in {1, 2, 3}
+    assert float(suggestions.loc[0, "dose"]) in {0.1, 0.2, 0.5}
     assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
 
 
@@ -229,6 +234,58 @@ def test_mixed_model_based_batch_suggestions() -> None:
     assert len(suggestions) == 2
     assert set(suggestions["source"]) == {"qlog_ei"}
     assert set(suggestions["dose"].astype(float)).issubset({0.1, 0.2, 0.5})
+    assert set(suggestions["repeats"].astype(int)).issubset({1, 2, 3})
+    assert set(suggestions["solvent"]).issubset({"MeCN", "EtOH"})
+    assert suggestions["solvent"].nunique() == 1
+
+
+def test_categorical_combination_threshold_is_enforced() -> None:
+    cfg = CampaignConfig(
+        campaign_name="many_categories",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=tuple(
+            VariableConfig(f"cat_{index}", "categorical", values=("a", "b"))
+            for index in range(7)
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+    )
+    row = {
+        "row_id": "obs_0",
+        "iteration": 0,
+        "status": "observed",
+        "source": "manual",
+        "score": 1.0,
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    for variable in cfg.variables:
+        row[variable.name] = "a"
+    df = pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    with pytest.raises(SuggestionError, match="at most 64 categorical combinations"):
+        suggest_next(cfg, df)
+
+
+def test_duplicate_decoded_candidates_retry_then_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = mixed_config(batch_size=1, initial_design_size=3)
+    df = mixed_observed_log(cfg)
+    duplicate_x = values_to_unit_cube(cfg, [(0.1, 1, 0.1, "MeCN")])
+    calls = 0
+
+    def duplicate_optimizer(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return duplicate_x, torch.tensor(0.0, dtype=torch.double), "log_ei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_log_ei", duplicate_optimizer)
+
+    with pytest.raises(SuggestionError, match=f"{MAX_DECODE_RETRIES} decode retries"):
+        suggest_next(cfg, df)
+
+    assert calls == MAX_DECODE_RETRIES
 
 
 def test_mixed_append_round_trip_validates(tmp_path) -> None:

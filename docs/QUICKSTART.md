@@ -178,7 +178,11 @@ bo:
   initial_design_method: sobol
 ```
 
-`initial_design_method` can be `sobol` or `random`. Model-based mixed suggestions use a latent unit-cube representation internally, then decode and repair suggestions back to valid user-facing values before returning them.
+`initial_design_method` can be `sobol` or `random`. Model-based mixed suggestions use a latent representation internally, then decode and repair suggestions back to valid user-facing values before returning them.
+
+In v0.4.0, categorical variables used scalar-bin encoding. In v0.4.1, categorical variables use one-hot model features internally while public logs still store exact category labels. This removes artificial ordinal structure between labels, but categorical modelling still uses a standard continuous GP over one-hot features. Dedicated categorical kernels or learned embeddings are future work.
+
+For qLogEI batches with categorical variables, v0.4.1 optimizes each batch under one fixed categorical assignment. Mixed-category qLogEI batches are deferred to later suggestion-quality work.
 
 ## 📓 Example Notebooks
 
