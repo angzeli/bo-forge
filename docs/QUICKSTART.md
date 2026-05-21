@@ -36,17 +36,17 @@ The CLI wraps the same `CampaignSession` workflow used in notebooks.
 
 ```bash
 bo-forge validate \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 
 bo-forge summary \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 
 bo-forge suggest \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
-  --output examples/simple_2d_maximise_logei_latest_suggestions.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
+  --output examples/01_simple_2d_maximise_logei_latest_suggestions.csv \
   --append
 ```
 
@@ -64,12 +64,12 @@ import shutil
 
 from bo_forge.session import CampaignSession
 
-seed_log_path = Path("examples/simple_2d_maximise_logei_campaign_log.csv")
-log_path = Path("examples/simple_2d_maximise_logei_working_log.csv")
+seed_log_path = Path("examples/01_simple_2d_maximise_logei_campaign_log.csv")
+log_path = Path("examples/01_simple_2d_maximise_logei_working_log.csv")
 shutil.copyfile(seed_log_path, log_path)
 
 campaign = CampaignSession.from_files(
-    config_path="configs/simple_2d_maximise_logei.yaml",
+    config_path="configs/01_simple_2d_maximise_logei.yaml",
     log_path=log_path,
 )
 
@@ -129,9 +129,9 @@ from bo_forge import (
     suggest_next,
 )
 
-config = CampaignConfig.from_yaml("configs/simple_2d_maximise_logei.yaml")
-seed_log_path = Path("examples/simple_2d_maximise_logei_campaign_log.csv")
-log_path = Path("examples/simple_2d_maximise_logei_working_log.csv")
+config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+seed_log_path = Path("examples/01_simple_2d_maximise_logei_campaign_log.csv")
+log_path = Path("examples/01_simple_2d_maximise_logei_working_log.csv")
 shutil.copyfile(seed_log_path, log_path)
 
 df = load_campaign_log(log_path, config)

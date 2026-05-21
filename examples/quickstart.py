@@ -30,8 +30,8 @@ from bo_forge import (  # noqa: E402
     suggest_next,
 )
 
-CONFIG_PATH = PROJECT_ROOT / "configs" / "simple_2d_maximise_logei.yaml"
-SEED_LOG_PATH = PROJECT_ROOT / "examples" / "simple_2d_maximise_logei_campaign_log.csv"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "01_simple_2d_maximise_logei.yaml"
+SEED_LOG_PATH = PROJECT_ROOT / "examples" / "01_simple_2d_maximise_logei_campaign_log.csv"
 WORKING_LOG_PATH = PROJECT_ROOT / "examples" / "quickstart_working_log.csv"
 
 

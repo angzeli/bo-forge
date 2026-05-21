@@ -189,8 +189,8 @@ def test_plot_diagnostics_3d_uses_high_dimensional_heatmap_without_mutating_df()
 
 
 def test_plot_diagnostics_3d_text_stays_inside_figure() -> None:
-    cfg = CampaignConfig.from_yaml("configs/simple_3d_maximise_logei.yaml")
-    df = load_campaign_log("examples/simple_3d_maximise_logei_campaign_log.csv", cfg)
+    cfg = CampaignConfig.from_yaml("configs/03_simple_3d_maximise_logei.yaml")
+    df = load_campaign_log("examples/03_simple_3d_maximise_logei_campaign_log.csv", cfg)
 
     fig, axes = plot_diagnostics(cfg, df)
     fig.canvas.draw()

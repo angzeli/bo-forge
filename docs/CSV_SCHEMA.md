@@ -52,7 +52,7 @@ Use `mark_observed()`:
 from bo_forge import mark_observed
 
 mark_observed(
-    "../examples/simple_2d_maximise_logei_working_log.csv",
+    "../examples/01_simple_2d_maximise_logei_working_log.csv",
     row_id="suggested_row_id_here",
     objective_value=1.95,
 )

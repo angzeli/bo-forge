@@ -47,7 +47,7 @@ Create an empty canonical campaign log from a config:
 
 ```bash
 bo-forge init-log \
-  --config configs/simple_2d_maximise_logei.yaml \
+  --config configs/01_simple_2d_maximise_logei.yaml \
   --log examples/my_new_campaign_log.csv
 ```
 
@@ -55,32 +55,32 @@ Validate a campaign log:
 
 ```bash
 bo-forge validate \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 ```
 
 Inspect state:
 
 ```bash
 bo-forge status \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 
 bo-forge summary \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 
 bo-forge next-action \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 ```
 
 Generate suggestions without changing the campaign log:
 
 ```bash
 bo-forge suggest \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv \
   --batch-size 1
 ```
 
@@ -90,9 +90,9 @@ Generate suggestions, save a suggestions CSV, and append the same suggestions to
 
 ```bash
 bo-forge suggest \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
-  --output examples/simple_2d_maximise_logei_latest_suggestions.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
+  --output examples/01_simple_2d_maximise_logei_latest_suggestions.csv \
   --append
 ```
 
@@ -100,8 +100,8 @@ After running the experiment, record the result:
 
 ```bash
 bo-forge mark-observed \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --row-id ROW_ID_FROM_SUGGESTIONS \
   --objective-value 1.95
 ```
@@ -112,16 +112,16 @@ Print a plain-text campaign report:
 
 ```bash
 bo-forge report \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv
 ```
 
 Export the same deterministic report format:
 
 ```bash
 bo-forge report \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --output reports/latest_campaign_report.txt
 ```
 
@@ -129,14 +129,14 @@ Export one figure per command:
 
 ```bash
 bo-forge plot \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --kind progress \
   --output reports/progress.png
 
 bo-forge plot \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_working_log.csv \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --kind diagnostics \
   --output reports/diagnostics.png
 ```

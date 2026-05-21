@@ -98,8 +98,8 @@ def test_validate_campaign_data_accepts_valid_mixed_log() -> None:
 
 
 def test_validate_campaign_data_accepts_3d_example_log() -> None:
-    config_3d = CampaignConfig.from_yaml("configs/simple_3d_maximise_logei.yaml")
-    df = load_campaign_log("examples/simple_3d_maximise_logei_campaign_log.csv", config_3d)
+    config_3d = CampaignConfig.from_yaml("configs/03_simple_3d_maximise_logei.yaml")
+    df = load_campaign_log("examples/03_simple_3d_maximise_logei_campaign_log.csv", config_3d)
 
     validate_campaign_data(config_3d, df)
     assert config_3d.variable_names == [
@@ -110,8 +110,8 @@ def test_validate_campaign_data_accepts_3d_example_log() -> None:
 
 
 def test_validate_campaign_data_accepts_4d_example_log() -> None:
-    config_4d = CampaignConfig.from_yaml("configs/simple_4d_maximise_logei.yaml")
-    df = load_campaign_log("examples/simple_4d_maximise_logei_campaign_log.csv", config_4d)
+    config_4d = CampaignConfig.from_yaml("configs/04_simple_4d_maximise_logei.yaml")
+    df = load_campaign_log("examples/04_simple_4d_maximise_logei_campaign_log.csv", config_4d)
 
     validate_campaign_data(config_4d, df)
     assert config_4d.variable_names == [
@@ -123,8 +123,8 @@ def test_validate_campaign_data_accepts_4d_example_log() -> None:
 
 
 def test_validate_campaign_data_accepts_mixed_example_log() -> None:
-    config_mixed = CampaignConfig.from_yaml("configs/simple_mixed_logei.yaml")
-    df = load_campaign_log("examples/simple_mixed_logei_campaign_log.csv", config_mixed)
+    config_mixed = CampaignConfig.from_yaml("configs/05_simple_mixed_logei.yaml")
+    df = load_campaign_log("examples/05_simple_mixed_logei_campaign_log.csv", config_mixed)
 
     validate_campaign_data(config_mixed, df)
     assert config_mixed.variable_names == [

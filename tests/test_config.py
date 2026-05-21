@@ -78,7 +78,7 @@ bo:
 
 
 def test_example_minimize_config_parses() -> None:
-    config = CampaignConfig.from_yaml("configs/simple_2d_minimise_qlogei.yaml")
+    config = CampaignConfig.from_yaml("configs/02_simple_2d_minimise_qlogei.yaml")
 
     assert config.campaign_name == "process_defect_minimisation"
     assert config.objective.name == "defect_rate"
@@ -89,7 +89,7 @@ def test_example_minimize_config_parses() -> None:
 
 
 def test_example_3d_config_parses() -> None:
-    config = CampaignConfig.from_yaml("configs/simple_3d_maximise_logei.yaml")
+    config = CampaignConfig.from_yaml("configs/03_simple_3d_maximise_logei.yaml")
 
     assert config.campaign_name == "three_variable_photocatalyst"
     assert config.objective.name == "activity"
@@ -103,7 +103,7 @@ def test_example_3d_config_parses() -> None:
 
 
 def test_example_4d_config_parses() -> None:
-    config = CampaignConfig.from_yaml("configs/simple_4d_maximise_logei.yaml")
+    config = CampaignConfig.from_yaml("configs/04_simple_4d_maximise_logei.yaml")
 
     assert config.campaign_name == "four_variable_photocatalyst"
     assert config.objective.name == "activity"
@@ -118,7 +118,7 @@ def test_example_4d_config_parses() -> None:
 
 
 def test_example_mixed_config_parses() -> None:
-    config = CampaignConfig.from_yaml("configs/simple_mixed_logei.yaml")
+    config = CampaignConfig.from_yaml("configs/05_simple_mixed_logei.yaml")
 
     assert config.campaign_name == "mixed_catalyst_screen"
     assert config.objective.name == "yield_score"

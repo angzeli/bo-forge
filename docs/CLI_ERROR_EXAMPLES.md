@@ -10,8 +10,8 @@ Run examples against temporary files, not committed seed logs:
 
 ```bash
 mkdir -p /tmp/bo_forge_error_demo
-cp configs/simple_2d_maximise_logei.yaml /tmp/bo_forge_error_demo/config.yaml
-cp examples/simple_2d_maximise_logei_campaign_log.csv /tmp/bo_forge_error_demo/campaign.csv
+cp configs/01_simple_2d_maximise_logei.yaml /tmp/bo_forge_error_demo/config.yaml
+cp examples/01_simple_2d_maximise_logei_campaign_log.csv /tmp/bo_forge_error_demo/campaign.csv
 ```
 
 ## ⚙️ Missing Config Path
@@ -72,7 +72,7 @@ Fix: correct the CSV value or update the YAML bounds if the campaign definition 
 Reset the temporary CSV, append one suggestion, then ask for another:
 
 ```bash
-cp examples/simple_2d_maximise_logei_campaign_log.csv /tmp/bo_forge_error_demo/campaign.csv
+cp examples/01_simple_2d_maximise_logei_campaign_log.csv /tmp/bo_forge_error_demo/campaign.csv
 
 python -m bo_forge suggest \
   --config /tmp/bo_forge_error_demo/config.yaml \

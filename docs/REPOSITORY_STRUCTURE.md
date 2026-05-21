@@ -72,12 +72,12 @@ Validate a campaign from the terminal:
 bo-forge doctor
 
 bo-forge init-log \
-  --config configs/simple_2d_maximise_logei.yaml \
+  --config configs/01_simple_2d_maximise_logei.yaml \
   --log examples/my_new_campaign_log.csv
 
 bo-forge validate \
-  --config configs/simple_2d_maximise_logei.yaml \
-  --log examples/simple_2d_maximise_logei_campaign_log.csv
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv
 ```
 
 Open the full simulated workflow:

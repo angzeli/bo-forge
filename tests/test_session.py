@@ -224,8 +224,8 @@ def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> N
 
 def test_from_files_loads_3d_example_campaign() -> None:
     campaign = CampaignSession.from_files(
-        "configs/simple_3d_maximise_logei.yaml",
-        "examples/simple_3d_maximise_logei_campaign_log.csv",
+        "configs/03_simple_3d_maximise_logei.yaml",
+        "examples/03_simple_3d_maximise_logei_campaign_log.csv",
     )
 
     assert campaign.config.campaign_name == "three_variable_photocatalyst"
@@ -239,8 +239,8 @@ def test_from_files_loads_3d_example_campaign() -> None:
 
 def test_from_files_loads_mixed_example_campaign() -> None:
     campaign = CampaignSession.from_files(
-        "configs/simple_mixed_logei.yaml",
-        "examples/simple_mixed_logei_campaign_log.csv",
+        "configs/05_simple_mixed_logei.yaml",
+        "examples/05_simple_mixed_logei_campaign_log.csv",
     )
 
     assert campaign.config.campaign_name == "mixed_catalyst_screen"
