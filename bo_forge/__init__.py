@@ -1,6 +1,6 @@
-"""BO Forge v0.3.3."""
+"""BO Forge v0.4.0."""
 
-__version__ = "0.3.3"
+__version__ = "0.4.0"
 
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import (

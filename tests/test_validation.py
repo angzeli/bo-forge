@@ -4,7 +4,7 @@ import pytest
 from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
 from bo_forge.errors import LogValidationError
 from bo_forge.logs import load_campaign_log
-from bo_forge.validation import canonical_columns, validate_campaign_data
+from bo_forge.validation import canonical_columns, design_tuples, validate_campaign_data
 
 
 def config() -> CampaignConfig:
@@ -52,8 +52,49 @@ def valid_df() -> pd.DataFrame:
     )
 
 
+def mixed_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="mixed",
+        objective=ObjectiveConfig(name="yield", direction="maximize"),
+        variables=(
+            VariableConfig("loading", "continuous", 0.0, 1.0),
+            VariableConfig("repeats", "integer", 1.0, 5.0),
+            VariableConfig("base_ratio", "discrete", values=(0.1, 0.2, 0.5)),
+            VariableConfig("solvent", "categorical", values=("MeCN", "EtOH", "Water")),
+        ),
+        bo=BOConfig(batch_size=2, initial_design_size=3),
+    )
+
+
+def mixed_df() -> pd.DataFrame:
+    cfg = mixed_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "mixed_1",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "loading": 0.5,
+                "repeats": 3.0,
+                "base_ratio": "0.10",
+                "solvent": "MeCN",
+                "yield": 72.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_validate_campaign_data_accepts_valid_log() -> None:
     validate_campaign_data(config(), valid_df())
+
+
+def test_validate_campaign_data_accepts_valid_mixed_log() -> None:
+    validate_campaign_data(mixed_config(), mixed_df())
 
 
 def test_validate_campaign_data_accepts_3d_example_log() -> None:
@@ -78,6 +119,19 @@ def test_validate_campaign_data_accepts_4d_example_log() -> None:
         "annealing_temperature",
         "electrolyte_concentration",
         "reaction_time",
+    ]
+
+
+def test_validate_campaign_data_accepts_mixed_example_log() -> None:
+    config_mixed = CampaignConfig.from_yaml("configs/simple_mixed_logei.yaml")
+    df = load_campaign_log("examples/simple_mixed_logei_campaign_log.csv", config_mixed)
+
+    validate_campaign_data(config_mixed, df)
+    assert config_mixed.variable_names == [
+        "catalyst_loading",
+        "reaction_time",
+        "base_equivalents",
+        "solvent",
     ]
 
 
@@ -122,7 +176,52 @@ def test_validate_campaign_data_rejects_out_of_bounds_variable() -> None:
 
 def test_validate_campaign_data_rejects_invalid_source() -> None:
     df = valid_df()
+    df.loc[0, "source"] = "bad_source"
+
+    with pytest.raises(LogValidationError, match="invalid source 'bad_source'"):
+        validate_campaign_data(config(), df)
+
+
+def test_validate_campaign_data_accepts_random_source() -> None:
+    df = valid_df()
     df.loc[0, "source"] = "random"
 
-    with pytest.raises(LogValidationError, match="invalid source 'random'"):
-        validate_campaign_data(config(), df)
+    validate_campaign_data(config(), df)
+
+
+def test_validate_campaign_data_rejects_invalid_integer_value() -> None:
+    df = mixed_df()
+    df.loc[0, "repeats"] = 3.5
+
+    with pytest.raises(LogValidationError, match="non-integer value"):
+        validate_campaign_data(mixed_config(), df)
+
+
+def test_validate_campaign_data_rejects_invalid_discrete_value() -> None:
+    df = mixed_df()
+    df.loc[0, "base_ratio"] = "0.3"
+
+    with pytest.raises(LogValidationError, match="outside configured choices"):
+        validate_campaign_data(mixed_config(), df)
+
+
+def test_validate_campaign_data_rejects_categorical_case_mismatch() -> None:
+    df = mixed_df()
+    df.loc[0, "solvent"] = "mecn"
+
+    with pytest.raises(LogValidationError, match="outside configured choices"):
+        validate_campaign_data(mixed_config(), df)
+
+
+def test_validate_campaign_data_rejects_categorical_whitespace() -> None:
+    df = mixed_df()
+    df.loc[0, "solvent"] = " MeCN "
+
+    with pytest.raises(LogValidationError, match="whitespace-padded categorical value"):
+        validate_campaign_data(mixed_config(), df)
+
+
+def test_design_tuples_preserve_mixed_user_space_values() -> None:
+    keys = design_tuples(mixed_config(), mixed_df())
+
+    assert keys == {(0.5, 3, 0.1, "MeCN")}

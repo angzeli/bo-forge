@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import uuid
 
 import pandas as pd
@@ -12,9 +13,14 @@ from bo_forge.acquisition import optimize_log_ei
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
-from bo_forge.transforms import from_unit_cube, objective_from_model_space
+from bo_forge.transforms import (
+    objective_from_model_space,
+    unit_cube_to_user_values,
+    values_to_unit_cube,
+)
 from bo_forge.validation import (
     canonical_columns,
+    design_key_for_values,
     design_tuples,
     get_observed_data,
     has_pending_suggestions,
@@ -42,7 +48,7 @@ def suggest_next(
     observed_df = get_observed_data(config, df)
     remaining_initial = config.bo.initial_design_size - len(observed_df)
     if remaining_initial > 0:
-        return _suggest_sobol(
+        return _suggest_initial_design(
             config=config,
             df=df,
             count=min(requested_batch_size, remaining_initial),
@@ -56,9 +62,19 @@ def suggest_next(
     )
 
 
-def _suggest_sobol(config: CampaignConfig, df: pd.DataFrame, count: int) -> pd.DataFrame:
+def _suggest_initial_design(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    count: int,
+) -> pd.DataFrame:
     existing = design_tuples(config, df)
-    candidates = _sobol_user_candidates(config, count=count, existing=existing)
+    source = config.bo.initial_design_method
+    candidates = _initial_user_candidates(
+        config,
+        count=count,
+        existing=existing,
+        method=source,
+    )
     rows = []
     iteration = next_iteration(df)
     for candidate in candidates:
@@ -66,9 +82,9 @@ def _suggest_sobol(config: CampaignConfig, df: pd.DataFrame, count: int) -> pd.D
         row["row_id"] = uuid.uuid4().hex
         row["iteration"] = iteration
         row["status"] = "suggested"
-        row["source"] = "sobol"
+        row["source"] = source
         for name, value in zip(config.variable_names, candidate, strict=True):
-            row[name] = float(value)
+            row[name] = value
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(config))
 
@@ -82,17 +98,18 @@ def _suggest_model_based(
     torch.manual_seed(config.bo.random_seed)
     model = fit_gp_model(config, observed_df)
     _, train_y_model = dataframe_to_tensors(config, observed_df)
-    x_unit, acquisition_value, source = optimize_log_ei(
+    x_unit_raw, acquisition_value, source = optimize_log_ei(
         config=config,
         model=model,
         train_y_model=train_y_model,
         batch_size=batch_size,
     )
-    x_user = from_unit_cube(config, x_unit).detach()
-    _raise_if_duplicate_candidates(config, df, x_user)
+    user_candidates = unit_cube_to_user_values(config, x_unit_raw)
+    _raise_if_duplicate_candidates(config, df, user_candidates)
+    x_unit_repaired = values_to_unit_cube(config, user_candidates)
 
     with torch.no_grad():
-        posterior = model.posterior(x_unit)
+        posterior = model.posterior(x_unit_repaired)
         mean_model = posterior.mean.squeeze(-1)
         std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
         mean_user = objective_from_model_space(config, mean_model)
@@ -106,8 +123,8 @@ def _suggest_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
-        for name, value in zip(config.variable_names, x_user[index].tolist(), strict=True):
-            row[name] = float(value)
+        for name, value in zip(config.variable_names, user_candidates[index], strict=True):
+            row[name] = value
         row["predicted_mean"] = float(mean_user[index])
         row["predicted_std"] = float(std[index])
         row["acquisition"] = acquisition_scalar
@@ -116,34 +133,64 @@ def _suggest_model_based(
     return pd.DataFrame(rows, columns=canonical_columns(config))
 
 
-def _sobol_user_candidates(
+def _initial_user_candidates(
     config: CampaignConfig,
     count: int,
-    existing: set[tuple[float, ...]],
-) -> list[tuple[float, ...]]:
-    engine = SobolEngine(
-        dimension=len(config.variables),
-        scramble=True,
-        seed=config.bo.random_seed,
-    )
-    selected: list[tuple[float, ...]] = []
+    existing: set[tuple[object, ...]],
+    method: str,
+) -> list[tuple[object, ...]]:
+    finite_size = _finite_design_space_size(config)
+    if finite_size is not None and len(existing) + count > finite_size:
+        raise SuggestionError(
+            "Could not generate non-duplicate initial suggestions because the finite "
+            f"design space is exhausted: requested={count}, existing={len(existing)}, "
+            f"space_size={finite_size}."
+        )
+
+    engine = None
+    generator = None
+    if method == "sobol":
+        engine = SobolEngine(
+            dimension=len(config.variables),
+            scramble=True,
+            seed=config.bo.random_seed,
+        )
+    elif method == "random":
+        generator = torch.Generator()
+        generator.manual_seed(config.bo.random_seed)
+    else:
+        raise SuggestionError(
+            f"Unsupported initial_design_method '{method}'. Expected 'sobol' or 'random'."
+        )
+
+    selected: list[tuple[object, ...]] = []
     seen = set(existing)
+    batches_drawn = 0
 
     while len(selected) < count:
-        draw_count = max(count * 8, len(seen) + count + 8)
-        unit = engine.draw(draw_count).to(dtype=torch.double)
-        user = from_unit_cube(config, unit).tolist()
-        for row in user:
-            candidate = tuple(float(value) for value in row)
-            candidate_key = _design_key(candidate)
+        draw_count = max(count * 16, 64)
+        if engine is not None:
+            unit = engine.draw(draw_count).to(dtype=torch.double)
+        else:
+            unit = torch.rand(
+                draw_count,
+                len(config.variables),
+                generator=generator,
+                dtype=torch.double,
+            )
+        for candidate in unit_cube_to_user_values(config, unit):
+            candidate_key = design_key_for_values(config, candidate)
             if candidate_key in seen:
                 continue
             selected.append(candidate)
             seen.add(candidate_key)
             if len(selected) == count:
                 break
-        if len(seen) > 100_000:
-            raise SuggestionError("Could not generate non-duplicate Sobol suggestions.")
+        batches_drawn += 1
+        if batches_drawn > 1000 or len(seen) > 100_000:
+            raise SuggestionError(
+                f"Could not generate non-duplicate {method} suggestions."
+            )
 
     return selected
 
@@ -151,21 +198,38 @@ def _sobol_user_candidates(
 def _raise_if_duplicate_candidates(
     config: CampaignConfig,
     df: pd.DataFrame,
-    x_user: torch.Tensor,
+    candidates: list[tuple[object, ...]],
 ) -> None:
     existing = design_tuples(config, df)
-    for row in x_user.tolist():
-        candidate = tuple(float(value) for value in row)
-        if _design_key(candidate) in existing:
+    seen = set(existing)
+    for candidate in candidates:
+        candidate_key = design_key_for_values(config, candidate)
+        if candidate_key in seen:
             raise SuggestionError(
-                "Model-based suggestion duplicated an existing design exactly: "
+                "Model-based suggestion duplicated an existing or batch design exactly "
+                "after decoding: "
                 f"candidate={candidate}."
             )
+        seen.add(candidate_key)
 
 
 def _empty_row(config: CampaignConfig) -> dict[str, object]:
     return {column: "" for column in canonical_columns(config)}
 
 
-def _design_key(candidate: tuple[float, ...]) -> tuple[float, ...]:
-    return tuple(round(value, 12) for value in candidate)
+def _finite_design_space_size(config: CampaignConfig) -> int | None:
+    sizes = []
+    for variable in config.variables:
+        if variable.type == "continuous":
+            return None
+        if variable.type == "integer":
+            if variable.lower is None or variable.upper is None:
+                raise SuggestionError(f"Variable '{variable.name}' is missing integer bounds.")
+            sizes.append(int(variable.upper) - int(variable.lower) + 1)
+        elif variable.type in {"discrete", "categorical"}:
+            sizes.append(len(variable.values))
+        else:
+            raise SuggestionError(
+                f"Variable '{variable.name}' has unsupported type '{variable.type}'."
+            )
+    return math.prod(sizes)

@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 
 import pandas as pd
 
-from bo_forge.config import CampaignConfig
+from bo_forge.config import CampaignConfig, VariableConfig
 from bo_forge.errors import LogValidationError
 
 BASE_COLUMNS = ["row_id", "iteration", "status", "source"]
 RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
 VALID_STATUSES = {"suggested", "observed"}
-VALID_SOURCES = {"manual", "sobol", "log_ei", "qlog_ei"}
+VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei"}
 
 
 def canonical_columns(config: CampaignConfig) -> list[str]:
@@ -53,14 +54,28 @@ def has_pending_suggestions(df: pd.DataFrame) -> bool:
     return bool((df["status"] == "suggested").any())
 
 
-def design_tuples(config: CampaignConfig, df: pd.DataFrame) -> set[tuple[float, ...]]:
-    """Return existing variable rows as stable float tuples for duplicate checks."""
+def design_tuples(config: CampaignConfig, df: pd.DataFrame) -> set[tuple[object, ...]]:
+    """Return existing variable rows as stable typed tuples for duplicate checks."""
     if df.empty:
         return set()
     return {
-        tuple(round(float(row[name]), 12) for name in config.variable_names)
+        design_key_for_values(
+            config,
+            [row[variable.name] for variable in config.variables],
+        )
         for _, row in df.iterrows()
     }
+
+
+def design_key_for_values(
+    config: CampaignConfig,
+    values: Iterable[object],
+) -> tuple[object, ...]:
+    """Return one stable typed design key for user-facing variable values."""
+    return tuple(
+        _normalise_variable_value(variable, value)
+        for variable, value in zip(config.variables, values, strict=True)
+    )
 
 
 def next_iteration(df: pd.DataFrame) -> int:
@@ -135,8 +150,12 @@ def _validate_source(df: pd.DataFrame) -> None:
 
 def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
     for variable in config.variables:
+        if variable.type == "categorical":
+            _validate_categorical_variable(variable, df)
+            continue
+
         numeric = pd.to_numeric(df[variable.name], errors="coerce")
-        invalid_numeric = numeric.isna()
+        invalid_numeric = numeric.isna() | ~numeric.map(math.isfinite)
         if invalid_numeric.any():
             row_id = str(df.loc[invalid_numeric, "row_id"].iloc[0])
             value = df.loc[invalid_numeric, variable.name].iloc[0]
@@ -145,15 +164,89 @@ def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
                 f"'{variable.name}': value={value!r}."
             )
 
-        below = numeric < variable.lower
-        above = numeric > variable.upper
-        if below.any() or above.any():
-            invalid = below | above
-            row_id = str(df.loc[invalid, "row_id"].iloc[0])
-            value = numeric.loc[invalid].iloc[0]
+        if variable.type == "continuous":
+            _validate_numeric_bounds(variable, df, numeric)
+        elif variable.type == "integer":
+            _validate_integer_variable(variable, df, numeric)
+        elif variable.type == "discrete":
+            _validate_discrete_variable(variable, df, numeric)
+        else:
             raise LogValidationError(
-                f"Row '{row_id}' has variable '{variable.name}' outside bounds: "
-                f"value={value:g}, lower={variable.lower:g}, upper={variable.upper:g}."
+                f"Variable '{variable.name}' has unsupported type '{variable.type}'."
+            )
+
+
+def _validate_numeric_bounds(
+    variable: VariableConfig,
+    df: pd.DataFrame,
+    numeric: pd.Series,
+) -> None:
+    lower = _required_bound(variable, "lower")
+    upper = _required_bound(variable, "upper")
+    below = numeric < lower
+    above = numeric > upper
+    if below.any() or above.any():
+        invalid = below | above
+        row_id = str(df.loc[invalid, "row_id"].iloc[0])
+        value = numeric.loc[invalid].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has variable '{variable.name}' outside bounds: "
+            f"value={value:g}, lower={lower:g}, upper={upper:g}."
+        )
+
+
+def _validate_integer_variable(
+    variable: VariableConfig,
+    df: pd.DataFrame,
+    numeric: pd.Series,
+) -> None:
+    non_integer = numeric % 1 != 0
+    if non_integer.any():
+        row_id = str(df.loc[non_integer, "row_id"].iloc[0])
+        value = df.loc[non_integer, variable.name].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has non-integer value for variable "
+            f"'{variable.name}': value={value!r}."
+        )
+    _validate_numeric_bounds(variable, df, numeric)
+
+
+def _validate_discrete_variable(
+    variable: VariableConfig,
+    df: pd.DataFrame,
+    numeric: pd.Series,
+) -> None:
+    allowed = [float(value) for value in variable.values]
+    valid = numeric.map(
+        lambda value: any(
+            math.isclose(float(value), allowed_value, rel_tol=1e-12, abs_tol=1e-12)
+            for allowed_value in allowed
+        )
+    )
+    invalid = ~valid
+    if invalid.any():
+        row_id = str(df.loc[invalid, "row_id"].iloc[0])
+        value = df.loc[invalid, variable.name].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has value outside configured choices for variable "
+            f"'{variable.name}': value={value!r}, allowed={allowed}."
+        )
+
+
+def _validate_categorical_variable(variable: VariableConfig, df: pd.DataFrame) -> None:
+    allowed = set(str(value) for value in variable.values)
+    for index, value in df[variable.name].items():
+        if not isinstance(value, str) or value == "" or value.strip() != value:
+            row_id = str(df.at[index, "row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has blank or whitespace-padded categorical value "
+                f"for variable '{variable.name}': value={value!r}."
+            )
+        if value not in allowed:
+            row_id = str(df.at[index, "row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has value outside configured choices for variable "
+                f"'{variable.name}': value={value!r}, allowed={sorted(allowed)}."
             )
 
 
@@ -206,3 +299,55 @@ def _validate_nullable_numeric_columns(df: pd.DataFrame, columns: Iterable[str])
 
 def _blank_mask(series: pd.Series) -> pd.Series:
     return series.isna() | (series.astype(str).str.strip() == "")
+
+
+def _normalise_variable_value(variable: VariableConfig, value: object) -> object:
+    if variable.type == "continuous":
+        return round(_finite_float(variable, value), 12)
+    if variable.type == "integer":
+        parsed = _finite_float(variable, value)
+        if parsed % 1 != 0:
+            raise LogValidationError(
+                f"Variable '{variable.name}' has non-integer value: value={value!r}."
+            )
+        return int(parsed)
+    if variable.type == "discrete":
+        parsed = _finite_float(variable, value)
+        for allowed in [float(item) for item in variable.values]:
+            if math.isclose(parsed, allowed, rel_tol=1e-12, abs_tol=1e-12):
+                return float(allowed)
+        raise LogValidationError(
+            f"Variable '{variable.name}' has value outside configured choices: "
+            f"value={value!r}."
+        )
+    if variable.type == "categorical":
+        if not isinstance(value, str) or value == "" or value.strip() != value:
+            raise LogValidationError(
+                f"Variable '{variable.name}' has blank or whitespace-padded "
+                f"categorical value: value={value!r}."
+            )
+        return value
+    raise LogValidationError(
+        f"Variable '{variable.name}' has unsupported type '{variable.type}'."
+    )
+
+
+def _finite_float(variable: VariableConfig, value: object) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise LogValidationError(
+            f"Variable '{variable.name}' has non-numeric value: value={value!r}."
+        ) from exc
+    if not math.isfinite(parsed):
+        raise LogValidationError(
+            f"Variable '{variable.name}' has non-finite value: value={value!r}."
+        )
+    return parsed
+
+
+def _required_bound(variable: VariableConfig, key: str) -> float:
+    value = variable.lower if key == "lower" else variable.upper
+    if value is None:
+        raise LogValidationError(f"Variable '{variable.name}' is missing bound '{key}'.")
+    return float(value)

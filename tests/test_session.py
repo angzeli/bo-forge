@@ -39,11 +39,68 @@ bo:
     return path
 
 
+def write_mixed_config(path: Path, *, initial_design_size: int = 3) -> Path:
+    path.write_text(
+        f"""
+campaign_name: mixed_session_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: repeats
+    type: integer
+    lower: 1
+    upper: 3
+  - name: dose
+    type: discrete
+    values: [0.1, 0.2, 0.5]
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH]
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 5
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(direction: str = "maximize", initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="session_test",
         objective=ObjectiveConfig(name="score", direction=direction),
         variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            random_seed=5,
+            raw_samples=16,
+            num_restarts=2,
+            mc_samples=16,
+        ),
+    )
+
+
+def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="mixed_session_test",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("repeats", "integer", 1.0, 3.0),
+            VariableConfig("dose", "discrete", values=(0.1, 0.2, 0.5)),
+            VariableConfig("solvent", "categorical", values=("MeCN", "EtOH")),
+        ),
         bo=BOConfig(
             batch_size=1,
             initial_design_size=initial_design_size,
@@ -66,6 +123,34 @@ def observed_log(cfg: CampaignConfig, values: list[float]) -> pd.DataFrame:
                 "source": "manual",
                 "x": 0.2 + index * 0.2,
                 "score": value,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (x_value, repeats, dose, solvent, score) in enumerate(
+        [
+            (0.1, 1, 0.1, "MeCN", 1.0),
+            (0.3, 2, 0.2, "EtOH", 1.4),
+            (0.8, 3, 0.5, "MeCN", 1.2),
+        ]
+    ):
+        rows.append(
+            {
+                "row_id": f"mixed_obs_{index}",
+                "iteration": index,
+                "status": "observed",
+                "source": "manual",
+                "x": x_value,
+                "repeats": repeats,
+                "dose": dose,
+                "solvent": solvent,
+                "score": score,
                 "predicted_mean": "",
                 "predicted_std": "",
                 "acquisition": "",
@@ -119,6 +204,24 @@ def test_from_files_loads_config_and_log(tmp_path: Path) -> None:
     assert len(campaign.df) == 1
 
 
+def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> None:
+    config_path = write_mixed_config(tmp_path / "mixed.yaml")
+    cfg = mixed_config()
+    log_path = write_log(tmp_path / "mixed.csv", cfg, mixed_observed_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    campaign.validate()
+    summary = campaign.summary()
+    report = campaign.report()
+    suggestions = campaign.suggest_next(batch_size=1)
+
+    assert summary_value(summary, "campaign_status") == "ready_for_bo"
+    assert list(report) == ["summary", "next_action", "best_observation", "pending_suggestions"]
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
+
+
 def test_from_files_loads_3d_example_campaign() -> None:
     campaign = CampaignSession.from_files(
         "configs/simple_3d_maximise_logei.yaml",
@@ -130,6 +233,22 @@ def test_from_files_loads_3d_example_campaign() -> None:
         "precursor_ratio",
         "annealing_temperature",
         "electrolyte_concentration",
+    ]
+    assert len(campaign.df) == 4
+
+
+def test_from_files_loads_mixed_example_campaign() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/simple_mixed_logei.yaml",
+        "examples/simple_mixed_logei_campaign_log.csv",
+    )
+
+    assert campaign.config.campaign_name == "mixed_catalyst_screen"
+    assert campaign.config.variable_names == [
+        "catalyst_loading",
+        "reaction_time",
+        "base_equivalents",
+        "solvent",
     ]
     assert len(campaign.df) == 4
 

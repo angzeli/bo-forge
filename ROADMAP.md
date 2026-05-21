@@ -6,7 +6,7 @@ This roadmap is directional, not a release promise. BO Forge should stay useful 
 
 ```mermaid
 flowchart LR
-    v01["v0.1<br/>MVP foundation"] --> v02["v0.2<br/>Notebook engine"] --> v03["v0.3<br/>CLI workflow"] --> v04["v0.4<br/>Practical BO features"] --> v05["v0.5<br/>Streamlit prototype"]
+    v01["v0.1<br/>MVP foundation"] --> v02["v0.2<br/>Notebook engine"] --> v03["v0.3<br/>CLI workflow"] --> v04["v0.4<br/>Practical campaigns"] --> v05["v0.5<br/>Streamlit prototype"]
 
     v011["v0.1.1<br/>Polish"]
     v012["v0.1.2<br/>Usability"]
@@ -41,7 +41,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.3.3`. Next planned milestone: `v0.4`, focused on practical BO features beyond the current workflow layer.
+Current baseline: `v0.4.0`. Next planned milestone: `v0.4.1`, focused on constraints, duplicate handling, and batch diversity.
 
 ### Patch Notes So Far
 
@@ -60,6 +60,7 @@ Current baseline: `v0.3.3`. Next planned milestone: `v0.4`, focused on practical
 | `v0.3.1` | Patch | CLI invocation hardening with package module entrypoint |
 | `v0.3.2` | Patch | CLI error polish for expected failure paths |
 | `v0.3.3` | Patch | Add CLI doctor and init-log commands |
+| `v0.4.0` | Major | Mixed-variable single-objective BO |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -112,15 +113,18 @@ Status: completed
 - Preserve the CSV log as the source of truth.
 - Keep `suggest` non-mutating unless `--append` is passed.
 
-## 🧪 v0.4 - Practical BO Features
+## 🧪 v0.4 - Practical Single-Objective Campaigns
 
-- Observation noise support.
-- Fixed/context variables.
-- Simple constraints.
-- Better duplicate and near-duplicate avoidance.
-- Candidate diversity rules for batch suggestions.
-- Optional objective transforms.
-- More explicit model diagnostics.
+Status: in progress
+
+- Mixed-variable campaign configs: `continuous`, `integer`, `discrete`, and `categorical`.
+- Strict mixed-variable CSV validation.
+- Sobol/random mixed-variable initial suggestions.
+- Latent unit-cube encoding/decoding for mixed-variable model fitting.
+- Domain repair back to valid user-space rows.
+- Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
+- Mixed-variable duplicate handling using typed user-space design keys.
+- Session, CLI, docs, examples, and notebook coverage.
 
 ## 🖥️ v0.5 - Streamlit Prototype
 
@@ -136,8 +140,6 @@ Status: completed
 - FastAPI backend.
 - React frontend.
 - Database-backed campaign storage.
-- Mixed continuous/categorical variables.
 - Multi-objective optimisation.
 - Multi-fidelity or contextual BO.
 - Authentication and multi-user campaign management.
-- Exportable reports for campaign summaries.

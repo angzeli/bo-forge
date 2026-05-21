@@ -19,6 +19,7 @@ from bo_forge.plot_style import (
     set_title,
     style_colorbar,
 )
+from bo_forge.transforms import dataframe_to_unit_cube, has_mixed_variables
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
 _HIGH_DIM_TITLE_SIZE = 16
@@ -91,6 +92,16 @@ def plot_diagnostics(
         set_axis_labels(ax, "", "")
         return finalise_figure(
             ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    if has_mixed_variables(config):
+        return _plot_high_dimensional_diagnostics(
+            config,
+            observed,
             filename=filename,
             fig_folder=fig_folder,
             save_path=save_path,
@@ -282,10 +293,9 @@ def _normalised_variable_coverage(
     config: CampaignConfig,
     observed: pd.DataFrame,
 ) -> pd.DataFrame:
-    data = {}
-    for variable in config.variables:
-        values = pd.to_numeric(observed[variable.name])
-        width = variable.upper - variable.lower
-        normalised = (values - variable.lower) / width
-        data[variable.name] = normalised.clip(lower=0.0, upper=1.0)
-    return pd.DataFrame(data, index=observed.index)
+    unit = dataframe_to_unit_cube(config, observed)
+    data = unit.detach().cpu().numpy()
+    return pd.DataFrame(data, columns=config.variable_names, index=observed.index).clip(
+        lower=0.0,
+        upper=1.0,
+    )

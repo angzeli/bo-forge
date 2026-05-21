@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `log_ei`, or `qlog_ei`.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, or `qlog_ei`.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 
@@ -48,11 +48,36 @@ or:
 direction: minimize
 ```
 
-### `Variable 'catalyst' has unsupported type 'categorical'`
+### `Variable '...' has unsupported type`
 
-BO Forge currently supports continuous variables only.
+The variable type is not recognised.
 
-Fix: use `type: continuous`, or wait for categorical support in a later version.
+Fix: use one of:
+
+```text
+continuous
+integer
+discrete
+categorical
+```
+
+### `unsupported keys for type='categorical'`
+
+The YAML contains keys that do not belong to that variable type.
+
+Fix: use `lower`/`upper` for `continuous` and `integer`, and `values` for `discrete` and `categorical`.
+
+### `duplicate discrete value after numeric parsing`
+
+Discrete values are compared numerically, so `1` and `1.0` are duplicates.
+
+Fix: remove duplicate numeric choices.
+
+### `whitespace-padded categorical value`
+
+Categorical labels are exact strings.
+
+Fix: remove leading/trailing spaces from the YAML or CSV value.
 
 ## 🧾 CSV Schema Errors
 
@@ -98,6 +123,7 @@ Fix: use only:
 ```text
 manual
 sobol
+random
 log_ei
 qlog_ei
 ```
@@ -129,6 +155,8 @@ Fix: run that experiment and call `mark_observed()`, or remove the suggested row
 A variable cell contains text or an empty value.
 
 Fix: enter a numeric value in original user units.
+
+For `categorical` variables, use one of the exact configured labels instead.
 
 ### `variable ... outside bounds`
 

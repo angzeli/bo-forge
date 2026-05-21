@@ -21,7 +21,7 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `log_ei`, or `qlog_ei`. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, or `qlog_ei`. |
 | variable columns | Yes | One column per configured variable, in YAML order, stored in original user units. |
 | objective column | Yes | The configured objective name, such as `activity` or `defect_rate`. |
 | `predicted_mean` | Yes | Optional model prediction for suggested model-based rows. Blank is allowed. |
@@ -34,8 +34,8 @@ Suggested rows:
 
 - `status` must be `suggested`.
 - The objective cell must be blank.
-- Variable values must be filled and inside bounds.
-- `source` is usually `sobol`, `log_ei`, or `qlog_ei`.
+- Variable values must be filled and valid for the configured variable type.
+- `source` is usually `sobol`, `random`, `log_ei`, or `qlog_ei`.
 
 Observed rows:
 
@@ -75,4 +75,16 @@ Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed be
 
 - `row_id` values must be unique.
 - Exact duplicate variable rows are avoided when BO Forge generates suggestions.
+- Mixed-variable duplicate checks use typed user-space values, such as `(0.5, 3, 0.1, "MeCN")`.
 - Historical manual duplicates should be cleaned before relying on model-based suggestions.
+
+## 🧪 Variable Value Rules
+
+BO Forge validates variables according to their YAML type:
+
+| Type | CSV rule |
+| --- | --- |
+| `continuous` | Finite numeric value inside `lower`/`upper`. |
+| `integer` | Integer-valued numeric value inside inclusive `lower`/`upper`; `3.0` is accepted. |
+| `discrete` | Numeric value matching one configured choice after parsing; `0.10` can match `0.1`. |
+| `categorical` | Exact configured string label; matching is case-sensitive and whitespace-padded values fail. |

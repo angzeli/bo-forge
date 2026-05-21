@@ -199,13 +199,12 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
 
     variable_columns, objective = _variable_and_objective_columns(df.columns)
     for column in variable_columns:
-        numeric = pd.to_numeric(df[column], errors="coerce")
-        invalid = numeric.isna()
+        invalid = df[column].map(_is_blank)
         if invalid.any():
             row_id = str(df.loc[invalid, "row_id"].iloc[0])
             value = df.loc[invalid, column].iloc[0]
             raise LogValidationError(
-                f"Row '{row_id}' has non-numeric value for variable '{column}': value={value!r}."
+                f"Row '{row_id}' has blank value for variable '{column}': value={value!r}."
             )
 
     objective_blank = df[objective].map(_is_blank)

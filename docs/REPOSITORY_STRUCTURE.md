@@ -100,7 +100,7 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/simple_3d_maximise_logei.yaml` as a three-variable continuous example, and `configs/simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example.
+The repository also includes `configs/simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/simple_3d_maximise_logei.yaml` as a three-variable continuous example, `configs/simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example, and `configs/simple_mixed_logei.yaml` as a mixed-variable v0.4 example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

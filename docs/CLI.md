@@ -1,7 +1,7 @@
 # 💻 CLI Workflow
 
 The `bo-forge` command wraps the same `CampaignSession` workflow used in notebooks.
-It does not add new BO behaviour; it makes validation, suggestions, reporting, and plotting usable from the terminal.
+It exposes the same BO behaviour as the package API; it makes validation, suggestions, reporting, and plotting usable from the terminal.
 
 For a runnable notebook version of this workflow, open `notebooks/04_cli_four_variable_campaign.ipynb`.
 
@@ -83,6 +83,8 @@ bo-forge suggest \
   --log examples/simple_2d_maximise_logei_campaign_log.csv \
   --batch-size 1
 ```
+
+The same commands work for mixed-variable configs such as `configs/simple_mixed_logei.yaml`.
 
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 

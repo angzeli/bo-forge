@@ -42,11 +42,68 @@ bo:
     return path
 
 
+def write_mixed_config(path: Path, *, initial_design_size: int = 3) -> Path:
+    path.write_text(
+        f"""
+campaign_name: mixed_cli_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: repeats
+    type: integer
+    lower: 1
+    upper: 3
+  - name: dose
+    type: discrete
+    values: [0.1, 0.2, 0.5]
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH]
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 7
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
         objective=ObjectiveConfig(name="score", direction="maximize"),
         variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            random_seed=7,
+            raw_samples=16,
+            num_restarts=2,
+            mc_samples=16,
+        ),
+    )
+
+
+def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="mixed_cli_test",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("repeats", "integer", 1.0, 3.0),
+            VariableConfig("dose", "discrete", values=(0.1, 0.2, 0.5)),
+            VariableConfig("solvent", "categorical", values=("MeCN", "EtOH")),
+        ),
         bo=BOConfig(
             batch_size=1,
             initial_design_size=initial_design_size,
@@ -88,6 +145,56 @@ def observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "mixed_obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.1,
+                "repeats": 1,
+                "dose": 0.1,
+                "solvent": "MeCN",
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mixed_obs_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.4,
+                "repeats": 2,
+                "dose": 0.2,
+                "solvent": "EtOH",
+                "score": 1.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mixed_obs_2",
+                "iteration": 2,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.8,
+                "repeats": 3,
+                "dose": 0.5,
+                "solvent": "MeCN",
+                "score": 1.2,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
     if df is None:
         df = empty_campaign_log(cfg)
@@ -119,7 +226,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.3.3\n"
+    assert captured.out == "bo-forge 0.4.0\n"
     assert captured.err == ""
 
 
@@ -128,7 +235,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.3.3\n"
+    assert completed.stdout == "bo-forge 0.4.0\n"
     assert completed.stderr == ""
 
 
@@ -269,6 +376,18 @@ def test_init_log_missing_required_arguments_return_argparse_error(
 def test_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
     log_path = write_log(tmp_path / "campaign.csv", config())
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.out == "Campaign log is valid.\n"
+    assert captured.err == ""
+
+
+def test_mixed_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = write_mixed_config(tmp_path / "mixed.yaml")
+    cfg = mixed_config()
+    log_path = write_log(tmp_path / "mixed.csv", cfg, mixed_observed_log(cfg))
 
     assert run(["validate", *base_args(config_path, log_path)]) == 0
 
@@ -491,6 +610,24 @@ def test_suggest_output_and_append_writes_output_and_log(
     assert len(suggestions) == 1
     assert len(log) == 1
     assert suggestions.loc[0, "row_id"] == log.loc[0, "row_id"]
+
+
+def test_mixed_suggest_append_writes_valid_mixed_row(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_mixed_config(tmp_path / "mixed.yaml", initial_design_size=4)
+    cfg = mixed_config(initial_design_size=4)
+    log_path = write_log(tmp_path / "mixed.csv", cfg)
+
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    df = load_campaign_log(log_path, cfg)
+    assert len(df) == 1
+    assert df.loc[0, "status"] == "suggested"
+    assert df.loc[0, "solvent"] in {"MeCN", "EtOH"}
 
 
 def test_suggest_output_write_failure_returns_clear_error(

@@ -10,22 +10,18 @@ from botorch.models.transforms import Normalize, Standardize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from bo_forge.config import CampaignConfig
-from bo_forge.transforms import objective_to_model_space, to_unit_cube
+from bo_forge.transforms import dataframe_to_unit_cube, objective_to_model_space
 
 
 def dataframe_to_tensors(
     config: CampaignConfig, observed_df: pd.DataFrame
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Convert observed campaign rows to model-space tensors."""
-    x_user = torch.tensor(
-        observed_df[config.variable_names].astype(float).to_numpy(),
-        dtype=torch.double,
-    )
     y_user = torch.tensor(
         observed_df[[config.objective.name]].astype(float).to_numpy(),
         dtype=torch.double,
     )
-    return to_unit_cube(config, x_user), objective_to_model_space(config, y_user)
+    return dataframe_to_unit_cube(config, observed_df), objective_to_model_space(config, y_user)
 
 
 def fit_gp_model(config: CampaignConfig, observed_df: pd.DataFrame) -> SingleTaskGP:
@@ -40,4 +36,3 @@ def fit_gp_model(config: CampaignConfig, observed_df: pd.DataFrame) -> SingleTas
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_mll(mll)
     return model
-

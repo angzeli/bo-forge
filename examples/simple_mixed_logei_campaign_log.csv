@@ -1,0 +1,5 @@
+row_id,iteration,status,source,catalyst_loading,reaction_time,base_equivalents,solvent,yield_score,predicted_mean,predicted_std,acquisition
+mixed_seed_0,0,observed,manual,0.05,20,0.1,MeCN,54.2,,,
+mixed_seed_1,1,observed,manual,0.12,35,0.5,EtOH,67.8,,,
+mixed_seed_2,2,observed,manual,0.18,50,1.0,Water,48.5,,,
+mixed_seed_3,3,observed,manual,0.09,45,0.2,MeCN,63.1,,,

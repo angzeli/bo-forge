@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,8 +26,9 @@ RESERVED_COLUMNS = {
 class VariableConfig:
     name: str
     type: str
-    lower: float
-    upper: float
+    lower: float | None = None
+    upper: float | None = None
+    values: tuple[str | float, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,7 @@ class BOConfig:
     batch_size: int = 1
     initial_design_size: int = 8
     acquisition: str = "log_ei"
+    initial_design_method: str = "sobol"
     random_seed: int = 0
     raw_samples: int = 128
     num_restarts: int = 5
@@ -121,11 +124,12 @@ def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
 
         name = _required_str(item, "name", f"variables[{index}]")
         variable_type = _required_str(item, "type", f"variable '{name}'")
-        if variable_type != "continuous":
+        if variable_type not in {"continuous", "integer", "discrete", "categorical"}:
             raise ConfigError(
                 f"Variable '{name}' has unsupported type '{variable_type}'. "
-                "BO Forge currently supports only type='continuous'."
+                "Expected one of ['categorical', 'continuous', 'discrete', 'integer']."
             )
+        _reject_unsupported_variable_keys(item, name, variable_type)
         if name in seen_names:
             raise ConfigError(f"Duplicate variable name '{name}'.")
         if name == objective_name:
@@ -135,16 +139,48 @@ def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
         if name in RESERVED_COLUMNS:
             raise ConfigError(f"Variable name '{name}' conflicts with a reserved CSV column.")
 
-        lower = _required_float(item, "lower", f"variable '{name}'")
-        upper = _required_float(item, "upper", f"variable '{name}'")
-        if lower >= upper:
-            raise ConfigError(
-                f"Variable '{name}' has lower >= upper: lower={lower:g}, upper={upper:g}."
+        if variable_type == "continuous":
+            lower = _required_float(item, "lower", f"variable '{name}'")
+            upper = _required_float(item, "upper", f"variable '{name}'")
+            if lower >= upper:
+                raise ConfigError(
+                    f"Variable '{name}' has lower >= upper: "
+                    f"lower={lower:g}, upper={upper:g}."
+                )
+            variable = VariableConfig(
+                name=name,
+                type=variable_type,
+                lower=lower,
+                upper=upper,
+            )
+        elif variable_type == "integer":
+            lower = _required_integer_bound(item, "lower", f"variable '{name}'")
+            upper = _required_integer_bound(item, "upper", f"variable '{name}'")
+            if lower > upper:
+                raise ConfigError(
+                    f"Variable '{name}' has lower > upper: "
+                    f"lower={lower:g}, upper={upper:g}."
+                )
+            variable = VariableConfig(
+                name=name,
+                type=variable_type,
+                lower=lower,
+                upper=upper,
+            )
+        elif variable_type == "discrete":
+            variable = VariableConfig(
+                name=name,
+                type=variable_type,
+                values=_required_discrete_values(item, name),
+            )
+        else:
+            variable = VariableConfig(
+                name=name,
+                type=variable_type,
+                values=_required_categorical_values(item, name),
             )
 
-        variables.append(
-            VariableConfig(name=name, type=variable_type, lower=lower, upper=upper)
-        )
+        variables.append(variable)
         seen_names.add(name)
 
     return variables
@@ -160,6 +196,12 @@ def _parse_bo(raw: Any) -> BOConfig:
             f"Unsupported acquisition '{acquisition}'. "
             "BO Forge currently supports only 'log_ei'."
         )
+    initial_design_method = str(raw.get("initial_design_method", "sobol"))
+    if initial_design_method not in {"sobol", "random"}:
+        raise ConfigError(
+            f"Unsupported initial_design_method '{initial_design_method}'. "
+            "Expected 'sobol' or 'random'."
+        )
 
     return BOConfig(
         batch_size=_positive_int(raw.get("batch_size", 1), "bo.batch_size"),
@@ -167,6 +209,7 @@ def _parse_bo(raw: Any) -> BOConfig:
             raw.get("initial_design_size", 8), "bo.initial_design_size"
         ),
         acquisition=acquisition,
+        initial_design_method=initial_design_method,
         random_seed=_non_negative_int(raw.get("random_seed", 0), "bo.random_seed"),
         raw_samples=_positive_int(raw.get("raw_samples", 128), "bo.raw_samples"),
         num_restarts=_positive_int(raw.get("num_restarts", 5), "bo.num_restarts"),
@@ -183,11 +226,101 @@ def _required_str(raw: dict[str, Any], key: str, context: str) -> str:
 
 def _required_float(raw: dict[str, Any], key: str, context: str) -> float:
     value = raw.get(key)
+    if isinstance(value, bool):
+        raise ConfigError(f"{context} must define numeric key '{key}', not a boolean.")
     try:
         parsed = float(value)
     except (TypeError, ValueError) as exc:
         raise ConfigError(f"{context} must define numeric key '{key}'.") from exc
+    if not math.isfinite(parsed):
+        raise ConfigError(f"{context} must define finite numeric key '{key}'.")
     return parsed
+
+
+def _required_integer_bound(raw: dict[str, Any], key: str, context: str) -> float:
+    parsed = _required_float(raw, key, context)
+    if parsed % 1 != 0:
+        raise ConfigError(f"{context} must define integer-valued key '{key}': value={parsed:g}.")
+    return parsed
+
+
+def _required_discrete_values(raw: dict[str, Any], name: str) -> tuple[float, ...]:
+    values = raw.get("values")
+    if not isinstance(values, list) or not values:
+        raise ConfigError(f"Variable '{name}' must define non-empty list key 'values'.")
+
+    parsed_values: list[float] = []
+    seen: set[float] = set()
+    for index, value in enumerate(values):
+        if isinstance(value, bool):
+            raise ConfigError(
+                f"Variable '{name}' has non-numeric discrete value at index {index}: "
+                f"value={value!r}."
+            )
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(
+                f"Variable '{name}' has non-numeric discrete value at index {index}: "
+                f"value={value!r}."
+            ) from exc
+        if not math.isfinite(parsed):
+            raise ConfigError(
+                f"Variable '{name}' has non-finite discrete value at index {index}: "
+                f"value={value!r}."
+            )
+        if parsed in seen:
+            raise ConfigError(
+                f"Variable '{name}' has duplicate discrete value after numeric parsing: "
+                f"value={parsed:g}."
+            )
+        seen.add(parsed)
+        parsed_values.append(parsed)
+    return tuple(parsed_values)
+
+
+def _required_categorical_values(raw: dict[str, Any], name: str) -> tuple[str, ...]:
+    values = raw.get("values")
+    if not isinstance(values, list) or not values:
+        raise ConfigError(f"Variable '{name}' must define non-empty list key 'values'.")
+
+    parsed_values: list[str] = []
+    seen: set[str] = set()
+    for index, value in enumerate(values):
+        if not isinstance(value, str):
+            raise ConfigError(
+                f"Variable '{name}' has non-string categorical value at index {index}: "
+                f"value={value!r}."
+            )
+        if value == "" or value.strip() != value:
+            raise ConfigError(
+                f"Variable '{name}' has blank or whitespace-padded categorical value "
+                f"at index {index}: value={value!r}."
+            )
+        if value in seen:
+            raise ConfigError(
+                f"Variable '{name}' has duplicate categorical value: value={value!r}."
+            )
+        seen.add(value)
+        parsed_values.append(value)
+    return tuple(parsed_values)
+
+
+def _reject_unsupported_variable_keys(
+    raw: dict[str, Any],
+    name: str,
+    variable_type: str,
+) -> None:
+    if variable_type in {"continuous", "integer"}:
+        allowed = {"name", "type", "lower", "upper"}
+    else:
+        allowed = {"name", "type", "values"}
+    unsupported = sorted(set(raw) - allowed)
+    if unsupported:
+        raise ConfigError(
+            f"Variable '{name}' has unsupported keys for type='{variable_type}': "
+            f"{unsupported}."
+        )
 
 
 def _positive_int(value: Any, context: str) -> int:

@@ -32,7 +32,7 @@ It copies the seed CSV log to an ignored working file, requests one suggestion, 
 
 ## 💻 CLI Quickstart
 
-The v0.3 CLI wraps the same `CampaignSession` workflow used in notebooks.
+The CLI wraps the same `CampaignSession` workflow used in notebooks.
 
 ```bash
 bo-forge validate \
@@ -148,6 +148,37 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
 - `configs/simple_3d_maximise_logei.yaml`: maximises a three-variable synthetic activity.
 - `configs/simple_4d_maximise_logei.yaml`: maximises a four-variable synthetic activity for CLI demos.
+- `configs/simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
+
+## 🧪 Mixed-Variable Campaigns
+
+v0.4 supports mixed-variable single-objective campaigns:
+
+```yaml
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.02
+    upper: 0.20
+
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+
+  - name: base_equivalents
+    type: discrete
+    values: [0.1, 0.2, 0.5, 1.0]
+
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH, Water]
+
+bo:
+  initial_design_method: sobol
+```
+
+`initial_design_method` can be `sobol` or `random`. Model-based mixed suggestions use a latent unit-cube representation internally, then decode and repair suggestions back to valid user-facing values before returning them.
 
 ## 📓 Example Notebooks
 
@@ -158,6 +189,8 @@ Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisatio
 Open `notebooks/03_three_variable_campaign.ipynb` for a compact 3D continuous campaign and the higher-dimensional diagnostic view.
 
 Open `notebooks/04_cli_four_variable_campaign.ipynb` for a 4D campaign driven through the `bo-forge` CLI command surface.
+
+Open `notebooks/05_mixed_variable_campaign.ipynb` for a mixed-variable v0.4 campaign using `configs/simple_mixed_logei.yaml`.
 
 From a fresh clone:
 
@@ -182,6 +215,7 @@ The notebooks write only ignored working files:
 - `examples/simple_2d_minimise_qlogei_working_log.csv`
 - `examples/simple_3d_maximise_logei_working_log.csv`
 - `examples/simple_4d_maximise_logei_working_log.csv`
+- `examples/simple_mixed_logei_working_log.csv`
 - `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.
