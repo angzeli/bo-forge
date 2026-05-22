@@ -11,6 +11,7 @@ from torch.quasirandom import SobolEngine
 
 from bo_forge.acquisition import optimize_log_ei
 from bo_forge.config import CampaignConfig
+from bo_forge.constraints import constraint_violations_for_values
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
 from bo_forge.transforms import (
@@ -34,6 +35,10 @@ from bo_forge.validation import (
 
 MAX_CATEGORICAL_COMBINATIONS = 64
 MAX_DECODE_RETRIES = 8
+_GENERATION_FAILURE_HINT = (
+    "The feasible design space may be exhausted, constraints may be too restrictive, "
+    "or bo.min_normalized_distance may be too large."
+)
 
 
 def suggest_next(
@@ -74,12 +79,11 @@ def _suggest_initial_design(
     df: pd.DataFrame,
     count: int,
 ) -> pd.DataFrame:
-    existing = design_tuples(config, df)
     source = config.bo.initial_design_method
     candidates = _initial_user_candidates(
         config,
+        df=df,
         count=count,
-        existing=existing,
         method=source,
     )
     rows = []
@@ -117,7 +121,7 @@ def _suggest_model_based(
     user_candidates: list[tuple[object, ...]] | None = None
     acquisition_value: torch.Tensor | None = None
     source: str | None = None
-    duplicate_message = "no candidate was decoded"
+    rejection_message = "no candidate was decoded"
     for attempt in range(MAX_DECODE_RETRIES):
         torch.manual_seed(config.bo.random_seed + attempt)
         x_unit_raw, acquisition_value, source = optimize_log_ei(
@@ -129,16 +133,16 @@ def _suggest_model_based(
             fixed_features_list=fixed_features_list,
         )
         decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
-        duplicate_message = _duplicate_candidate_message(config, df, decoded_candidates)
-        if duplicate_message is None:
+        rejection_message = _candidate_batch_rejection_message(config, df, decoded_candidates)
+        if rejection_message is None:
             user_candidates = decoded_candidates
             break
 
     if user_candidates is None or acquisition_value is None or source is None:
         raise SuggestionError(
-            "Could not generate non-duplicate model-based suggestions after "
-            f"{MAX_DECODE_RETRIES} decode retries. Last duplicate check: "
-            f"{duplicate_message}"
+            "Could not generate enough feasible, non-duplicate suggestions after "
+            f"{MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+            f"Last rejection: {rejection_message}"
         )
 
     x_unit_repaired = values_to_unit_cube(config, user_candidates)
@@ -170,10 +174,11 @@ def _suggest_model_based(
 
 def _initial_user_candidates(
     config: CampaignConfig,
+    df: pd.DataFrame,
     count: int,
-    existing: set[tuple[object, ...]],
     method: str,
 ) -> list[tuple[object, ...]]:
+    existing = design_tuples(config, df)
     finite_size = _finite_design_space_size(config)
     if finite_size is not None and len(existing) + count > finite_size:
         raise SuggestionError(
@@ -214,38 +219,172 @@ def _initial_user_candidates(
                 dtype=torch.double,
             )
         for candidate in unit_cube_to_design_values(config, unit):
-            candidate_key = design_key_for_values(config, candidate)
-            if candidate_key in seen:
+            rejection_message = _candidate_rejection_message(config, df, candidate, selected)
+            if rejection_message is not None:
                 continue
             selected.append(candidate)
+            candidate_key = design_key_for_values(config, candidate)
             seen.add(candidate_key)
             if len(selected) == count:
                 break
         batches_drawn += 1
         if batches_drawn > 1000 or len(seen) > 100_000:
             raise SuggestionError(
-                f"Could not generate non-duplicate {method} suggestions."
+                "Could not generate enough feasible, non-duplicate suggestions after "
+                f"{batches_drawn} retries. {_GENERATION_FAILURE_HINT}"
             )
 
     return selected
 
 
-def _duplicate_candidate_message(
+def _candidate_batch_rejection_message(
     config: CampaignConfig,
     df: pd.DataFrame,
     candidates: list[tuple[object, ...]],
 ) -> str | None:
-    existing = design_tuples(config, df)
-    seen = set(existing)
+    accepted: list[tuple[object, ...]] = []
     for candidate in candidates:
-        candidate_key = design_key_for_values(config, candidate)
-        if candidate_key in seen:
-            return (
-                "Model-based suggestion duplicated an existing or batch design exactly "
-                f"after decoding: candidate={candidate}."
-            )
-        seen.add(candidate_key)
+        rejection_message = _candidate_rejection_message(config, df, candidate, accepted)
+        if rejection_message is not None:
+            return rejection_message
+        accepted.append(candidate)
     return None
+
+
+def _candidate_rejection_message(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    candidate: tuple[object, ...],
+    batch_candidates: list[tuple[object, ...]],
+) -> str | None:
+    violations = constraint_violations_for_values(config, candidate)
+    if violations:
+        names = [constraint.name for constraint in violations]
+        return f"candidate violates constraint(s) {names}: candidate={candidate}."
+
+    candidate_key = design_key_for_values(config, candidate)
+    if candidate_key in design_tuples(config, df):
+        return f"candidate duplicates an existing design exactly: candidate={candidate}."
+
+    batch_keys = {design_key_for_values(config, existing) for existing in batch_candidates}
+    if candidate_key in batch_keys:
+        return f"candidate duplicates another same-batch design exactly: candidate={candidate}."
+
+    threshold = config.bo.min_normalized_distance
+    if threshold > 0:
+        comparisons = _candidate_values_from_df(config, df) + batch_candidates
+        nearest = _nearest_normalized_distance(config, candidate, comparisons)
+        if nearest is not None and nearest < threshold:
+            return (
+                "candidate is too close to an existing or same-batch design in encoded "
+                f"model space: distance={nearest:.6g}, "
+                f"min_normalized_distance={threshold:.6g}, candidate={candidate}."
+            )
+
+    return None
+
+
+def suggestion_quality_summary(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    suggestions: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return read-only quality diagnostics for suggested rows."""
+    validate_campaign_data(config, df)
+    required_columns = {"row_id", *config.variable_names}
+    missing = sorted(required_columns - set(suggestions.columns))
+    if missing:
+        raise SuggestionError(
+            f"Suggestion quality summary is missing required columns: {missing}."
+        )
+
+    suggestion_candidates = _candidate_values_from_df(config, suggestions)
+    existing_candidates = _candidate_values_from_df(config, df)
+    existing_keys = design_tuples(config, df)
+    suggestion_keys = [
+        design_key_for_values(config, candidate) for candidate in suggestion_candidates
+    ]
+    threshold = config.bo.min_normalized_distance
+
+    rows = []
+    for index, candidate in enumerate(suggestion_candidates):
+        row = suggestions.iloc[index]
+        violations = constraint_violations_for_values(config, candidate)
+        violation_names = [constraint.name for constraint in violations]
+        candidate_key = suggestion_keys[index]
+        is_exact_duplicate = (
+            candidate_key in existing_keys
+            or suggestion_keys.count(candidate_key) > 1
+        )
+        batch_comparisons = [
+            other_candidate
+            for other_index, other_candidate in enumerate(suggestion_candidates)
+            if other_index != index
+        ]
+        nearest_existing = _nearest_normalized_distance(
+            config,
+            candidate,
+            existing_candidates,
+        )
+        nearest_batch = _nearest_normalized_distance(
+            config,
+            candidate,
+            batch_comparisons,
+        )
+        distances = [
+            distance for distance in (nearest_existing, nearest_batch) if distance is not None
+        ]
+        passes_distance_threshold = (
+            True if threshold <= 0 or not distances else min(distances) >= threshold
+        )
+        rows.append(
+            {
+                "row_id": row["row_id"],
+                "is_feasible": len(violation_names) == 0,
+                "violated_constraints": ", ".join(violation_names),
+                "is_exact_duplicate": is_exact_duplicate,
+                "nearest_existing_distance": nearest_existing,
+                "nearest_batch_distance": nearest_batch,
+                "passes_distance_threshold": passes_distance_threshold,
+            }
+        )
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "row_id",
+            "is_feasible",
+            "violated_constraints",
+            "is_exact_duplicate",
+            "nearest_existing_distance",
+            "nearest_batch_distance",
+            "passes_distance_threshold",
+        ],
+    )
+
+
+def _candidate_values_from_df(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+) -> list[tuple[object, ...]]:
+    return [
+        tuple(row[variable.name] for variable in config.variables)
+        for _, row in df.iterrows()
+    ]
+
+
+def _nearest_normalized_distance(
+    config: CampaignConfig,
+    candidate: tuple[object, ...],
+    comparison_candidates: list[tuple[object, ...]],
+) -> float | None:
+    if not comparison_candidates:
+        return None
+
+    candidate_tensor = values_to_unit_cube(config, [candidate])
+    comparison_tensor = values_to_unit_cube(config, comparison_candidates)
+    distance = torch.cdist(candidate_tensor, comparison_tensor).min().item()
+    return float(distance / math.sqrt(encoded_dimension(config)))
 
 
 def _empty_row(config: CampaignConfig) -> dict[str, object]:

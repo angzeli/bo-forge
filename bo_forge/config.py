@@ -38,6 +38,12 @@ class ObjectiveConfig:
 
 
 @dataclass(frozen=True)
+class ConstraintConfig:
+    name: str
+    expression: str
+
+
+@dataclass(frozen=True)
 class BOConfig:
     batch_size: int = 1
     initial_design_size: int = 8
@@ -47,6 +53,7 @@ class BOConfig:
     raw_samples: int = 128
     num_restarts: int = 5
     mc_samples: int = 128
+    min_normalized_distance: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -55,6 +62,7 @@ class CampaignConfig:
     objective: ObjectiveConfig
     variables: tuple[VariableConfig, ...]
     bo: BOConfig
+    constraints: tuple[ConstraintConfig, ...] = ()
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CampaignConfig:
@@ -86,6 +94,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     campaign_name = _required_str(raw, "campaign_name", "campaign")
     objective = _parse_objective(raw.get("objective"))
     variables = _parse_variables(raw.get("variables"), objective.name)
+    constraints = _parse_constraints(raw.get("constraints", []), variables)
     bo = _parse_bo(raw.get("bo", {}))
 
     return CampaignConfig(
@@ -93,6 +102,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         objective=objective,
         variables=tuple(variables),
         bo=bo,
+        constraints=tuple(constraints),
     )
 
 
@@ -214,7 +224,47 @@ def _parse_bo(raw: Any) -> BOConfig:
         raw_samples=_positive_int(raw.get("raw_samples", 128), "bo.raw_samples"),
         num_restarts=_positive_int(raw.get("num_restarts", 5), "bo.num_restarts"),
         mc_samples=_positive_int(raw.get("mc_samples", 128), "bo.mc_samples"),
+        min_normalized_distance=_non_negative_float(
+            raw.get("min_normalized_distance", 0.0),
+            "bo.min_normalized_distance",
+        ),
     )
+
+
+def _parse_constraints(
+    raw: Any,
+    variables: list[VariableConfig],
+) -> list[ConstraintConfig]:
+    if raw in (None, []):
+        return []
+    if not isinstance(raw, list):
+        raise ConfigError("Config key 'constraints' must be a list when provided.")
+
+    from bo_forge.constraints import validate_constraint_expression
+
+    variable_names = {variable.name for variable in variables}
+    constraints: list[ConstraintConfig] = []
+    seen_names: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ConfigError(f"Constraint at index {index} must be a mapping.")
+        unsupported = sorted(set(item) - {"name", "expression"})
+        if unsupported:
+            raise ConfigError(
+                f"Constraint at index {index} has unsupported keys: {unsupported}."
+            )
+        name = _required_str(item, "name", f"constraints[{index}]")
+        expression = _required_str(item, "expression", f"constraint '{name}'")
+        if name in seen_names:
+            raise ConfigError(f"Duplicate constraint name '{name}'.")
+        validate_constraint_expression(
+            name=name,
+            expression=expression,
+            variable_names=variable_names,
+        )
+        constraints.append(ConstraintConfig(name=name, expression=expression))
+        seen_names.add(name)
+    return constraints
 
 
 def _required_str(raw: dict[str, Any], key: str, context: str) -> str:
@@ -334,6 +384,20 @@ def _non_negative_int(value: Any, context: str) -> int:
     parsed = _int_value(value, context)
     if parsed < 0:
         raise ConfigError(f"{context} must be >= 0: value={parsed}.")
+    return parsed
+
+
+def _non_negative_float(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ConfigError(f"{context} must be numeric, not a boolean.")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{context} must be numeric.") from exc
+    if not math.isfinite(parsed):
+        raise ConfigError(f"{context} must be finite.")
+    if parsed < 0:
+        raise ConfigError(f"{context} must be >= 0: value={parsed:g}.")
     return parsed
 
 

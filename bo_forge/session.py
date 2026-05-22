@@ -18,7 +18,12 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     mark_observed as _mark_observed,
 )
-from bo_forge.suggestions import suggest_next as _suggest_next
+from bo_forge.suggestions import (
+    suggest_next as _suggest_next,
+)
+from bo_forge.suggestions import (
+    suggestion_quality_summary,
+)
 from bo_forge.validation import (
     canonical_columns,
     get_observed_data,
@@ -182,6 +187,14 @@ class CampaignSession:
     def suggest_next(self, batch_size: int | None = None) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
         return _suggest_next(self.config, self.df.copy(deep=True), batch_size=batch_size)
+
+    def suggestion_quality(self, suggestions: pd.DataFrame) -> pd.DataFrame:
+        """Return read-only quality diagnostics for suggested rows."""
+        return suggestion_quality_summary(
+            self.config,
+            self.df.copy(deep=True),
+            suggestions.copy(deep=True),
+        )
 
     def append_suggestions(self, suggestions: pd.DataFrame) -> pd.DataFrame:
         """Append suggestions to disk, reload the session, and return the refreshed log."""

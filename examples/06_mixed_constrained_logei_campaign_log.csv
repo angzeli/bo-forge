@@ -1,0 +1,5 @@
+row_id,iteration,status,source,catalyst_loading,reaction_time,base_equivalents,solvent,yield_score,predicted_mean,predicted_std,acquisition
+constrained_seed_0,0,observed,manual,0.05,20,0.1,MeCN,54.0,,,
+constrained_seed_1,1,observed,manual,0.12,35,0.5,EtOH,67.5,,,
+constrained_seed_2,2,observed,manual,0.16,45,0.2,Water,57.2,,,
+constrained_seed_3,3,observed,manual,0.09,50,1.0,MeCN,62.8,,,

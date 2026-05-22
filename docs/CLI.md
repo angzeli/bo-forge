@@ -84,7 +84,7 @@ bo-forge suggest \
   --batch-size 1
 ```
 
-The same commands work for mixed-variable configs such as `configs/simple_mixed_logei.yaml`.
+The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 

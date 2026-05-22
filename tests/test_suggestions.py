@@ -3,11 +3,21 @@ import pytest
 import torch
 
 import bo_forge.suggestions as suggestions_module
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    ConstraintConfig,
+    ObjectiveConfig,
+    VariableConfig,
+)
 from bo_forge.errors import SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
-from bo_forge.suggestions import MAX_DECODE_RETRIES, suggest_next
+from bo_forge.suggestions import (
+    MAX_DECODE_RETRIES,
+    suggest_next,
+    suggestion_quality_summary,
+)
 from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
 
@@ -81,6 +91,36 @@ def mixed_config(
             raw_samples=16,
             num_restarts=2,
             mc_samples=16,
+        ),
+    )
+
+
+def constrained_mixed_config(
+    *,
+    batch_size: int = 2,
+    initial_design_size: int = 3,
+    min_normalized_distance: float = 0.0,
+) -> CampaignConfig:
+    cfg = mixed_config(batch_size=batch_size, initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=BOConfig(
+            batch_size=cfg.bo.batch_size,
+            initial_design_size=cfg.bo.initial_design_size,
+            initial_design_method=cfg.bo.initial_design_method,
+            random_seed=cfg.bo.random_seed,
+            raw_samples=cfg.bo.raw_samples,
+            num_restarts=cfg.bo.num_restarts,
+            mc_samples=cfg.bo.mc_samples,
+            min_normalized_distance=min_normalized_distance,
+        ),
+        constraints=(
+            ConstraintConfig(
+                name="no_etoh_high_dose",
+                expression="not (solvent == 'EtOH' and dose >= 0.5)",
+            ),
         ),
     )
 
@@ -211,6 +251,18 @@ def test_mixed_random_initial_suggestions_are_seeded() -> None:
     assert set(first["source"]) == {"random"}
 
 
+def test_constrained_mixed_initial_suggestions_are_feasible() -> None:
+    cfg = constrained_mixed_config(batch_size=4, initial_design_size=4)
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert not (
+        (suggestions["solvent"] == "EtOH")
+        & (suggestions["dose"].astype(float) >= 0.5)
+    ).any()
+
+
 def test_mixed_model_based_single_suggestion() -> None:
     cfg = mixed_config(batch_size=1, initial_design_size=3)
     df = mixed_observed_log(cfg)
@@ -237,6 +289,76 @@ def test_mixed_model_based_batch_suggestions() -> None:
     assert set(suggestions["repeats"].astype(int)).issubset({1, 2, 3})
     assert set(suggestions["solvent"]).issubset({"MeCN", "EtOH"})
     assert suggestions["solvent"].nunique() == 1
+
+
+def test_constrained_mixed_model_based_suggestions_are_feasible() -> None:
+    cfg = constrained_mixed_config(batch_size=2, initial_design_size=3)
+    df = mixed_observed_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert not (
+        (suggestions["solvent"] == "EtOH")
+        & (suggestions["dose"].astype(float) >= 0.5)
+    ).any()
+
+
+def test_suggestion_quality_summary_reports_constraints_duplicates_and_distances() -> None:
+    cfg = constrained_mixed_config(
+        batch_size=2,
+        initial_design_size=3,
+        min_normalized_distance=0.05,
+    )
+    df = mixed_observed_log(cfg)
+    suggestions = pd.DataFrame(
+        [
+            {
+                "row_id": "suggested_duplicate",
+                "iteration": 4,
+                "status": "suggested",
+                "source": "log_ei",
+                "x": 0.1,
+                "repeats": 1,
+                "dose": 0.1,
+                "solvent": "MeCN",
+                "score": "",
+                "predicted_mean": 1.1,
+                "predicted_std": 0.1,
+                "acquisition": 0.01,
+            },
+            {
+                "row_id": "suggested_infeasible",
+                "iteration": 4,
+                "status": "suggested",
+                "source": "log_ei",
+                "x": 0.2,
+                "repeats": 2,
+                "dose": 0.5,
+                "solvent": "EtOH",
+                "score": "",
+                "predicted_mean": 1.2,
+                "predicted_std": 0.1,
+                "acquisition": 0.02,
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    summary = suggestion_quality_summary(cfg, df, suggestions)
+
+    assert list(summary.columns) == [
+        "row_id",
+        "is_feasible",
+        "violated_constraints",
+        "is_exact_duplicate",
+        "nearest_existing_distance",
+        "nearest_batch_distance",
+        "passes_distance_threshold",
+    ]
+    assert bool(summary.loc[0, "is_exact_duplicate"])
+    assert summary.loc[1, "violated_constraints"] == "no_etoh_high_dose"
+    assert not bool(summary.loc[1, "is_feasible"])
+    assert summary["nearest_existing_distance"].notna().all()
 
 
 def test_categorical_combination_threshold_is_enforced() -> None:
@@ -282,10 +404,46 @@ def test_duplicate_decoded_candidates_retry_then_raise(
 
     monkeypatch.setattr(suggestions_module, "optimize_log_ei", duplicate_optimizer)
 
-    with pytest.raises(SuggestionError, match=f"{MAX_DECODE_RETRIES} decode retries"):
+    with pytest.raises(SuggestionError, match=f"{MAX_DECODE_RETRIES} retries"):
         suggest_next(cfg, df)
 
     assert calls == MAX_DECODE_RETRIES
+
+
+def test_near_duplicate_threshold_failure_has_clear_message() -> None:
+    cfg = CampaignConfig(
+        campaign_name="too_restrictive",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=1,
+            random_seed=3,
+            raw_samples=16,
+            num_restarts=2,
+            mc_samples=16,
+            min_normalized_distance=1.1,
+        ),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.5,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    with pytest.raises(SuggestionError, match="constraints may be too restrictive"):
+        suggest_next(cfg, df)
 
 
 def test_mixed_append_round_trip_validates(tmp_path) -> None:

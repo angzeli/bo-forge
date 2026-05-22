@@ -107,6 +107,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.export_report(path)` | Write a deterministic plain-text campaign report and return the written path. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
+| `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
 | `campaign.mark_observed(row_id, objective_value)` | Mark one pending suggestion observed, write the result, and refresh `campaign.df`. |
 | `campaign.reload()` | Reload the CSV log from disk into `campaign.df`. |
@@ -144,11 +145,12 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 
 ## ⚙️ Example Configs
 
-- `configs/simple_2d_maximise_logei.yaml`: maximises photocatalyst-style `activity`.
-- `configs/simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
-- `configs/simple_3d_maximise_logei.yaml`: maximises a three-variable synthetic activity.
-- `configs/simple_4d_maximise_logei.yaml`: maximises a four-variable synthetic activity for CLI demos.
-- `configs/simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
+- `configs/01_simple_2d_maximise_logei.yaml`: maximises photocatalyst-style `activity`.
+- `configs/02_simple_2d_minimise_qlogei.yaml`: minimises process `defect_rate`.
+- `configs/03_simple_3d_maximise_logei.yaml`: maximises a three-variable synthetic activity.
+- `configs/04_simple_4d_maximise_logei.yaml`: maximises a four-variable synthetic activity for CLI demos.
+- `configs/05_simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
+- `configs/06_mixed_constrained_logei.yaml`: maximises a constrained mixed-variable synthetic yield.
 
 ## 🧪 Mixed-Variable Campaigns
 
@@ -176,25 +178,49 @@ variables:
 
 bo:
   initial_design_method: sobol
+  min_normalized_distance: 0.03
 ```
 
 `initial_design_method` can be `sobol` or `random`. Model-based mixed suggestions use a latent representation internally, then decode and repair suggestions back to valid user-facing values before returning them.
 
 In v0.4.0, categorical variables used scalar-bin encoding. In v0.4.1, categorical variables use one-hot model features internally while public logs still store exact category labels. This removes artificial ordinal structure between labels, but categorical modelling still uses a standard continuous GP over one-hot features. Dedicated categorical kernels or learned embeddings are future work.
 
-For qLogEI batches with categorical variables, v0.4.1 optimizes each batch under one fixed categorical assignment. Mixed-category qLogEI batches are deferred to later suggestion-quality work.
+For qLogEI batches with categorical variables, BO Forge uses BoTorch's mixed optimizer over enumerated one-hot category assignments. Batch rows may therefore contain different category labels. The `acquisition` value stored on each returned row is the shared batch-level qLogEI value, not a separate independent score for that row.
+
+v0.4.2 adds optional feasibility constraints:
+
+```yaml
+constraints:
+  - name: no_water_high_base
+    expression: "not (solvent == 'Water' and base_equivalents >= 0.5)"
+
+  - name: water_needs_longer_time
+    expression: "solvent != 'Water' or reaction_time >= 35"
+```
+
+Constraint expressions are checked twice. Config-time validation checks safe syntax and known variable names when the YAML is loaded. Row-time validation evaluates each expression on normalized user-space row values during CSV validation. Constraints apply to all CSV rows regardless of `status` or `source`.
+
+Allowed constraint syntax is deliberately small: campaign variable names, numeric and string constants, arithmetic, unary `+`/`-`, boolean `and`/`or`/`not`, comparisons, and parentheses. Function calls, attributes, subscripts, comprehensions, imports, and unknown names fail clearly.
+
+`bo.min_normalized_distance` is computed in encoded model space, not raw user units. That encoded space includes continuous dimensions, relaxed integer/discrete dimensions, and one-hot categorical dimensions. Exact duplicates are always rejected; near-duplicates are rejected only when this threshold is greater than `0`.
+
+Use `campaign.suggestion_quality(suggestions)` to inspect feasibility, constraint violations, exact duplicates, nearest distances, and threshold pass/fail before appending suggestions. Constraint handling in v0.4.2 is repair/filter/retry based; it is not a probabilistic constrained acquisition with a learned feasibility model.
+
+The v0.4.2 constraint and diversity design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_03_mixed_variable_and_constrained_bo_worked.ipynb` for repair-aware constrained mixed-variable BO, and `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_02_batch_bo_for_parallel_experimentation_worked.ipynb` for within-batch distance summaries.
 
 ## 📓 Example Notebooks
 
-Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/simple_2d_maximise_logei.yaml` and `examples/simple_2d_maximise_logei_campaign_log.csv`.
+Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/01_simple_2d_maximise_logei.yaml` and `examples/01_simple_2d_maximise_logei_campaign_log.csv`.
 
-Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/simple_2d_minimise_qlogei.yaml` and `examples/simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
+Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/02_simple_2d_minimise_qlogei.yaml` and `examples/02_simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
 
 Open `notebooks/03_three_variable_campaign.ipynb` for a compact 3D continuous campaign and the higher-dimensional diagnostic view.
 
 Open `notebooks/04_cli_four_variable_campaign.ipynb` for a 4D campaign driven through the `bo-forge` CLI command surface.
 
-Open `notebooks/05_mixed_variable_campaign.ipynb` for a mixed-variable v0.4 campaign using `configs/simple_mixed_logei.yaml`.
+Open `notebooks/05_mixed_variable_campaign.ipynb` for a mixed-variable v0.4 campaign using `configs/05_simple_mixed_logei.yaml`.
+
+Open `notebooks/06_constrained_mixed_campaign.ipynb` for a constrained mixed-variable campaign using `configs/06_mixed_constrained_logei.yaml`.
 
 From a fresh clone:
 
@@ -215,11 +241,12 @@ The main notebook demonstrates the real sequential workflow:
 
 The notebooks write only ignored working files:
 
-- `examples/simple_2d_maximise_logei_working_log.csv`
-- `examples/simple_2d_minimise_qlogei_working_log.csv`
-- `examples/simple_3d_maximise_logei_working_log.csv`
-- `examples/simple_4d_maximise_logei_working_log.csv`
-- `examples/simple_mixed_logei_working_log.csv`
+- `examples/01_simple_2d_maximise_logei_working_log.csv`
+- `examples/02_simple_2d_minimise_qlogei_working_log.csv`
+- `examples/03_simple_3d_maximise_logei_working_log.csv`
+- `examples/04_simple_4d_maximise_logei_working_log.csv`
+- `examples/05_simple_mixed_logei_working_log.csv`
+- `examples/06_mixed_constrained_logei_working_log.csv`
 - `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.

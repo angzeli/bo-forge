@@ -12,6 +12,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, or `qlog_ei`.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
+- `violates constraint`: check the row values against the YAML `constraints` block.
 
 ## ⚙️ Config Errors
 
@@ -78,6 +79,18 @@ Fix: remove duplicate numeric choices.
 Categorical labels are exact strings.
 
 Fix: remove leading/trailing spaces from the YAML or CSV value.
+
+### `Constraint '...' references unknown variable`
+
+The constraint expression uses a name that is not one of the configured variables.
+
+Fix: use exact variable names from the YAML `variables` list.
+
+### `Constraint '...' uses unsupported syntax`
+
+The constraint expression contains something outside the safe expression subset, such as a function call or attribute access.
+
+Fix: use only variable names, constants, arithmetic, unary `+`/`-`, boolean logic, comparisons, and parentheses.
 
 ## 🧾 CSV Schema Errors
 
@@ -147,6 +160,18 @@ Fix: use `mark_observed()` to perform the transition, or manually set `status=ob
 BO Forge refuses to suggest more experiments while there is an outstanding suggestion.
 
 Fix: run that experiment and call `mark_observed()`, or remove the suggested row if it should be abandoned.
+
+### `Row '...' violates constraint`
+
+The row is structurally valid, but the configured feasibility rules reject its variable values.
+
+Fix: change the row values or update the constraint if the campaign definition is wrong. Constraints apply to all rows, including `manual`, `sobol`, `random`, `log_ei`, and `qlog_ei`.
+
+### `Could not generate enough feasible, non-duplicate suggestions`
+
+BO Forge exhausted its bounded retry loop while filtering infeasible, exact-duplicate, or near-duplicate candidates.
+
+Fix: check whether constraints are too restrictive, whether the feasible design space is exhausted, or whether `bo.min_normalized_distance` is too large.
 
 ## 🔢 Numeric And Bounds Errors
 

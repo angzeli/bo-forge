@@ -226,7 +226,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.4.1\n"
+    assert captured.out == "bo-forge 0.4.2\n"
     assert captured.err == ""
 
 
@@ -235,7 +235,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.4.1\n"
+    assert completed.stdout == "bo-forge 0.4.2\n"
     assert completed.stderr == ""
 
 
@@ -394,6 +394,63 @@ def test_mixed_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFi
     captured = capsys.readouterr()
     assert captured.out == "Campaign log is valid.\n"
     assert captured.err == ""
+
+
+def test_validate_constrained_log_failure_returns_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/06_mixed_constrained_logei.yaml")
+    cfg = CampaignConfig.from_yaml(config_path)
+    df = pd.read_csv(
+        "examples/06_mixed_constrained_logei_campaign_log.csv",
+        keep_default_na=False,
+    )
+    df.loc[0, "solvent"] = "Water"
+    df.loc[0, "base_equivalents"] = 1.0
+    df.loc[0, "reaction_time"] = 20
+    log_path = write_log(tmp_path / "constrained.csv", cfg, df)
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "violates constraint" in captured.err
+
+
+def test_constrained_suggest_output_is_feasible(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/06_mixed_constrained_logei.yaml")
+    log_path = tmp_path / "constrained.csv"
+    output_path = tmp_path / "suggestions.csv"
+    seed = pd.read_csv(
+        "examples/06_mixed_constrained_logei_campaign_log.csv",
+        keep_default_na=False,
+    )
+    seed.to_csv(log_path, index=False)
+
+    assert run(
+        [
+            "suggest",
+            *base_args(config_path, log_path),
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated" in captured.out
+    suggestions = pd.read_csv(output_path, keep_default_na=False)
+    assert not (
+        (suggestions["solvent"] == "Water")
+        & (suggestions["base_equivalents"].astype(float) >= 0.5)
+    ).any()
+    assert not (
+        (suggestions["solvent"] == "Water")
+        & (suggestions["reaction_time"].astype(int) < 35)
+    ).any()
 
 
 def test_config_load_failure_returns_hint(

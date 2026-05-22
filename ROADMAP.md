@@ -19,6 +19,7 @@ flowchart LR
     v032["v0.3.2<br/>CLI error polish"]
     v033["v0.3.3<br/>CLI bootstrap"]
     v041["v0.4.1<br/>One-hot categoricals"]
+    v042["v0.4.2<br/>Constraints + diversity"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -31,11 +32,12 @@ flowchart LR
     v03 -.-> v032
     v03 -.-> v033
     v04 -.-> v041
+    v04 -.-> v042
     
     class v01,v02,v03 majorDone
     class v04 majorNext
     class v05 majorFuture
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -43,7 +45,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.4.1`. Next planned milestone: `v0.4.2`, focused on constraints, duplicate handling, and batch diversity.
+Current baseline: `v0.4.2`. Next planned milestone: `v0.4.3`, focused on cost-aware and human-review support.
 
 ### Patch Notes So Far
 
@@ -64,6 +66,7 @@ Current baseline: `v0.4.1`. Next planned milestone: `v0.4.2`, focused on constra
 | `v0.3.3` | Patch | Add CLI doctor and init-log commands |
 | `v0.4.0` | Major | Mixed-variable single-objective BO |
 | `v0.4.1` | Patch | One-hot categorical encoding and mixed-suggestion quality |
+| `v0.4.2` | Patch | Constraints, duplicate handling, and batch diversity |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -125,6 +128,8 @@ Status: in progress
 - Sobol/random mixed-variable initial suggestions.
 - Latent unit-cube encoding/decoding for mixed-variable model fitting.
 - One-hot categorical model features while public logs keep category labels.
+- Optional feasibility constraints with safe expression validation.
+- Encoded-space near-duplicate checks and suggestion quality summaries.
 - Domain repair back to valid user-space rows.
 - Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
 - Mixed-variable duplicate handling using typed user-space design keys.

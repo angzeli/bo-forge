@@ -8,7 +8,7 @@ BO Forge campaign logs are plain CSV files. The schema is deliberately strict so
 row_id,iteration,status,source,<variable columns...>,<objective column>,predicted_mean,predicted_std,acquisition
 ```
 
-For `configs/simple_2d_maximise_logei.yaml`, the concrete columns are:
+For `configs/01_simple_2d_maximise_logei.yaml`, the concrete columns are:
 
 ```text
 row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,predicted_mean,predicted_std,acquisition
@@ -77,7 +77,14 @@ Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed be
 - Exact duplicate variable rows are avoided when BO Forge generates suggestions.
 - Mixed-variable duplicate checks use typed user-space values, such as `(0.5, 3, 0.1, "MeCN")`.
 - Categorical variables stay as exact labels in CSV logs; v0.4.1 one-hot encoding is internal model-space behavior only.
+- When `bo.min_normalized_distance > 0`, near-duplicate checks use encoded model-space distance, not raw user units.
 - Historical manual duplicates should be cleaned before relying on model-based suggestions.
+
+## ✅ Constraint Rules
+
+If a config defines `constraints`, every CSV row must satisfy every constraint regardless of `status` or `source`.
+
+This means manual historical rows, Sobol/random initial suggestions, and LogEI/qLogEI model suggestions all follow the same feasibility rules. A row that violates a constraint fails CSV validation with the row ID, constraint name, and expression.
 
 ## 🧪 Variable Value Rules
 

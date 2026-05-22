@@ -1,7 +1,13 @@
 import pandas as pd
 import pytest
 
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    ConstraintConfig,
+    ObjectiveConfig,
+    VariableConfig,
+)
 from bo_forge.errors import LogValidationError
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns, design_tuples, validate_campaign_data
@@ -66,6 +72,22 @@ def mixed_config() -> CampaignConfig:
     )
 
 
+def constrained_mixed_config() -> CampaignConfig:
+    cfg = mixed_config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        constraints=(
+            ConstraintConfig(
+                name="no_water_high_base",
+                expression="not (solvent == 'Water' and base_ratio >= 0.5)",
+            ),
+        ),
+    )
+
+
 def mixed_df() -> pd.DataFrame:
     cfg = mixed_config()
     return pd.DataFrame(
@@ -95,6 +117,10 @@ def test_validate_campaign_data_accepts_valid_log() -> None:
 
 def test_validate_campaign_data_accepts_valid_mixed_log() -> None:
     validate_campaign_data(mixed_config(), mixed_df())
+
+
+def test_validate_campaign_data_accepts_feasible_constrained_log() -> None:
+    validate_campaign_data(constrained_mixed_config(), mixed_df())
 
 
 def test_validate_campaign_data_accepts_3d_example_log() -> None:
@@ -135,6 +161,20 @@ def test_validate_campaign_data_accepts_mixed_example_log() -> None:
     ]
 
 
+def test_validate_campaign_data_accepts_constrained_mixed_example_log() -> None:
+    config_mixed = CampaignConfig.from_yaml("configs/06_mixed_constrained_logei.yaml")
+    df = load_campaign_log(
+        "examples/06_mixed_constrained_logei_campaign_log.csv",
+        config_mixed,
+    )
+
+    validate_campaign_data(config_mixed, df)
+    assert [constraint.name for constraint in config_mixed.constraints] == [
+        "no_water_high_base",
+        "water_needs_longer_time",
+    ]
+
+
 def test_validate_campaign_data_rejects_missing_column() -> None:
     df = valid_df().drop(columns=["source"])
 
@@ -163,6 +203,14 @@ def test_validate_campaign_data_rejects_filled_suggested_objective() -> None:
     df.loc[1, "activity"] = 1.8
 
     with pytest.raises(LogValidationError, match="status='suggested'.*activity.*filled"):
+        validate_campaign_data(config(), df)
+
+
+def test_validate_campaign_data_rejects_non_finite_objective() -> None:
+    df = valid_df()
+    df.loc[0, "activity"] = float("inf")
+
+    with pytest.raises(LogValidationError, match="non-finite objective 'activity'"):
         validate_campaign_data(config(), df)
 
 
@@ -219,6 +267,89 @@ def test_validate_campaign_data_rejects_categorical_whitespace() -> None:
 
     with pytest.raises(LogValidationError, match="whitespace-padded categorical value"):
         validate_campaign_data(mixed_config(), df)
+
+
+@pytest.mark.parametrize("source", ["manual", "sobol", "random", "log_ei", "qlog_ei"])
+def test_constraints_apply_to_all_sources_and_statuses(source: str) -> None:
+    cfg = constrained_mixed_config()
+    df = mixed_df()
+    df["yield"] = df["yield"].astype(object)
+    df.loc[0, "source"] = source
+    df.loc[0, "base_ratio"] = "0.5"
+    df.loc[0, "solvent"] = "Water"
+    if source != "manual":
+        df.loc[0, "status"] = "suggested"
+        df.loc[0, "yield"] = ""
+
+    with pytest.raises(LogValidationError, match="violates constraint 'no_water_high_base'"):
+        validate_campaign_data(cfg, df)
+
+
+def test_constraint_or_short_circuits() -> None:
+    cfg = CampaignConfig(
+        campaign_name="short_circuit_or",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(),
+        constraints=(
+            ConstraintConfig(
+                name="allow_zero",
+                expression="x == 0 or 1 / x > 0",
+            ),
+        ),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "row_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.0,
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    validate_campaign_data(cfg, df)
+
+
+def test_constraint_and_short_circuits_to_violation() -> None:
+    cfg = CampaignConfig(
+        campaign_name="short_circuit_and",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(),
+        constraints=(
+            ConstraintConfig(
+                name="positive_inverse",
+                expression="x != 0 and 1 / x > 0",
+            ),
+        ),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "row_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.0,
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    with pytest.raises(LogValidationError, match="violates constraint 'positive_inverse'"):
+        validate_campaign_data(cfg, df)
 
 
 def test_design_tuples_preserve_mixed_user_space_values() -> None:

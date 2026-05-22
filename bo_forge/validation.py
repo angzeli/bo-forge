@@ -8,6 +8,7 @@ from collections.abc import Iterable
 import pandas as pd
 
 from bo_forge.config import CampaignConfig, VariableConfig
+from bo_forge.constraints import constraint_violations_for_row
 from bo_forge.errors import LogValidationError
 
 BASE_COLUMNS = ["row_id", "iteration", "status", "source"]
@@ -37,6 +38,7 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_status(df)
     _validate_source(df)
     _validate_variables(config, df)
+    _validate_constraints(config, df)
     _validate_objective(config, df)
     _validate_nullable_numeric_columns(df, RESULT_COLUMNS)
 
@@ -282,6 +284,25 @@ def _validate_objective(config: CampaignConfig, df: pd.DataFrame) -> None:
         raise LogValidationError(
             f"Row '{row_id}' has non-numeric objective '{objective_name}': value={value!r}."
         )
+    non_finite = ~numeric.map(math.isfinite)
+    if non_finite.any():
+        row_id = str(df.loc[observed].loc[non_finite, "row_id"].iloc[0])
+        value = df.loc[observed].loc[non_finite, objective_name].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has non-finite objective '{objective_name}': value={value!r}."
+        )
+
+
+def _validate_constraints(config: CampaignConfig, df: pd.DataFrame) -> None:
+    for _, row in df.iterrows():
+        violations = constraint_violations_for_row(config, row)
+        if violations:
+            constraint = violations[0]
+            row_id = str(row["row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' violates constraint '{constraint.name}': "
+                f"{constraint.expression}."
+            )
 
 
 def _validate_nullable_numeric_columns(df: pd.DataFrame, columns: Iterable[str]) -> None:

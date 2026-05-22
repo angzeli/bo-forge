@@ -222,6 +222,29 @@ def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> N
     assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
 
 
+def test_session_suggestion_quality_is_read_only(tmp_path: Path) -> None:
+    config_path = write_mixed_config(tmp_path / "mixed.yaml")
+    cfg = mixed_config()
+    log_path = write_log(tmp_path / "mixed.csv", cfg, mixed_observed_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before = campaign.df.copy(deep=True)
+    suggestions = campaign.suggest_next(batch_size=1)
+
+    quality = campaign.suggestion_quality(suggestions)
+
+    assert list(quality.columns) == [
+        "row_id",
+        "is_feasible",
+        "violated_constraints",
+        "is_exact_duplicate",
+        "nearest_existing_distance",
+        "nearest_batch_distance",
+        "passes_distance_threshold",
+    ]
+    pd.testing.assert_frame_equal(campaign.df, before)
+    pd.testing.assert_frame_equal(pd.read_csv(log_path, keep_default_na=False), before)
+
+
 def test_from_files_loads_3d_example_campaign() -> None:
     campaign = CampaignSession.from_files(
         "configs/03_simple_3d_maximise_logei.yaml",

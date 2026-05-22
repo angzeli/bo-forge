@@ -1,0 +1,41 @@
+campaign_name: constrained_mixed_catalyst_screen
+objective:
+  name: yield_score
+  direction: maximize
+
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.02
+    upper: 0.20
+
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+
+  - name: base_equivalents
+    type: discrete
+    values: [0.1, 0.2, 0.5, 1.0]
+
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH, Water]
+
+constraints:
+  - name: no_water_high_base
+    expression: "not (solvent == 'Water' and base_equivalents >= 0.5)"
+
+  - name: water_needs_longer_time
+    expression: "solvent != 'Water' or reaction_time >= 35"
+
+bo:
+  batch_size: 2
+  initial_design_size: 6
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 13
+  raw_samples: 32
+  num_restarts: 3
+  mc_samples: 32
+  min_normalized_distance: 0.03

@@ -77,6 +77,37 @@ bo:
     assert config.bo.initial_design_method == "random"
 
 
+def test_config_from_yaml_parses_constraints_and_distance_threshold(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: constrained
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: temperature
+    type: continuous
+    lower: -20
+    upper: 100
+  - name: solvent
+    type: categorical
+    values: [MeCN, Water]
+constraints:
+  - name: no_cold_water
+    expression: "solvent != 'Water' or temperature >= -10"
+bo:
+  min_normalized_distance: 0.05
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.constraints[0].name == "no_cold_water"
+    assert config.constraints[0].expression == "solvent != 'Water' or temperature >= -10"
+    assert config.bo.min_normalized_distance == 0.05
+
+
 def test_example_minimize_config_parses() -> None:
     config = CampaignConfig.from_yaml("configs/02_simple_2d_minimise_qlogei.yaml")
 
@@ -135,6 +166,24 @@ def test_example_mixed_config_parses() -> None:
         "categorical",
     ]
     assert config.bo.batch_size == 2
+
+
+def test_example_constrained_mixed_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/06_mixed_constrained_logei.yaml")
+
+    assert config.campaign_name == "constrained_mixed_catalyst_screen"
+    assert config.objective.name == "yield_score"
+    assert config.variable_names == [
+        "catalyst_loading",
+        "reaction_time",
+        "base_equivalents",
+        "solvent",
+    ]
+    assert [constraint.name for constraint in config.constraints] == [
+        "no_water_high_base",
+        "water_needs_longer_time",
+    ]
+    assert config.bo.min_normalized_distance == 0.03
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:
@@ -318,4 +367,97 @@ bo:
     )
 
     with pytest.raises(ConfigError, match="Unsupported initial_design_method"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_duplicate_constraint_names(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_constraints
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+constraints:
+  - name: keep_positive
+    expression: "x >= 0"
+  - name: keep_positive
+    expression: "x <= 1"
+""",
+    )
+
+    with pytest.raises(ConfigError, match="Duplicate constraint name 'keep_positive'"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_unknown_constraint_variable(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_constraints
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+constraints:
+  - name: unknown_name
+    expression: "y >= 0"
+""",
+    )
+
+    with pytest.raises(ConfigError, match="references unknown variable 'y'"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_unsafe_constraint_expression(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_constraints
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+constraints:
+  - name: unsafe
+    expression: "abs(x) <= 1"
+""",
+    )
+
+    with pytest.raises(ConfigError, match="unsupported syntax: Call"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_invalid_min_normalized_distance(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_distance
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  min_normalized_distance: -0.1
+""",
+    )
+
+    with pytest.raises(ConfigError, match="bo.min_normalized_distance must be >= 0"):
         CampaignConfig.from_yaml(path)
