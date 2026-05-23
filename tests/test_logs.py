@@ -3,9 +3,16 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    CostConfig,
+    ObjectiveConfig,
+    ReviewConfig,
+    VariableConfig,
+)
 from bo_forge.errors import LogWriteError
-from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
+from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
 from bo_forge.validation import canonical_columns
 
 
@@ -15,6 +22,18 @@ def config() -> CampaignConfig:
         objective=ObjectiveConfig(name="activity", direction="maximize"),
         variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
         bo=BOConfig(batch_size=1, initial_design_size=1),
+    )
+
+
+def cost_review_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        cost=CostConfig(expression="1.0 + x", budget=10.0),
+        review=ReviewConfig(enabled=True),
     )
 
 
@@ -38,6 +57,31 @@ def suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
     )
 
 
+def cost_review_suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
+    cfg = cost_review_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": row_id,
+                "iteration": 0,
+                "status": "suggested",
+                "source": "sobol",
+                "review_status": "pending",
+                "review_note": "",
+                "x": 0.4,
+                "activity": "",
+                "cost_estimate": 1.4,
+                "cost_actual": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None:
     cfg = config()
     log_path = tmp_path / "campaign.csv"
@@ -51,6 +95,62 @@ def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None
     assert df.loc[0, "status"] == "observed"
     assert float(df.loc[0, "activity"]) == pytest.approx(1.7)
     assert float(df.loc[0, "x"]) == pytest.approx(0.4)
+
+
+def test_review_suggestion_and_mark_observed_with_actual_cost(tmp_path: Path) -> None:
+    cfg = cost_review_config()
+    log_path = tmp_path / "campaign.csv"
+
+    append_suggestions(log_path, cost_review_suggestion())
+    review_suggestion(log_path, "suggested_1", "accept", " approved ")
+    mark_observed(log_path, "suggested_1", 1.7, actual_cost=1.25)
+
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "status"] == "observed"
+    assert df.loc[0, "review_status"] == "accepted"
+    assert df.loc[0, "review_note"] == "approved"
+    assert float(df.loc[0, "cost_actual"]) == pytest.approx(1.25)
+
+
+def test_mark_observed_rejects_unaccepted_review_row(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, cost_review_suggestion())
+
+    with pytest.raises(LogWriteError, match="review_status is 'pending', not 'accepted'"):
+        mark_observed(log_path, "suggested_1", 1.7)
+
+
+def test_review_suggestion_rejects_newline_note(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, cost_review_suggestion())
+
+    with pytest.raises(LogWriteError, match="review_note cannot contain newline"):
+        review_suggestion(log_path, "suggested_1", "accept", "first\nsecond")
+
+
+def test_review_suggestion_rejects_non_review_log(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, suggestion())
+
+    with pytest.raises(LogWriteError, match="review is not enabled"):
+        review_suggestion(log_path, "suggested_1", "accept")
+
+
+def test_mark_observed_rejects_actual_cost_without_cost_columns(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, suggestion())
+
+    with pytest.raises(LogWriteError, match="no cost columns"):
+        mark_observed(log_path, "suggested_1", 1.7, actual_cost=1.2)
+
+
+def test_mark_observed_rejects_negative_actual_cost(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, cost_review_suggestion())
+    review_suggestion(log_path, "suggested_1", "accept")
+
+    with pytest.raises(LogWriteError, match="finite and >= 0"):
+        mark_observed(log_path, "suggested_1", 1.7, actual_cost=-1.0)
 
 
 def test_append_suggestions_rejects_observed_rows(tmp_path: Path) -> None:

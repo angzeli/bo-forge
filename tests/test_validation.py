@@ -5,7 +5,9 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
+    CostConfig,
     ObjectiveConfig,
+    ReviewConfig,
     VariableConfig,
 )
 from bo_forge.errors import LogValidationError
@@ -88,6 +90,17 @@ def constrained_mixed_config() -> CampaignConfig:
     )
 
 
+def cost_review_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="cost_review",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        cost=CostConfig(expression="1.0 + x", weight=0.5, budget=10.0),
+        review=ReviewConfig(enabled=True),
+    )
+
+
 def mixed_df() -> pd.DataFrame:
     cfg = mixed_config()
     return pd.DataFrame(
@@ -111,6 +124,47 @@ def mixed_df() -> pd.DataFrame:
     )
 
 
+def cost_review_df() -> pd.DataFrame:
+    cfg = cost_review_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "x": 0.2,
+                "score": 1.0,
+                "cost_estimate": 1.2,
+                "cost_actual": 1.1,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+            {
+                "row_id": "suggested_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "cost_log_ei",
+                "review_status": "pending",
+                "review_note": "",
+                "x": 0.6,
+                "score": "",
+                "cost_estimate": 1.6,
+                "cost_actual": "",
+                "predicted_mean": 1.2,
+                "predicted_std": 0.1,
+                "acquisition": 0.02,
+                "utility": -0.78,
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_validate_campaign_data_accepts_valid_log() -> None:
     validate_campaign_data(config(), valid_df())
 
@@ -121,6 +175,10 @@ def test_validate_campaign_data_accepts_valid_mixed_log() -> None:
 
 def test_validate_campaign_data_accepts_feasible_constrained_log() -> None:
     validate_campaign_data(constrained_mixed_config(), mixed_df())
+
+
+def test_validate_campaign_data_accepts_cost_review_log() -> None:
+    validate_campaign_data(cost_review_config(), cost_review_df())
 
 
 def test_validate_campaign_data_accepts_3d_example_log() -> None:
@@ -175,11 +233,38 @@ def test_validate_campaign_data_accepts_constrained_mixed_example_log() -> None:
     ]
 
 
+def test_validate_campaign_data_accepts_cost_review_example_log() -> None:
+    config_cost = CampaignConfig.from_yaml("configs/07_cost_aware_human_review_logei.yaml")
+    df = load_campaign_log(
+        "examples/07_cost_aware_human_review_campaign_log.csv",
+        config_cost,
+    )
+
+    validate_campaign_data(config_cost, df)
+    assert config_cost.cost is not None
+    assert config_cost.review.enabled
+
+
 def test_validate_campaign_data_rejects_missing_column() -> None:
     df = valid_df().drop(columns=["source"])
 
     with pytest.raises(LogValidationError, match="missing required columns"):
         validate_campaign_data(config(), df)
+
+
+def test_validate_campaign_data_rejects_review_columns_without_review_config() -> None:
+    cfg = cost_review_config()
+    df = cost_review_df()
+
+    plain_cfg = CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+    )
+
+    with pytest.raises(LogValidationError, match="unsupported extra columns"):
+        validate_campaign_data(plain_cfg, df)
 
 
 def test_validate_campaign_data_rejects_duplicate_row_id() -> None:
@@ -204,6 +289,53 @@ def test_validate_campaign_data_rejects_filled_suggested_objective() -> None:
 
     with pytest.raises(LogValidationError, match="status='suggested'.*activity.*filled"):
         validate_campaign_data(config(), df)
+
+
+def test_validate_campaign_data_rejects_observed_review_not_accepted() -> None:
+    df = cost_review_df()
+    df.loc[0, "review_status"] = "pending"
+
+    with pytest.raises(LogValidationError, match="review_status is 'pending', not 'accepted'"):
+        validate_campaign_data(cost_review_config(), df)
+
+
+def test_validate_campaign_data_rejects_review_note_newline() -> None:
+    df = cost_review_df()
+    df.loc[1, "review_note"] = "line one\nline two"
+
+    with pytest.raises(LogValidationError, match="review_note containing a newline"):
+        validate_campaign_data(cost_review_config(), df)
+
+
+def test_validate_campaign_data_rejects_negative_cost_value() -> None:
+    df = cost_review_df()
+    df.loc[1, "cost_estimate"] = -1.0
+
+    with pytest.raises(LogValidationError, match="negative value"):
+        validate_campaign_data(cost_review_config(), df)
+
+
+def test_validate_campaign_data_rejects_mismatched_cost_estimate() -> None:
+    df = cost_review_df()
+    df.loc[1, "cost_estimate"] = 9.9
+
+    with pytest.raises(LogValidationError, match="cost_estimate inconsistent"):
+        validate_campaign_data(cost_review_config(), df)
+
+
+def test_validate_campaign_data_rejects_negative_cost_expression_result() -> None:
+    cfg = CampaignConfig(
+        campaign_name="bad_cost_result",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        cost=CostConfig(expression="-1.0 + x"),
+        review=ReviewConfig(enabled=True),
+    )
+    df = cost_review_df()
+
+    with pytest.raises(LogValidationError, match="negative value"):
+        validate_campaign_data(cfg, df)
 
 
 def test_validate_campaign_data_rejects_non_finite_objective() -> None:

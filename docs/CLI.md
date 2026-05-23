@@ -86,6 +86,14 @@ bo-forge suggest \
 
 The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
+Cost-aware and review-enabled campaigns use the same rhythm with extra review and cost commands. Inspect the current budget state:
+
+```bash
+bo-forge cost-summary \
+  --config configs/07_cost_aware_human_review_logei.yaml \
+  --log examples/07_cost_aware_human_review_working_log.csv
+```
+
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 
 ```bash
@@ -104,6 +112,28 @@ bo-forge mark-observed \
   --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --row-id ROW_ID_FROM_SUGGESTIONS \
   --objective-value 1.95
+```
+
+For review-enabled campaigns, accept, reject, or defer suggestions before running them:
+
+```bash
+bo-forge review \
+  --config configs/07_cost_aware_human_review_logei.yaml \
+  --log examples/07_cost_aware_human_review_working_log.csv \
+  --row-id ROW_ID_FROM_SUGGESTIONS \
+  --decision accept \
+  --note "run next"
+```
+
+Accepted suggestions can then be marked observed with an optional realised cost:
+
+```bash
+bo-forge mark-observed \
+  --config configs/07_cost_aware_human_review_logei.yaml \
+  --log examples/07_cost_aware_human_review_working_log.csv \
+  --row-id ROW_ID_FROM_SUGGESTIONS \
+  --objective-value 68.4 \
+  --actual-cost 2.7
 ```
 
 ## 📄 Reports And Plots
@@ -139,6 +169,12 @@ bo-forge plot \
   --log examples/01_simple_2d_maximise_logei_working_log.csv \
   --kind diagnostics \
   --output reports/diagnostics.png
+
+bo-forge plot \
+  --config configs/07_cost_aware_human_review_logei.yaml \
+  --log examples/07_cost_aware_human_review_working_log.csv \
+  --kind cost-progress \
+  --output reports/cost_progress.png
 ```
 
 ## 🧭 Command Reference
@@ -153,10 +189,12 @@ bo-forge plot \
 | `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
 | `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
 | `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
+| `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and best-observed-objective fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
-| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE` | Mark one pending suggestion as observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics --output PATH` | Export one progress or diagnostics figure. |
+| `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
+| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress --output PATH` | Export one progress, diagnostics, or cost-progress figure. |
 
 ## 🧯 CLI Error Output
 
@@ -176,6 +214,7 @@ The commands that can change files are:
 
 - `bo-forge init-log`: creates a new empty campaign log and refuses to overwrite existing files.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
+- `bo-forge review`: updates `review_status` and `review_note` for one suggested row.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.
 - `bo-forge report --output`: writes a report file.
 - `bo-forge plot --output`: writes a figure file.
@@ -183,3 +222,7 @@ The commands that can change files are:
 `bo-forge suggest --append` never marks suggestions observed. The explicit campaign rhythm remains:
 
 > suggest → append → run experiment → mark-observed
+
+For review-enabled campaigns, the explicit rhythm is:
+
+> suggest → append → review → run accepted experiment → mark-observed

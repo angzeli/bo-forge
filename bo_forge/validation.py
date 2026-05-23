@@ -12,18 +12,25 @@ from bo_forge.constraints import constraint_violations_for_row
 from bo_forge.errors import LogValidationError
 
 BASE_COLUMNS = ["row_id", "iteration", "status", "source"]
+REVIEW_COLUMNS = ["review_status", "review_note"]
+COST_COLUMNS = ["cost_estimate", "cost_actual"]
 RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
+UTILITY_COLUMNS = ["utility"]
 VALID_STATUSES = {"suggested", "observed"}
-VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei"}
+VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei", "cost_log_ei"}
+VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
 
 def canonical_columns(config: CampaignConfig) -> list[str]:
     """Return canonical CSV columns for a campaign."""
     return [
         *BASE_COLUMNS,
+        *(REVIEW_COLUMNS if config.review.enabled else []),
         *config.variable_names,
         config.objective.name,
+        *(COST_COLUMNS if config.cost is not None else []),
         *RESULT_COLUMNS,
+        *(UTILITY_COLUMNS if config.cost is not None else []),
     ]
 
 
@@ -37,10 +44,15 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_iteration(df)
     _validate_status(df)
     _validate_source(df)
+    _validate_review(config, df)
     _validate_variables(config, df)
     _validate_constraints(config, df)
     _validate_objective(config, df)
     _validate_nullable_numeric_columns(df, RESULT_COLUMNS)
+    if config.cost is not None:
+        _validate_nonnegative_nullable_numeric_columns(df, COST_COLUMNS)
+        _validate_finite_nullable_numeric_columns(df, UTILITY_COLUMNS)
+        _validate_cost_expression(config, df)
 
 
 def get_observed_data(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
@@ -49,11 +61,15 @@ def get_observed_data(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[df["status"] == "observed"].copy()
 
 
-def has_pending_suggestions(df: pd.DataFrame) -> bool:
+def has_pending_suggestions(df: pd.DataFrame, config: CampaignConfig | None = None) -> bool:
     """Return True when a log contains unresolved suggested rows."""
     if "status" not in df.columns or df.empty:
         return False
-    return bool((df["status"] == "suggested").any())
+    suggested = df["status"] == "suggested"
+    if config is not None and config.review.enabled:
+        blocking = df["review_status"].isin({"pending", "accepted"})
+        return bool((suggested & blocking).any())
+    return bool(suggested.any())
 
 
 def design_tuples(config: CampaignConfig, df: pd.DataFrame) -> set[tuple[object, ...]]:
@@ -148,6 +164,33 @@ def _validate_source(df: pd.DataFrame) -> None:
             f"Row '{row_id}' has invalid source '{value}'. "
             f"Expected one of {sorted(VALID_SOURCES)}."
         )
+
+
+def _validate_review(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if not config.review.enabled:
+        return
+    invalid = ~df["review_status"].isin(VALID_REVIEW_STATUSES)
+    if invalid.any():
+        row_id = str(df.loc[invalid, "row_id"].iloc[0])
+        value = df.loc[invalid, "review_status"].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has invalid review_status '{value}'. "
+            f"Expected one of {sorted(VALID_REVIEW_STATUSES)}."
+        )
+
+    observed_not_accepted = (df["status"] == "observed") & (df["review_status"] != "accepted")
+    if observed_not_accepted.any():
+        row_id = str(df.loc[observed_not_accepted, "row_id"].iloc[0])
+        value = df.loc[observed_not_accepted, "review_status"].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has status='observed' but review_status is "
+            f"'{value}', not 'accepted'."
+        )
+
+    newline = df["review_note"].astype(str).str.contains(r"[\r\n]", regex=True)
+    if newline.any():
+        row_id = str(df.loc[newline, "row_id"].iloc[0])
+        raise LogValidationError(f"Row '{row_id}' has review_note containing a newline.")
 
 
 def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
@@ -305,6 +348,26 @@ def _validate_constraints(config: CampaignConfig, df: pd.DataFrame) -> None:
             )
 
 
+def _validate_cost_expression(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if config.cost is None:
+        return
+
+    from bo_forge.costs import evaluate_cost
+
+    for _, row in df.iterrows():
+        expected = evaluate_cost(config, row)
+        estimate = row["cost_estimate"]
+        if _is_blank_value(estimate):
+            continue
+        actual = float(estimate)
+        if not math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-9):
+            row_id = str(row["row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has cost_estimate inconsistent with cost expression: "
+                f"cost_estimate={actual:g}, expected={expected:g}."
+            )
+
+
 def _validate_nullable_numeric_columns(df: pd.DataFrame, columns: Iterable[str]) -> None:
     for column in columns:
         blank = _blank_mask(df[column])
@@ -318,8 +381,53 @@ def _validate_nullable_numeric_columns(df: pd.DataFrame, columns: Iterable[str])
             )
 
 
+def _validate_nonnegative_nullable_numeric_columns(
+    df: pd.DataFrame,
+    columns: Iterable[str],
+) -> None:
+    for column in columns:
+        blank = _blank_mask(df[column])
+        numeric = pd.to_numeric(df.loc[~blank, column], errors="coerce")
+        invalid = numeric.isna() | ~numeric.map(math.isfinite)
+        if invalid.any():
+            row_id = str(df.loc[~blank].loc[invalid, "row_id"].iloc[0])
+            value = df.loc[~blank].loc[invalid, column].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-finite numeric value for column "
+                f"'{column}': value={value!r}."
+            )
+        negative = numeric < 0
+        if negative.any():
+            row_id = str(df.loc[~blank].loc[negative, "row_id"].iloc[0])
+            value = numeric.loc[negative].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has negative value for column '{column}': value={value:g}."
+            )
+
+
+def _validate_finite_nullable_numeric_columns(
+    df: pd.DataFrame,
+    columns: Iterable[str],
+) -> None:
+    for column in columns:
+        blank = _blank_mask(df[column])
+        numeric = pd.to_numeric(df.loc[~blank, column], errors="coerce")
+        invalid = numeric.isna() | ~numeric.map(math.isfinite)
+        if invalid.any():
+            row_id = str(df.loc[~blank].loc[invalid, "row_id"].iloc[0])
+            value = df.loc[~blank].loc[invalid, column].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-finite numeric value for column "
+                f"'{column}': value={value!r}."
+            )
+
+
 def _blank_mask(series: pd.Series) -> pd.Series:
     return series.isna() | (series.astype(str).str.strip() == "")
+
+
+def _is_blank_value(value: object) -> bool:
+    return pd.isna(value) or str(value).strip() == ""
 
 
 def _normalise_variable_value(variable: VariableConfig, value: object) -> object:

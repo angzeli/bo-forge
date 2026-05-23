@@ -8,7 +8,14 @@ import pytest
 
 import bo_forge.cli as cli
 from bo_forge.cli import run
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    CostConfig,
+    ObjectiveConfig,
+    ReviewConfig,
+    VariableConfig,
+)
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
@@ -78,6 +85,40 @@ bo:
     return path
 
 
+def write_cost_review_config(path: Path, *, initial_design_size: int = 2) -> Path:
+    path.write_text(
+        f"""
+campaign_name: cost_review_cli_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+cost:
+  expression: "1.0 + x"
+  weight: 0.5
+  budget: 10
+  candidate_pool_size: 16
+  top_k: 8
+review:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 7
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
@@ -112,6 +153,24 @@ def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
             num_restarts=2,
             mc_samples=16,
         ),
+    )
+
+
+def cost_review_config(initial_design_size: int = 2) -> CampaignConfig:
+    cfg = config(initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name="cost_review_cli_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        cost=CostConfig(
+            expression="1.0 + x",
+            weight=0.5,
+            budget=10.0,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        review=ReviewConfig(enabled=True),
     )
 
 
@@ -195,6 +254,46 @@ def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def cost_review_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "x": 0.2,
+                "score": 1.0,
+                "cost_estimate": 1.2,
+                "cost_actual": 1.1,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+            {
+                "row_id": "suggested_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "sobol",
+                "review_status": "pending",
+                "review_note": "",
+                "x": 0.5,
+                "score": "",
+                "cost_estimate": 1.5,
+                "cost_actual": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
     if df is None:
         df = empty_campaign_log(cfg)
@@ -226,7 +325,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.4.2\n"
+    assert captured.out == "bo-forge 0.4.3\n"
     assert captured.err == ""
 
 
@@ -235,7 +334,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.4.2\n"
+    assert completed.stdout == "bo-forge 0.4.3\n"
     assert completed.stderr == ""
 
 
@@ -311,6 +410,22 @@ def test_init_log_creates_empty_canonical_log(
     assert captured.out == f"Created empty campaign log: {log_path}\n"
     assert captured.err == ""
     cfg = CampaignConfig.from_yaml(config_path)
+    df = load_campaign_log(log_path, cfg)
+    assert df.empty
+    assert list(df.columns) == canonical_columns(cfg)
+
+
+def test_init_log_creates_cost_review_schema(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = tmp_path / "nested" / "campaign.csv"
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+
+    capsys.readouterr()
     df = load_campaign_log(log_path, cfg)
     assert df.empty
     assert list(df.columns) == canonical_columns(cfg)
@@ -571,6 +686,19 @@ def test_summary_status_next_action_and_report_outputs(
     assert "Best Observation" in report_out
 
 
+def test_cost_summary_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+
+    assert run(["cost-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "total_observed_cost" in captured.out
+    assert "accepted_pending_cost" in captured.out
+    assert "budget_remaining" in captured.out
+
+
 def test_report_output_uses_export_path(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -687,6 +815,24 @@ def test_mixed_suggest_append_writes_valid_mixed_row(
     assert df.loc[0, "solvent"] in {"MeCN", "EtOH"}
 
 
+def test_cost_review_suggest_append_writes_cost_and_review_columns(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml", initial_design_size=3)
+    cfg = cost_review_config(initial_design_size=3)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "review_status"] == "pending"
+    assert float(df.loc[0, "cost_estimate"]) > 0
+    assert df.loc[0, "utility"] == ""
+
+
 def test_suggest_output_write_failure_returns_clear_error(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -738,6 +884,59 @@ def test_mark_observed_resolves_only_specified_pending_suggestion(
     assert df.loc[df["row_id"] == other_row_id, "status"].iloc[0] == "suggested"
 
 
+def test_review_and_mark_observed_with_actual_cost(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+
+    assert (
+        run(
+            [
+                "review",
+                *base_args(config_path, log_path),
+                "--row-id",
+                "suggested_0",
+                "--decision",
+                "accept",
+                "--note",
+                " approved ",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == (
+        f"Reviewed row suggested_0 as accept in campaign log: {log_path}\n"
+    )
+
+    assert (
+        run(
+            [
+                "mark-observed",
+                *base_args(config_path, log_path),
+                "--row-id",
+                "suggested_0",
+                "--objective-value",
+                "1.8",
+                "--actual-cost",
+                "1.7",
+            ]
+        )
+        == 0
+    )
+
+    df = load_campaign_log(log_path, cfg)
+    row = df.loc[df["row_id"] == "suggested_0"].iloc[0]
+    assert row["status"] == "observed"
+    assert row["review_note"] == "approved"
+    assert float(row["score"]) == pytest.approx(1.8)
+    assert float(row["cost_actual"]) == pytest.approx(1.7)
+
+
 @pytest.mark.parametrize("kind", ["progress", "diagnostics"])
 def test_plot_writes_nested_output_path(
     kind: str,
@@ -766,6 +965,36 @@ def test_plot_writes_nested_output_path(
 
     captured = capsys.readouterr()
     assert captured.out == f"Wrote {kind} plot: {output_path}\n"
+    assert output_path.exists()
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_plot_cost_progress_writes_nested_output_path(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+    output_path = tmp_path / "figures" / "cost-progress.png"
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "cost-progress",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == f"Wrote cost-progress plot: {output_path}\n"
     assert output_path.exists()
     assert log_path.read_text(encoding="utf-8") == before_csv
 
@@ -799,6 +1028,36 @@ def test_plot_output_write_failure_returns_clear_error(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert f"Error: Could not write {kind} plot '{output_path}'" in captured.err
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_plot_cost_progress_output_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+    output_path = output_under_file_parent(tmp_path, "cost-progress.png")
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "cost-progress",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Error: Could not write cost-progress plot '{output_path}'" in captured.err
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 

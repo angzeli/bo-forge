@@ -103,15 +103,19 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.pending_suggestions()` | Return unresolved `status='suggested'` rows. |
 | `campaign.campaign_status()` | Return the current campaign status without mutating state or writing to disk. |
 | `campaign.next_action()` | Return a one-row advisory DataFrame with campaign status, recommended action, reason, and suggested calls. |
-| `campaign.report()` | Return read-only report tables for summary, next action, best observation, and pending suggestions. |
+| `campaign.report()` | Return read-only report tables for summary, next action, best observation, suggestions, review queue, and cost summary. |
 | `campaign.export_report(path)` | Write a deterministic plain-text campaign report and return the written path. |
+| `campaign.review_queue()` | Return suggested rows still waiting for a review decision when review is enabled. |
+| `campaign.review_suggestion(row_id, decision, note="")` | Record `accept`, `reject`, or `defer` for one suggested row and refresh `campaign.df`. |
+| `campaign.cost_summary()` | Return cost, reserved-cost, budget, and best-objective fields when cost is configured. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
-| `campaign.mark_observed(row_id, objective_value)` | Mark one pending suggestion observed, write the result, and refresh `campaign.df`. |
+| `campaign.mark_observed(row_id, objective_value, actual_cost=None)` | Mark one pending suggestion observed, optionally record actual cost, and refresh `campaign.df`. |
 | `campaign.reload()` | Reload the CSV log from disk into `campaign.df`. |
 | `campaign.plot_progress(save_path=None)` | Plot objective and best-so-far progress; returns figure/axes objects. |
+| `campaign.plot_cost_progress(save_path=None)` | Plot best observed objective against cumulative effective cost. |
 | `campaign.plot_diagnostics(save_path=None)` | Plot dimension-aware diagnostics; returns figure/axes objects. |
 
 ## 🧱 Lower-Level API
@@ -151,6 +155,7 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/04_simple_4d_maximise_logei.yaml`: maximises a four-variable synthetic activity for CLI demos.
 - `configs/05_simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
 - `configs/06_mixed_constrained_logei.yaml`: maximises a constrained mixed-variable synthetic yield.
+- `configs/07_cost_aware_human_review_logei.yaml`: adds deterministic cost estimates, budget tracking, and human-review decisions.
 
 ## 🧪 Mixed-Variable Campaigns
 
@@ -208,6 +213,38 @@ Use `campaign.suggestion_quality(suggestions)` to inspect feasibility, constrain
 
 The v0.4.2 constraint and diversity design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_03_mixed_variable_and_constrained_bo_worked.ipynb` for repair-aware constrained mixed-variable BO, and `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_02_batch_bo_for_parallel_experimentation_worked.ipynb` for within-batch distance summaries.
 
+v0.4.3 adds optional deterministic cost and review sections:
+
+```yaml
+cost:
+  expression: "1.0 + 0.04 * reaction_time + 2.0 * (solvent == 'Water')"
+  weight: 0.5
+  budget: 30.0
+  candidate_pool_size: 128
+  top_k: 24
+
+review:
+  enabled: true
+```
+
+Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank. Model-based cost-aware suggestions use `source=cost_log_ei` and fill `utility = acquisition - cost.weight * cost_estimate`. For `batch_size > 1`, v0.4.3 uses greedy single-candidate utility rather than joint cost-aware qLogEI.
+
+When `cost_estimate` is filled, validation checks it against the deterministic cost expression. Use `cost_actual` for realised experiment costs that differ from the estimate.
+
+Review-enabled campaigns keep `status` as only `suggested` or `observed`; review decisions live in `review_status`. Pending and accepted suggestions block new suggestions. Rejected and deferred suggestions remain in the CSV for auditability and duplicate avoidance, but do not reserve budget and do not block new suggestions.
+
+`campaign.next_action()` is review-aware: pending review rows point to `campaign.review_queue()` and `campaign.review_suggestion(...)`, while accepted rows point to `campaign.mark_observed(..., actual_cost=...)`.
+
+For review-enabled campaigns, `campaign.summary()` and exported reports include separate `pending_review`, `accepted_pending`, `rejected`, and `deferred` counts.
+
+Budget semantics are:
+
+- observed rows consume `cost_actual` when present, otherwise `cost_estimate`;
+- accepted pending suggestions reserve `cost_estimate`;
+- pending, rejected, and deferred suggestions do not reserve budget.
+
+The v0.4.3 cost and review design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_04_budget_aware_and_human_in_the_loop_bo_workflows_worked.ipynb`, especially acquisition-minus-cost utility, cumulative-cost comparison, and accepted/rejected workflow history.
+
 ## 📓 Example Notebooks
 
 Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/01_simple_2d_maximise_logei.yaml` and `examples/01_simple_2d_maximise_logei_campaign_log.csv`.
@@ -221,6 +258,8 @@ Open `notebooks/04_cli_four_variable_campaign.ipynb` for a 4D campaign driven th
 Open `notebooks/05_mixed_variable_campaign.ipynb` for a mixed-variable v0.4 campaign using `configs/05_simple_mixed_logei.yaml`.
 
 Open `notebooks/06_constrained_mixed_campaign.ipynb` for a constrained mixed-variable campaign using `configs/06_mixed_constrained_logei.yaml`.
+
+Open `notebooks/07_cost_aware_human_review_campaign.ipynb` for a cost-aware and human-review campaign using `configs/07_cost_aware_human_review_logei.yaml`.
 
 From a fresh clone:
 
@@ -247,6 +286,7 @@ The notebooks write only ignored working files:
 - `examples/04_simple_4d_maximise_logei_working_log.csv`
 - `examples/05_simple_mixed_logei_working_log.csv`
 - `examples/06_mixed_constrained_logei_working_log.csv`
+- `examples/07_cost_aware_human_review_working_log.csv`
 - `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.

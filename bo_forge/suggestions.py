@@ -7,11 +7,14 @@ import uuid
 
 import pandas as pd
 import torch
+from botorch.acquisition import LogExpectedImprovement
+from botorch.exceptions.errors import BotorchError
 from torch.quasirandom import SobolEngine
 
 from bo_forge.acquisition import optimize_log_ei
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_violations_for_values
+from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
 from bo_forge.transforms import (
@@ -48,7 +51,7 @@ def suggest_next(
 ) -> pd.DataFrame:
     """Suggest the next experiment or batch for a campaign."""
     validate_campaign_data(config, df)
-    if has_pending_suggestions(df):
+    if has_pending_suggestions(df, config):
         raise SuggestionError(
             "Cannot generate new suggestions while unresolved status='suggested' rows exist."
         )
@@ -64,6 +67,14 @@ def suggest_next(
             config=config,
             df=df,
             count=min(requested_batch_size, remaining_initial),
+        )
+
+    if config.cost is not None:
+        return _suggest_cost_aware_model_based(
+            config=config,
+            df=df,
+            observed_df=observed_df,
+            batch_size=requested_batch_size,
         )
 
     return _suggest_model_based(
@@ -94,8 +105,10 @@ def _suggest_initial_design(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
+        _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, candidate, strict=True):
             row[name] = value
+        _populate_cost_fields(config, row, candidate)
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(config))
 
@@ -162,6 +175,7 @@ def _suggest_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
+        _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, user_candidates[index], strict=True):
             row[name] = value
         row["predicted_mean"] = float(mean_user[index])
@@ -170,6 +184,197 @@ def _suggest_model_based(
         rows.append(row)
 
     return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _suggest_cost_aware_model_based(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    torch.manual_seed(config.bo.random_seed)
+    combination_count = categorical_combination_count(config)
+    if combination_count > MAX_CATEGORICAL_COMBINATIONS:
+        raise SuggestionError(
+            "Cost-aware mixed-variable suggestions support at most "
+            f"{MAX_CATEGORICAL_COMBINATIONS} categorical combinations: "
+            f"configured={combination_count}."
+        )
+
+    model = fit_gp_model(config, observed_df)
+    _, train_y_model = dataframe_to_tensors(config, observed_df)
+    acquisition = LogExpectedImprovement(model=model, best_f=train_y_model.max())
+    fixed_features_list = categorical_feature_assignments(config)
+    remaining_budget = budget_remaining(config, df)
+    selected: list[tuple[object, ...]] = []
+    rows = []
+    iteration = next_iteration(df)
+
+    for batch_index in range(batch_size):
+        chosen = _choose_cost_aware_candidate(
+            config=config,
+            df=df,
+            model=model,
+            acquisition=acquisition,
+            train_y_model=train_y_model,
+            fixed_features_list=fixed_features_list,
+            selected=selected,
+            remaining_budget=remaining_budget,
+            attempt_offset=batch_index,
+        )
+        if remaining_budget is not None:
+            remaining_budget -= chosen["cost_estimate"]
+        selected.append(chosen["candidate"])
+
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = "cost_log_ei"
+        _populate_review_fields(config, row)
+        for name, value in zip(config.variable_names, chosen["candidate"], strict=True):
+            row[name] = value
+        row["predicted_mean"] = chosen["predicted_mean"]
+        row["predicted_std"] = chosen["predicted_std"]
+        row["acquisition"] = chosen["acquisition"]
+        row["cost_estimate"] = chosen["cost_estimate"]
+        row["utility"] = chosen["utility"]
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _choose_cost_aware_candidate(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    model,
+    acquisition,
+    train_y_model: torch.Tensor,
+    fixed_features_list: list[dict[int, float]],
+    selected: list[tuple[object, ...]],
+    remaining_budget: float | None,
+    attempt_offset: int,
+) -> dict[str, object]:
+    rejection_message = "no cost-aware candidates were evaluated"
+    for attempt in range(MAX_DECODE_RETRIES):
+        torch.manual_seed(config.bo.random_seed + attempt_offset * 101 + attempt)
+        pool = _cost_aware_candidate_pool(
+            config=config,
+            model=model,
+            train_y_model=train_y_model,
+            fixed_features_list=fixed_features_list,
+            attempt=attempt_offset * 101 + attempt,
+        )
+        seen: set[tuple[object, ...]] = set()
+        scored_candidates: list[dict[str, object]] = []
+        for candidate in pool:
+            candidate_key = design_key_for_values(config, candidate)
+            if candidate_key in seen:
+                continue
+            seen.add(candidate_key)
+            rejection_message = _candidate_rejection_message(config, df, candidate, selected)
+            if rejection_message is not None:
+                continue
+            cost_estimate = evaluate_cost(config, candidate)
+            if remaining_budget is not None and cost_estimate > remaining_budget:
+                rejection_message = (
+                    "candidate exceeds remaining budget: "
+                    f"cost_estimate={cost_estimate:.6g}, "
+                    f"remaining_budget={remaining_budget:.6g}, candidate={candidate}."
+                )
+                continue
+            scored = _score_cost_aware_candidate(
+                config=config,
+                model=model,
+                acquisition=acquisition,
+                candidate=candidate,
+                cost_estimate=cost_estimate,
+            )
+            scored_candidates.append(scored)
+        if scored_candidates:
+            assert config.cost is not None
+            shortlisted = sorted(
+                scored_candidates,
+                key=lambda item: float(item["acquisition"]),
+                reverse=True,
+            )[: config.cost.top_k]
+            return max(
+                shortlisted,
+                key=lambda item: (
+                    float(item["utility"]),
+                    float(item["acquisition"]),
+                    -float(item["cost_estimate"]),
+                ),
+            )
+
+    raise SuggestionError(
+        "Could not generate enough budget-feasible cost-aware suggestions after "
+        f"{MAX_DECODE_RETRIES} retries. The feasible design space may be exhausted, "
+        "constraints may be too restrictive, bo.min_normalized_distance may be too "
+        f"large, or the remaining budget may be too small. Last rejection: {rejection_message}"
+    )
+
+
+def _cost_aware_candidate_pool(
+    *,
+    config: CampaignConfig,
+    model,
+    train_y_model: torch.Tensor,
+    fixed_features_list: list[dict[int, float]],
+    attempt: int,
+) -> list[tuple[object, ...]]:
+    candidates: list[tuple[object, ...]] = []
+    try:
+        x_unit_raw, _, _ = optimize_log_ei(
+            config=config,
+            model=model,
+            train_y_model=train_y_model,
+            batch_size=1,
+            model_dim=encoded_dimension(config),
+            fixed_features_list=fixed_features_list,
+        )
+    except (BotorchError, RuntimeError, ValueError):
+        pass
+    else:
+        candidates.extend(unit_cube_to_user_values(config, x_unit_raw))
+
+    assert config.cost is not None
+    pool_size = config.cost.candidate_pool_size
+    engine = SobolEngine(
+        dimension=encoded_dimension(config),
+        scramble=True,
+        seed=config.bo.random_seed + 7919 + attempt,
+    )
+    sobol = engine.draw(pool_size).to(dtype=torch.double)
+    candidates.extend(unit_cube_to_user_values(config, sobol))
+    return candidates
+
+
+def _score_cost_aware_candidate(
+    *,
+    config: CampaignConfig,
+    model,
+    acquisition,
+    candidate: tuple[object, ...],
+    cost_estimate: float,
+) -> dict[str, object]:
+    x_unit = values_to_unit_cube(config, [candidate])
+    with torch.no_grad():
+        acquisition_value = float(acquisition(x_unit.unsqueeze(1)).reshape(-1)[0])
+        posterior = model.posterior(x_unit)
+        mean_model = posterior.mean.squeeze(-1)
+        std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
+        mean_user = objective_from_model_space(config, mean_model)
+    utility = acquisition_value - config.cost.weight * cost_estimate
+    return {
+        "candidate": candidate,
+        "cost_estimate": float(cost_estimate),
+        "acquisition": acquisition_value,
+        "utility": float(utility),
+        "predicted_mean": float(mean_user[0]),
+        "predicted_std": float(std[0]),
+    }
 
 
 def _initial_user_candidates(
@@ -206,6 +411,16 @@ def _initial_user_candidates(
     selected: list[tuple[object, ...]] = []
     seen = set(existing)
     batches_drawn = 0
+    initial_remaining_budget = budget_remaining(config, df)
+    if (
+        config.cost is not None
+        and initial_remaining_budget is not None
+        and initial_remaining_budget <= 0
+    ):
+        raise SuggestionError(
+            "Could not generate enough budget-feasible initial suggestions. "
+            "The remaining budget may be too small."
+        )
 
     while len(selected) < count:
         draw_count = max(count * 16, 64)
@@ -222,6 +437,11 @@ def _initial_user_candidates(
             rejection_message = _candidate_rejection_message(config, df, candidate, selected)
             if rejection_message is not None:
                 continue
+            if config.cost is not None and initial_remaining_budget is not None:
+                selected_cost = sum(evaluate_cost(config, item) for item in selected)
+                candidate_cost = evaluate_cost(config, candidate)
+                if candidate_cost > initial_remaining_budget - selected_cost:
+                    continue
             selected.append(candidate)
             candidate_key = design_key_for_values(config, candidate)
             seen.add(candidate_key)
@@ -229,6 +449,12 @@ def _initial_user_candidates(
                 break
         batches_drawn += 1
         if batches_drawn > 1000 or len(seen) > 100_000:
+            if config.cost is not None and initial_remaining_budget is not None:
+                raise SuggestionError(
+                    "Could not generate enough budget-feasible initial suggestions. "
+                    "The feasible design space may be exhausted or the remaining "
+                    "budget may be too small."
+                )
             raise SuggestionError(
                 "Could not generate enough feasible, non-duplicate suggestions after "
                 f"{batches_drawn} retries. {_GENERATION_FAILURE_HINT}"
@@ -389,6 +615,24 @@ def _nearest_normalized_distance(
 
 def _empty_row(config: CampaignConfig) -> dict[str, object]:
     return {column: "" for column in canonical_columns(config)}
+
+
+def _populate_review_fields(config: CampaignConfig, row: dict[str, object]) -> None:
+    if config.review.enabled:
+        row["review_status"] = "pending"
+        row["review_note"] = ""
+
+
+def _populate_cost_fields(
+    config: CampaignConfig,
+    row: dict[str, object],
+    candidate: tuple[object, ...],
+) -> None:
+    if config.cost is None:
+        return
+    row["cost_estimate"] = evaluate_cost(config, candidate)
+    row["cost_actual"] = ""
+    row["utility"] = ""
 
 
 def _finite_design_space_size(config: CampaignConfig) -> int | None:

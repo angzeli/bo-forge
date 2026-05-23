@@ -9,6 +9,11 @@ from typing import Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
+from bo_forge.costs import (
+    accepted_pending_estimated_cost,
+    budget_remaining,
+    observed_effective_cost,
+)
 from bo_forge.logs import (
     append_suggestions as _append_suggestions,
 )
@@ -17,6 +22,9 @@ from bo_forge.logs import (
 )
 from bo_forge.logs import (
     mark_observed as _mark_observed,
+)
+from bo_forge.logs import (
+    review_suggestion as _review_suggestion,
 )
 from bo_forge.suggestions import (
     suggest_next as _suggest_next,
@@ -93,7 +101,36 @@ class CampaignSession:
             ("best_row_id", best_row_id),
             ("best_objective_value", best_objective_value),
         ]
+        if self.config.review.enabled:
+            review_counts = self._review_status_counts()
+            rows.extend(
+                [
+                    ("pending_review", review_counts["pending"]),
+                    ("accepted_pending", review_counts["accepted"]),
+                    ("rejected", review_counts["rejected"]),
+                    ("deferred", review_counts["deferred"]),
+                ]
+            )
+        if self.config.cost is not None:
+            rows.extend(
+                [
+                    ("budget", self.config.cost.budget),
+                    ("observed_effective_cost", observed_effective_cost(self.config, self.df)),
+                    (
+                        "accepted_pending_estimated_cost",
+                        accepted_pending_estimated_cost(self.config, self.df),
+                    ),
+                    ("budget_remaining", budget_remaining(self.config, self.df)),
+                ]
+            )
         return pd.DataFrame(rows, columns=["field", "value"])
+
+    def _review_status_counts(self) -> dict[str, int]:
+        suggested = self.df["status"] == "suggested"
+        return {
+            status: int((suggested & (self.df["review_status"] == status)).sum())
+            for status in ["pending", "accepted", "rejected", "deferred"]
+        }
 
     def observed_data(self) -> pd.DataFrame:
         """Return observed rows from the current session DataFrame."""
@@ -104,10 +141,46 @@ class CampaignSession:
         self.validate()
         return self.df.loc[self.df["status"] == "suggested"].copy()
 
+    def review_queue(self) -> pd.DataFrame:
+        """Return suggested rows that are still pending review."""
+        self.validate()
+        if not self.config.review.enabled:
+            return pd.DataFrame(columns=self.df.columns)
+        return self.df.loc[
+            (self.df["status"] == "suggested")
+            & (self.df["review_status"] == "pending")
+        ].copy()
+
+    def cost_summary(self) -> pd.DataFrame:
+        """Return cost and budget summary fields for the current campaign."""
+        self.validate()
+        if self.config.cost is None:
+            return pd.DataFrame(
+                columns=["field", "value"],
+            )
+        best = self.best_observation()
+        best_value = None if best.empty else float(best[self.config.objective.name].iloc[0])
+        rows = [
+            ("total_observed_cost", observed_effective_cost(self.config, self.df)),
+            ("accepted_pending_cost", accepted_pending_estimated_cost(self.config, self.df)),
+            ("budget", self.config.cost.budget),
+            ("budget_remaining", budget_remaining(self.config, self.df)),
+            ("best_observed_objective", best_value),
+        ]
+        return pd.DataFrame(rows, columns=["field", "value"])
+
     def campaign_status(self) -> str:
         """Return the current campaign status without mutating session state."""
         self.validate()
-        pending_count = int((self.df["status"] == "suggested").sum())
+        if self.config.review.enabled:
+            pending_count = int(
+                (
+                    (self.df["status"] == "suggested")
+                    & self.df["review_status"].isin(["pending", "accepted"])
+                ).sum()
+            )
+        else:
+            pending_count = int((self.df["status"] == "suggested").sum())
         observed_count = int((self.df["status"] == "observed").sum())
         if pending_count > 0:
             return "has_pending_suggestions"
@@ -119,12 +192,33 @@ class CampaignSession:
         """Return the recommended next notebook action without mutating state."""
         campaign_status = self.campaign_status()
         if campaign_status == "has_pending_suggestions":
-            action = "resolve_pending_suggestions"
-            reason = "There are unresolved suggested rows; record results before requesting more."
-            suggested_call = (
-                "campaign.pending_suggestions(); "
-                "campaign.mark_observed(row_id, objective_value)"
-            )
+            if self.config.review.enabled and not self.review_queue().empty:
+                action = "review_pending_suggestions"
+                reason = (
+                    "There are suggestions awaiting review; accept, reject, or defer "
+                    "them before requesting more."
+                )
+                suggested_call = (
+                    "campaign.review_queue(); "
+                    "campaign.review_suggestion(row_id, decision, note='')"
+                )
+            elif self.config.review.enabled:
+                action = "run_accepted_suggestions"
+                reason = "There are accepted suggestions awaiting experimental results."
+                suggested_call = (
+                    "campaign.pending_suggestions(); "
+                    "campaign.mark_observed(row_id, objective_value, actual_cost=...)"
+                )
+            else:
+                action = "resolve_pending_suggestions"
+                reason = (
+                    "There are unresolved suggested rows; record results before "
+                    "requesting more."
+                )
+                suggested_call = (
+                    "campaign.pending_suggestions(); "
+                    "campaign.mark_observed(row_id, objective_value)"
+                )
         elif campaign_status == "ready_for_initial_design":
             action = "suggest_initial_design"
             reason = "Observed rows are below initial_design_size; request Sobol suggestions."
@@ -159,6 +253,8 @@ class CampaignSession:
             "next_action": self.next_action(),
             "best_observation": self.best_observation(),
             "pending_suggestions": self.pending_suggestions(),
+            "review_queue": self.review_queue(),
+            "cost_summary": self.cost_summary(),
         }
 
     def export_report(self, path: str | Path) -> Path:
@@ -201,9 +297,24 @@ class CampaignSession:
         _append_suggestions(self.log_path, suggestions)
         return self.reload()
 
-    def mark_observed(self, row_id: str, objective_value: float) -> pd.DataFrame:
+    def mark_observed(
+        self,
+        row_id: str,
+        objective_value: float,
+        actual_cost: float | None = None,
+    ) -> pd.DataFrame:
         """Mark one pending suggestion observed, reload, and return the refreshed log."""
-        _mark_observed(self.log_path, row_id, objective_value)
+        _mark_observed(self.log_path, row_id, objective_value, actual_cost=actual_cost)
+        return self.reload()
+
+    def review_suggestion(
+        self,
+        row_id: str,
+        decision: str,
+        note: str = "",
+    ) -> pd.DataFrame:
+        """Review one pending suggestion, reload, and return the refreshed log."""
+        _review_suggestion(self.log_path, row_id, decision, note)
         return self.reload()
 
     def plot_progress(self, **kwargs: Any) -> Any:
@@ -217,6 +328,12 @@ class CampaignSession:
         from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
 
         return _plot_diagnostics(self.config, self.df, **kwargs)
+
+    def plot_cost_progress(self, **kwargs: Any) -> Any:
+        """Plot best observed objective against cumulative effective cost."""
+        from bo_forge.diagnostics import plot_cost_progress as _plot_cost_progress
+
+        return _plot_cost_progress(self.config, self.df, **kwargs)
 
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
@@ -235,6 +352,10 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             + _format_best_observation(tables["best_observation"]),
             "Pending Suggestions\n-------------------\n\n"
             + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
+            "Review Queue\n------------\n\n"
+            + _format_report_table(tables["review_queue"], "No suggestions awaiting review."),
+            "Cost Summary\n------------\n\n"
+            + _format_report_table(tables["cost_summary"], "No cost model configured."),
         ]
     )
 

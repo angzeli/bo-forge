@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.4.2
+# 🧪 BO Forge v0.4.3
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow. The reusable BO logic lives in the `bo_forge` Python package, while notebooks and the CLI wrap that package.
 
-v0.4 adds mixed-variable single-objective campaigns while preserving the notebook, session, CLI, and CSV workflow established in earlier releases. v0.4.2 adds practical constraint checks, stronger duplicate handling, and suggestion quality summaries.
+v0.4 adds mixed-variable single-objective campaigns while preserving the notebook, session, CLI, and CSV workflow established in earlier releases. v0.4.3 adds deterministic cost expressions, budget summaries, and human-review decisions.
 
 BO Forge deliberately supports only:
 
@@ -14,6 +14,7 @@ BO Forge deliberately supports only:
 - LogEI for single suggestions and qLogEI for batches
 - CSV campaign logs
 - optional feasibility constraints
+- optional cost-aware ranking and human review
 - resume from existing logs
 - basic diagnostics
 - a notebook-first `CampaignSession` workflow
@@ -77,10 +78,10 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.4.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.4.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 
-## 👤 Author 
+## 👤 Author
 
 Angze Li

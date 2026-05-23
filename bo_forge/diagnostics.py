@@ -9,6 +9,7 @@ import pandas as pd
 from matplotlib.ticker import MaxNLocator
 
 from bo_forge.config import CampaignConfig
+from bo_forge.costs import effective_row_cost
 from bo_forge.plot_style import (
     add_legend,
     configure_plot_style,
@@ -138,6 +139,54 @@ def plot_diagnostics(
             show=show,
         )
 
+    return finalise_figure(
+        ax,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+    )
+
+
+def plot_cost_progress(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot best observed objective against cumulative effective cost."""
+    validate_campaign_data(config, df)
+    if config.cost is None:
+        raise ValueError("plot_cost_progress() requires a config with a cost section.")
+    observed = get_observed_data(config, df)
+
+    _, ax = new_figure(figsize=(8, 6))
+    if observed.empty:
+        set_title(ax, f"{config.campaign_name}: no observations yet")
+        set_axis_labels(ax, "Cumulative cost", config.objective.name)
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    cumulative_costs = []
+    running_cost = 0.0
+    for _, row in observed.iterrows():
+        running_cost += effective_row_cost(config, row)
+        cumulative_costs.append(running_cost)
+
+    values = pd.to_numeric(observed[config.objective.name])
+    best = _directional_best_so_far(config, values)
+    ax.plot(cumulative_costs, best, marker="o", label="best so far")
+    set_title(ax, f"{config.campaign_name}: cost progress")
+    set_axis_labels(ax, "Cumulative cost", config.objective.name)
+    add_legend(ax)
     return finalise_figure(
         ax,
         filename=filename,

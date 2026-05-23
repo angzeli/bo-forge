@@ -7,7 +7,9 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
+    CostConfig,
     ObjectiveConfig,
+    ReviewConfig,
     VariableConfig,
 )
 from bo_forge.errors import SuggestionError
@@ -125,6 +127,45 @@ def constrained_mixed_config(
     )
 
 
+def review_mixed_config(
+    *,
+    batch_size: int = 2,
+    initial_design_size: int = 3,
+) -> CampaignConfig:
+    cfg = mixed_config(batch_size=batch_size, initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        review=ReviewConfig(enabled=True),
+    )
+
+
+def cost_review_mixed_config(
+    *,
+    batch_size: int = 2,
+    initial_design_size: int = 3,
+    budget: float | None = 50.0,
+    weight: float = 0.5,
+) -> CampaignConfig:
+    cfg = mixed_config(batch_size=batch_size, initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        cost=CostConfig(
+            expression="1.0 + 0.2 * repeats + 2.0 * (solvent == 'EtOH')",
+            weight=weight,
+            budget=budget,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        review=ReviewConfig(enabled=True),
+    )
+
+
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     rows = []
     for index, (x_value, repeats, dose, solvent, score) in enumerate(
@@ -149,6 +190,40 @@ def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
                 "predicted_mean": "",
                 "predicted_std": "",
                 "acquisition": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def cost_review_mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (x_value, repeats, dose, solvent, score, cost_estimate, cost_actual) in enumerate(
+        [
+            (0.1, 1, 0.1, "MeCN", 1.0, 1.2, 1.1),
+            (0.3, 2, 0.2, "EtOH", 1.4, 3.4, ""),
+            (0.8, 3, 0.5, "MeCN", 1.2, 1.6, 1.7),
+            (0.6, 2, 0.2, "MeCN", 1.8, 1.4, ""),
+        ]
+    ):
+        rows.append(
+            {
+                "row_id": f"mixed_obs_{index}",
+                "iteration": index,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "x": x_value,
+                "repeats": repeats,
+                "dose": dose,
+                "solvent": solvent,
+                "score": score,
+                "cost_estimate": cost_estimate,
+                "cost_actual": cost_actual,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
             }
         )
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
@@ -301,6 +376,183 @@ def test_constrained_mixed_model_based_suggestions_are_feasible() -> None:
         (suggestions["solvent"] == "EtOH")
         & (suggestions["dose"].astype(float) >= 0.5)
     ).any()
+
+
+def test_cost_aware_initial_suggestions_fill_cost_but_not_utility() -> None:
+    cfg = cost_review_mixed_config(batch_size=2, initial_design_size=4)
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 2
+    assert set(suggestions["source"]) == {"sobol"}
+    assert set(suggestions["review_status"]) == {"pending"}
+    assert suggestions["cost_estimate"].astype(float).gt(0).all()
+    assert suggestions["cost_actual"].astype(str).eq("").all()
+    assert suggestions["utility"].astype(str).eq("").all()
+
+
+def test_cost_aware_model_suggestions_fill_cost_and_utility() -> None:
+    cfg = cost_review_mixed_config(batch_size=1, initial_design_size=3)
+    df = cost_review_mixed_observed_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "cost_log_ei"
+    assert suggestions.loc[0, "review_status"] == "pending"
+    acquisition = float(suggestions.loc[0, "acquisition"])
+    cost_estimate = float(suggestions.loc[0, "cost_estimate"])
+    utility = float(suggestions.loc[0, "utility"])
+    assert utility == pytest.approx(acquisition - cfg.cost.weight * cost_estimate)
+
+
+def test_cost_aware_candidate_pool_falls_back_to_sobol_when_optimizer_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = cost_review_mixed_config(batch_size=1, initial_design_size=3)
+    df = cost_review_mixed_observed_log(cfg)
+
+    def failing_optimizer(*args, **kwargs):
+        raise RuntimeError("optimizer failed")
+
+    monkeypatch.setattr(suggestions_module, "optimize_log_ei", failing_optimizer)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "cost_log_ei"
+    assert suggestions.loc[0, "review_status"] == "pending"
+    assert float(suggestions.loc[0, "cost_estimate"]) > 0
+    assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
+
+
+@pytest.mark.parametrize(
+    ("review_status", "blocks"),
+    [
+        ("pending", True),
+        ("accepted", True),
+        ("rejected", False),
+        ("deferred", False),
+    ],
+)
+def test_review_status_controls_suggestion_blocking(
+    review_status: str,
+    blocks: bool,
+) -> None:
+    cfg = review_mixed_config(batch_size=1, initial_design_size=2)
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "reviewed_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "sobol",
+                "review_status": review_status,
+                "review_note": "",
+                "x": 0.1,
+                "repeats": 1,
+                "dose": 0.1,
+                "solvent": "MeCN",
+                "score": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    if blocks:
+        with pytest.raises(SuggestionError, match="unresolved status='suggested'"):
+            suggest_next(cfg, df)
+    else:
+        suggestions = suggest_next(cfg, df)
+        assert len(suggestions) == 1
+
+
+def test_rejected_suggestions_do_not_block_but_remain_duplicate_protected() -> None:
+    cfg = CampaignConfig(
+        campaign_name="review_categories",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(VariableConfig("solvent", "categorical", values=("MeCN", "EtOH")),),
+        bo=BOConfig(batch_size=1, initial_design_size=2, random_seed=3),
+        review=ReviewConfig(enabled=True),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "rejected_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "sobol",
+                "review_status": "rejected",
+                "review_note": "not practical",
+                "solvent": "MeCN",
+                "score": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "solvent"] == "EtOH"
+
+
+def test_cost_budget_exhaustion_raises_clear_error() -> None:
+    cfg = cost_review_mixed_config(batch_size=1, initial_design_size=3, budget=0.1)
+    df = cost_review_mixed_observed_log(cfg)
+
+    with pytest.raises(SuggestionError, match="remaining budget may be too small"):
+        suggest_next(cfg, df)
+
+
+def test_initial_cost_budget_exhaustion_raises_clear_error() -> None:
+    cfg = cost_review_mixed_config(batch_size=1, initial_design_size=2, budget=0.0)
+    df = empty_campaign_log(cfg)
+
+    with pytest.raises(SuggestionError, match="budget-feasible initial suggestions"):
+        suggest_next(cfg, df)
+
+
+def test_cost_penalty_can_choose_cheaper_lower_acquisition_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = cost_review_mixed_config(
+        batch_size=1,
+        initial_design_size=3,
+        budget=50.0,
+        weight=1.0,
+    )
+    df = cost_review_mixed_observed_log(cfg)
+    cheap = (0.2, 1, 0.1, "MeCN")
+    costly = (0.9, 3, 0.5, "EtOH")
+
+    def candidate_pool(*args, **kwargs):
+        return [costly, cheap]
+
+    def score_candidate(*, config, model, acquisition, candidate, cost_estimate):
+        acquisition_value = 3.0 if candidate == costly else 2.0
+        return {
+            "candidate": candidate,
+            "cost_estimate": cost_estimate,
+            "acquisition": acquisition_value,
+            "utility": acquisition_value - config.cost.weight * cost_estimate,
+            "predicted_mean": 1.0,
+            "predicted_std": 0.1,
+        }
+
+    monkeypatch.setattr(suggestions_module, "_cost_aware_candidate_pool", candidate_pool)
+    monkeypatch.setattr(suggestions_module, "_score_cost_aware_candidate", score_candidate)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert tuple(suggestions.loc[0, cfg.variable_names]) == cheap
+    assert float(suggestions.loc[0, "acquisition"]) < 3.0
 
 
 def test_suggestion_quality_summary_reports_constraints_duplicates_and_distances() -> None:

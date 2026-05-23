@@ -8,6 +8,16 @@ BO Forge campaign logs are plain CSV files. The schema is deliberately strict so
 row_id,iteration,status,source,<variable columns...>,<objective column>,predicted_mean,predicted_std,acquisition
 ```
 
+When `review.enabled: true`, add `review_status,review_note` immediately after `source`.
+
+When `cost` is configured, add `cost_estimate,cost_actual` immediately after the objective column and add `utility` immediately after `acquisition`.
+
+The full cost + review schema is:
+
+```text
+row_id,iteration,status,source,review_status,review_note,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
+```
+
 For `configs/01_simple_2d_maximise_logei.yaml`, the concrete columns are:
 
 ```text
@@ -21,12 +31,17 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, or `qlog_ei`. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, or `cost_log_ei`. |
+| `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
+| `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
 | variable columns | Yes | One column per configured variable, in YAML order, stored in original user units. |
 | objective column | Yes | The configured objective name, such as `activity` or `defect_rate`. |
+| `cost_estimate` | If cost configured | Optional finite non-negative estimated cost. If filled, it must match the deterministic cost expression. Generated suggestions fill this column. |
+| `cost_actual` | If cost configured | Optional finite non-negative realised cost entered when marking observed. |
 | `predicted_mean` | Yes | Optional model prediction for suggested model-based rows. Blank is allowed. |
 | `predicted_std` | Yes | Optional posterior standard deviation. Blank is allowed. |
 | `acquisition` | Yes | Optional acquisition value. Blank is allowed. |
+| `utility` | If cost configured | Optional cost-aware utility. Model-based cost-aware suggestions fill this column. |
 
 ## 🚦 Status Rules
 
@@ -36,6 +51,8 @@ Suggested rows:
 - The objective cell must be blank.
 - Variable values must be filled and valid for the configured variable type.
 - `source` is usually `sobol`, `random`, `log_ei`, or `qlog_ei`.
+- For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
+- For cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
 
 Observed rows:
 
@@ -43,6 +60,10 @@ Observed rows:
 - The objective cell must contain a numeric value.
 - Manually entered historical rows should use `source=manual`.
 - Rows that started as suggestions keep their original `row_id`, `iteration`, `source`, and variable values.
+- For review-enabled campaigns, observed rows must have `review_status=accepted`.
+- For cost-aware campaigns, `cost_actual` may be filled when the experiment is marked observed.
+
+If `review` is not enabled, review columns are unsupported extras. If `cost` is not configured, cost and utility columns are unsupported extras.
 
 ## 🔁 Suggested To Observed Transition
 
@@ -65,11 +86,30 @@ mark_observed(
 - preserves `row_id`, `iteration`, `source`, and variable values;
 - validates before and after writing.
 
+For cost-aware campaigns, `mark_observed(..., actual_cost=...)` records a finite non-negative realised cost in `cost_actual`. For review-enabled campaigns, only `review_status=accepted` rows can be marked observed.
+
+Review decisions do not change `status`; they update `review_status` in place:
+
+```python
+from bo_forge import review_suggestion
+
+review_suggestion(
+    "../examples/07_cost_aware_human_review_working_log.csv",
+    row_id="suggested_row_id_here",
+    decision="accept",
+    note="run next",
+)
+```
+
+Allowed decisions are `accept`, `reject`, and `defer`.
+
 ## ⬜ Blank Values
 
 Blank objective values are valid only for `status=suggested`.
 
 Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed because Sobol/manual rows may not have model predictions.
+
+Blank `utility` is expected for initial Sobol/random suggestions, because no model acquisition exists yet. Blank `cost_actual` is allowed until the experiment has been run.
 
 ## 🧬 Duplicate Rules
 
@@ -85,6 +125,20 @@ Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed be
 If a config defines `constraints`, every CSV row must satisfy every constraint regardless of `status` or `source`.
 
 This means manual historical rows, Sobol/random initial suggestions, and LogEI/qLogEI model suggestions all follow the same feasibility rules. A row that violates a constraint fails CSV validation with the row ID, constraint name, and expression.
+
+## 🧑‍⚖️ Review And Budget Rules
+
+For review-enabled campaigns, blocking behavior is review-aware:
+
+- non-review campaigns: any `status=suggested` row blocks new suggestions;
+- review-enabled campaigns: `review_status=pending` and `review_status=accepted` suggestions block new suggestions;
+- `review_status=rejected` and `review_status=deferred` suggestions stay auditable and duplicate-protected, but do not block new suggestions.
+
+For cost-aware campaigns, budget accounting uses:
+
+- observed rows: `cost_actual` if present, otherwise `cost_estimate`;
+- accepted pending suggestions: reserve `cost_estimate`;
+- pending, rejected, and deferred suggestions: no budget reservation.
 
 ## 🧪 Variable Value Rules
 

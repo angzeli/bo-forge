@@ -76,6 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(next_action_parser)
     next_action_parser.set_defaults(handler=_cmd_next_action)
 
+    cost_summary_parser = subparsers.add_parser(
+        "cost-summary",
+        help="Print campaign cost and budget summary.",
+    )
+    _add_config_log_arguments(cost_summary_parser)
+    cost_summary_parser.set_defaults(handler=_cmd_cost_summary)
+
     report_parser = subparsers.add_parser("report", help="Print or export a campaign report.")
     _add_config_log_arguments(report_parser)
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
@@ -92,6 +99,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     suggest_parser.set_defaults(handler=_cmd_suggest)
 
+    review_parser = subparsers.add_parser(
+        "review",
+        help="Accept, reject, or defer one suggested row.",
+    )
+    _add_config_log_arguments(review_parser)
+    review_parser.add_argument("--row-id", required=True, help="Suggested row_id to review.")
+    review_parser.add_argument(
+        "--decision",
+        choices=["accept", "reject", "defer"],
+        required=True,
+        help="Review decision.",
+    )
+    review_parser.add_argument("--note", default="", help="Optional one-line review note.")
+    review_parser.set_defaults(handler=_cmd_review)
+
     mark_parser = subparsers.add_parser(
         "mark-observed",
         help="Mark one pending suggestion as observed.",
@@ -104,13 +126,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Observed objective value in user-facing units.",
     )
+    mark_parser.add_argument(
+        "--actual-cost",
+        type=float,
+        help="Optional observed experiment cost for cost-aware campaigns.",
+    )
     mark_parser.set_defaults(handler=_cmd_mark_observed)
 
     plot_parser = subparsers.add_parser("plot", help="Export one campaign plot.")
     _add_config_log_arguments(plot_parser)
     plot_parser.add_argument(
         "--kind",
-        choices=["progress", "diagnostics"],
+        choices=["progress", "diagnostics", "cost-progress"],
         required=True,
         help="Plot type to export.",
     )
@@ -215,6 +242,12 @@ def _cmd_next_action(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_cost_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    _print_table(campaign.cost_summary())
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if args.output is None:
@@ -247,9 +280,18 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_review(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    campaign.review_suggestion(args.row_id, args.decision, args.note)
+    print(
+        f"Reviewed row {args.row_id} as {args.decision} in campaign log: {args.log}"
+    )
+    return 0
+
+
 def _cmd_mark_observed(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    campaign.mark_observed(args.row_id, args.objective_value)
+    campaign.mark_observed(args.row_id, args.objective_value, actual_cost=args.actual_cost)
     print(f"Marked row {args.row_id} as observed in campaign log: {args.log}")
     return 0
 
@@ -259,6 +301,12 @@ def _cmd_plot(args: argparse.Namespace) -> int:
     try:
         if args.kind == "progress":
             campaign.plot_progress(save_path=args.output)
+        elif args.kind == "cost-progress":
+            if campaign.config.cost is None:
+                raise ConfigError(
+                    "plot --kind cost-progress requires a config with a cost section."
+                )
+            campaign.plot_cost_progress(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

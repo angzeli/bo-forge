@@ -5,7 +5,14 @@ import pandas as pd
 import pytest
 
 from bo_forge import CampaignSession
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    CostConfig,
+    ObjectiveConfig,
+    ReviewConfig,
+    VariableConfig,
+)
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, mark_observed
 from bo_forge.validation import canonical_columns
@@ -75,6 +82,40 @@ bo:
     return path
 
 
+def write_cost_review_config(path: Path, *, initial_design_size: int = 2) -> Path:
+    path.write_text(
+        f"""
+campaign_name: cost_review_session_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+cost:
+  expression: "1.0 + x"
+  weight: 0.5
+  budget: 10
+  candidate_pool_size: 16
+  top_k: 8
+review:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 5
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(direction: str = "maximize", initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="session_test",
@@ -109,6 +150,24 @@ def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
             num_restarts=2,
             mc_samples=16,
         ),
+    )
+
+
+def cost_review_config(initial_design_size: int = 2) -> CampaignConfig:
+    cfg = config(initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name="cost_review_session_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        cost=CostConfig(
+            expression="1.0 + x",
+            weight=0.5,
+            budget=10.0,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        review=ReviewConfig(enabled=True),
     )
 
 
@@ -157,6 +216,46 @@ def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def cost_review_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "x": 0.2,
+                "score": 1.0,
+                "cost_estimate": 1.2,
+                "cost_actual": 1.1,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+            {
+                "row_id": "suggested_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "sobol",
+                "review_status": "pending",
+                "review_note": "",
+                "x": 0.5,
+                "score": "",
+                "cost_estimate": 1.5,
+                "cost_actual": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
 
 
 def pending_log(cfg: CampaignConfig) -> pd.DataFrame:
@@ -216,7 +315,14 @@ def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> N
     suggestions = campaign.suggest_next(batch_size=1)
 
     assert summary_value(summary, "campaign_status") == "ready_for_bo"
-    assert list(report) == ["summary", "next_action", "best_observation", "pending_suggestions"]
+    assert list(report) == [
+        "summary",
+        "next_action",
+        "best_observation",
+        "pending_suggestions",
+        "review_queue",
+        "cost_summary",
+    ]
     assert len(suggestions) == 1
     assert suggestions.loc[0, "source"] == "log_ei"
     assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
@@ -273,6 +379,18 @@ def test_from_files_loads_mixed_example_campaign() -> None:
         "base_equivalents",
         "solvent",
     ]
+    assert len(campaign.df) == 4
+
+
+def test_from_files_loads_cost_review_example_campaign() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/07_cost_aware_human_review_logei.yaml",
+        "examples/07_cost_aware_human_review_campaign_log.csv",
+    )
+
+    assert campaign.config.campaign_name == "cost_aware_human_review_catalyst_screen"
+    assert campaign.config.cost is not None
+    assert campaign.config.review.enabled
     assert len(campaign.df) == 4
 
 
@@ -434,7 +552,14 @@ def test_report_returns_read_only_dataframes(tmp_path: Path) -> None:
 
     report = campaign.report()
 
-    assert list(report) == ["summary", "next_action", "best_observation", "pending_suggestions"]
+    assert list(report) == [
+        "summary",
+        "next_action",
+        "best_observation",
+        "pending_suggestions",
+        "review_queue",
+        "cost_summary",
+    ]
     assert all(isinstance(value, pd.DataFrame) for value in report.values())
     pd.testing.assert_frame_equal(campaign.df, before_df)
     assert log_path.read_text(encoding="utf-8") == before_csv
@@ -489,6 +614,150 @@ def test_export_report_renders_empty_sections(tmp_path: Path) -> None:
 
     assert "No best observation yet." in text
     assert "No pending suggestions." in text
+    assert "No suggestions awaiting review." in text
+    assert "No cost model configured." in text
+
+
+def test_cost_review_session_helpers_and_plot(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    summary = campaign.summary()
+    review_queue = campaign.review_queue()
+    cost_summary = campaign.cost_summary()
+    report_path = campaign.export_report(tmp_path / "reports" / "cost_review.txt")
+    result = campaign.plot_cost_progress(save_path=tmp_path / "reports" / "cost.png")
+    report_text = report_path.read_text(encoding="utf-8")
+
+    assert summary_value(summary, "budget") == pytest.approx(10.0)
+    assert summary_value(summary, "pending_review") == 1
+    assert summary_value(summary, "accepted_pending") == 0
+    assert summary_value(summary, "rejected") == 0
+    assert summary_value(summary, "deferred") == 0
+    assert summary_value(summary, "observed_effective_cost") == pytest.approx(1.1)
+    assert summary_value(summary, "accepted_pending_estimated_cost") == pytest.approx(0.0)
+    assert summary_value(summary, "budget_remaining") == pytest.approx(8.9)
+    assert list(cost_summary["field"]) == [
+        "total_observed_cost",
+        "accepted_pending_cost",
+        "budget",
+        "budget_remaining",
+        "best_observed_objective",
+    ]
+    assert review_queue.iloc[0]["row_id"] == "suggested_0"
+    assert "Review Queue" in report_text
+    assert "Cost Summary" in report_text
+    assert "pending_review" in report_text
+    assert "accepted_pending" in report_text
+    assert "total_observed_cost" in report_text
+    assert "suggested_0" in report_text
+    assert hasattr(result[0], "savefig")
+    assert (tmp_path / "reports" / "cost.png").exists()
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_accepted_pending_suggestions_reserve_budget(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    df = cost_review_log(cfg)
+    df.loc[df["row_id"] == "suggested_0", "review_status"] = "accepted"
+    log_path = write_log(tmp_path / "campaign.csv", cfg, df)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    summary = campaign.summary()
+    cost_summary = campaign.cost_summary()
+
+    assert summary_value(summary, "pending_review") == 0
+    assert summary_value(summary, "accepted_pending") == 1
+    assert summary_value(summary, "accepted_pending_estimated_cost") == pytest.approx(1.5)
+    assert summary_value(summary, "budget_remaining") == pytest.approx(7.4)
+    assert summary_value(cost_summary, "accepted_pending_cost") == pytest.approx(1.5)
+
+
+def test_summary_reports_rejected_and_deferred_review_counts(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    df = cost_review_log(cfg)
+    rejected = df.loc[df["row_id"] == "suggested_0"].iloc[0].copy()
+    rejected["row_id"] = "suggested_1"
+    rejected["review_status"] = "rejected"
+    rejected["x"] = 0.6
+    rejected["cost_estimate"] = 1.6
+    deferred = rejected.copy()
+    deferred["row_id"] = "suggested_2"
+    deferred["review_status"] = "deferred"
+    deferred["x"] = 0.7
+    deferred["cost_estimate"] = 1.7
+    df = pd.concat([df, pd.DataFrame([rejected, deferred])], ignore_index=True)
+    log_path = write_log(tmp_path / "campaign.csv", cfg, df)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    summary = campaign.summary()
+
+    assert summary_value(summary, "pending_review") == 1
+    assert summary_value(summary, "accepted_pending") == 0
+    assert summary_value(summary, "rejected") == 1
+    assert summary_value(summary, "deferred") == 1
+
+
+def test_next_action_review_pending_suggestions(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    action = campaign.next_action()
+
+    assert action.loc[0, "campaign_status"] == "has_pending_suggestions"
+    assert action.loc[0, "action"] == "review_pending_suggestions"
+    assert "campaign.review_queue()" in action.loc[0, "suggested_call"]
+    assert "campaign.review_suggestion(row_id, decision, note='')" in (
+        action.loc[0, "suggested_call"]
+    )
+
+
+def test_next_action_review_accepted_suggestions(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    df = cost_review_log(cfg)
+    df.loc[df["row_id"] == "suggested_0", "review_status"] = "accepted"
+    log_path = write_log(tmp_path / "campaign.csv", cfg, df)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    action = campaign.next_action()
+
+    assert action.loc[0, "campaign_status"] == "has_pending_suggestions"
+    assert action.loc[0, "action"] == "run_accepted_suggestions"
+    assert "campaign.mark_observed(row_id, objective_value, actual_cost=...)" in (
+        action.loc[0, "suggested_call"]
+    )
+
+
+def test_review_suggestion_and_mark_observed_with_actual_cost_reload(tmp_path: Path) -> None:
+    config_path = write_cost_review_config(tmp_path / "campaign.yaml")
+    cfg = cost_review_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, cost_review_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    reviewed = campaign.review_suggestion("suggested_0", "accept", " approved ")
+    assert reviewed is campaign.df
+    assert campaign.df.loc[campaign.df["row_id"] == "suggested_0", "review_status"].iloc[0] == (
+        "accepted"
+    )
+    assert campaign.df.loc[campaign.df["row_id"] == "suggested_0", "review_note"].iloc[0] == (
+        "approved"
+    )
+
+    observed = campaign.mark_observed("suggested_0", 1.8, actual_cost=1.7)
+
+    assert observed is campaign.df
+    row = campaign.df.loc[campaign.df["row_id"] == "suggested_0"].iloc[0]
+    assert row["status"] == "observed"
+    assert float(row["score"]) == pytest.approx(1.8)
+    assert float(row["cost_actual"]) == pytest.approx(1.7)
 
 
 def test_suggest_next_does_not_mutate_df_or_disk(tmp_path: Path) -> None:

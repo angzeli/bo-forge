@@ -8,8 +8,8 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `Campaign log must start with canonical columns`: make sure the CSV begins with `row_id,iteration,status,source`.
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
-- `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, or `qlog_ei`.
+- `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, or `cost_log_ei`.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -92,6 +92,22 @@ The constraint expression contains something outside the safe expression subset,
 
 Fix: use only variable names, constants, arithmetic, unary `+`/`-`, boolean logic, comparisons, and parentheses.
 
+### `Cost expression references unknown variable`
+
+The cost expression uses a name that is not a configured variable.
+
+Fix: use exact variable names from the YAML `variables` list.
+
+### `Cost expression must evaluate to a numeric value`
+
+The cost expression returns a final boolean or string instead of a finite non-negative number.
+
+Fix: make the final expression numeric. Boolean arithmetic inside a numeric expression is allowed, for example:
+
+```yaml
+expression: "1.0 + 2.0 * (solvent == 'Water')"
+```
+
 ## 🧾 CSV Schema Errors
 
 ### `Campaign log is missing required columns`
@@ -139,7 +155,20 @@ sobol
 random
 log_ei
 qlog_ei
+cost_log_ei
 ```
+
+### `review_status is not 'accepted'`
+
+In review-enabled campaigns, a suggested row must be accepted before it can be marked observed.
+
+Fix: call `review_suggestion(..., decision="accept")` or use the CLI `bo-forge review --decision accept` before `mark_observed()`.
+
+### `review_note containing a newline`
+
+Review notes must stay on one CSV row.
+
+Fix: use a one-line note. `review_suggestion()` strips leading and trailing whitespace.
 
 ## 🎯 Objective-State Errors
 
@@ -159,19 +188,25 @@ Fix: use `mark_observed()` to perform the transition, or manually set `status=ob
 
 BO Forge refuses to suggest more experiments while there is an outstanding suggestion.
 
-Fix: run that experiment and call `mark_observed()`, or remove the suggested row if it should be abandoned.
+Fix: run that experiment and call `mark_observed()`, or use review decisions when review is enabled. `review_status=rejected` and `review_status=deferred` rows do not block new suggestions.
 
 ### `Row '...' violates constraint`
 
 The row is structurally valid, but the configured feasibility rules reject its variable values.
 
-Fix: change the row values or update the constraint if the campaign definition is wrong. Constraints apply to all rows, including `manual`, `sobol`, `random`, `log_ei`, and `qlog_ei`.
+Fix: change the row values or update the constraint if the campaign definition is wrong. Constraints apply to all rows, including `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, and `cost_log_ei`.
 
 ### `Could not generate enough feasible, non-duplicate suggestions`
 
 BO Forge exhausted its bounded retry loop while filtering infeasible, exact-duplicate, or near-duplicate candidates.
 
 Fix: check whether constraints are too restrictive, whether the feasible design space is exhausted, or whether `bo.min_normalized_distance` is too large.
+
+### `remaining budget may be too small`
+
+The cost-aware suggestion loop could not find enough feasible candidates within the remaining budget.
+
+Fix: check `campaign.cost_summary()`, the configured `cost.budget`, and the cost expression. Observed rows consume actual cost when present; accepted pending suggestions reserve estimated cost.
 
 ## 🔢 Numeric And Bounds Errors
 
@@ -194,6 +229,18 @@ Fix: correct the CSV value or widen the YAML bounds if the campaign definition w
 An observed objective cell contains text.
 
 Fix: replace it with a numeric result.
+
+### `negative value for column 'cost_estimate'`
+
+Cost columns must be finite and non-negative.
+
+Fix: correct the cost value, or leave `cost_actual` blank until the experiment has been run.
+
+### `cost_estimate inconsistent with cost expression`
+
+A filled `cost_estimate` does not match the deterministic YAML `cost.expression`.
+
+Fix: update `cost_estimate` to the expression result for that row, or leave realised deviations in `cost_actual`.
 
 ## ✅ Fast Validation Check
 

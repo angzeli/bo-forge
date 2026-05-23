@@ -37,9 +37,10 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 - `config.py`: dataclasses and strict YAML parsing.
 - `constraints.py`: safe constraint expression validation and row feasibility checks.
+- `costs.py`: safe deterministic cost expressions, effective-cost accounting, and budget summaries.
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
-- `logs.py`: CSV loading, `append_suggestions()`, and `mark_observed()`.
+- `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
 - `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.
@@ -101,7 +102,7 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/01_simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/02_simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/03_simple_3d_maximise_logei.yaml` as a three-variable continuous example, `configs/04_simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example, `configs/05_simple_mixed_logei.yaml` as a mixed-variable v0.4 example, and `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example.
+The repository also includes `configs/02_simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/03_simple_3d_maximise_logei.yaml` as a three-variable continuous example, `configs/04_simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example, `configs/05_simple_mixed_logei.yaml` as a mixed-variable v0.4 example, `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example, and `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

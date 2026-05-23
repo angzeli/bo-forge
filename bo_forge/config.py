@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +16,14 @@ RESERVED_COLUMNS = {
     "iteration",
     "status",
     "source",
+    "review_status",
+    "review_note",
     "predicted_mean",
     "predicted_std",
     "acquisition",
+    "cost_estimate",
+    "cost_actual",
+    "utility",
 }
 
 
@@ -44,6 +49,20 @@ class ConstraintConfig:
 
 
 @dataclass(frozen=True)
+class CostConfig:
+    expression: str
+    weight: float = 1.0
+    budget: float | None = None
+    candidate_pool_size: int = 256
+    top_k: int = 24
+
+
+@dataclass(frozen=True)
+class ReviewConfig:
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class BOConfig:
     batch_size: int = 1
     initial_design_size: int = 8
@@ -63,6 +82,8 @@ class CampaignConfig:
     variables: tuple[VariableConfig, ...]
     bo: BOConfig
     constraints: tuple[ConstraintConfig, ...] = ()
+    cost: CostConfig | None = None
+    review: ReviewConfig = field(default_factory=ReviewConfig)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CampaignConfig:
@@ -95,6 +116,8 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     objective = _parse_objective(raw.get("objective"))
     variables = _parse_variables(raw.get("variables"), objective.name)
     constraints = _parse_constraints(raw.get("constraints", []), variables)
+    cost = _parse_cost(raw.get("cost"), variables)
+    review = _parse_review(raw.get("review"))
     bo = _parse_bo(raw.get("bo", {}))
 
     return CampaignConfig(
@@ -103,6 +126,8 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         variables=tuple(variables),
         bo=bo,
         constraints=tuple(constraints),
+        cost=cost,
+        review=review,
     )
 
 
@@ -265,6 +290,61 @@ def _parse_constraints(
         constraints.append(ConstraintConfig(name=name, expression=expression))
         seen_names.add(name)
     return constraints
+
+
+def _parse_cost(raw: Any, variables: list[VariableConfig]) -> CostConfig | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'cost' must be a mapping when provided.")
+    unsupported = sorted(
+        set(raw) - {"expression", "weight", "budget", "candidate_pool_size", "top_k"}
+    )
+    if unsupported:
+        raise ConfigError(f"Config key 'cost' has unsupported keys: {unsupported}.")
+
+    from bo_forge.costs import validate_cost_expression
+
+    expression = _required_str(raw, "expression", "cost")
+    validate_cost_expression(
+        expression=expression,
+        variable_names={variable.name for variable in variables},
+    )
+    weight = _non_negative_float(raw.get("weight", 1.0), "cost.weight")
+    budget = None
+    if raw.get("budget") is not None:
+        budget = _non_negative_float(raw.get("budget"), "cost.budget")
+    candidate_pool_size = _positive_int(
+        raw.get("candidate_pool_size", 256),
+        "cost.candidate_pool_size",
+    )
+    top_k = _positive_int(raw.get("top_k", 24), "cost.top_k")
+    if top_k > candidate_pool_size:
+        raise ConfigError(
+            "cost.top_k must be <= cost.candidate_pool_size: "
+            f"top_k={top_k}, candidate_pool_size={candidate_pool_size}."
+        )
+    return CostConfig(
+        expression=expression,
+        weight=weight,
+        budget=budget,
+        candidate_pool_size=candidate_pool_size,
+        top_k=top_k,
+    )
+
+
+def _parse_review(raw: Any) -> ReviewConfig:
+    if raw is None:
+        return ReviewConfig()
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'review' must be a mapping when provided.")
+    unsupported = sorted(set(raw) - {"enabled"})
+    if unsupported:
+        raise ConfigError(f"Config key 'review' has unsupported keys: {unsupported}.")
+    enabled = raw.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise ConfigError("review.enabled must be a boolean.")
+    return ReviewConfig(enabled=enabled)
 
 
 def _required_str(raw: dict[str, Any], key: str, context: str) -> str:

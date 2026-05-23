@@ -1,14 +1,17 @@
-"""BO Forge v0.4.2."""
+"""BO Forge v0.4.3."""
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
+    CostConfig,
     ObjectiveConfig,
+    ReviewConfig,
     VariableConfig,
 )
+from bo_forge.costs import evaluate_cost
 from bo_forge.errors import (
     BOForgeError,
     ConfigError,
@@ -16,7 +19,7 @@ from bo_forge.errors import (
     LogWriteError,
     SuggestionError,
 )
-from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
+from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
 from bo_forge.session import CampaignSession
 from bo_forge.suggestions import suggest_next, suggestion_quality_summary
 from bo_forge.validation import get_observed_data, validate_campaign_data
@@ -28,16 +31,20 @@ __all__ = [
     "CampaignSession",
     "ConfigError",
     "ConstraintConfig",
+    "CostConfig",
     "LogValidationError",
     "LogWriteError",
     "ObjectiveConfig",
+    "ReviewConfig",
     "SuggestionError",
     "VariableConfig",
     "__version__",
     "append_suggestions",
+    "evaluate_cost",
     "get_observed_data",
     "load_campaign_log",
     "mark_observed",
+    "review_suggestion",
     "suggest_next",
     "suggestion_quality_summary",
     "validate_campaign_data",

@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import ConfigError
+from bo_forge.costs import evaluate_cost
+from bo_forge.errors import ConfigError, LogValidationError
 
 
 def write_yaml(path: Path, text: str) -> Path:
@@ -108,6 +109,67 @@ bo:
     assert config.bo.min_normalized_distance == 0.05
 
 
+def test_config_from_yaml_parses_cost_and_review(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: cost_review
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: solvent
+    type: categorical
+    values: [MeCN, Water]
+cost:
+  expression: "1.0 + 0.04 * reaction_time + 2.0 * (solvent == 'Water')"
+  weight: 0.5
+  budget: 30
+  candidate_pool_size: 64
+  top_k: 8
+review:
+  enabled: true
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.cost is not None
+    assert config.cost.weight == 0.5
+    assert config.cost.budget == 30.0
+    assert config.cost.candidate_pool_size == 64
+    assert config.cost.top_k == 8
+    assert config.review.enabled
+    assert evaluate_cost(config, (20, "Water")) == pytest.approx(3.8)
+
+
+def test_cost_expression_bare_boolean_fails_at_evaluation(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_cost_value
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: solvent
+    type: categorical
+    values: [MeCN, Water]
+cost:
+  expression: "solvent == 'Water'"
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    with pytest.raises(LogValidationError, match="numeric value"):
+        evaluate_cost(config, ("Water",))
+
+
 def test_example_minimize_config_parses() -> None:
     config = CampaignConfig.from_yaml("configs/02_simple_2d_minimise_qlogei.yaml")
 
@@ -184,6 +246,19 @@ def test_example_constrained_mixed_config_parses() -> None:
         "water_needs_longer_time",
     ]
     assert config.bo.min_normalized_distance == 0.03
+
+
+def test_example_cost_review_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/07_cost_aware_human_review_logei.yaml")
+
+    assert config.campaign_name == "cost_aware_human_review_catalyst_screen"
+    assert config.cost is not None
+    assert config.cost.weight == 0.5
+    assert config.cost.budget == 30.0
+    assert config.cost.candidate_pool_size == 128
+    assert config.cost.top_k == 24
+    assert config.review.enabled
+    assert config.constraints
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:
@@ -438,6 +513,73 @@ constraints:
     )
 
     with pytest.raises(ConfigError, match="unsupported syntax: Call"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_unknown_cost_variable(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_cost
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+cost:
+  expression: "missing + 1"
+""",
+    )
+
+    with pytest.raises(ConfigError, match="references unknown variable 'missing'"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_invalid_cost_settings(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_cost
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+cost:
+  expression: "1 + x"
+  weight: -0.1
+""",
+    )
+
+    with pytest.raises(ConfigError, match="cost.weight must be >= 0"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_rejects_invalid_review_enabled(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_review
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+review:
+  enabled: yes please
+""",
+    )
+
+    with pytest.raises(ConfigError, match="review.enabled must be a boolean"):
         CampaignConfig.from_yaml(path)
 
 
