@@ -22,6 +22,7 @@ flowchart LR
     v042["v0.4.2<br/>Constraints + diversity"]
     v043["v0.4.3<br/>Cost + review"]
     v044["v0.4.4<br/>Replicates"]
+    v045["v0.4.5<br/>Notebook depth"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -37,10 +38,11 @@ flowchart LR
     v04 -.-> v042
     v04 -.-> v043
     v04 -.-> v044
+    v04 -.-> v045
     
     class v01,v02,v03,v04 majorDone
     class v05 majorNext
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -48,7 +50,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.4.4`. Next planned milestone: `v0.5`, focused on a thin Streamlit prototype around the backend package.
+Current baseline: `v0.4.5`. Next planned milestone: `v0.5`, focused on a thin Streamlit prototype around the backend package.
 
 ### Patch Notes So Far
 
@@ -72,6 +74,7 @@ Current baseline: `v0.4.4`. Next planned milestone: `v0.5`, focused on a thin St
 | `v0.4.2` | Patch | Constraints, duplicate handling, and batch diversity |
 | `v0.4.3` | Patch | Cost-aware ranking and human-review support |
 | `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting |
+| `v0.4.5` | Patch | Final v0.4.x notebook depth polish with 15-step simulated campaigns |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -138,6 +141,7 @@ Status: completed
 - Optional deterministic cost expressions, budget summaries, and cost-progress plotting.
 - Human-review decisions with accepted/rejected/deferred suggestion history.
 - Explicit replicate tracking, replicate summaries, and mean-aggregated model fitting.
+- Deeper example notebooks ending with 15 completed simulated campaign units.
 - Domain repair back to valid user-space rows.
 - Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
 - Mixed-variable duplicate handling using typed user-space design keys.
@@ -149,7 +153,8 @@ Status: completed
 | `v0.4.1` | One-hot categorical encoding and mixed-suggestion quality |
 | `v0.4.2` | Constraints, duplicate handling, and batch diversity |
 | `v0.4.3` | Cost-aware and human-review support |
-| `v0.4.4` | Explicit replicates and final practical baseline |
+| `v0.4.4` | Explicit replicates and practical baseline |
+| `v0.4.5` | Final v0.4.x notebook depth polish |
 
 ## 🖥️ v0.5 - Streamlit Prototype
 

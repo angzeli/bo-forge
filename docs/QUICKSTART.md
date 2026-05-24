@@ -268,9 +268,11 @@ The v0.4.4 replicate design is inspired by `/Users/liangze/Desktop/bo_forge/PyTo
 
 ## 📓 Example Notebooks
 
+The example notebooks now run deeper simulated campaigns. Each notebook finishes with 15 completed observed campaign units, including seed data; the replicate-aware notebook finishes with 15 observed replicate groups.
+
 Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/01_simple_2d_maximise_logei.yaml` and `examples/01_simple_2d_maximise_logei_campaign_log.csv`.
 
-Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a shorter minimisation campaign using `configs/02_simple_2d_minimise_qlogei.yaml` and `examples/02_simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates one qLogEI batch BO round.
+Open `notebooks/02_minimisation_qlogei_campaign.ipynb` for a minimisation campaign using `configs/02_simple_2d_minimise_qlogei.yaml` and `examples/02_simple_2d_minimise_qlogei_campaign_log.csv`. It fills the Sobol initial design, then demonstrates qLogEI batch BO rounds.
 
 Open `notebooks/03_three_variable_campaign.ipynb` for a compact 3D continuous campaign and the higher-dimensional diagnostic view.
 

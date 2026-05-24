@@ -322,7 +322,7 @@ def test_example_cost_review_config_parses() -> None:
     assert config.campaign_name == "cost_aware_human_review_catalyst_screen"
     assert config.cost is not None
     assert config.cost.weight == 0.5
-    assert config.cost.budget == 30.0
+    assert config.cost.budget == 60.0
     assert config.cost.candidate_pool_size == 128
     assert config.cost.top_k == 24
     assert config.review.enabled

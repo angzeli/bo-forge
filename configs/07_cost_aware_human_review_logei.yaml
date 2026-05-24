@@ -32,7 +32,7 @@ constraints:
 cost:
   expression: "1.0 + 0.04 * reaction_time + 2.0 * (solvent == 'Water')"
   weight: 0.5
-  budget: 30.0
+  budget: 60.0
   candidate_pool_size: 128
   top_k: 24
 
