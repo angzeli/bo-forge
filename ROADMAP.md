@@ -21,6 +21,7 @@ flowchart LR
     v041["v0.4.1<br/>One-hot categoricals"]
     v042["v0.4.2<br/>Constraints + diversity"]
     v043["v0.4.3<br/>Cost + review"]
+    v044["v0.4.4<br/>Replicates"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -35,11 +36,11 @@ flowchart LR
     v04 -.-> v041
     v04 -.-> v042
     v04 -.-> v043
+    v04 -.-> v044
     
-    class v01,v02,v03 majorDone
-    class v04 majorNext
-    class v05 majorFuture
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043 patchDone
+    class v01,v02,v03,v04 majorDone
+    class v05 majorNext
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -47,7 +48,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.4.3`. Next planned milestone: `v0.4.4`, focused on noise, replicates, and the final practical-campaign baseline.
+Current baseline: `v0.4.4`. Next planned milestone: `v0.5`, focused on a thin Streamlit prototype around the backend package.
 
 ### Patch Notes So Far
 
@@ -70,6 +71,7 @@ Current baseline: `v0.4.3`. Next planned milestone: `v0.4.4`, focused on noise, 
 | `v0.4.1` | Patch | One-hot categorical encoding and mixed-suggestion quality |
 | `v0.4.2` | Patch | Constraints, duplicate handling, and batch diversity |
 | `v0.4.3` | Patch | Cost-aware ranking and human-review support |
+| `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -124,7 +126,7 @@ Status: completed
 
 ## 🧪 v0.4 - Practical Single-Objective Campaigns
 
-Status: in progress
+Status: completed
 
 - Mixed-variable campaign configs: `continuous`, `integer`, `discrete`, and `categorical`.
 - Strict mixed-variable CSV validation.
@@ -135,6 +137,7 @@ Status: in progress
 - Encoded-space near-duplicate checks and suggestion quality summaries.
 - Optional deterministic cost expressions, budget summaries, and cost-progress plotting.
 - Human-review decisions with accepted/rejected/deferred suggestion history.
+- Explicit replicate tracking, replicate summaries, and mean-aggregated model fitting.
 - Domain repair back to valid user-space rows.
 - Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
 - Mixed-variable duplicate handling using typed user-space design keys.
@@ -146,7 +149,7 @@ Status: in progress
 | `v0.4.1` | One-hot categorical encoding and mixed-suggestion quality |
 | `v0.4.2` | Constraints, duplicate handling, and batch diversity |
 | `v0.4.3` | Cost-aware and human-review support |
-| `v0.4.4` | Noise, replicates, and final practical baseline |
+| `v0.4.4` | Explicit replicates and final practical baseline |
 
 ## 🖥️ v0.5 - Streamlit Prototype
 

@@ -1,6 +1,6 @@
-"""BO Forge v0.4.3."""
+"""BO Forge v0.4.4."""
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 from bo_forge.config import (
     BOConfig,
@@ -8,6 +8,7 @@ from bo_forge.config import (
     ConstraintConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
@@ -20,6 +21,11 @@ from bo_forge.errors import (
     SuggestionError,
 )
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
+from bo_forge.replicates import (
+    aggregate_observed_replicates,
+    best_replicate_group,
+    replicate_summary,
+)
 from bo_forge.session import CampaignSession
 from bo_forge.suggestions import suggest_next, suggestion_quality_summary
 from bo_forge.validation import get_observed_data, validate_campaign_data
@@ -35,16 +41,20 @@ __all__ = [
     "LogValidationError",
     "LogWriteError",
     "ObjectiveConfig",
+    "ReplicateConfig",
     "ReviewConfig",
     "SuggestionError",
     "VariableConfig",
     "__version__",
     "append_suggestions",
+    "aggregate_observed_replicates",
+    "best_replicate_group",
     "evaluate_cost",
     "get_observed_data",
     "load_campaign_log",
     "mark_observed",
     "review_suggestion",
+    "replicate_summary",
     "suggest_next",
     "suggestion_quality_summary",
     "validate_campaign_data",

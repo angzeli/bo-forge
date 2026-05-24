@@ -10,6 +10,7 @@ from bo_forge.config import (
     CampaignConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
@@ -171,6 +172,17 @@ def cost_review_config(initial_design_size: int = 2) -> CampaignConfig:
     )
 
 
+def replicate_config(initial_design_size: int = 2) -> CampaignConfig:
+    cfg = config(initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name="replicate_session_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
 def observed_log(cfg: CampaignConfig, values: list[float]) -> pd.DataFrame:
     rows = []
     for index, value in enumerate(values):
@@ -258,6 +270,53 @@ def cost_review_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "score": 1.6,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_1a",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.8,
+                "score": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def pending_log(cfg: CampaignConfig) -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -319,6 +378,8 @@ def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> N
         "summary",
         "next_action",
         "best_observation",
+        "best_replicate_group",
+        "replicate_summary",
         "pending_suggestions",
         "review_queue",
         "cost_summary",
@@ -392,6 +453,17 @@ def test_from_files_loads_cost_review_example_campaign() -> None:
     assert campaign.config.cost is not None
     assert campaign.config.review.enabled
     assert len(campaign.df) == 4
+
+
+def test_from_files_loads_replicate_example_campaign() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/08_replicate_aware_logei.yaml",
+        "examples/08_replicate_aware_campaign_log.csv",
+    )
+
+    assert campaign.config.campaign_name == "replicate_aware_photocatalyst"
+    assert campaign.config.replicates.enabled
+    assert len(campaign.df) == 5
 
 
 def test_summary_shape_counts_status_and_no_observed_rows(tmp_path: Path) -> None:
@@ -556,6 +628,8 @@ def test_report_returns_read_only_dataframes(tmp_path: Path) -> None:
         "summary",
         "next_action",
         "best_observation",
+        "best_replicate_group",
+        "replicate_summary",
         "pending_suggestions",
         "review_queue",
         "cost_summary",
@@ -585,7 +659,9 @@ def test_export_report_writes_text_to_nested_path_without_mutating_campaign(
     assert "BO Forge Campaign Report\n========================" in text
     assert "Summary\n-------" in text
     assert "Next Action\n-----------" in text
-    assert "Best Observation\n----------------" in text
+    assert "Best Raw Observation\n--------------------" in text
+    assert "Best Replicate Group By Mean Objective" in text
+    assert "Replicate Summary\n-----------------" in text
     assert "Pending Suggestions\n-------------------" in text
     assert "Campaign status: has_pending_suggestions" in text
     assert "Action: resolve_pending_suggestions" in text
@@ -613,6 +689,7 @@ def test_export_report_renders_empty_sections(tmp_path: Path) -> None:
     text = report_path.read_text(encoding="utf-8")
 
     assert "No best observation yet." in text
+    assert "No replicate groups observed." in text
     assert "No pending suggestions." in text
     assert "No suggestions awaiting review." in text
     assert "No cost model configured." in text
@@ -656,6 +733,60 @@ def test_cost_review_session_helpers_and_plot(tmp_path: Path) -> None:
     assert "suggested_0" in report_text
     assert hasattr(result[0], "savefig")
     assert (tmp_path / "reports" / "cost.png").exists()
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_replicate_session_helpers_summary_report_and_plot(tmp_path: Path) -> None:
+    cfg = replicate_config(initial_design_size=2)
+    config_path = tmp_path / "campaign.yaml"
+    config_path.write_text(
+        """
+campaign_name: replicate_session_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: 2
+  acquisition: log_ei
+  random_seed: 5
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    log_path = write_log(tmp_path / "campaign.csv", cfg, replicate_log(cfg))
+    campaign = CampaignSession.from_files(config_path, log_path)
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    summary = campaign.summary()
+    replicate_summary = campaign.replicate_summary()
+    best_group = campaign.best_replicate_group()
+    report_path = campaign.export_report(tmp_path / "reports" / "replicate.txt")
+    result = campaign.plot_replicates(save_path=tmp_path / "reports" / "replicates.png")
+    report_text = report_path.read_text(encoding="utf-8")
+
+    assert summary_value(summary, "campaign_status") == "ready_for_bo"
+    assert summary_value(summary, "replicate_groups") == 2
+    assert summary_value(summary, "replicated_groups") == 1
+    assert summary_value(summary, "max_replicates_per_group") == 2
+    assert summary_value(summary, "best_replicate_group") == "group_1"
+    assert summary_value(summary, "best_replicate_mean") == pytest.approx(1.4)
+    assert list(replicate_summary["replicate_group"]) == ["group_0", "group_1"]
+    assert best_group["replicate_group"].iloc[0] == "group_1"
+    assert "Best Raw Observation" in report_text
+    assert "Best Replicate Group By Mean Objective" in report_text
+    assert "Replicate Summary" in report_text
+    assert hasattr(result[0], "savefig")
+    assert (tmp_path / "reports" / "replicates.png").exists()
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 

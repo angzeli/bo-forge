@@ -14,6 +14,7 @@ from bo_forge.io import empty_campaign_log
 from bo_forge.validation import (
     BASE_COLUMNS,
     COST_COLUMNS,
+    REPLICATE_COLUMNS,
     RESULT_COLUMNS,
     REVIEW_COLUMNS,
     UTILITY_COLUMNS,
@@ -352,6 +353,36 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
             row_id = str(df.loc[review_newline, "row_id"].iloc[0])
             raise LogValidationError(f"Row '{row_id}' has review_note containing a newline.")
 
+    if _has_replicate_columns(df.columns):
+        invalid_group = df["replicate_group"].map(
+            lambda value: (
+                not isinstance(value, str)
+                or value == ""
+                or value.strip() != value
+                or "\n" in value
+                or "\r" in value
+            )
+        )
+        if invalid_group.any():
+            row_id = str(df.loc[invalid_group, "row_id"].iloc[0])
+            value = df.loc[invalid_group, "replicate_group"].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has invalid replicate_group: value={value!r}."
+            )
+
+        replicate_index = pd.to_numeric(df["replicate_index"], errors="coerce")
+        invalid_replicate = (
+            replicate_index.isna()
+            | (replicate_index < 0)
+            | (replicate_index % 1 != 0)
+        )
+        if invalid_replicate.any():
+            row_id = str(df.loc[invalid_replicate, "row_id"].iloc[0])
+            value = df.loc[invalid_replicate, "replicate_index"].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has invalid replicate_index '{value}'."
+            )
+
     numeric_columns = [*RESULT_COLUMNS]
     if _has_cost_columns(df.columns):
         numeric_columns.extend([*COST_COLUMNS, *UTILITY_COLUMNS])
@@ -412,6 +443,8 @@ def _variable_and_objective_columns(columns: pd.Index | list[str]) -> tuple[list
     start = len(BASE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         start += len(REVIEW_COLUMNS)
+    if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
+        start += len(REPLICATE_COLUMNS)
 
     has_utility = column_list[-len(UTILITY_COLUMNS) :] == UTILITY_COLUMNS
     result_end = len(column_list) - (len(UTILITY_COLUMNS) if has_utility else 0)
@@ -443,6 +476,14 @@ def _has_review_columns(columns: pd.Index | list[str]) -> bool:
     return column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS
 
 
+def _has_replicate_columns(columns: pd.Index | list[str]) -> bool:
+    column_list = list(columns)
+    start = len(BASE_COLUMNS)
+    if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
+        start += len(REVIEW_COLUMNS)
+    return column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS
+
+
 def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
     column_list = list(columns)
     has_utility = column_list[-len(UTILITY_COLUMNS) :] == UTILITY_COLUMNS
@@ -450,4 +491,6 @@ def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
     middle = column_list[len(BASE_COLUMNS) : result_end - len(RESULT_COLUMNS)]
     if middle[: len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         middle = middle[len(REVIEW_COLUMNS) :]
+    if middle[: len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
+        middle = middle[len(REPLICATE_COLUMNS) :]
     return middle[-len(COST_COLUMNS) :] == COST_COLUMNS

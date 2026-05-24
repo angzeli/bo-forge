@@ -17,6 +17,7 @@ from bo_forge.constraints import constraint_violations_for_values
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
+from bo_forge.replicates import modeling_observed_data
 from bo_forge.transforms import (
     categorical_combination_count,
     categorical_feature_assignments,
@@ -61,7 +62,8 @@ def suggest_next(
         raise SuggestionError(f"batch_size must be >= 1: value={requested_batch_size}.")
 
     observed_df = get_observed_data(config, df)
-    remaining_initial = config.bo.initial_design_size - len(observed_df)
+    training_observed_df = modeling_observed_data(config, observed_df)
+    remaining_initial = config.bo.initial_design_size - len(training_observed_df)
     if remaining_initial > 0:
         return _suggest_initial_design(
             config=config,
@@ -105,6 +107,7 @@ def _suggest_initial_design(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
+        _populate_replicate_fields(config, row)
         _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, candidate, strict=True):
             row[name] = value
@@ -175,6 +178,7 @@ def _suggest_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
+        _populate_replicate_fields(config, row)
         _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, user_candidates[index], strict=True):
             row[name] = value
@@ -231,6 +235,7 @@ def _suggest_cost_aware_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = "cost_log_ei"
+        _populate_replicate_fields(config, row)
         _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, chosen["candidate"], strict=True):
             row[name] = value
@@ -621,6 +626,12 @@ def _populate_review_fields(config: CampaignConfig, row: dict[str, object]) -> N
     if config.review.enabled:
         row["review_status"] = "pending"
         row["review_note"] = ""
+
+
+def _populate_replicate_fields(config: CampaignConfig, row: dict[str, object]) -> None:
+    if config.replicates.enabled:
+        row["replicate_group"] = row["row_id"]
+        row["replicate_index"] = 0
 
 
 def _populate_cost_fields(

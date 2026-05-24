@@ -1,0 +1,6 @@
+row_id,iteration,status,source,replicate_group,replicate_index,precursor_ratio,annealing_temperature,activity,predicted_mean,predicted_std,acquisition
+rep_seed_0a,0,observed,manual,rep_0,0,0.20,500,1.22,,,
+rep_seed_0b,0,observed,manual,rep_0,1,0.20,500,1.36,,,
+rep_seed_1a,1,observed,manual,rep_1,0,0.70,650,1.78,,,
+rep_seed_2a,2,observed,manual,rep_2,0,0.45,720,1.92,,,
+rep_seed_2b,2,observed,manual,rep_2,1,0.45,720,1.44,,,

@@ -13,6 +13,7 @@ from bo_forge.config import (
     CampaignConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
@@ -119,6 +120,34 @@ bo:
     return path
 
 
+def write_replicate_config(path: Path, *, initial_design_size: int = 2) -> Path:
+    path.write_text(
+        f"""
+campaign_name: replicate_cli_test
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: log_ei
+  random_seed: 7
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
@@ -171,6 +200,17 @@ def cost_review_config(initial_design_size: int = 2) -> CampaignConfig:
             top_k=8,
         ),
         review=ReviewConfig(enabled=True),
+    )
+
+
+def replicate_config(initial_design_size: int = 2) -> CampaignConfig:
+    cfg = config(initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name="replicate_cli_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
     )
 
 
@@ -294,6 +334,53 @@ def cost_review_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "score": 1.6,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_1a",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.8,
+                "score": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
     if df is None:
         df = empty_campaign_log(cfg)
@@ -325,7 +412,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.4.3\n"
+    assert captured.out == "bo-forge 0.4.4\n"
     assert captured.err == ""
 
 
@@ -334,7 +421,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.4.3\n"
+    assert completed.stdout == "bo-forge 0.4.4\n"
     assert completed.stderr == ""
 
 
@@ -421,6 +508,22 @@ def test_init_log_creates_cost_review_schema(
 ) -> None:
     config_path = write_cost_review_config(tmp_path / "campaign.yaml")
     cfg = cost_review_config()
+    log_path = tmp_path / "nested" / "campaign.csv"
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+
+    capsys.readouterr()
+    df = load_campaign_log(log_path, cfg)
+    assert df.empty
+    assert list(df.columns) == canonical_columns(cfg)
+
+
+def test_init_log_creates_replicate_schema(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_replicate_config(tmp_path / "campaign.yaml")
+    cfg = replicate_config()
     log_path = tmp_path / "nested" / "campaign.csv"
 
     assert run(["init-log", *base_args(config_path, log_path)]) == 0
@@ -683,7 +786,7 @@ def test_summary_status_next_action_and_report_outputs(
     assert run(["report", *base_args(config_path, log_path)]) == 0
     report_out = capsys.readouterr().out
     assert "BO Forge Campaign Report" in report_out
-    assert "Best Observation" in report_out
+    assert "Best Raw Observation" in report_out
 
 
 def test_cost_summary_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -697,6 +800,19 @@ def test_cost_summary_output(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     assert "total_observed_cost" in captured.out
     assert "accepted_pending_cost" in captured.out
     assert "budget_remaining" in captured.out
+
+
+def test_replicate_summary_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = write_replicate_config(tmp_path / "campaign.yaml")
+    cfg = replicate_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, replicate_log(cfg))
+
+    assert run(["replicate-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "replicate_group" in captured.out
+    assert "objective_mean" in captured.out
+    assert "group_0" in captured.out
 
 
 def test_report_output_uses_export_path(
@@ -999,6 +1115,36 @@ def test_plot_cost_progress_writes_nested_output_path(
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 
+def test_plot_replicates_writes_nested_output_path(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_replicate_config(tmp_path / "campaign.yaml")
+    cfg = replicate_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, replicate_log(cfg))
+    output_path = tmp_path / "figures" / "replicates.png"
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "replicates",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == f"Wrote replicates plot: {output_path}\n"
+    assert output_path.exists()
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
 @pytest.mark.parametrize("kind", ["progress", "diagnostics"])
 def test_plot_output_write_failure_returns_clear_error(
     kind: str,
@@ -1058,6 +1204,36 @@ def test_plot_cost_progress_output_write_failure_returns_clear_error(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert f"Error: Could not write cost-progress plot '{output_path}'" in captured.err
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_plot_replicates_output_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_replicate_config(tmp_path / "campaign.yaml")
+    cfg = replicate_config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, replicate_log(cfg))
+    output_path = output_under_file_parent(tmp_path, "replicates.png")
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "replicates",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Error: Could not write replicates plot '{output_path}'" in captured.err
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 

@@ -13,6 +13,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
+- `invalid replicate_group` or `invalid replicate_index`: check explicit replicate metadata.
 
 ## ⚙️ Config Errors
 
@@ -170,6 +171,30 @@ Review notes must stay on one CSV row.
 
 Fix: use a one-line note. `review_suggestion()` strips leading and trailing whitespace.
 
+### `invalid replicate_group`
+
+The replicate group is blank, whitespace-padded, or contains a newline.
+
+Fix: use a simple one-line identifier such as `group_0`.
+
+### `invalid replicate_index`
+
+The replicate index is negative, non-integer, blank, or non-numeric.
+
+Fix: use zero-based integer values within each group, such as `0`, `1`, and `2`.
+
+### `Duplicate replicate row`
+
+Two rows have the same `(replicate_group, replicate_index)` pair.
+
+Fix: make each `replicate_index` unique within its group.
+
+### `Rows with the same design must share one replicate_group`
+
+Replicate-aware duplicate rows are allowed only when they are explicitly grouped.
+
+Fix: put repeated measurements of the same design in one shared `replicate_group`, or remove the duplicate design row.
+
 ## 🎯 Objective-State Errors
 
 ### `status='observed' but objective ... is blank`
@@ -241,6 +266,12 @@ Fix: correct the cost value, or leave `cost_actual` blank until the experiment h
 A filled `cost_estimate` does not match the deterministic YAML `cost.expression`.
 
 Fix: update `cost_estimate` to the expression result for that row, or leave realised deviations in `cost_actual`.
+
+### `objective_std` or `objective_sem` is blank/NaN
+
+For single-replicate groups, BO Forge reports `objective_std = NaN` and `objective_sem = NaN` by definition.
+
+Fix: add more observed rows to the same `replicate_group` if you need a group-level standard deviation or SEM.
 
 ## ✅ Fast Validation Check
 

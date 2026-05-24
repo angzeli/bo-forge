@@ -18,6 +18,8 @@ RESERVED_COLUMNS = {
     "source",
     "review_status",
     "review_note",
+    "replicate_group",
+    "replicate_index",
     "predicted_mean",
     "predicted_std",
     "acquisition",
@@ -63,6 +65,11 @@ class ReviewConfig:
 
 
 @dataclass(frozen=True)
+class ReplicateConfig:
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class BOConfig:
     batch_size: int = 1
     initial_design_size: int = 8
@@ -84,6 +91,7 @@ class CampaignConfig:
     constraints: tuple[ConstraintConfig, ...] = ()
     cost: CostConfig | None = None
     review: ReviewConfig = field(default_factory=ReviewConfig)
+    replicates: ReplicateConfig = field(default_factory=ReplicateConfig)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CampaignConfig:
@@ -118,6 +126,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     constraints = _parse_constraints(raw.get("constraints", []), variables)
     cost = _parse_cost(raw.get("cost"), variables)
     review = _parse_review(raw.get("review"))
+    replicates = _parse_replicates(raw.get("replicates"))
     bo = _parse_bo(raw.get("bo", {}))
 
     return CampaignConfig(
@@ -128,6 +137,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         constraints=tuple(constraints),
         cost=cost,
         review=review,
+        replicates=replicates,
     )
 
 
@@ -345,6 +355,20 @@ def _parse_review(raw: Any) -> ReviewConfig:
     if not isinstance(enabled, bool):
         raise ConfigError("review.enabled must be a boolean.")
     return ReviewConfig(enabled=enabled)
+
+
+def _parse_replicates(raw: Any) -> ReplicateConfig:
+    if raw is None:
+        return ReplicateConfig()
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'replicates' must be a mapping when provided.")
+    unsupported = sorted(set(raw) - {"enabled"})
+    if unsupported:
+        raise ConfigError(f"Config key 'replicates' has unsupported keys: {unsupported}.")
+    enabled = raw.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise ConfigError("replicates.enabled must be a boolean.")
+    return ReplicateConfig(enabled=enabled)
 
 
 def _required_str(raw: dict[str, Any], key: str, context: str) -> str:

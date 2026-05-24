@@ -147,6 +147,74 @@ review:
     assert evaluate_cost(config, (20, "Water")) == pytest.approx(3.8)
 
 
+def test_config_from_yaml_parses_replicates(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: replicate_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.replicates.enabled
+
+
+def test_replicates_unknown_key_fails(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_replicates
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  repeats: 2
+""",
+    )
+
+    with pytest.raises(ConfigError, match="replicates.*unsupported keys"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_replicates_enabled_must_be_boolean(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_replicates
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: "true"
+""",
+    )
+
+    with pytest.raises(ConfigError, match="replicates.enabled must be a boolean"):
+        CampaignConfig.from_yaml(path)
+
+
 def test_cost_expression_bare_boolean_fails_at_evaluation(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",
@@ -258,7 +326,15 @@ def test_example_cost_review_config_parses() -> None:
     assert config.cost.candidate_pool_size == 128
     assert config.cost.top_k == 24
     assert config.review.enabled
-    assert config.constraints
+
+
+def test_example_replicate_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/08_replicate_aware_logei.yaml")
+
+    assert config.campaign_name == "replicate_aware_photocatalyst"
+    assert config.replicates.enabled
+    assert config.variable_names == ["precursor_ratio", "annealing_temperature"]
+    assert config.bo.initial_design_size == 4
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:

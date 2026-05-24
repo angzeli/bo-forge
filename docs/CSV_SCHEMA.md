@@ -10,12 +10,14 @@ row_id,iteration,status,source,<variable columns...>,<objective column>,predicte
 
 When `review.enabled: true`, add `review_status,review_note` immediately after `source`.
 
+When `replicates.enabled: true`, add `replicate_group,replicate_index` immediately after `source`, or immediately after the review columns when review is also enabled.
+
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after the objective column and add `utility` immediately after `acquisition`.
 
-The full cost + review schema is:
+The full cost + review + replicates schema is:
 
 ```text
-row_id,iteration,status,source,review_status,review_note,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
+row_id,iteration,status,source,review_status,review_note,replicate_group,replicate_index,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
 ```
 
 For `configs/01_simple_2d_maximise_logei.yaml`, the concrete columns are:
@@ -34,6 +36,8 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, or `cost_log_ei`. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
+| `replicate_group` | If replicates enabled | Nonblank replicate-group identifier. Rows in a group share one design. |
+| `replicate_index` | If replicates enabled | Zero-based non-negative integer, unique within each replicate group. |
 | variable columns | Yes | One column per configured variable, in YAML order, stored in original user units. |
 | objective column | Yes | The configured objective name, such as `activity` or `defect_rate`. |
 | `cost_estimate` | If cost configured | Optional finite non-negative estimated cost. If filled, it must match the deterministic cost expression. Generated suggestions fill this column. |
@@ -63,7 +67,7 @@ Observed rows:
 - For review-enabled campaigns, observed rows must have `review_status=accepted`.
 - For cost-aware campaigns, `cost_actual` may be filled when the experiment is marked observed.
 
-If `review` is not enabled, review columns are unsupported extras. If `cost` is not configured, cost and utility columns are unsupported extras.
+If `review` is not enabled, review columns are unsupported extras. If `cost` is not configured, cost and utility columns are unsupported extras. If `replicates` is not enabled, replicate columns are unsupported extras.
 
 ## 🔁 Suggested To Observed Transition
 
@@ -118,7 +122,8 @@ Blank `utility` is expected for initial Sobol/random suggestions, because no mod
 - Mixed-variable duplicate checks use typed user-space values, such as `(0.5, 3, 0.1, "MeCN")`.
 - Categorical variables stay as exact labels in CSV logs; v0.4.1 one-hot encoding is internal model-space behavior only.
 - When `bo.min_normalized_distance > 0`, near-duplicate checks use encoded model-space distance, not raw user units.
-- Historical manual duplicates should be cleaned before relying on model-based suggestions.
+- Without `replicates.enabled: true`, repeated design rows fail validation.
+- With `replicates.enabled: true`, repeated design rows are allowed only when they share one `replicate_group`.
 
 ## ✅ Constraint Rules
 
@@ -139,6 +144,26 @@ For cost-aware campaigns, budget accounting uses:
 - observed rows: `cost_actual` if present, otherwise `cost_estimate`;
 - accepted pending suggestions: reserve `cost_estimate`;
 - pending, rejected, and deferred suggestions: no budget reservation.
+
+## 🔬 Replicate Rules
+
+Replicates are explicit CSV metadata, not silently inferred.
+
+- `replicate_group` must be a nonblank string with no surrounding whitespace or newlines.
+- `replicate_index` is zero-based, non-negative, integer-valued, and unique within each group.
+- Rows in the same group must have identical typed user-space design values.
+- Manual replicate rows are allowed when explicitly grouped.
+- Generated suggestions remain exploration suggestions: they avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
+
+Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
+
+Aggregate replicate summaries use these columns:
+
+```text
+replicate_group,<variable columns...>,n_replicates,objective_mean,objective_std,objective_sem,objective_min,objective_max
+```
+
+For single-replicate groups, `objective_std` and `objective_sem` are `NaN`.
 
 ## 🧪 Variable Value Rules
 

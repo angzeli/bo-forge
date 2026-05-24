@@ -99,16 +99,18 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `CampaignSession.from_files(config_path, log_path)` | Load YAML config and CSV log into one session object. |
 | `campaign.validate()` | Validate the current in-memory campaign DataFrame. |
 | `campaign.summary()` | Return a two-column DataFrame with campaign counts, status, and best observation. |
-| `campaign.observed_data()` | Return observed rows used for model fitting. |
+| `campaign.observed_data()` | Return raw observed CSV rows. Replicate-aware model fitting aggregates separately. |
 | `campaign.pending_suggestions()` | Return unresolved `status='suggested'` rows. |
 | `campaign.campaign_status()` | Return the current campaign status without mutating state or writing to disk. |
 | `campaign.next_action()` | Return a one-row advisory DataFrame with campaign status, recommended action, reason, and suggested calls. |
-| `campaign.report()` | Return read-only report tables for summary, next action, best observation, suggestions, review queue, and cost summary. |
+| `campaign.report()` | Return read-only report tables for summary, next action, best raw observation, replicate summaries, suggestions, review queue, and cost summary. |
 | `campaign.export_report(path)` | Write a deterministic plain-text campaign report and return the written path. |
 | `campaign.review_queue()` | Return suggested rows still waiting for a review decision when review is enabled. |
 | `campaign.review_suggestion(row_id, decision, note="")` | Record `accept`, `reject`, or `defer` for one suggested row and refresh `campaign.df`. |
 | `campaign.cost_summary()` | Return cost, reserved-cost, budget, and best-objective fields when cost is configured. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
+| `campaign.replicate_summary()` | Return group-level replicate counts, mean, std, SEM, min, and max when replicates are enabled. |
+| `campaign.best_replicate_group()` | Return the best replicate group by mean objective. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
@@ -116,6 +118,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.reload()` | Reload the CSV log from disk into `campaign.df`. |
 | `campaign.plot_progress(save_path=None)` | Plot objective and best-so-far progress; returns figure/axes objects. |
 | `campaign.plot_cost_progress(save_path=None)` | Plot best observed objective against cumulative effective cost. |
+| `campaign.plot_replicates(save_path=None)` | Plot raw replicate observations and replicate-group mean summaries. |
 | `campaign.plot_diagnostics(save_path=None)` | Plot dimension-aware diagnostics; returns figure/axes objects. |
 
 ## 🧱 Lower-Level API
@@ -156,6 +159,7 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/05_simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
 - `configs/06_mixed_constrained_logei.yaml`: maximises a constrained mixed-variable synthetic yield.
 - `configs/07_cost_aware_human_review_logei.yaml`: adds deterministic cost estimates, budget tracking, and human-review decisions.
+- `configs/08_replicate_aware_logei.yaml`: adds explicit replicate rows and mean-aggregated model fitting.
 
 ## 🧪 Mixed-Variable Campaigns
 
@@ -245,6 +249,23 @@ Budget semantics are:
 
 The v0.4.3 cost and review design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_04_budget_aware_and_human_in_the_loop_bo_workflows_worked.ipynb`, especially acquisition-minus-cost utility, cumulative-cost comparison, and accepted/rejected workflow history.
 
+v0.4.4 adds optional explicit replicate tracking:
+
+```yaml
+replicates:
+  enabled: true
+```
+
+When replicates are enabled, the CSV log adds `replicate_group` and `replicate_index` after `source` or after review columns. `replicate_index` is zero-based. Rows in the same replicate group must have identical typed user-space design values, and repeated design rows are allowed only when they share one `replicate_group`.
+
+Generated suggestions remain exploration suggestions in v0.4.4: BO Forge avoids existing designs, sets `replicate_group=row_id`, and sets `replicate_index=0`. It does not automatically suggest repeating an existing design.
+
+For model fitting, observed replicate rows are aggregated by group mean. Public CSV logs still store every raw replicate row. `campaign.best_observation()` remains the best raw observed row, while `campaign.best_replicate_group()` returns the best group by mean objective. For single-replicate groups, `objective_std` and `objective_sem` are `NaN`.
+
+Cost and review summaries remain row-level when combined with replicates. Replicate summaries are group-level, so a replicate group may contain multiple rows with their own costs and review states.
+
+The v0.4.4 replicate design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 6/tutorial_01_noisy_and_replication_aware_bo_worked.ipynb`, especially explicit repeated measurements, noisy best-vs-model recommendation, and replicate-aware diagnostics.
+
 ## 📓 Example Notebooks
 
 Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/01_simple_2d_maximise_logei.yaml` and `examples/01_simple_2d_maximise_logei_campaign_log.csv`.
@@ -260,6 +281,8 @@ Open `notebooks/05_mixed_variable_campaign.ipynb` for a mixed-variable v0.4 camp
 Open `notebooks/06_constrained_mixed_campaign.ipynb` for a constrained mixed-variable campaign using `configs/06_mixed_constrained_logei.yaml`.
 
 Open `notebooks/07_cost_aware_human_review_campaign.ipynb` for a cost-aware and human-review campaign using `configs/07_cost_aware_human_review_logei.yaml`.
+
+Open `notebooks/08_replicate_aware_campaign.ipynb` for a replicate-aware campaign using `configs/08_replicate_aware_logei.yaml`.
 
 From a fresh clone:
 
@@ -287,6 +310,7 @@ The notebooks write only ignored working files:
 - `examples/05_simple_mixed_logei_working_log.csv`
 - `examples/06_mixed_constrained_logei_working_log.csv`
 - `examples/07_cost_aware_human_review_working_log.csv`
+- `examples/08_replicate_aware_working_log.csv`
 - `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.
@@ -300,10 +324,11 @@ For one- and two-variable campaigns, `plot_diagnostics()` can show direct design
 Both functions return figure/axes objects and can optionally save figures:
 
 ```python
-from bo_forge.diagnostics import plot_diagnostics, plot_progress
+from bo_forge.diagnostics import plot_diagnostics, plot_progress, plot_replicates
 
 plot_progress(config, df, save_path="reports/progress.png")
 plot_diagnostics(config, df, save_path="reports/diagnostics.png")
+plot_replicates(config, df, save_path="reports/replicates.png")
 ```
 
 `save_path` writes exactly to the requested path. The older `filename`/`fig_folder` arguments construct a path from `fig_folder` and `filename`. Passing both `filename` and `save_path` is invalid.

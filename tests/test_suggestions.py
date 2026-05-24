@@ -9,6 +9,7 @@ from bo_forge.config import (
     ConstraintConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
@@ -166,6 +167,26 @@ def cost_review_mixed_config(
     )
 
 
+def replicate_config(initial_design_size: int = 3) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="replicate_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 800.0),
+        ),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            random_seed=3,
+            raw_samples=16,
+            num_restarts=2,
+            mc_samples=16,
+        ),
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     rows = []
     for index, (x_value, repeats, dose, solvent, score) in enumerate(
@@ -229,6 +250,33 @@ def cost_review_mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
+def replicate_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for row_id, iteration, group, replicate_index, x_value, temperature, activity in [
+        ("rep_0a", 0, "group_0", 0, 0.1, 350.0, 0.5),
+        ("rep_0b", 0, "group_0", 1, 0.1, 350.0, 0.9),
+        ("rep_1a", 1, "group_1", 0, 0.4, 550.0, 1.4),
+        ("rep_2a", 2, "group_2", 0, 0.8, 720.0, 1.2),
+    ]:
+        rows.append(
+            {
+                "row_id": row_id,
+                "iteration": iteration,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": group,
+                "replicate_index": replicate_index,
+                "x": x_value,
+                "temperature": temperature,
+                "activity": activity,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
 def test_suggest_next_returns_sobol_initial_suggestions() -> None:
     cfg = config(batch_size=2, initial_design_size=3)
     df = empty_campaign_log(cfg)
@@ -241,6 +289,46 @@ def test_suggest_next_returns_sobol_initial_suggestions() -> None:
     assert suggestions["x"].astype(float).between(0.0, 1.0).all()
     assert suggestions["temperature"].astype(float).between(300.0, 800.0).all()
     assert suggestions["activity"].astype(str).eq("").all()
+
+
+def test_replicate_suggestions_set_group_to_row_id_and_start_at_zero() -> None:
+    cfg = replicate_config(initial_design_size=4)
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "replicate_group"] == suggestions.loc[0, "row_id"]
+    assert int(suggestions.loc[0, "replicate_index"]) == 0
+
+
+def test_replicate_initial_design_counts_groups_not_raw_rows() -> None:
+    cfg = replicate_config(initial_design_size=4)
+    df = replicate_observed_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "source"] == "sobol"
+
+
+def test_replicate_model_based_suggestions_use_aggregated_observations() -> None:
+    cfg = replicate_config(initial_design_size=3)
+    df = replicate_observed_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert suggestions.loc[0, "replicate_group"] == suggestions.loc[0, "row_id"]
+    existing_designs = {
+        (float(row["x"]), float(row["temperature"]))
+        for _, row in df.iterrows()
+    }
+    suggested_design = (
+        float(suggestions.loc[0, "x"]),
+        float(suggestions.loc[0, "temperature"]),
+    )
+    assert suggested_design not in existing_designs
 
 
 def test_suggest_next_refuses_pending_suggestions() -> None:

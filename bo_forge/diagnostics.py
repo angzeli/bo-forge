@@ -20,6 +20,7 @@ from bo_forge.plot_style import (
     set_title,
     style_colorbar,
 )
+from bo_forge.replicates import replicate_summary
 from bo_forge.transforms import dataframe_to_variable_coverage, has_mixed_variables
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
@@ -186,6 +187,69 @@ def plot_cost_progress(
     ax.plot(cumulative_costs, best, marker="o", label="best so far")
     set_title(ax, f"{config.campaign_name}: cost progress")
     set_axis_labels(ax, "Cumulative cost", config.objective.name)
+    add_legend(ax)
+    return finalise_figure(
+        ax,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+    )
+
+
+def plot_replicates(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot raw replicate observations and replicate-group mean summaries."""
+    validate_campaign_data(config, df)
+    if not config.replicates.enabled:
+        raise ValueError("plot_replicates() requires replicates.enabled: true.")
+
+    observed = get_observed_data(config, df)
+    summary = replicate_summary(config, df)
+    _, ax = new_figure(figsize=(9, 6))
+    if summary.empty:
+        set_title(ax, f"{config.campaign_name}: no replicate observations yet")
+        set_axis_labels(ax, "Replicate group index", config.objective.name)
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    group_positions = {
+        group: index + 1
+        for index, group in enumerate(summary["replicate_group"].astype(str).tolist())
+    }
+    raw_x = observed["replicate_group"].astype(str).map(group_positions)
+    raw_y = pd.to_numeric(observed[config.objective.name])
+    ax.scatter(raw_x, raw_y, color="#64748b", alpha=0.75, label="raw observation")
+
+    x = list(range(1, len(summary) + 1))
+    mean = pd.to_numeric(summary["objective_mean"])
+    sem = pd.to_numeric(summary["objective_sem"])
+    ax.errorbar(
+        x,
+        mean,
+        yerr=sem,
+        fmt="o-",
+        color="#2563eb",
+        ecolor="#1d4ed8",
+        capsize=4,
+        label="group mean +/- SEM",
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(index) for index in x])
+    set_title(ax, f"{config.campaign_name}: replicate summary")
+    set_axis_labels(ax, "Replicate group index", config.objective.name)
     add_legend(ax)
     return finalise_figure(
         ax,

@@ -4,12 +4,19 @@ import matplotlib
 import pandas as pd
 import pytest
 
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    ObjectiveConfig,
+    ReplicateConfig,
+    VariableConfig,
+)
 from bo_forge.diagnostics import (
     _directional_best_so_far,
     _normalised_variable_coverage,
     plot_diagnostics,
     plot_progress,
+    plot_replicates,
 )
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
@@ -114,6 +121,65 @@ def observed_log_3d(direction: str = "maximize") -> pd.DataFrame:
                 "temperature": 550.0,
                 "concentration": 1.05,
                 "activity": 2.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def replicate_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name="replicate_diagnostics",
+        objective=cfg.objective,
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def replicate_log() -> pd.DataFrame:
+    cfg = replicate_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "activity": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_1a",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.7,
+                "activity": 1.3,
                 "predicted_mean": "",
                 "predicted_std": "",
                 "acquisition": "",
@@ -252,6 +318,22 @@ def test_plot_diagnostics_rejects_filename_and_save_path(tmp_path: Path) -> None
             filename="diagnostics.png",
             save_path=tmp_path / "diagnostics.png",
         )
+
+
+def test_plot_replicates_writes_nested_output_without_mutating_df(tmp_path: Path) -> None:
+    cfg = replicate_config()
+    df = replicate_log()
+    before = df.copy(deep=True)
+    save_path = tmp_path / "reports" / "replicates.png"
+
+    fig, ax = plot_replicates(cfg, df, save_path=save_path)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert save_path.exists()
+    assert fig is ax.figure
+    assert ax.get_title() == "replicate_diagnostics: replicate summary"
+    assert ax.get_xlabel() == "Replicate group index"
+    assert [label.get_text() for label in ax.get_xticklabels()] == ["1", "2"]
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

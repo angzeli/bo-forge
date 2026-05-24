@@ -26,6 +26,15 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
+from bo_forge.replicates import (
+    best_replicate_group as _best_replicate_group,
+)
+from bo_forge.replicates import (
+    modeling_observed_data,
+)
+from bo_forge.replicates import (
+    replicate_summary as _replicate_summary,
+)
 from bo_forge.suggestions import (
     suggest_next as _suggest_next,
 )
@@ -78,8 +87,12 @@ class CampaignSession:
         observed = self.observed_data()
         pending = self.pending_suggestions()
         observed_count = len(observed)
+        training_observed_count = len(modeling_observed_data(self.config, observed))
         pending_count = len(pending)
-        initial_design_remaining = max(self.config.bo.initial_design_size - observed_count, 0)
+        initial_design_remaining = max(
+            self.config.bo.initial_design_size - training_observed_count,
+            0,
+        )
         best = self.best_observation()
         if best.empty:
             best_row_id = None
@@ -121,6 +134,34 @@ class CampaignSession:
                         accepted_pending_estimated_cost(self.config, self.df),
                     ),
                     ("budget_remaining", budget_remaining(self.config, self.df)),
+                ]
+            )
+        if self.config.replicates.enabled:
+            replicate_summary = self.replicate_summary()
+            best_group = self.best_replicate_group()
+            if best_group.empty:
+                best_replicate_group = None
+                best_replicate_mean = None
+            else:
+                best_replicate_group = str(best_group["replicate_group"].iloc[0])
+                best_replicate_mean = float(best_group["objective_mean"].iloc[0])
+            rows.extend(
+                [
+                    ("replicate_groups", len(replicate_summary)),
+                    (
+                        "replicated_groups",
+                        int((replicate_summary["n_replicates"] > 1).sum())
+                        if not replicate_summary.empty
+                        else 0,
+                    ),
+                    (
+                        "max_replicates_per_group",
+                        int(replicate_summary["n_replicates"].max())
+                        if not replicate_summary.empty
+                        else 0,
+                    ),
+                    ("best_replicate_group", best_replicate_group),
+                    ("best_replicate_mean", best_replicate_mean),
                 ]
             )
         return pd.DataFrame(rows, columns=["field", "value"])
@@ -181,7 +222,8 @@ class CampaignSession:
             )
         else:
             pending_count = int((self.df["status"] == "suggested").sum())
-        observed_count = int((self.df["status"] == "observed").sum())
+        observed = get_observed_data(self.config, self.df)
+        observed_count = len(modeling_observed_data(self.config, observed))
         if pending_count > 0:
             return "has_pending_suggestions"
         if observed_count < self.config.bo.initial_design_size:
@@ -252,6 +294,8 @@ class CampaignSession:
             "summary": self.summary(),
             "next_action": self.next_action(),
             "best_observation": self.best_observation(),
+            "best_replicate_group": self.best_replicate_group(),
+            "replicate_summary": self.replicate_summary(),
             "pending_suggestions": self.pending_suggestions(),
             "review_queue": self.review_queue(),
             "cost_summary": self.cost_summary(),
@@ -279,6 +323,14 @@ class CampaignSession:
         else:
             best_index = values.idxmin()
         return observed.loc[[best_index], columns].copy()
+
+    def replicate_summary(self) -> pd.DataFrame:
+        """Return observed replicate-group summary statistics."""
+        return _replicate_summary(self.config, self.df)
+
+    def best_replicate_group(self) -> pd.DataFrame:
+        """Return the best replicate group by mean objective."""
+        return _best_replicate_group(self.config, self.df)
 
     def suggest_next(self, batch_size: int | None = None) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
@@ -335,6 +387,12 @@ class CampaignSession:
 
         return _plot_cost_progress(self.config, self.df, **kwargs)
 
+    def plot_replicates(self, **kwargs: Any) -> Any:
+        """Plot replicate-group objective summaries and return figure/axes objects."""
+        from bo_forge.diagnostics import plot_replicates as _plot_replicates
+
+        return _plot_replicates(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -348,8 +406,15 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             "BO Forge Campaign Report\n========================",
             "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
             "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
-            "Best Observation\n----------------\n\n"
+            "Best Raw Observation\n--------------------\n\n"
             + _format_best_observation(tables["best_observation"]),
+            "Best Replicate Group By Mean Objective\n--------------------------------------\n\n"
+            + _format_best_observation(
+                tables["best_replicate_group"],
+                empty_message="No replicate groups observed.",
+            ),
+            "Replicate Summary\n-----------------\n\n"
+            + _format_report_table(tables["replicate_summary"], "No replicate groups observed."),
             "Pending Suggestions\n-------------------\n\n"
             + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
             "Review Queue\n------------\n\n"
@@ -379,9 +444,12 @@ def _format_next_action(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def _format_best_observation(df: pd.DataFrame) -> str:
+def _format_best_observation(
+    df: pd.DataFrame,
+    empty_message: str = "No best observation yet.",
+) -> str:
     if df.empty:
-        return "No best observation yet."
+        return empty_message
 
     row = df.iloc[0]
     return "\n".join(f"{column}: {_format_report_value(row[column])}" for column in df.columns)

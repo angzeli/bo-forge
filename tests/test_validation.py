@@ -7,6 +7,7 @@ from bo_forge.config import (
     ConstraintConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
@@ -101,6 +102,17 @@ def cost_review_config() -> CampaignConfig:
     )
 
 
+def replicate_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name="replicate_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
 def mixed_df() -> pd.DataFrame:
     cfg = mixed_config()
     return pd.DataFrame(
@@ -165,6 +177,57 @@ def cost_review_df() -> pd.DataFrame:
     )
 
 
+def replicate_df() -> pd.DataFrame:
+    cfg = replicate_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "temperature": 500.0,
+                "activity": 1.3,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "temperature": 500.0,
+                "activity": 1.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_1a",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.6,
+                "temperature": 650.0,
+                "activity": 1.8,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_validate_campaign_data_accepts_valid_log() -> None:
     validate_campaign_data(config(), valid_df())
 
@@ -179,6 +242,10 @@ def test_validate_campaign_data_accepts_feasible_constrained_log() -> None:
 
 def test_validate_campaign_data_accepts_cost_review_log() -> None:
     validate_campaign_data(cost_review_config(), cost_review_df())
+
+
+def test_validate_campaign_data_accepts_manual_replicate_rows() -> None:
+    validate_campaign_data(replicate_config(), replicate_df())
 
 
 def test_validate_campaign_data_accepts_3d_example_log() -> None:
@@ -243,6 +310,161 @@ def test_validate_campaign_data_accepts_cost_review_example_log() -> None:
     validate_campaign_data(config_cost, df)
     assert config_cost.cost is not None
     assert config_cost.review.enabled
+
+
+def test_validate_campaign_data_accepts_replicate_example_log() -> None:
+    config_replicate = CampaignConfig.from_yaml("configs/08_replicate_aware_logei.yaml")
+    df = load_campaign_log("examples/08_replicate_aware_campaign_log.csv", config_replicate)
+
+    validate_campaign_data(config_replicate, df)
+    assert config_replicate.replicates.enabled
+
+
+def test_canonical_columns_for_schema_combinations() -> None:
+    base = config()
+    cost = cost_review_config()
+    review = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        review=ReviewConfig(enabled=True),
+    )
+    replicates = replicate_config()
+    cost_replicates = CampaignConfig(
+        campaign_name=cost.campaign_name,
+        objective=cost.objective,
+        variables=cost.variables,
+        bo=cost.bo,
+        cost=cost.cost,
+        replicates=ReplicateConfig(enabled=True),
+    )
+    review_replicates = CampaignConfig(
+        campaign_name=review.campaign_name,
+        objective=review.objective,
+        variables=review.variables,
+        bo=review.bo,
+        review=review.review,
+        replicates=ReplicateConfig(enabled=True),
+    )
+    all_enabled = CampaignConfig(
+        campaign_name=cost.campaign_name,
+        objective=cost.objective,
+        variables=cost.variables,
+        bo=cost.bo,
+        cost=cost.cost,
+        review=ReviewConfig(enabled=True),
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+    assert canonical_columns(base) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "x",
+        "temperature",
+        "activity",
+        "predicted_mean",
+        "predicted_std",
+        "acquisition",
+    ]
+    assert canonical_columns(review)[4:8] == [
+        "review_status",
+        "review_note",
+        "x",
+        "temperature",
+    ]
+    assert canonical_columns(replicates)[4:8] == [
+        "replicate_group",
+        "replicate_index",
+        "x",
+        "temperature",
+    ]
+    assert canonical_columns(cost)[-6:] == [
+        "cost_estimate",
+        "cost_actual",
+        "predicted_mean",
+        "predicted_std",
+        "acquisition",
+        "utility",
+    ]
+    assert canonical_columns(cost_replicates)[4:8] == [
+        "replicate_group",
+        "replicate_index",
+        "x",
+        "score",
+    ]
+    assert canonical_columns(review_replicates)[4:10] == [
+        "review_status",
+        "review_note",
+        "replicate_group",
+        "replicate_index",
+        "x",
+        "temperature",
+    ]
+    assert canonical_columns(all_enabled)[4:8] == [
+        "review_status",
+        "review_note",
+        "replicate_group",
+        "replicate_index",
+    ]
+
+
+def test_validate_campaign_data_accepts_cost_review_replicate_log() -> None:
+    base = cost_review_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        cost=base.cost,
+        review=base.review,
+        replicates=ReplicateConfig(enabled=True),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "score": 1.0,
+                "cost_estimate": 1.2,
+                "cost_actual": 1.1,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "score": 1.2,
+                "cost_estimate": 1.2,
+                "cost_actual": 1.3,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    validate_campaign_data(cfg, df)
 
 
 def test_validate_campaign_data_rejects_missing_column() -> None:
@@ -482,6 +704,75 @@ def test_constraint_and_short_circuits_to_violation() -> None:
 
     with pytest.raises(LogValidationError, match="violates constraint 'positive_inverse'"):
         validate_campaign_data(cfg, df)
+
+
+@pytest.mark.parametrize("value", ["", " group_0", "group_0 ", "group\n0"])
+def test_validate_campaign_data_rejects_invalid_replicate_group(value: str) -> None:
+    df = replicate_df()
+    df.loc[0, "replicate_group"] = value
+
+    with pytest.raises(LogValidationError, match="invalid replicate_group"):
+        validate_campaign_data(replicate_config(), df)
+
+
+@pytest.mark.parametrize("value", [-1, 0.5, "bad"])
+def test_validate_campaign_data_rejects_invalid_replicate_index(value: object) -> None:
+    df = replicate_df()
+    df["replicate_index"] = df["replicate_index"].astype(object)
+    df.loc[0, "replicate_index"] = value
+
+    with pytest.raises(LogValidationError, match="invalid replicate_index"):
+        validate_campaign_data(replicate_config(), df)
+
+
+def test_validate_campaign_data_accepts_zero_based_replicate_index() -> None:
+    df = replicate_df()
+
+    validate_campaign_data(replicate_config(), df)
+
+
+def test_validate_campaign_data_rejects_duplicate_replicate_pair() -> None:
+    df = replicate_df()
+    df.loc[1, "replicate_index"] = 0
+
+    with pytest.raises(LogValidationError, match="Duplicate replicate row"):
+        validate_campaign_data(replicate_config(), df)
+
+
+def test_validate_campaign_data_rejects_same_group_different_design() -> None:
+    df = replicate_df()
+    df.loc[1, "temperature"] = 550.0
+
+    with pytest.raises(LogValidationError, match="same design|different designs"):
+        validate_campaign_data(replicate_config(), df)
+
+
+def test_validate_campaign_data_rejects_duplicate_design_different_group() -> None:
+    df = replicate_df()
+    df.loc[2, "x"] = 0.2
+    df.loc[2, "temperature"] = 500.0
+
+    with pytest.raises(LogValidationError, match="same design.*replicate_group"):
+        validate_campaign_data(replicate_config(), df)
+
+
+def test_validate_campaign_data_rejects_duplicate_design_without_replicates() -> None:
+    df = valid_df()
+    extra = df.iloc[[0]].copy()
+    extra.loc[extra.index[0], "row_id"] = "row_3"
+    duplicate = pd.concat([df, extra], ignore_index=True)
+
+    with pytest.raises(LogValidationError, match="Repeated design rows require"):
+        validate_campaign_data(config(), duplicate)
+
+
+def test_validate_campaign_data_rejects_replicate_columns_when_disabled() -> None:
+    df = valid_df()
+    df.insert(4, "replicate_group", "group_0")
+    df.insert(5, "replicate_index", 0)
+
+    with pytest.raises(LogValidationError, match="unsupported extra columns"):
+        validate_campaign_data(config(), df)
 
 
 def test_design_tuples_preserve_mixed_user_space_values() -> None:

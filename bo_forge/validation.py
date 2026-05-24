@@ -13,6 +13,7 @@ from bo_forge.errors import LogValidationError
 
 BASE_COLUMNS = ["row_id", "iteration", "status", "source"]
 REVIEW_COLUMNS = ["review_status", "review_note"]
+REPLICATE_COLUMNS = ["replicate_group", "replicate_index"]
 COST_COLUMNS = ["cost_estimate", "cost_actual"]
 RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
 UTILITY_COLUMNS = ["utility"]
@@ -26,6 +27,7 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
     return [
         *BASE_COLUMNS,
         *(REVIEW_COLUMNS if config.review.enabled else []),
+        *(REPLICATE_COLUMNS if config.replicates.enabled else []),
         *config.variable_names,
         config.objective.name,
         *(COST_COLUMNS if config.cost is not None else []),
@@ -46,6 +48,7 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_source(df)
     _validate_review(config, df)
     _validate_variables(config, df)
+    _validate_replicates(config, df)
     _validate_constraints(config, df)
     _validate_objective(config, df)
     _validate_nullable_numeric_columns(df, RESULT_COLUMNS)
@@ -293,6 +296,100 @@ def _validate_categorical_variable(variable: VariableConfig, df: pd.DataFrame) -
                 f"Row '{row_id}' has value outside configured choices for variable "
                 f"'{variable.name}': value={value!r}, allowed={sorted(allowed)}."
             )
+
+
+def _validate_replicates(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if not config.replicates.enabled:
+        _validate_no_duplicate_design_rows(config, df)
+        return
+
+    for index, value in df["replicate_group"].items():
+        if (
+            not isinstance(value, str)
+            or value == ""
+            or value.strip() != value
+            or "\n" in value
+            or "\r" in value
+        ):
+            row_id = str(df.at[index, "row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has invalid replicate_group: value={value!r}. "
+                "Expected a nonblank string with no surrounding whitespace or newlines."
+            )
+
+    replicate_index = pd.to_numeric(df["replicate_index"], errors="coerce")
+    invalid_index = (
+        replicate_index.isna()
+        | ~replicate_index.map(math.isfinite)
+        | (replicate_index < 0)
+        | (replicate_index % 1 != 0)
+    )
+    if invalid_index.any():
+        row_id = str(df.loc[invalid_index, "row_id"].iloc[0])
+        value = df.loc[invalid_index, "replicate_index"].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has invalid replicate_index '{value}'. "
+            "Expected a zero-based non-negative integer."
+        )
+
+    pairs = df["replicate_group"].astype(str) + "\0" + replicate_index.astype(int).astype(str)
+    duplicated_pair = pairs[pairs.duplicated()]
+    if not duplicated_pair.empty:
+        index = int(duplicated_pair.index[0])
+        group = str(df.at[index, "replicate_group"])
+        replicate = int(replicate_index.at[index])
+        raise LogValidationError(
+            f"Duplicate replicate row for replicate_group='{group}', "
+            f"replicate_index={replicate}."
+        )
+
+    _validate_replicate_design_consistency(config, df)
+
+
+def _validate_no_duplicate_design_rows(config: CampaignConfig, df: pd.DataFrame) -> None:
+    seen: dict[tuple[object, ...], str] = {}
+    for _, row in df.iterrows():
+        key = design_key_for_values(
+            config,
+            [row[variable.name] for variable in config.variables],
+        )
+        row_id = str(row["row_id"])
+        previous = seen.get(key)
+        if previous is not None:
+            raise LogValidationError(
+                f"Rows '{previous}' and '{row_id}' have the same design. "
+                "Repeated design rows require replicates.enabled: true and a shared "
+                "replicate_group."
+            )
+        seen[key] = row_id
+
+
+def _validate_replicate_design_consistency(config: CampaignConfig, df: pd.DataFrame) -> None:
+    group_to_key: dict[str, tuple[object, ...]] = {}
+    key_to_group: dict[tuple[object, ...], str] = {}
+    for _, row in df.iterrows():
+        group = str(row["replicate_group"])
+        key = design_key_for_values(
+            config,
+            [row[variable.name] for variable in config.variables],
+        )
+        row_id = str(row["row_id"])
+        existing_key = group_to_key.get(group)
+        if existing_key is not None and existing_key != key:
+            raise LogValidationError(
+                f"Replicate group '{group}' contains rows with different designs; "
+                f"first_design={existing_key}, row_id='{row_id}', design={key}."
+            )
+        group_to_key[group] = key
+
+        existing_group = key_to_group.get(key)
+        if existing_group is not None and existing_group != group:
+            raise LogValidationError(
+                f"Rows with the same design must share one replicate_group: "
+                f"existing_group='{existing_group}', row_id='{row_id}', "
+                f"replicate_group='{group}'."
+            )
+        key_to_group[key] = group
 
 
 def _validate_objective(config: CampaignConfig, df: pd.DataFrame) -> None:

@@ -83,6 +83,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(cost_summary_parser)
     cost_summary_parser.set_defaults(handler=_cmd_cost_summary)
 
+    replicate_summary_parser = subparsers.add_parser(
+        "replicate-summary",
+        help="Print observed replicate-group summary statistics.",
+    )
+    _add_config_log_arguments(replicate_summary_parser)
+    replicate_summary_parser.set_defaults(handler=_cmd_replicate_summary)
+
     report_parser = subparsers.add_parser("report", help="Print or export a campaign report.")
     _add_config_log_arguments(report_parser)
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
@@ -137,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(plot_parser)
     plot_parser.add_argument(
         "--kind",
-        choices=["progress", "diagnostics", "cost-progress"],
+        choices=["progress", "diagnostics", "cost-progress", "replicates"],
         required=True,
         help="Plot type to export.",
     )
@@ -248,6 +255,12 @@ def _cmd_cost_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_replicate_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    _print_table(campaign.replicate_summary())
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if args.output is None:
@@ -307,6 +320,12 @@ def _cmd_plot(args: argparse.Namespace) -> int:
                     "plot --kind cost-progress requires a config with a cost section."
                 )
             campaign.plot_cost_progress(save_path=args.output)
+        elif args.kind == "replicates":
+            if not campaign.config.replicates.enabled:
+                raise ConfigError(
+                    "plot --kind replicates requires a config with replicates.enabled: true."
+                )
+            campaign.plot_replicates(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

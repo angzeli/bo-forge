@@ -94,6 +94,14 @@ bo-forge cost-summary \
   --log examples/07_cost_aware_human_review_working_log.csv
 ```
 
+For replicate-aware campaigns, inspect group-level replicate statistics:
+
+```bash
+bo-forge replicate-summary \
+  --config configs/08_replicate_aware_logei.yaml \
+  --log examples/08_replicate_aware_working_log.csv
+```
+
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 
 ```bash
@@ -175,6 +183,12 @@ bo-forge plot \
   --log examples/07_cost_aware_human_review_working_log.csv \
   --kind cost-progress \
   --output reports/cost_progress.png
+
+bo-forge plot \
+  --config configs/08_replicate_aware_logei.yaml \
+  --log examples/08_replicate_aware_working_log.csv \
+  --kind replicates \
+  --output reports/replicates.png
 ```
 
 ## 🧭 Command Reference
@@ -190,11 +204,12 @@ bo-forge plot \
 | `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
 | `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
 | `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and best-observed-objective fields. |
+| `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress --output PATH` | Export one progress, diagnostics, or cost-progress figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates --output PATH` | Export one progress, diagnostics, cost-progress, or replicate-summary figure. |
 
 ## 🧯 CLI Error Output
 
