@@ -54,27 +54,27 @@ Current baseline: `v0.4.5`. Next planned milestone: `v0.5`, focused on a thin St
 
 ### Patch Notes So Far
 
-| Version | Type | Summary |
-| --- | --- | --- |
-| `v0.1` | Major MVP | Core backend, CSV logs, Sobol, GP, LogEI/qLogEI |
-| `v0.1.1` | Patch | README, quickstart, notebook execution support, repo guide |
-| `v0.1.2` | Patch | CSV schema docs, common errors, minimisation + qLogEI batch demo |
-| `v0.1.3` | Patch | Notebook metadata cleanup, docs links, notebook validation test |
-| `v0.2.0` | Major | CampaignSession notebook engine |
-| `v0.2.1` | Patch | Read-only session API helpers and notebook hygiene guards |
-| `v0.2.2` | Patch | Read-only next-action guidance for notebook campaign loops |
-| `v0.2.3` | Patch | Read-only campaign report helper |
+| Version | Type | Summary                                                             |
+| --- | --- |---------------------------------------------------------------------|
+| `v0.1` | Major MVP | Core backend, CSV logs, Sobol, GP, LogEI/qLogEI                     |
+| `v0.1.1` | Patch | README, quickstart, notebook execution support, repo guide          |
+| `v0.1.2` | Patch | CSV schema docs, common errors, minimisation + qLogEI batch demo    |
+| `v0.1.3` | Patch | Notebook metadata cleanup, docs links, notebook validation test     |
+| `v0.2.0` | Major | CampaignSession notebook engine                                     |
+| `v0.2.1` | Patch | Read-only session API helpers and notebook hygiene guards           |
+| `v0.2.2` | Patch | Read-only next-action guidance for notebook campaign loops          |
+| `v0.2.3` | Patch | Read-only campaign report helper                                    |
 | `v0.2.4` | Patch | 3D example, higher-dimensional diagnostics, and figure export paths |
-| `v0.3.0` | Major | CLI workflow around the CampaignSession API |
-| `v0.3.1` | Patch | CLI invocation hardening with package module entrypoint |
-| `v0.3.2` | Patch | CLI error polish for expected failure paths |
-| `v0.3.3` | Patch | Add CLI doctor and init-log commands |
-| `v0.4.0` | Major | Mixed-variable single-objective BO |
-| `v0.4.1` | Patch | One-hot categorical encoding and mixed-suggestion quality |
-| `v0.4.2` | Patch | Constraints, duplicate handling, and batch diversity |
-| `v0.4.3` | Patch | Cost-aware ranking and human-review support |
-| `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting |
-| `v0.4.5` | Patch | Final v0.4.x notebook depth polish with 15-step simulated campaigns |
+| `v0.3.0` | Major | CLI workflow around the CampaignSession API                         |
+| `v0.3.1` | Patch | CLI invocation hardening with package module entrypoint             |
+| `v0.3.2` | Patch | CLI error polish for expected failure paths                         |
+| `v0.3.3` | Patch | Add CLI doctor and init-log commands                                |
+| `v0.4.0` | Major | Mixed-variable single-objective BO                                  |
+| `v0.4.1` | Patch | One-hot categorical encoding and mixed-suggestion quality           |
+| `v0.4.2` | Patch | Constraints, duplicate handling, and batch diversity                |
+| `v0.4.3` | Patch | Cost-aware ranking and human-review support                         |
+| `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting       |
+| `v0.4.5` | Patch | Notebook depth polish with 15-step simulated campaigns              |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -146,15 +146,6 @@ Status: completed
 - Single-objective GP + LogEI/qLogEI mixed-variable suggestions.
 - Mixed-variable duplicate handling using typed user-space design keys.
 - Session, CLI, docs, examples, and notebook coverage.
-
-| Version | Focus |
-| --- | --- |
-| `v0.4.0` | Mixed-variable single-objective BO |
-| `v0.4.1` | One-hot categorical encoding and mixed-suggestion quality |
-| `v0.4.2` | Constraints, duplicate handling, and batch diversity |
-| `v0.4.3` | Cost-aware and human-review support |
-| `v0.4.4` | Explicit replicates and practical baseline |
-| `v0.4.5` | Final v0.4.x notebook depth polish |
 
 ## 🖥️ v0.5 - Streamlit Prototype
 
