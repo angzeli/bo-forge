@@ -12,12 +12,15 @@ from bo_forge_app.streamlit_helpers import (
     LOG_PATH_KEY,
     SESSION_KEY,
     STAGED_SUGGESTION_BUNDLE_KEY,
+    campaign_report_text,
     default_export_path,
+    export_staged_suggestions_csv,
     extract_matplotlib_figure,
     feature_flags,
     format_dataframe_for_display,
     load_campaign_session,
     make_staged_suggestion_bundle,
+    observable_rows,
     resolve_path_input,
     staged_bundle_invalidation_reason,
     staged_suggestions_from_bundle,
@@ -135,8 +138,14 @@ def _render_overview(st: Any, campaign: Any) -> None:
         campaign.validate()
     except BOForgeError as exc:
         st.error(f"Validation failed: {exc}")
+        st.subheader("Campaign Log")
+        st.dataframe(format_dataframe_for_display(campaign.df), use_container_width=True)
+        return
     else:
         st.success("Campaign log is valid.")
+
+    st.subheader("Campaign Status")
+    st.code(campaign.campaign_status(), language=None)
 
     col_left, col_right = st.columns(2)
     with col_left:
@@ -151,12 +160,32 @@ def _render_overview(st: Any, campaign: Any) -> None:
         format_dataframe_for_display(campaign.best_observation()),
         use_container_width=True,
     )
+    if campaign.config.cost is not None:
+        st.subheader("Cost Summary")
+        st.dataframe(
+            format_dataframe_for_display(campaign.cost_summary()),
+            use_container_width=True,
+        )
     if campaign.config.replicates.enabled:
         st.subheader("Best Replicate Group")
         st.dataframe(
             format_dataframe_for_display(campaign.best_replicate_group()),
             use_container_width=True,
         )
+        st.subheader("Replicate Summary")
+        st.dataframe(
+            format_dataframe_for_display(campaign.replicate_summary()),
+            use_container_width=True,
+        )
+
+    st.subheader("Observed Rows")
+    st.dataframe(format_dataframe_for_display(campaign.observed_data()), use_container_width=True)
+
+    st.subheader("Pending Suggestions")
+    st.dataframe(
+        format_dataframe_for_display(campaign.pending_suggestions()),
+        use_container_width=True,
+    )
 
     st.subheader("Campaign Log")
     st.dataframe(format_dataframe_for_display(campaign.df), use_container_width=True)
@@ -198,6 +227,22 @@ def _render_suggest(st: Any, campaign: Any) -> None:
 
     st.subheader("Staged Suggestions")
     st.dataframe(format_dataframe_for_display(suggestions), use_container_width=True)
+
+    export_path = Path(
+        st.text_input(
+            "Staged suggestions CSV export path",
+            value=str(default_export_path(log_path, "staged_suggestions", "csv")),
+            key="staged_suggestions_export_path",
+        )
+    )
+    if st.button("Export staged suggestions CSV"):
+        try:
+            written_path = export_staged_suggestions_csv(suggestions, export_path)
+        except OSError as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Wrote staged suggestions CSV: {written_path}")
+
     try:
         quality = campaign.suggestion_quality(suggestions)
     except BOForgeError as exc:
@@ -222,6 +267,7 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
     st.subheader("Pending Suggestions")
     pending = campaign.pending_suggestions()
     st.dataframe(format_dataframe_for_display(pending), use_container_width=True)
+    observable = observable_rows(campaign.config, campaign.df)
 
     if flags["has_review"]:
         st.subheader("Review Queue")
@@ -241,12 +287,17 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
                     st.session_state[SESSION_KEY] = campaign
                     st.success("Review decision recorded.")
 
-    if pending.empty:
-        st.info("No suggested rows to mark observed.")
+    st.subheader("Rows Ready To Mark Observed")
+    st.dataframe(format_dataframe_for_display(observable), use_container_width=True)
+    if observable.empty:
+        st.info("No suggested rows are ready to mark observed.")
         return
 
     st.subheader("Mark Observed")
-    observed_row_id = st.selectbox("Observed row_id", pending["row_id"].astype(str).tolist())
+    observed_row_id = st.selectbox(
+        "Observed row_id",
+        observable["row_id"].astype(str).tolist(),
+    )
     objective_value = st.number_input("Objective value", value=0.0, format="%.8f")
     actual_cost = None
     if flags["has_cost"]:
@@ -271,6 +322,14 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
 
 def _render_reports(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
     _, log_path = _current_paths(st)
+
+    st.subheader("Report Preview")
+    try:
+        report_text = campaign_report_text(campaign)
+    except BOForgeError as exc:
+        st.error(str(exc))
+    else:
+        st.text_area("Campaign report", value=report_text, height=360)
 
     report_path = Path(
         st.text_input(

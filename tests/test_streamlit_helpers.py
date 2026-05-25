@@ -8,16 +8,20 @@ from matplotlib import pyplot as plt
 from bo_forge.config import CampaignConfig
 from bo_forge_app import streamlit_app, streamlit_helpers
 from bo_forge_app.streamlit_helpers import (
+    campaign_report_text,
     dataframe_fingerprint,
     default_export_path,
+    export_staged_suggestions_csv,
     extract_matplotlib_figure,
     feature_flags,
     file_fingerprint,
     load_campaign_session,
     make_staged_suggestion_bundle,
+    observable_rows,
     resolve_path_input,
     staged_bundle_invalidation_reason,
     staged_bundle_is_appendable,
+    staged_suggestions_from_bundle,
 )
 
 
@@ -188,6 +192,104 @@ def test_staged_bundle_rejects_missing_or_empty_suggestions(tmp_path: Path) -> N
 
     assert not staged_bundle_is_appendable(None, config_path, log_path)
     assert not staged_bundle_is_appendable(empty_bundle, config_path, log_path)
+
+
+def test_observable_rows_returns_all_suggested_rows_without_review() -> None:
+    config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+    df = pd.DataFrame(
+        [
+            {"row_id": "observed_0", "status": "observed"},
+            {"row_id": "suggested_0", "status": "suggested"},
+            {"row_id": "suggested_1", "status": "suggested"},
+        ]
+    )
+
+    rows = observable_rows(config, df)
+
+    assert rows["row_id"].tolist() == ["suggested_0", "suggested_1"]
+
+
+def test_observable_rows_returns_only_accepted_review_suggestions() -> None:
+    config = CampaignConfig.from_yaml("configs/07_cost_aware_human_review_logei.yaml")
+    df = pd.DataFrame(
+        [
+            {"row_id": "pending_0", "status": "suggested", "review_status": "pending"},
+            {"row_id": "accepted_0", "status": "suggested", "review_status": "accepted"},
+            {"row_id": "rejected_0", "status": "suggested", "review_status": "rejected"},
+            {"row_id": "deferred_0", "status": "suggested", "review_status": "deferred"},
+            {"row_id": "observed_0", "status": "observed", "review_status": "accepted"},
+        ]
+    )
+
+    rows = observable_rows(config, df)
+
+    assert rows["row_id"].tolist() == ["accepted_0"]
+
+
+def test_export_staged_suggestions_csv_is_non_mutating(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "01_simple_2d_maximise_logei_campaign_log.csv")
+    campaign = load_campaign_session(
+        "configs/01_simple_2d_maximise_logei.yaml",
+        log_path,
+    )
+    config_path = Path("configs/01_simple_2d_maximise_logei.yaml")
+    suggestions = simple_suggestions()
+    bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
+    before_bundle_fingerprint = str(bundle["suggestions_fingerprint"])
+    before_log_bytes = log_path.read_bytes()
+    before_df = campaign.df.copy(deep=True)
+
+    output_path = export_staged_suggestions_csv(
+        staged_suggestions_from_bundle(bundle),
+        tmp_path / "exports" / "suggestions.csv",
+    )
+
+    assert output_path.exists()
+    pd.testing.assert_frame_equal(pd.read_csv(output_path, keep_default_na=False), suggestions)
+    assert bundle["suggestions_fingerprint"] == before_bundle_fingerprint
+    assert bundle["appended"] is False
+    assert log_path.read_bytes() == before_log_bytes
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+
+
+def test_campaign_report_text_uses_session_report_formatting(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "01_simple_2d_maximise_logei_campaign_log.csv")
+    campaign = load_campaign_session(
+        "configs/01_simple_2d_maximise_logei.yaml",
+        log_path,
+    )
+
+    text = campaign_report_text(campaign)
+
+    assert "BO Forge Campaign Report" in text
+    assert "Summary" in text
+    assert "Next Action" in text
+
+
+def test_report_and_plot_exports_do_not_mutate_campaign_log_or_session(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "01_simple_2d_maximise_logei_campaign_log.csv")
+    campaign = load_campaign_session(
+        "configs/01_simple_2d_maximise_logei.yaml",
+        log_path,
+    )
+    before_log_bytes = log_path.read_bytes()
+    before_df = campaign.df.copy(deep=True)
+
+    campaign.export_report(tmp_path / "reports" / "campaign.txt")
+    plot_result = campaign.plot_progress(save_path=tmp_path / "reports" / "progress.png")
+    plt.close(extract_matplotlib_figure(plot_result))
+
+    assert log_path.read_bytes() == before_log_bytes
+    pd.testing.assert_frame_equal(campaign.df, before_df)
+
+
+def test_streamlit_app_clear_staged_suggestions_removes_bundle() -> None:
+    class FakeStreamlit:
+        session_state = {"bo_forge_staged_suggestion_bundle": {"suggestions": simple_suggestions()}}
+
+    streamlit_app._clear_staged_suggestions(FakeStreamlit)
+
+    assert "bo_forge_staged_suggestion_bundle" not in FakeStreamlit.session_state
 
 
 @pytest.mark.parametrize(

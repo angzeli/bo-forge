@@ -65,6 +65,15 @@ The local Streamlit app wraps the same `CampaignSession` workflow:
 
 Suggestions are generated as a dry run and staged in app session state. They are appended to the selected CSV log only after the explicit append button is clicked.
 
+The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
+
+Campaign creation and environment checks remain CLI workflows:
+
+```bash
+./.venv/bin/python -m bo_forge doctor
+./.venv/bin/python -m bo_forge init-log --config configs/01_simple_2d_maximise_logei.yaml --log examples/new_campaign_log.csv
+```
+
 See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings.
 
 ## 🔁 Session API

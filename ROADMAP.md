@@ -23,6 +23,7 @@ flowchart LR
     v043["v0.4.3<br/>Cost + review"]
     v044["v0.4.4<br/>Replicates"]
     v045["v0.4.5<br/>Notebook depth"]
+    v051["v0.5.1<br/>Workflow coverage"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -39,9 +40,10 @@ flowchart LR
     v04 -.-> v043
     v04 -.-> v044
     v04 -.-> v045
+    v05 -.-> v051
     
     class v01,v02,v03,v04,v05 majorDone
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -49,7 +51,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.5.0`. Next planned milestone: `v0.5.1`, focused on app state and safety polish.
+Current baseline: `v0.5.1`. Next planned milestone: `v0.5.2`, focused on Forge Suite UI alignment.
 
 ### Patch Notes So Far
 
@@ -75,6 +77,7 @@ Current baseline: `v0.5.0`. Next planned milestone: `v0.5.1`, focused on app sta
 | `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting       |
 | `v0.4.5` | Patch | Notebook depth polish with 15-step simulated campaigns              |
 | `v0.5.0` | Major | Local Streamlit campaign app MVP                                    |
+| `v0.5.1` | Patch | Streamlit workflow coverage                                         |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -149,14 +152,16 @@ Status: completed
 
 ## 🖥️ v0.5 - Streamlit Prototype
 
-Status: MVP started
+Status: MVP plus workflow coverage
 
 - Build a thin Streamlit wrapper around the backend package.
 - Support local YAML config and CSV log path loading.
 - Show campaign log validation issues.
 - Stage dry-run suggestions before explicit append.
+- Export staged suggestions to a standalone CSV without mutating the campaign log.
 - Enter results and review decisions through the UI.
 - Display and export progress and diagnostic plots.
+- Display cost and replicate summaries when configured.
 - Keep BO logic out of the app layer.
 
 ## 🔮 Later

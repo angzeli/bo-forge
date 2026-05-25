@@ -1,4 +1,4 @@
-# 🧪 BO Forge v0.5.0
+# 🧪 BO Forge v0.5.1
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow and local Streamlit prototype. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
@@ -82,7 +82,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.5.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.5.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

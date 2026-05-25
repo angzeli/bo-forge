@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
-from bo_forge.session import CampaignSession
+from bo_forge.session import CampaignSession, _format_campaign_report
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -136,6 +136,27 @@ def feature_flags(config: CampaignConfig) -> dict[str, bool]:
 def format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy suitable for Streamlit display."""
     return df.copy(deep=True).reset_index(drop=True)
+
+
+def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
+    """Return suggested rows that can be marked observed from the app."""
+    suggested = df["status"] == "suggested"
+    if config.review.enabled:
+        suggested = suggested & (df["review_status"] == "accepted")
+    return df.loc[suggested].copy()
+
+
+def export_staged_suggestions_csv(suggestions: pd.DataFrame, path: str | Path) -> Path:
+    """Write staged suggestions to a standalone CSV without mutating app state."""
+    output_path = Path(path).expanduser()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    suggestions.copy(deep=True).to_csv(output_path, index=False)
+    return output_path
+
+
+def campaign_report_text(campaign: CampaignSession) -> str:
+    """Return the same deterministic report text used by CampaignSession.export_report."""
+    return _format_campaign_report(campaign.report())
 
 
 def default_export_path(log_path: Path, suffix: str, extension: str) -> Path:
