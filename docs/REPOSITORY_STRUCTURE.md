@@ -1,12 +1,13 @@
 # 🗂️ BO Forge Repository Structure
 
-This repository is organised around one rule: the Bayesian optimisation engine lives in the `bo_forge` Python package, while notebooks, the CLI, and future apps call that package.
+This repository is organised around one rule: the Bayesian optimisation engine lives in the `bo_forge` Python package, while notebooks, the CLI, and the local Streamlit app call that package.
 
 ## 🏗️ Top-Level Layout
 
 ```text
 bo-forge/
 ├── bo_forge/                         # Reusable backend package
+├── bo_forge_app/                     # Local Streamlit wrapper
 ├── configs/                          # YAML campaign definitions
 ├── examples/                         # Seed CSV logs and runnable scripts
 ├── notebooks/                        # Notebook-first campaign workflows
@@ -14,6 +15,7 @@ bo-forge/
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── QUICKSTART.md
 │   ├── CLI.md
+│   ├── STREAMLIT_APP.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
@@ -53,6 +55,8 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `io.py`: canonical empty-log creation.
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
+
+`bo_forge_app/` contains the local Streamlit wrapper. It should call `CampaignSession` and helper functions rather than reimplementing BO logic.
 
 ## 🚀 How To Use The Repository
 
@@ -103,7 +107,14 @@ A campaign needs two files:
 - A YAML config in `configs/`, such as `configs/01_simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
 
-The repository also includes `configs/02_simple_2d_minimise_qlogei.yaml` as a small minimisation example, `configs/03_simple_3d_maximise_logei.yaml` as a three-variable continuous example, `configs/04_simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example, `configs/05_simple_mixed_logei.yaml` as a mixed-variable v0.4 example, `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example, `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example, and `configs/08_replicate_aware_logei.yaml` as a replicate-aware example.
+The repository also includes:
+- `configs/02_simple_2d_minimise_qlogei.yaml` as a small minimisation example,
+- `configs/03_simple_3d_maximise_logei.yaml` as a three-variable continuous example,
+- `configs/04_simple_4d_maximise_logei.yaml` as a four-variable CLI workflow example,
+- `configs/05_simple_mixed_logei.yaml` as a mixed-variable example,
+- `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example,
+- `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example,
+- and `configs/08_replicate_aware_logei.yaml` as a replicate-aware example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

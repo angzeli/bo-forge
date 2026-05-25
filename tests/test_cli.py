@@ -412,7 +412,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 0.4.5\n"
+    assert captured.out == "bo-forge 0.5.0\n"
     assert captured.err == ""
 
 
@@ -421,7 +421,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 0.4.5\n"
+    assert completed.stdout == "bo-forge 0.5.0\n"
     assert completed.stderr == ""
 
 

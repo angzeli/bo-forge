@@ -40,8 +40,7 @@ flowchart LR
     v04 -.-> v044
     v04 -.-> v045
     
-    class v01,v02,v03,v04 majorDone
-    class v05 majorNext
+    class v01,v02,v03,v04,v05 majorDone
     class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
@@ -50,7 +49,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.4.5`. Next planned milestone: `v0.5`, focused on a thin Streamlit prototype around the backend package.
+Current baseline: `v0.5.0`. Next planned milestone: `v0.5.1`, focused on app state and safety polish.
 
 ### Patch Notes So Far
 
@@ -75,6 +74,7 @@ Current baseline: `v0.4.5`. Next planned milestone: `v0.5`, focused on a thin St
 | `v0.4.3` | Patch | Cost-aware ranking and human-review support                         |
 | `v0.4.4` | Patch | Explicit replicate tracking and mean-aggregated model fitting       |
 | `v0.4.5` | Patch | Notebook depth polish with 15-step simulated campaigns              |
+| `v0.5.0` | Major | Local Streamlit campaign app MVP                                    |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -149,11 +149,14 @@ Status: completed
 
 ## 🖥️ v0.5 - Streamlit Prototype
 
+Status: MVP started
+
 - Build a thin Streamlit wrapper around the backend package.
-- Support config upload/editing.
+- Support local YAML config and CSV log path loading.
 - Show campaign log validation issues.
-- Suggest candidates and enter results through the UI.
-- Display progress and diagnostic plots.
+- Stage dry-run suggestions before explicit append.
+- Enter results and review decisions through the UI.
+- Display and export progress and diagnostic plots.
 - Keep BO logic out of the app layer.
 
 ## 🔮 Later

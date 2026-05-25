@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.4.5
+# 🧪 BO Forge v0.5.0
 
-BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow. The reusable BO logic lives in the `bo_forge` Python package, while notebooks and the CLI wrap that package.
+BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow and local Streamlit prototype. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v0.4 adds mixed-variable single-objective campaigns while preserving the notebook, session, CLI, and CSV workflow established in earlier releases. v0.4.5 closes the v0.4 line with deeper example notebooks that reach 15 completed simulated campaign steps.
+v0.5 adds the first local Streamlit wrapper around the existing `CampaignSession` workflow. Suggestions are staged as a dry run before the user explicitly appends them to the CSV log.
 
 BO Forge deliberately supports only:
 
@@ -20,8 +20,9 @@ BO Forge deliberately supports only:
 - basic diagnostics
 - a notebook-first `CampaignSession` workflow
 - a small `bo-forge` CLI workflow
+- a local Streamlit app prototype
 
-It intentionally does not yet cover qNEI, learned noise models, multi-objective optimisation, or an app UI.
+It intentionally does not yet cover qNEI, learned noise models, multi-objective optimisation, or a production web backend.
 
 ---
 
@@ -43,9 +44,9 @@ flowchart LR
     K --> B
 ```
 
-The app/UI layer is intentionally absent in this MVP.
+The Streamlit app is intentionally a thin wrapper.
 
-Future interfaces should wrap this backend package rather than moving BO logic into notebooks, CLI commands, or app code.
+Future interfaces should keep wrapping this backend package rather than moving BO logic into notebooks, CLI commands, or app code.
 
 ---
 
@@ -54,6 +55,7 @@ Future interfaces should wrap this backend package rather than moving BO logic i
 ```text
 bo-forge/
 ├── bo_forge/       # reusable backend package
+├── bo_forge_app/   # local Streamlit wrapper
 ├── configs/        # YAML campaign configs
 ├── examples/       # seed CSV logs and runnable scripts
 ├── notebooks/      # notebook-first campaign workflows with 15-step demos
@@ -67,6 +69,7 @@ bo-forge/
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): setup, quickstart commands, session API example, notebooks, and diagnostics.
 - [docs/CLI.md](docs/CLI.md): terminal workflow and command reference.
+- [docs/STREAMLIT_APP.md](docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
 - [docs/CLI_ERROR_EXAMPLES.md](docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
 - [docs/CSV_SCHEMA.md](docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
 - [docs/COMMON_ERRORS.md](docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
@@ -79,7 +82,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.4.5 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.5.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

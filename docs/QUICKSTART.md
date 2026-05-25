@@ -54,6 +54,19 @@ bo-forge suggest \
 
 See [CLI.md](CLI.md) for the full command reference.
 
+## 🖥️ Streamlit App Quickstart
+
+The local Streamlit app wraps the same `CampaignSession` workflow:
+
+```bash
+./.venv/bin/pip install -e ".[app]"
+./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
+```
+
+Suggestions are generated as a dry run and staged in app session state. They are appended to the selected CSV log only after the explicit append button is clicked.
+
+See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings.
+
 ## 🔁 Session API
 
 The v0.2 notebook workflow should usually start with `CampaignSession`:
