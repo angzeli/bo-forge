@@ -25,6 +25,11 @@ from bo_forge_app.streamlit_helpers import (
     staged_bundle_invalidation_reason,
     staged_suggestions_from_bundle,
 )
+from bo_forge_app.streamlit_style import (
+    apply_forge_suite_style,
+    forge_action_label,
+    forge_status_label,
+)
 
 
 def main() -> None:
@@ -37,10 +42,10 @@ def render_app() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="BO Forge", layout="wide")
-    st.title("BO Forge Campaign App")
-    st.caption("Local Streamlit wrapper around CampaignSession.")
+    apply_forge_suite_style(st)
+    _render_workbench_header(st)
 
-    _render_sidebar(st)
+    _render_campaign_files_panel(st)
     campaign = st.session_state.get(SESSION_KEY)
     if campaign is None:
         st.info("Enter a YAML config path and CSV log path, then load a campaign.")
@@ -48,7 +53,7 @@ def render_app() -> None:
 
     flags = feature_flags(campaign.config)
     overview_tab, suggest_tab, resolve_tab, reports_tab = st.tabs(
-        ["Overview", "Suggest", "Resolve", "Reports & Plots"]
+        ["Campaign", "Suggest", "Resolve", "Reports"]
     )
     with overview_tab:
         _render_overview(st, campaign)
@@ -60,41 +65,94 @@ def render_app() -> None:
         _render_reports(st, campaign, flags)
 
 
-def _render_sidebar(st: Any) -> None:
-    with st.sidebar:
-        st.header("Campaign Files")
+def _render_workbench_header(st: Any) -> None:
+    st.markdown(
+        """
+        <section class="bf-workbench-header">
+          <div class="bf-brand-row">
+            <div class="bf-brand-mark">BO</div>
+            <div>
+              <p class="bf-kicker">Forge Suite workbench</p>
+              <h1 class="bf-title">BO Forge</h1>
+            </div>
+          </div>
+          <p class="bf-subtitle">
+            Local campaign control for CSV-backed Bayesian optimisation workflows.
+            Load files, stage suggestions, record outcomes, and export diagnostics without
+            moving BO logic into the app layer.
+          </p>
+          <div class="bf-chip-row">
+            <span class="bf-chip">Local CSV</span>
+            <span class="bf-chip">Dry-run suggestions</span>
+            <span class="bf-chip">CampaignSession backend</span>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_campaign_files_panel(st: Any) -> None:
+    st.markdown(
+        """
+        <section class="bf-panel bf-file-panel">
+          <div class="bf-panel-header">
+            <div>
+              <p class="bf-kicker">Local campaign files</p>
+              <h2 class="bf-panel-title">Campaign Files</h2>
+              <p class="bf-panel-note">
+                Select the YAML config and CSV log that define the active campaign.
+              </p>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+    config_col, log_col = st.columns(2)
+    with config_col:
         config_value = st.text_input(
             "YAML config path",
             value=st.session_state.get(CONFIG_PATH_KEY, ""),
             placeholder="configs/01_simple_2d_maximise_logei.yaml",
         )
+    with log_col:
         log_value = st.text_input(
             "CSV log path",
             value=st.session_state.get(LOG_PATH_KEY, ""),
             placeholder="examples/01_simple_2d_maximise_logei_working_log.csv",
         )
 
-        if _path_changed(config_value, LOG_PATH_KEY, log_value):
-            _clear_staged_suggestions(st)
+    if _path_changed(config_value, LOG_PATH_KEY, log_value):
+        _clear_staged_suggestions(st)
 
-        st.warning(
-            "Append, review, and mark-observed actions modify the selected CSV log. "
-            "Report and plot exports write files to the selected output path.",
-        )
+    st.warning(
+        "Append, review, and mark-observed actions modify the selected CSV log. "
+        "Report and plot exports write files to the selected output path.",
+    )
 
+    action_col, reload_col = st.columns([1, 1])
+    with action_col:
         if st.button("Load campaign", type="primary"):
             _load_campaign_from_inputs(st, config_value, log_value)
-
+    with reload_col:
         if st.button("Reload from disk"):
             _clear_staged_suggestions(st)
             _load_campaign_from_inputs(st, config_value, log_value)
 
-        if st.session_state.get(CONFIG_PATH_KEY):
-            st.text("Current config:")
-            st.code(st.session_state[CONFIG_PATH_KEY], language=None)
-        if st.session_state.get(LOG_PATH_KEY):
-            st.text("Current log:")
-            st.code(st.session_state[LOG_PATH_KEY], language=None)
+    current_config = st.session_state.get(CONFIG_PATH_KEY)
+    current_log = st.session_state.get(LOG_PATH_KEY)
+    if current_config or current_log:
+        st.markdown("**Current file paths**")
+        path_col, log_path_col = st.columns(2)
+        if current_config:
+            with path_col:
+                st.caption("Current config")
+                st.code(current_config, language=None)
+        if current_log:
+            with log_path_col:
+                st.caption("Current log")
+                st.code(current_log, language=None)
 
 
 def _path_changed(config_value: str, log_key: str, log_value: str) -> bool:
@@ -134,64 +192,102 @@ def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> No
 
 
 def _render_overview(st: Any, campaign: Any) -> None:
+    _render_panel_intro(
+        st,
+        "Campaign",
+        "Inspect campaign state, next action, observed data, and pending rows.",
+    )
     try:
         campaign.validate()
     except BOForgeError as exc:
         st.error(f"Validation failed: {exc}")
         st.subheader("Campaign Log")
-        st.dataframe(format_dataframe_for_display(campaign.df), use_container_width=True)
+        st.dataframe(format_dataframe_for_display(campaign.df), width="stretch")
         return
     else:
         st.success("Campaign log is valid.")
 
-    st.subheader("Campaign Status")
-    st.code(campaign.campaign_status(), language=None)
+    _render_campaign_state_blocks(st, campaign)
 
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Summary")
-        st.dataframe(format_dataframe_for_display(campaign.summary()), use_container_width=True)
+        st.dataframe(format_dataframe_for_display(campaign.summary()), width="stretch")
     with col_right:
         st.subheader("Next Action")
-        st.dataframe(format_dataframe_for_display(campaign.next_action()), use_container_width=True)
+        st.dataframe(format_dataframe_for_display(campaign.next_action()), width="stretch")
 
     st.subheader("Best Observation")
     st.dataframe(
         format_dataframe_for_display(campaign.best_observation()),
-        use_container_width=True,
+        width="stretch",
     )
     if campaign.config.cost is not None:
         st.subheader("Cost Summary")
         st.dataframe(
             format_dataframe_for_display(campaign.cost_summary()),
-            use_container_width=True,
+            width="stretch",
         )
     if campaign.config.replicates.enabled:
         st.subheader("Best Replicate Group")
         st.dataframe(
             format_dataframe_for_display(campaign.best_replicate_group()),
-            use_container_width=True,
+            width="stretch",
         )
         st.subheader("Replicate Summary")
         st.dataframe(
             format_dataframe_for_display(campaign.replicate_summary()),
-            use_container_width=True,
+            width="stretch",
         )
 
-    st.subheader("Observed Rows")
-    st.dataframe(format_dataframe_for_display(campaign.observed_data()), use_container_width=True)
+    with st.expander("Observed Rows", expanded=False):
+        st.dataframe(
+            format_dataframe_for_display(campaign.observed_data()),
+            width="stretch",
+        )
 
-    st.subheader("Pending Suggestions")
-    st.dataframe(
-        format_dataframe_for_display(campaign.pending_suggestions()),
-        use_container_width=True,
-    )
+    with st.expander("Pending Suggestions", expanded=True):
+        st.dataframe(
+            format_dataframe_for_display(campaign.pending_suggestions()),
+            width="stretch",
+        )
 
-    st.subheader("Campaign Log")
-    st.dataframe(format_dataframe_for_display(campaign.df), use_container_width=True)
+    with st.expander("Full Campaign Log", expanded=False):
+        st.dataframe(format_dataframe_for_display(campaign.df), width="stretch")
+
+
+def _render_campaign_state_blocks(st: Any, campaign: Any) -> None:
+    status = campaign.campaign_status()
+    next_action = campaign.next_action()
+    action = ""
+    reason = ""
+    if not next_action.empty:
+        action = str(next_action.loc[0, "action"])
+        reason = str(next_action.loc[0, "reason"])
+
+    status_col, action_col = st.columns(2)
+    with status_col:
+        _render_status_block(
+            st,
+            "Campaign status",
+            forge_status_label(status),
+            status,
+        )
+    with action_col:
+        _render_status_block(
+            st,
+            "Next action",
+            forge_action_label(action),
+            reason,
+        )
 
 
 def _render_suggest(st: Any, campaign: Any) -> None:
+    _render_panel_intro(
+        st,
+        "Suggest",
+        "Generate candidates as a dry run, inspect quality, then append explicitly.",
+    )
     config_path, log_path = _current_paths(st)
     batch_size = st.number_input(
         "Batch size",
@@ -226,7 +322,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             return
 
     st.subheader("Staged Suggestions")
-    st.dataframe(format_dataframe_for_display(suggestions), use_container_width=True)
+    st.dataframe(format_dataframe_for_display(suggestions), width="stretch")
 
     export_path = Path(
         st.text_input(
@@ -249,7 +345,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         st.warning(f"Could not compute suggestion quality: {exc}")
     else:
         st.subheader("Suggestion Quality")
-        st.dataframe(format_dataframe_for_display(quality), use_container_width=True)
+        st.dataframe(format_dataframe_for_display(quality), width="stretch")
 
     if st.button("Append staged suggestions", disabled=reason is not None):
         try:
@@ -264,15 +360,20 @@ def _render_suggest(st: Any, campaign: Any) -> None:
 
 
 def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
-    st.subheader("Pending Suggestions")
+    _render_panel_intro(
+        st,
+        "Resolve",
+        "Review suggested rows and record experimental outcomes.",
+    )
     pending = campaign.pending_suggestions()
-    st.dataframe(format_dataframe_for_display(pending), use_container_width=True)
+    with st.expander("Pending Suggestions", expanded=True):
+        st.dataframe(format_dataframe_for_display(pending), width="stretch")
     observable = observable_rows(campaign.config, campaign.df)
 
     if flags["has_review"]:
         st.subheader("Review Queue")
         review_queue = campaign.review_queue()
-        st.dataframe(format_dataframe_for_display(review_queue), use_container_width=True)
+        st.dataframe(format_dataframe_for_display(review_queue), width="stretch")
         if not review_queue.empty:
             row_id = st.selectbox("Review row_id", review_queue["row_id"].astype(str).tolist())
             decision = st.selectbox("Decision", ["accept", "reject", "defer"])
@@ -288,7 +389,7 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
                     st.success("Review decision recorded.")
 
     st.subheader("Rows Ready To Mark Observed")
-    st.dataframe(format_dataframe_for_display(observable), use_container_width=True)
+    st.dataframe(format_dataframe_for_display(observable), width="stretch")
     if observable.empty:
         st.info("No suggested rows are ready to mark observed.")
         return
@@ -321,6 +422,11 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
 
 
 def _render_reports(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
+    _render_panel_intro(
+        st,
+        "Reports",
+        "Preview reports and export campaign figures.",
+    )
     _, log_path = _current_paths(st)
 
     st.subheader("Report Preview")
@@ -365,7 +471,7 @@ def _render_reports(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
         st.subheader("Cost Summary")
         st.dataframe(
             format_dataframe_for_display(campaign.cost_summary()),
-            use_container_width=True,
+            width="stretch",
         )
         _render_plot_controls(
             st,
@@ -378,7 +484,7 @@ def _render_reports(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
         st.subheader("Replicate Summary")
         st.dataframe(
             format_dataframe_for_display(campaign.replicate_summary()),
-            use_container_width=True,
+            width="stretch",
         )
         _render_plot_controls(
             st,
@@ -423,6 +529,36 @@ def _render_plot_controls(
             st.error(str(exc))
         else:
             st.success(f"Wrote plot: {export_path}")
+
+
+def _render_panel_intro(st: Any, title: str, note: str) -> None:
+    st.markdown(
+        f"""
+        <section class="bf-panel">
+          <div class="bf-panel-header">
+            <div>
+              <p class="bf-kicker">Campaign workbench</p>
+              <h2 class="bf-panel-title">{title}</h2>
+              <p class="bf-panel-note">{note}</p>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_status_block(st: Any, label: str, value: str, detail: str) -> None:
+    st.markdown(
+        f"""
+        <div class="bf-status-block">
+          <p class="bf-status-label">{label}</p>
+          <p class="bf-status-value">{value}</p>
+          <p class="bf-status-detail">{detail}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _current_paths(st: Any) -> tuple[Path, Path]:

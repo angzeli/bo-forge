@@ -6,7 +6,7 @@ import pytest
 from matplotlib import pyplot as plt
 
 from bo_forge.config import CampaignConfig
-from bo_forge_app import streamlit_app, streamlit_helpers
+from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
 from bo_forge_app.streamlit_helpers import (
     campaign_report_text,
     dataframe_fingerprint,
@@ -15,6 +15,7 @@ from bo_forge_app.streamlit_helpers import (
     extract_matplotlib_figure,
     feature_flags,
     file_fingerprint,
+    format_dataframe_for_display,
     load_campaign_session,
     make_staged_suggestion_bundle,
     observable_rows,
@@ -23,6 +24,7 @@ from bo_forge_app.streamlit_helpers import (
     staged_bundle_is_appendable,
     staged_suggestions_from_bundle,
 )
+from bo_forge_app.streamlit_style import FORGE_SUITE_CSS, forge_action_label, forge_status_label
 
 
 def copy_example_log(tmp_path: Path, name: str) -> Path:
@@ -85,6 +87,14 @@ def test_dataframe_fingerprint_is_stable_for_identical_values() -> None:
     df = simple_suggestions()
 
     assert dataframe_fingerprint(df) == dataframe_fingerprint(df.copy(deep=True))
+
+
+def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
+    df = pd.DataFrame({"field": ["a", "b"], "value": ["text", 3]})
+
+    display_df = format_dataframe_for_display(df)
+
+    assert display_df["value"].tolist() == ["text", "3"]
 
 
 def test_make_staged_suggestion_bundle_records_context(tmp_path: Path) -> None:
@@ -346,5 +356,54 @@ def test_extract_matplotlib_figure_from_figure_and_tuple() -> None:
 
 def test_app_modules_import_without_streamlit_runtime() -> None:
     assert hasattr(streamlit_helpers, "make_staged_suggestion_bundle")
+    assert hasattr(streamlit_style, "apply_forge_suite_style")
     assert hasattr(streamlit_app, "main")
     assert hasattr(streamlit_app, "render_app")
+    assert hasattr(streamlit_app, "_render_workbench_header")
+    assert hasattr(streamlit_app, "_render_campaign_files_panel")
+    assert hasattr(streamlit_app, "_render_campaign_state_blocks")
+
+
+def test_workbench_header_uses_bo_brand_mark() -> None:
+    class FakeStreamlit:
+        markdown_calls: list[str] = []
+
+        @classmethod
+        def markdown(cls, body: str, unsafe_allow_html: bool = False) -> None:
+            cls.markdown_calls.append(body)
+            assert unsafe_allow_html is True
+
+    streamlit_app._render_workbench_header(FakeStreamlit)
+
+    assert 'class="bf-brand-mark">BO</div>' in "\n".join(FakeStreamlit.markdown_calls)
+
+
+def test_forge_suite_css_contains_expected_palette_tokens() -> None:
+    assert "#9f4f32" in FORGE_SUITE_CSS
+    assert "#d6a84f" in FORGE_SUITE_CSS
+    assert "#7f9a7a" in FORGE_SUITE_CSS
+    assert "bf-workbench-header" in FORGE_SUITE_CSS
+    assert "bf-file-panel" in FORGE_SUITE_CSS
+
+
+def test_forge_status_labels_are_stable() -> None:
+    assert forge_status_label("has_pending_suggestions") == "Pending suggestions"
+    assert forge_status_label("ready_for_initial_design") == "Ready for initial design"
+    assert forge_status_label("ready_for_bo") == "Ready for BO"
+
+
+def test_forge_action_labels_are_stable() -> None:
+    assert forge_action_label("review_pending_suggestions") == "Review pending suggestions"
+    assert forge_action_label("run_accepted_suggestions") == "Run accepted suggestions"
+    assert forge_action_label("resolve_pending_suggestions") == "Resolve pending suggestions"
+    assert forge_action_label("suggest_initial_design") == "Suggest initial design"
+    assert forge_action_label("suggest_bo") == "Suggest BO candidates"
+
+
+def test_streamlit_app_smoke_runs_without_exceptions() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    assert len(app.exception) == 0

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "0.5.1"
+version = "0.5.2"
 description = "Notebook-first Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ bo-forge = "bo_forge.cli:main"
 
 [project.optional-dependencies]
 app = [
-    "streamlit>=1.40",
+    "streamlit>=1.57",
 ]
 dev = [
     "ipykernel>=6.29",
@@ -33,7 +33,7 @@ dev = [
     "notebook>=7.0",
     "pytest>=8.0",
     "ruff>=0.8",
-    "streamlit>=1.40",
+    "streamlit>=1.57",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,8 +1,10 @@
 # 🖥️ Streamlit App
 
-BO Forge v0.5.1 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
+BO Forge v0.5.2 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
+
+The v0.5.2 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, and practical campaign tabs rather than a marketing-style landing page.
 
 ## 🧰 Install
 
@@ -26,7 +28,7 @@ Start the local app:
 ./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
 ```
 
-Then enter:
+Then use the `Campaign Files` panel on the main workbench page to enter:
 
 - a YAML config path, such as `configs/01_simple_2d_maximise_logei.yaml`;
 - a CSV log path, preferably an ignored working log such as `examples/01_simple_2d_maximise_logei_working_log.csv`.
@@ -50,6 +52,15 @@ The app follows the same explicit BO Forge rhythm:
 Generated suggestions are staged in Streamlit session state. They are not appended to the CSV log until the append button is clicked.
 
 Exporting staged suggestions writes a separate CSV file only. It does not modify the staged suggestions, append fingerprint, selected campaign log, or loaded session state.
+
+## 🧭 Panels
+
+The app keeps file selection on the main workbench page, followed by four practical campaign panels:
+
+- `Campaign`: validation, campaign status, next action, summary, best observation, observed rows, pending suggestions, and full log preview.
+- `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
+- `Resolve`: review queue, rows ready to observe, mark-observed form, and actual-cost input when configured.
+- `Reports`: report preview/export and progress, diagnostics, cost-progress, or replicate plots when supported by the config.
 
 ## ⚠️ Write Actions
 

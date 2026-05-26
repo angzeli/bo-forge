@@ -135,7 +135,15 @@ def feature_flags(config: CampaignConfig) -> dict[str, bool]:
 
 def format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy suitable for Streamlit display."""
-    return df.copy(deep=True).reset_index(drop=True)
+    display_df = df.copy(deep=True).reset_index(drop=True)
+    for column in display_df.columns:
+        values = display_df[column].dropna()
+        value_types = {type(value) for value in values}
+        if len(value_types) > 1:
+            display_df[column] = display_df[column].map(
+                lambda value: "" if pd.isna(value) else str(value)
+            )
+    return display_df
 
 
 def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
