@@ -9,27 +9,38 @@ from bo_forge.config import CampaignConfig
 from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
 from bo_forge_app.streamlit_helpers import (
+    append_disabled_reason,
+    available_plot_kinds,
     build_campaign_yaml_text,
     campaign_report_text,
+    compact_dataframe,
     create_campaign_files,
     dataframe_fingerprint,
     default_export_path,
     default_new_campaign_paths,
+    drop_all_blank_columns,
+    empty_state_message,
     export_staged_suggestions_csv,
     extract_matplotlib_figure,
     feature_flags,
     file_fingerprint,
     format_dataframe_for_display,
+    format_number_for_display,
+    humanize_campaign_status,
+    humanize_next_action,
     load_campaign_session,
     make_staged_suggestion_bundle,
+    observable_row_options,
     observable_rows,
     parse_campaign_config_text,
     parse_categorical_values_text,
     parse_discrete_values_text,
     resolve_path_input,
+    select_display_columns,
     staged_bundle_invalidation_reason,
     staged_bundle_is_appendable,
     staged_suggestions_from_bundle,
+    status_tone,
 )
 from bo_forge_app.streamlit_style import FORGE_SUITE_CSS, forge_action_label, forge_status_label
 
@@ -154,6 +165,56 @@ def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
     display_df = format_dataframe_for_display(df)
 
     assert display_df["value"].tolist() == ["text", "3"]
+
+
+def test_display_status_helpers_are_stable() -> None:
+    assert humanize_campaign_status("has_pending_suggestions") == "Pending suggestions"
+    assert humanize_campaign_status("ready_for_initial_design") == "Ready for initial design"
+    assert humanize_campaign_status("ready_for_bo") == "Ready for BO"
+    assert humanize_next_action("resolve_pending_suggestions") == "Resolve pending suggestions"
+    assert humanize_next_action("suggest_bo") == "Suggest BO candidates"
+    assert status_tone("has_pending_suggestions") == "warning"
+    assert status_tone("ready_for_bo") == "success"
+
+
+def test_number_and_identifier_display_helpers_are_stable() -> None:
+    assert format_number_for_display(10.0) == 10
+    assert format_number_for_display(0.167123456) == 0.1671
+    assert format_number_for_display(float("nan")) == ""
+    assert (
+        streamlit_helpers.shorten_identifier("8a69540f7cb847e9b2a4acb56b3a67ed")
+        == "8a69540f...3a67ed"
+    )
+
+
+def test_dataframe_display_helpers_compact_without_mutating_source() -> None:
+    df = pd.DataFrame(
+        {
+            "row_id": ["8a69540f7cb847e9b2a4acb56b3a67ed"],
+            "blank": [""],
+            "activity": [10.0],
+            "precursor_ratio": [0.167123456],
+        }
+    )
+    before = df.copy(deep=True)
+
+    without_blank = drop_all_blank_columns(df)
+    selected = select_display_columns(without_blank, ["activity", "row_id"])
+    compact = compact_dataframe(df)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert "blank" not in without_blank.columns
+    assert selected.columns[:2].tolist() == ["activity", "row_id"]
+    assert compact["row_id"].iloc[0] == "8a69540f...b3a67ed"
+    assert compact["activity"].iloc[0] == 10
+    assert compact["precursor_ratio"].iloc[0] == 0.1671
+
+
+def test_empty_state_messages_are_defined() -> None:
+    title, detail = empty_state_message("staged_suggestions")
+
+    assert title == "No staged suggestions yet."
+    assert "dry-run" in detail
 
 
 def test_create_campaign_files_writes_config_and_empty_log(tmp_path: Path) -> None:
@@ -355,6 +416,25 @@ def test_staged_bundle_invalidates_for_already_appended_fingerprint(tmp_path: Pa
     assert reason == "Staged suggestions were already appended."
 
 
+def test_append_disabled_reason_maps_to_user_facing_text(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+    bundle = make_staged_suggestion_bundle(simple_suggestions(), config_path, log_path)
+
+    assert append_disabled_reason(bundle, config_path, log_path) is None
+    assert append_disabled_reason(None, config_path, log_path) == (
+        "Append disabled: no staged suggestions."
+    )
+    assert append_disabled_reason(
+        bundle,
+        config_path,
+        log_path,
+        last_appended_fingerprint=str(bundle["suggestions_fingerprint"]),
+    ) == "Append disabled: this staged batch has already been appended."
+
+
 def test_staged_bundle_rejects_missing_or_empty_suggestions(tmp_path: Path) -> None:
     config_path = tmp_path / "campaign.yaml"
     log_path = tmp_path / "campaign.csv"
@@ -396,6 +476,27 @@ def test_observable_rows_returns_only_accepted_review_suggestions() -> None:
     rows = observable_rows(config, df)
 
     assert rows["row_id"].tolist() == ["accepted_0"]
+
+
+def test_observable_row_options_use_short_ids_and_design_values() -> None:
+    config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+    row_id = "8a69540f7cb847e9b2a4acb56b3a67ed"
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": row_id,
+                "status": "suggested",
+                "precursor_ratio": 0.167123456,
+                "annealing_temperature": 540.0,
+            }
+        ]
+    )
+
+    options = observable_row_options(config, df)
+
+    assert list(options.values()) == [row_id]
+    assert "8a69540f...3a67ed" in next(iter(options))
+    assert "precursor_ratio=0.1671" in next(iter(options))
 
 
 def test_export_staged_suggestions_csv_is_non_mutating(tmp_path: Path) -> None:
@@ -486,6 +587,7 @@ def test_create_campaign_from_inputs_sets_session_state_and_clears_staged(
         }
         success_messages: list[str] = []
         error_messages: list[str] = []
+        markdown_messages: list[str] = []
 
         @classmethod
         def success(cls, message: str) -> None:
@@ -494,6 +596,10 @@ def test_create_campaign_from_inputs_sets_session_state_and_clears_staged(
         @classmethod
         def error(cls, message: str) -> None:
             cls.error_messages.append(message)
+
+        @classmethod
+        def markdown(cls, message: str, unsafe_allow_html: bool = False) -> None:
+            cls.markdown_messages.append(message)
 
     streamlit_app._create_campaign_from_inputs(
         FakeStreamlit,
@@ -509,7 +615,7 @@ def test_create_campaign_from_inputs_sets_session_state_and_clears_staged(
         "app_created"
     )
     assert "bo_forge_staged_suggestion_bundle" not in FakeStreamlit.session_state
-    assert FakeStreamlit.success_messages == ["Created and loaded campaign: app_created"]
+    assert "Campaign created and loaded" in "\n".join(FakeStreamlit.markdown_messages)
 
 
 @pytest.mark.parametrize(
@@ -550,6 +656,16 @@ def test_feature_flags(config_path: str, expected: dict[str, bool]) -> None:
     assert feature_flags(config) == expected
 
 
+def test_available_plot_kinds_follow_config_features() -> None:
+    plain = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+    cost = CampaignConfig.from_yaml("configs/07_cost_aware_human_review_logei.yaml")
+    replicate = CampaignConfig.from_yaml("configs/08_replicate_aware_logei.yaml")
+
+    assert available_plot_kinds(plain) == ["progress", "diagnostics"]
+    assert available_plot_kinds(cost) == ["progress", "diagnostics", "cost_progress"]
+    assert available_plot_kinds(replicate) == ["progress", "diagnostics", "replicates"]
+
+
 def test_default_export_path_uses_reports_directory() -> None:
     path = default_export_path(Path("examples/my_campaign_log.csv"), "progress", "png")
 
@@ -585,9 +701,10 @@ def test_workbench_header_uses_bo_brand_mark() -> None:
             cls.markdown_calls.append(body)
             assert unsafe_allow_html is True
 
-    streamlit_app._render_workbench_header(FakeStreamlit)
+    streamlit_app._render_workbench_header(FakeStreamlit, campaign_loaded=True)
 
     assert 'class="bf-brand-mark">BO</div>' in "\n".join(FakeStreamlit.markdown_calls)
+    assert "Campaign loaded" in "\n".join(FakeStreamlit.markdown_calls)
 
 
 def test_forge_suite_css_contains_expected_palette_tokens() -> None:
@@ -596,6 +713,11 @@ def test_forge_suite_css_contains_expected_palette_tokens() -> None:
     assert "#7f9a7a" in FORGE_SUITE_CSS
     assert "bf-workbench-header" in FORGE_SUITE_CSS
     assert "bf-file-panel" in FORGE_SUITE_CSS
+    assert "--forge-paper" in FORGE_SUITE_CSS
+    assert "forge-card" in FORGE_SUITE_CSS
+    assert "forge-empty" in FORGE_SUITE_CSS
+    assert "forge-artifact" in FORGE_SUITE_CSS
+    assert "forge-callout" in FORGE_SUITE_CSS
     assert '[data-testid="stHeader"]' in FORGE_SUITE_CSS
     assert '[data-testid="stToolbar"]' in FORGE_SUITE_CSS
     assert '[data-testid="stDecoration"]' in FORGE_SUITE_CSS
@@ -622,7 +744,7 @@ def test_streamlit_app_smoke_runs_without_exceptions() -> None:
     app.run(timeout=10)
 
     assert len(app.exception) == 0
-    assert [tab.label for tab in app.tabs[:2]] == ["Load Existing", "Create New"]
+    assert [tab.label for tab in app.tabs[:2]] == ["Load Existing", "Create Campaign"]
     assert len(app.text_area) >= 1
 
 
@@ -636,10 +758,11 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
 
     app.text_input[3].set_value(str(config_path))
     app.text_input[4].set_value(str(log_path))
-    app.button[3].click()
+    create_button = next(button for button in app.button if button.label == "Create campaign")
+    create_button.click()
     app.run(timeout=10)
 
     assert len(app.exception) == 0
     assert config_path.exists()
     assert log_path.exists()
-    assert "Created and loaded campaign: my_campaign" in [message.value for message in app.success]
+    assert any("Campaign created and loaded" in markdown.value for markdown in app.markdown)

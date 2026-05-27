@@ -67,7 +67,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create New` campaign flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v0.5.4 closes the local Streamlit prototype line and serves as the practical baseline for a later v1.0.0 release decision.
 
 Campaign creation and environment checks remain CLI workflows:
 

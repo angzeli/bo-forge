@@ -22,7 +22,7 @@ From the repository root:
 ./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
 ```
 
-Open the `Campaign Files` workbench panel and choose the `Create New` tab.
+Open the `Campaign Files` workbench panel and choose the `Create Campaign` tab.
 
 ## 🧾 Fill The Structured Fields
 

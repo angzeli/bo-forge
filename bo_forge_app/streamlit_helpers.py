@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from math import isfinite
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
@@ -267,6 +268,228 @@ def format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
+def humanize_campaign_status(status: str) -> str:
+    """Return a concise user-facing campaign status label."""
+    labels = {
+        "has_pending_suggestions": "Pending suggestions",
+        "ready_for_initial_design": "Ready for initial design",
+        "ready_for_bo": "Ready for BO",
+    }
+    return labels.get(status, status.replace("_", " ").title())
+
+
+def humanize_next_action(action: str) -> str:
+    """Return a concise user-facing next-action label."""
+    labels = {
+        "review_pending_suggestions": "Review pending suggestions",
+        "run_accepted_suggestions": "Run accepted suggestions",
+        "resolve_pending_suggestions": "Resolve pending suggestions",
+        "suggest_initial_design": "Suggest initial design",
+        "suggest_bo": "Suggest BO candidates",
+    }
+    return labels.get(action, action.replace("_", " ").title())
+
+
+def status_tone(status: str) -> str:
+    """Return a stable display tone for a campaign status."""
+    tones = {
+        "has_pending_suggestions": "warning",
+        "ready_for_initial_design": "sage",
+        "ready_for_bo": "success",
+    }
+    return tones.get(status, "neutral")
+
+
+def shorten_identifier(value: str, head: int = 8, tail: int = 6) -> str:
+    """Shorten a long identifier for display."""
+    if len(value) <= head + tail + 1:
+        return value
+    return f"{value[:head]}...{value[-tail:]}"
+
+
+def format_number_for_display(value: object, digits: int = 4) -> object:
+    """Format numbers for compact display while leaving non-numbers unchanged."""
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not isfinite(value):
+            return ""
+        rounded = round(value, digits)
+        if rounded.is_integer():
+            return int(rounded)
+        return rounded
+    return value
+
+
+def drop_all_blank_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop columns where every value is blank or missing."""
+    display_df = df.copy(deep=True)
+    keep_columns: list[str] = []
+    for column in display_df.columns:
+        series = display_df[column]
+        has_value = series.map(lambda value: not _is_blank_display_value(value)).any()
+        if bool(has_value):
+            keep_columns.append(column)
+    return display_df.loc[:, keep_columns]
+
+
+def select_display_columns(df: pd.DataFrame, preferred: list[str]) -> pd.DataFrame:
+    """Move preferred columns to the front when they exist."""
+    front = [column for column in preferred if column in df.columns]
+    rest = [column for column in df.columns if column not in front]
+    return df.loc[:, front + rest]
+
+
+def compact_dataframe(df: pd.DataFrame, *, max_id_length: int = 16) -> pd.DataFrame:
+    """Return a compact display copy with shorter IDs and rounded numbers."""
+    display_df = drop_all_blank_columns(df.copy(deep=True).reset_index(drop=True))
+    preferred = [
+        "row_id",
+        "iteration",
+        "status",
+        "review_status",
+        "source",
+        "replicate_group",
+        "replicate_index",
+        "objective_mean",
+        "objective_std",
+        "objective_min",
+        "objective_max",
+    ]
+    display_df = select_display_columns(display_df, preferred)
+    head = max(4, max_id_length // 2)
+    tail = max(4, max_id_length - head - 1)
+    for column in display_df.columns:
+        if column == "row_id" or column.endswith("_id") or column == "replicate_group":
+            display_df[column] = display_df[column].map(
+                lambda value: ""
+                if _is_blank_display_value(value)
+                else shorten_identifier(str(value), head=head, tail=tail)
+            )
+        else:
+            display_df[column] = display_df[column].map(format_number_for_display)
+    return format_dataframe_for_display(display_df)
+
+
+def empty_state_message(kind: str) -> tuple[str, str]:
+    """Return a standard empty-state title and detail."""
+    messages = {
+        "staged_suggestions": (
+            "No staged suggestions yet.",
+            "Generate a dry-run batch to preview candidates before appending them.",
+        ),
+        "observed_rows": (
+            "No observed rows yet.",
+            "Run suggested experiments and mark them observed to build campaign history.",
+        ),
+        "pending_suggestions": (
+            "No pending suggestions.",
+            "Generate candidates in the Suggest tab when the campaign is ready.",
+        ),
+        "review_queue": (
+            "No rows awaiting review.",
+            "Review-enabled campaigns show pending review decisions here.",
+        ),
+        "cost_summary": (
+            "No cost summary available.",
+            "Cost summaries appear only when the campaign config includes cost settings.",
+        ),
+        "replicate_summary": (
+            "No replicate summary available.",
+            "Replicate summaries appear only when replicates are enabled.",
+        ),
+        "report_preview": (
+            "No report preview available.",
+            "Load a valid campaign before exporting a report.",
+        ),
+        "plots": (
+            "No plot available yet.",
+            "Load a valid campaign and use the plot controls to render figures.",
+        ),
+        "best_observation": (
+            "No best observation yet.",
+            "Observed objective values are needed before a best row can be shown.",
+        ),
+    }
+    return messages.get(
+        kind,
+        ("Nothing to show yet.", "This section will update as the campaign changes."),
+    )
+
+
+def append_disabled_reason(
+    bundle: dict[str, object] | None,
+    config_path: str | Path,
+    log_path: str | Path,
+    last_appended_fingerprint: str | None = None,
+) -> str | None:
+    """Return a concise append-disabled reason, or None when append is allowed."""
+    reason = staged_bundle_invalidation_reason(
+        bundle=bundle,
+        config_path=config_path,
+        log_path=log_path,
+        last_appended_fingerprint=last_appended_fingerprint,
+    )
+    if reason is None:
+        return None
+    messages = {
+        "No staged suggestions.": "Append disabled: no staged suggestions.",
+        "Staged suggestions were already appended.": (
+            "Append disabled: this staged batch has already been appended."
+        ),
+        "Config path changed after suggestions were staged.": (
+            "Append disabled: the active config path changed after staging."
+        ),
+        "Log path changed after suggestions were staged.": (
+            "Append disabled: the active log path changed after staging."
+        ),
+        "Config file changed after suggestions were staged.": (
+            "Append disabled: the campaign config changed after these suggestions were generated."
+        ),
+        "Log file changed after suggestions were staged.": (
+            "Append disabled: the campaign log changed after these suggestions were generated."
+        ),
+    }
+    return messages.get(reason, f"Append disabled: {reason}")
+
+
+def observable_row_options(config: CampaignConfig, df: pd.DataFrame) -> dict[str, str]:
+    """Return display labels mapped to full row IDs for observable suggestions."""
+    rows = observable_rows(config, df)
+    options: dict[str, str] = {}
+    for _, row in rows.iterrows():
+        row_id = str(row["row_id"])
+        details = []
+        for variable in config.variables[:3]:
+            value = row.get(variable.name, "")
+            if not _is_blank_display_value(value):
+                details.append(f"{variable.name}={format_number_for_display(value)}")
+        label = shorten_identifier(row_id)
+        if details:
+            label = f"{label} - {', '.join(details)}"
+        options[label] = row_id
+    return options
+
+
+def available_plot_kinds(config: CampaignConfig) -> list[str]:
+    """Return plot kinds supported by the current config."""
+    kinds = ["progress", "diagnostics"]
+    if config.cost is not None:
+        kinds.append("cost_progress")
+    if config.replicates.enabled:
+        kinds.append("replicates")
+    return kinds
+
+
 def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     """Return suggested rows that can be marked observed from the app."""
     suggested = df["status"] == "suggested"
@@ -326,6 +549,17 @@ def mark_bundle_appended(bundle: dict[str, object]) -> dict[str, object]:
     updated = dict(bundle)
     updated["appended"] = True
     return updated
+
+
+def _is_blank_display_value(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        if pd.isna(value):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return isinstance(value, str) and value.strip() == ""
 
 
 def _campaign_slug(campaign_name: str) -> str:

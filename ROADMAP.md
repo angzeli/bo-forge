@@ -26,6 +26,7 @@ flowchart LR
     v051["v0.5.1<br/>Workflow coverage"]
     v052["v0.5.2<br/>Forge Suite UI"]
     v053["v0.5.3<br/>In-app campaign creation"]
+    v054["v0.5.4<br/>Workbench polish"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -45,9 +46,10 @@ flowchart LR
     v05 -.-> v051
     v05 -.-> v052
     v05 -.-> v053
+    v05 -.-> v054
     
     class v01,v02,v03,v04,v05 majorDone
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051,v052,v053 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051,v052,v053,v054 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -55,7 +57,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.5.3`. Next planned milestone: `v0.6.0`, focused on the next app/workflow layer.
+Current baseline: `v0.5.4`. Next planned milestone: a later `v1.0.0` release decision based on the local Streamlit prototype baseline.
 
 ### Patch Notes So Far
 
@@ -84,6 +86,7 @@ Current baseline: `v0.5.3`. Next planned milestone: `v0.6.0`, focused on the nex
 | `v0.5.1` | Patch | Streamlit workflow coverage                                         |
 | `v0.5.2` | Patch | Forge Suite UI polish and practical panels                          |
 | `v0.5.3` | Patch | In-app campaign creation and Streamlit header cleanup                |
+| `v0.5.4` | Patch | Final Streamlit workbench polish and v1.0-ready baseline            |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -170,6 +173,7 @@ Status: MVP plus Forge Suite UI polish
 - Display cost and replicate summaries when configured.
 - Align the Streamlit UI with the Forge Suite workbench style.
 - Create new local campaign configs and empty canonical CSV logs inside the app.
+- Close the local Streamlit prototype line as the practical baseline for a later v1.0.0 release decision.
 - Keep BO logic out of the app layer.
 
 ## 🔮 Later

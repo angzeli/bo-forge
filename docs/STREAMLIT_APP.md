@@ -1,10 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v0.5.3 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
+BO Forge v0.5.4 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v0.5.3 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, and an in-app campaign creation flow.
+The v0.5.4 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
+
+v0.5.4 closes the local Streamlit prototype line and serves as the practical baseline for a later v1.0.0 release decision.
 
 ## 🧰 Install
 
@@ -35,7 +37,7 @@ Then use the `Campaign Files` panel on the main workbench page to enter:
 
 Use a working log rather than editing seed example logs directly.
 
-You can also use `Create New` in the same panel to build a basic config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+You can also use `Create Campaign` in the same panel to build a basic config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
 
 For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
 
@@ -65,6 +67,18 @@ The app keeps file selection on the main workbench page, followed by four practi
 - `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
 - `Resolve`: review queue, rows ready to observe, mark-observed form, and actual-cost input when configured.
 - `Reports`: report preview/export and progress, diagnostics, cost-progress, or replicate plots when supported by the config.
+
+## 🖼️ Workbench Screenshots
+
+![Campaign Files and Create Campaign](assets/streamlit_campaign_files_create_campaign.png)
+
+![Campaign panel](assets/streamlit_campaign_panel.png)
+
+![Suggest panel](assets/streamlit_suggest_panel.png)
+
+![Resolve panel](assets/streamlit_resolve_panel.png)
+
+![Reports panel](assets/streamlit_reports_panel.png)
 
 ## ⚠️ Write Actions
 

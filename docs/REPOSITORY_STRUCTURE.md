@@ -13,6 +13,7 @@ bo-forge/
 ├── notebooks/                        # Notebook-first campaign workflows
 ├── reports/                          # Generated local reports and figures
 ├── docs/                             # Quickstart, schema, errors, and repository guides
+│   ├── assets/                       # Tracked documentation screenshots
 │   ├── QUICKSTART.md
 │   ├── CLI.md
 │   ├── STREAMLIT_APP.md

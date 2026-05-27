@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from bo_forge_app.streamlit_helpers import humanize_campaign_status, humanize_next_action
+
 FORGE_SUITE_CSS = """
 <style>
 :root {
+  --forge-paper: #fff8ed;
+  --forge-panel: rgba(255, 250, 241, 0.86);
+  --forge-ink: #2a1d16;
+  --forge-muted: #77685f;
+  --forge-copper: #9f4f32;
+  --forge-gold: #d6a84f;
+  --forge-sage: #7f9a7a;
+  --forge-border: rgba(87, 60, 40, 0.16);
   --bf-ink: #2a1d16;
   --bf-muted: #77685f;
   --bf-paper: #fff8ed;
@@ -20,6 +30,7 @@ FORGE_SUITE_CSS = """
   --bf-radius-xl: 32px;
   --bf-radius-lg: 22px;
   --bf-radius-md: 16px;
+  --bf-radius-sm: 12px;
   --bf-ui: Optima, Candara, "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --bf-serif: Charter, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
@@ -47,7 +58,8 @@ FORGE_SUITE_CSS = """
 }
 
 .block-container {
-  padding-top: 2rem;
+  max-width: 1160px;
+  padding-top: 1.15rem;
   padding-bottom: 3rem;
 }
 
@@ -83,7 +95,13 @@ p, label, span, div {
 
 .bf-workbench-header,
 .bf-panel,
-.bf-status-block {
+.bf-status-block,
+.forge-card,
+.forge-empty,
+.forge-artifact,
+.forge-callout,
+.forge-success,
+.forge-warning {
   border: 1px solid var(--bf-line);
   background: var(--bf-card);
   box-shadow: var(--bf-shadow-soft);
@@ -93,24 +111,25 @@ p, label, span, div {
 .bf-workbench-header {
   position: relative;
   overflow: hidden;
-  margin-bottom: 1.2rem;
-  padding: clamp(1.2rem, 3vw, 2rem);
+  margin-bottom: 0.85rem;
+  padding: clamp(1rem, 2.2vw, 1.55rem);
   border-radius: var(--bf-radius-xl);
 }
 
 .bf-workbench-header::after {
   position: absolute;
-  right: -72px;
-  bottom: -150px;
-  width: 280px;
-  height: 280px;
+  right: -92px;
+  bottom: -162px;
+  width: 260px;
+  height: 260px;
   content: "";
   pointer-events: none;
   border: 1px solid rgba(87, 60, 40, 0.12);
   border-radius: 50%;
+  opacity: 0.62;
   background: repeating-conic-gradient(
     from 12deg,
-    rgba(159, 79, 50, 0.12) 0deg 10deg,
+    rgba(159, 79, 50, 0.09) 0deg 10deg,
     transparent 10deg 24deg
   );
 }
@@ -130,18 +149,21 @@ p, label, span, div {
 
 .bf-brand-mark {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   color: var(--bf-paper-strong);
   border: 1px solid rgba(255, 250, 241, 0.52);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 34% 30%, rgba(255, 250, 241, 0.56), transparent 0.62rem),
+    radial-gradient(circle at 34% 26%, rgba(255, 250, 241, 0.68), transparent 0.54rem),
+    radial-gradient(circle at 70% 78%, rgba(42, 29, 22, 0.20), transparent 1.15rem),
     conic-gradient(from 212deg, var(--bf-accent), var(--bf-gold), var(--bf-sage), var(--bf-accent));
-  box-shadow: 0 12px 28px rgba(125, 53, 36, 0.2);
+  box-shadow:
+    inset 0 1px 10px rgba(255, 250, 241, 0.32),
+    0 12px 28px rgba(125, 53, 36, 0.18);
   font-family: var(--bf-serif);
-  font-size: 1.22rem;
+  font-size: 1.04rem;
   font-weight: 800;
   line-height: 1;
   text-shadow: 0 1px 7px rgba(42, 29, 22, 0.28);
@@ -161,7 +183,7 @@ p, label, span, div {
   margin: 0;
   color: var(--bf-ink);
   font-family: var(--bf-serif);
-  font-size: clamp(2.2rem, 4vw, 4.25rem);
+  font-size: clamp(2rem, 3.3vw, 3.3rem);
   font-weight: 700;
   line-height: 0.92;
 }
@@ -170,16 +192,16 @@ p, label, span, div {
   position: relative;
   z-index: 1;
   max-width: 56rem;
-  margin: 0.85rem 0 0;
+  margin: 0.7rem 0 0;
   color: var(--bf-muted);
-  font-size: 1.04rem;
+  font-size: 0.98rem;
   line-height: 1.5;
 }
 
 .bf-chip-row {
   flex-wrap: wrap;
   gap: 0.55rem;
-  margin-top: 1rem;
+  margin-top: 0.8rem;
 }
 
 .bf-chip {
@@ -198,6 +220,14 @@ p, label, span, div {
   text-transform: uppercase;
 }
 
+.bf-chip-warning::before {
+  background: var(--bf-gold);
+}
+
+.bf-chip-success::before {
+  background: var(--bf-sage);
+}
+
 .bf-chip::before {
   width: 7px;
   height: 7px;
@@ -208,7 +238,7 @@ p, label, span, div {
 }
 
 .bf-panel {
-  margin: 0.75rem 0 1rem;
+  margin: 0.6rem 0 0.85rem;
   padding: 1.05rem 1.1rem;
   border-radius: var(--bf-radius-lg);
 }
@@ -248,6 +278,18 @@ p, label, span, div {
   background: var(--bf-card-strong);
 }
 
+.bf-status-block-sage {
+  border-color: rgba(127, 154, 122, 0.35);
+}
+
+.bf-status-block-success {
+  border-color: rgba(87, 130, 82, 0.38);
+}
+
+.bf-status-block-warning {
+  border-color: rgba(214, 168, 79, 0.42);
+}
+
 .bf-status-label {
   margin: 0;
   color: var(--bf-accent-strong);
@@ -270,6 +312,175 @@ p, label, span, div {
   color: var(--bf-muted);
   font-size: 0.94rem;
   line-height: 1.45;
+}
+
+.forge-card,
+.forge-empty,
+.forge-artifact,
+.forge-callout,
+.forge-success,
+.forge-warning {
+  margin: 0.55rem 0 0.85rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--bf-radius-md);
+}
+
+.forge-card {
+  background: var(--bf-card-strong);
+}
+
+.forge-callout {
+  border-left: 4px solid var(--bf-gold);
+  background: rgba(255, 246, 204, 0.56);
+}
+
+.forge-empty {
+  background: rgba(255, 253, 247, 0.66);
+  box-shadow: none;
+}
+
+.forge-artifact {
+  border-color: rgba(159, 79, 50, 0.22);
+  background: rgba(255, 250, 241, 0.72);
+}
+
+.forge-success {
+  border-color: rgba(127, 154, 122, 0.38);
+  background: rgba(239, 247, 231, 0.74);
+}
+
+.forge-warning {
+  border-color: rgba(159, 79, 50, 0.30);
+  background: rgba(255, 240, 229, 0.72);
+}
+
+.forge-card-title,
+.forge-empty-title,
+.forge-callout-title {
+  margin: 0;
+  color: var(--bf-accent-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.forge-card-value,
+.forge-empty-detail,
+.forge-callout-detail {
+  margin: 0.32rem 0 0;
+  color: var(--bf-ink);
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+.forge-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 0.6rem 0 0.85rem;
+}
+
+.forge-metric {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--bf-line);
+  border-radius: var(--bf-radius-md);
+  background: rgba(255, 253, 247, 0.76);
+}
+
+.forge-metric-label {
+  margin: 0;
+  color: var(--bf-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forge-metric-value {
+  margin: 0.25rem 0 0;
+  color: var(--bf-ink);
+  font-family: var(--bf-serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.forge-file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.forge-file-card {
+  padding: 0.78rem 0.85rem;
+  border: 1px solid var(--bf-line);
+  border-radius: var(--bf-radius-md);
+  background: rgba(255, 253, 247, 0.72);
+}
+
+.forge-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.45rem;
+  color: var(--bf-accent-strong);
+  border: 1px solid rgba(87, 60, 40, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 253, 247, 0.75);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forge-pill-sage {
+  color: #3e633c;
+}
+
+.forge-pill-gold {
+  color: #7a5b13;
+}
+
+.forge-pill-copper {
+  color: var(--bf-accent-strong);
+}
+
+.forge-pill-blue {
+  color: #42536c;
+}
+
+.forge-file-path {
+  margin: 0.35rem 0 0;
+  color: var(--bf-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.83rem;
+  overflow-wrap: anywhere;
+}
+
+.forge-step-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0.45rem 0 0.85rem;
+}
+
+.forge-step {
+  padding: 0.45rem 0.62rem;
+  border: 1px solid var(--bf-line);
+  border-radius: 999px;
+  background: rgba(255, 253, 247, 0.7);
+  color: var(--bf-accent-strong);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.forge-artifact pre,
+.forge-artifact textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+div[data-testid="stTabs"] button[aria-selected="true"] {
+  color: var(--bf-accent-strong);
+  border-bottom-color: var(--bf-accent);
 }
 
 .stButton > button {
@@ -300,21 +511,9 @@ def apply_forge_suite_style(st: object) -> None:
 
 def forge_status_label(status: str) -> str:
     """Return a readable label for a campaign status value."""
-    labels = {
-        "has_pending_suggestions": "Pending suggestions",
-        "ready_for_initial_design": "Ready for initial design",
-        "ready_for_bo": "Ready for BO",
-    }
-    return labels.get(status, status.replace("_", " ").title())
+    return humanize_campaign_status(status)
 
 
 def forge_action_label(action: str) -> str:
     """Return a readable label for a next-action value."""
-    labels = {
-        "review_pending_suggestions": "Review pending suggestions",
-        "run_accepted_suggestions": "Run accepted suggestions",
-        "resolve_pending_suggestions": "Resolve pending suggestions",
-        "suggest_initial_design": "Suggest initial design",
-        "suggest_bo": "Suggest BO candidates",
-    }
-    return labels.get(action, action.replace("_", " ").title())
+    return humanize_next_action(action)
