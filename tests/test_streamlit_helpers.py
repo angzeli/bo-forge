@@ -6,11 +6,15 @@ import pytest
 from matplotlib import pyplot as plt
 
 from bo_forge.config import CampaignConfig
+from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
 from bo_forge_app.streamlit_helpers import (
+    build_campaign_yaml_text,
     campaign_report_text,
+    create_campaign_files,
     dataframe_fingerprint,
     default_export_path,
+    default_new_campaign_paths,
     export_staged_suggestions_csv,
     extract_matplotlib_figure,
     feature_flags,
@@ -19,6 +23,9 @@ from bo_forge_app.streamlit_helpers import (
     load_campaign_session,
     make_staged_suggestion_bundle,
     observable_rows,
+    parse_campaign_config_text,
+    parse_categorical_values_text,
+    parse_discrete_values_text,
     resolve_path_input,
     staged_bundle_invalidation_reason,
     staged_bundle_is_appendable,
@@ -89,12 +96,167 @@ def test_dataframe_fingerprint_is_stable_for_identical_values() -> None:
     assert dataframe_fingerprint(df) == dataframe_fingerprint(df.copy(deep=True))
 
 
+def test_default_new_campaign_paths_are_derived_from_campaign_name() -> None:
+    config_path, log_path = default_new_campaign_paths("My Catalyst Campaign!")
+
+    assert config_path == Path("configs/my_catalyst_campaign.yaml")
+    assert log_path == Path("examples/my_catalyst_campaign_campaign_log.csv")
+
+
+def test_parse_discrete_values_text_is_strict() -> None:
+    assert parse_discrete_values_text("0.1, 0.2, 1", "loading") == [0.1, 0.2, 1.0]
+
+    with pytest.raises(ValueError, match="blank value"):
+        parse_discrete_values_text("0.1, , 0.3", "loading")
+    with pytest.raises(ValueError, match="non-numeric"):
+        parse_discrete_values_text("0.1, high", "loading")
+
+
+def test_parse_categorical_values_text_is_strict() -> None:
+    assert parse_categorical_values_text("MeCN, DMF, THF", "solvent") == [
+        "MeCN",
+        "DMF",
+        "THF",
+    ]
+
+    with pytest.raises(ValueError, match="blank label"):
+        parse_categorical_values_text("MeCN, , THF", "solvent")
+    with pytest.raises(ValueError, match="duplicate label"):
+        parse_categorical_values_text("MeCN, DMF, MeCN", "solvent")
+
+
+def test_build_campaign_yaml_text_parses_through_config_validation() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_campaign",
+        objective_name="yield",
+        objective_direction="maximize",
+        variables=[
+            {"name": "temperature", "type": "continuous", "lower": 20.0, "upper": 80.0},
+            {"name": "solvent", "type": "categorical", "values": ["MeCN", "DMF"]},
+        ],
+        batch_size=2,
+        initial_design_size=6,
+        initial_design_method="sobol",
+        random_seed=7,
+    )
+
+    config = parse_campaign_config_text(text)
+
+    assert config.campaign_name == "app_created_campaign"
+    assert config.objective.name == "yield"
+    assert config.variable_names == ["temperature", "solvent"]
+    assert config.bo.batch_size == 2
+
+
 def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
     df = pd.DataFrame({"field": ["a", "b"], "value": ["text", 3]})
 
     display_df = format_dataframe_for_display(df)
 
     assert display_df["value"].tolist() == ["text", "3"]
+
+
+def test_create_campaign_files_writes_config_and_empty_log(tmp_path: Path) -> None:
+    config_text = build_campaign_yaml_text(
+        campaign_name="new_app_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "x", "type": "continuous", "lower": 0.0, "upper": 1.0},
+        ],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=0,
+    )
+    config_path = tmp_path / "configs" / "campaign.yaml"
+    log_path = tmp_path / "logs" / "campaign.csv"
+
+    campaign = create_campaign_files(
+        config_text=config_text,
+        config_path=config_path,
+        log_path=log_path,
+    )
+
+    assert campaign.config.campaign_name == "new_app_campaign"
+    assert config_path.read_text(encoding="utf-8") == config_text
+    df = pd.read_csv(log_path, keep_default_na=False)
+    assert df.empty
+    assert list(df.columns) == canonical_columns(campaign.config)
+
+
+def test_create_campaign_files_validates_before_writing(tmp_path: Path) -> None:
+    config_path = tmp_path / "nested" / "campaign.yaml"
+    log_path = tmp_path / "logs" / "campaign.csv"
+
+    with pytest.raises(Exception, match="objective"):
+        create_campaign_files(
+            config_text="campaign_name: invalid\n",
+            config_path=config_path,
+            log_path=log_path,
+        )
+
+    assert not config_path.exists()
+    assert not log_path.exists()
+    assert not config_path.parent.exists()
+
+
+def test_create_campaign_files_refuses_overwrite(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("existing", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="Config file already exists"):
+        create_campaign_files(
+            config_text=build_campaign_yaml_text(
+                campaign_name="campaign",
+                objective_name="activity",
+                objective_direction="maximize",
+                variables=[{"name": "x", "type": "continuous", "lower": 0.0, "upper": 1.0}],
+                batch_size=1,
+                initial_design_size=4,
+                initial_design_method="sobol",
+                random_seed=0,
+            ),
+            config_path=config_path,
+            log_path=log_path,
+        )
+
+    assert config_path.read_text(encoding="utf-8") == "existing"
+    assert not log_path.exists()
+
+
+def test_create_campaign_files_rolls_back_config_if_log_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_text = build_campaign_yaml_text(
+        campaign_name="campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[{"name": "x", "type": "continuous", "lower": 0.0, "upper": 1.0}],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=0,
+    )
+
+    def fail_log_write(path: Path, df: pd.DataFrame) -> None:
+        raise OSError("no log write")
+
+    monkeypatch.setattr(streamlit_helpers, "_write_dataframe_no_overwrite", fail_log_write)
+
+    with pytest.raises(OSError, match="no log write"):
+        create_campaign_files(
+            config_text=config_text,
+            config_path=config_path,
+            log_path=log_path,
+        )
+
+    assert not config_path.exists()
+    assert not log_path.exists()
 
 
 def test_make_staged_suggestion_bundle_records_context(tmp_path: Path) -> None:
@@ -302,6 +464,54 @@ def test_streamlit_app_clear_staged_suggestions_removes_bundle() -> None:
     assert "bo_forge_staged_suggestion_bundle" not in FakeStreamlit.session_state
 
 
+def test_create_campaign_from_inputs_sets_session_state_and_clears_staged(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_text = build_campaign_yaml_text(
+        campaign_name="app_created",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[{"name": "x", "type": "continuous", "lower": 0.0, "upper": 1.0}],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=0,
+    )
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_staged_suggestion_bundle": {"suggestions": simple_suggestions()}
+        }
+        success_messages: list[str] = []
+        error_messages: list[str] = []
+
+        @classmethod
+        def success(cls, message: str) -> None:
+            cls.success_messages.append(message)
+
+        @classmethod
+        def error(cls, message: str) -> None:
+            cls.error_messages.append(message)
+
+    streamlit_app._create_campaign_from_inputs(
+        FakeStreamlit,
+        config_text,
+        str(config_path),
+        str(log_path),
+    )
+
+    assert FakeStreamlit.error_messages == []
+    assert FakeStreamlit.session_state["bo_forge_config_path"] == str(config_path)
+    assert FakeStreamlit.session_state["bo_forge_log_path"] == str(log_path)
+    assert FakeStreamlit.session_state["bo_forge_campaign_session"].config.campaign_name == (
+        "app_created"
+    )
+    assert "bo_forge_staged_suggestion_bundle" not in FakeStreamlit.session_state
+    assert FakeStreamlit.success_messages == ["Created and loaded campaign: app_created"]
+
+
 @pytest.mark.parametrize(
     ("config_path", "expected"),
     [
@@ -357,10 +567,12 @@ def test_extract_matplotlib_figure_from_figure_and_tuple() -> None:
 def test_app_modules_import_without_streamlit_runtime() -> None:
     assert hasattr(streamlit_helpers, "make_staged_suggestion_bundle")
     assert hasattr(streamlit_style, "apply_forge_suite_style")
+    assert hasattr(streamlit_helpers, "create_campaign_files")
     assert hasattr(streamlit_app, "main")
     assert hasattr(streamlit_app, "render_app")
     assert hasattr(streamlit_app, "_render_workbench_header")
     assert hasattr(streamlit_app, "_render_campaign_files_panel")
+    assert hasattr(streamlit_app, "_render_create_new_campaign")
     assert hasattr(streamlit_app, "_render_campaign_state_blocks")
 
 
@@ -384,6 +596,9 @@ def test_forge_suite_css_contains_expected_palette_tokens() -> None:
     assert "#7f9a7a" in FORGE_SUITE_CSS
     assert "bf-workbench-header" in FORGE_SUITE_CSS
     assert "bf-file-panel" in FORGE_SUITE_CSS
+    assert '[data-testid="stHeader"]' in FORGE_SUITE_CSS
+    assert '[data-testid="stToolbar"]' in FORGE_SUITE_CSS
+    assert '[data-testid="stDecoration"]' in FORGE_SUITE_CSS
 
 
 def test_forge_status_labels_are_stable() -> None:
@@ -407,3 +622,24 @@ def test_streamlit_app_smoke_runs_without_exceptions() -> None:
     app.run(timeout=10)
 
     assert len(app.exception) == 0
+    assert [tab.label for tab in app.tabs[:2]] == ["Load Existing", "Create New"]
+    assert len(app.text_area) >= 1
+
+
+def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "campaign.yaml"
+    log_path = tmp_path / "logs" / "campaign.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    app.text_input[3].set_value(str(config_path))
+    app.text_input[4].set_value(str(log_path))
+    app.button[3].click()
+    app.run(timeout=10)
+
+    assert len(app.exception) == 0
+    assert config_path.exists()
+    assert log_path.exists()
+    assert "Created and loaded campaign: my_campaign" in [message.value for message in app.success]

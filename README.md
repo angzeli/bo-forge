@@ -1,8 +1,8 @@
-# 🧪 BO Forge v0.5.2
+# 🧪 BO Forge v0.5.3
 
 BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow and local Streamlit prototype. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v0.5 adds a local Streamlit wrapper around the existing `CampaignSession` workflow. Suggestions are staged as a dry run before the user explicitly appends them to the CSV log, and the app now uses a Forge Suite-inspired workbench style.
+v0.5 adds a local Streamlit wrapper around the existing `CampaignSession` workflow. Suggestions are staged as a dry run before the user explicitly appends them to the CSV log, and the app now supports creating new local campaigns from inside the Forge Suite-inspired workbench.
 
 BO Forge deliberately supports only:
 
@@ -70,6 +70,7 @@ bo-forge/
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): setup, quickstart commands, session API example, notebooks, and diagnostics.
 - [docs/CLI.md](docs/CLI.md): terminal workflow and command reference.
 - [docs/STREAMLIT_APP.md](docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
+- [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
 - [docs/CLI_ERROR_EXAMPLES.md](docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
 - [docs/CSV_SCHEMA.md](docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
 - [docs/COMMON_ERRORS.md](docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
@@ -82,7 +83,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.5.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v0.5.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

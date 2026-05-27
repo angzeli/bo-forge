@@ -10,10 +10,14 @@ from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
     LAST_APPENDED_FINGERPRINT_KEY,
     LOG_PATH_KEY,
+    NEW_CAMPAIGN_YAML_KEY,
     SESSION_KEY,
     STAGED_SUGGESTION_BUNDLE_KEY,
+    build_campaign_yaml_text,
     campaign_report_text,
+    create_campaign_files,
     default_export_path,
+    default_new_campaign_paths,
     export_staged_suggestions_csv,
     extract_matplotlib_figure,
     feature_flags,
@@ -21,6 +25,8 @@ from bo_forge_app.streamlit_helpers import (
     load_campaign_session,
     make_staged_suggestion_bundle,
     observable_rows,
+    parse_categorical_values_text,
+    parse_discrete_values_text,
     resolve_path_input,
     staged_bundle_invalidation_reason,
     staged_suggestions_from_bundle,
@@ -109,6 +115,14 @@ def _render_campaign_files_panel(st: Any) -> None:
         """,
         unsafe_allow_html=True,
     )
+    load_tab, create_tab = st.tabs(["Load Existing", "Create New"])
+    with load_tab:
+        _render_load_existing_campaign(st)
+    with create_tab:
+        _render_create_new_campaign(st)
+
+
+def _render_load_existing_campaign(st: Any) -> None:
     config_col, log_col = st.columns(2)
     with config_col:
         config_value = st.text_input(
@@ -153,6 +167,181 @@ def _render_campaign_files_panel(st: Any) -> None:
             with log_path_col:
                 st.caption("Current log")
                 st.code(current_log, language=None)
+
+
+def _render_create_new_campaign(st: Any) -> None:
+    st.caption("Create a validated YAML config and empty canonical CSV log.")
+    campaign_name = st.text_input(
+        "New campaign name",
+        value="my_campaign",
+        key="new_campaign_name",
+    )
+    suggested_config_path, suggested_log_path = default_new_campaign_paths(campaign_name)
+    path_col, log_path_col = st.columns(2)
+    with path_col:
+        config_output = st.text_input(
+            "New YAML config output path",
+            value=str(suggested_config_path),
+            key="new_campaign_config_output_path",
+        )
+    with log_path_col:
+        log_output = st.text_input(
+            "New CSV log output path",
+            value=str(suggested_log_path),
+            key="new_campaign_log_output_path",
+        )
+
+    objective_col, direction_col = st.columns(2)
+    with objective_col:
+        objective_name = st.text_input(
+            "Objective name",
+            value="activity",
+            key="new_campaign_objective_name",
+        )
+    with direction_col:
+        objective_direction = st.selectbox(
+            "Objective direction",
+            ["maximize", "minimize"],
+            key="new_campaign_objective_direction",
+        )
+
+    bo_col_1, bo_col_2, bo_col_3, bo_col_4 = st.columns(4)
+    with bo_col_1:
+        batch_size = st.number_input("Batch size", min_value=1, value=1, key="new_bo_batch_size")
+    with bo_col_2:
+        initial_design_size = st.number_input(
+            "Initial design size",
+            min_value=1,
+            value=8,
+            key="new_bo_initial_design_size",
+        )
+    with bo_col_3:
+        initial_design_method = st.selectbox(
+            "Initial design method",
+            ["sobol", "random"],
+            key="new_bo_initial_design_method",
+        )
+    with bo_col_4:
+        random_seed = st.number_input("Random seed", min_value=0, value=0, key="new_bo_seed")
+
+    variable_count = st.number_input(
+        "Number of variables",
+        min_value=1,
+        max_value=12,
+        value=2,
+        key="new_campaign_variable_count",
+    )
+
+    generated_yaml = ""
+    try:
+        variables = _collect_new_campaign_variables(st, int(variable_count))
+        generated_yaml = build_campaign_yaml_text(
+            campaign_name=campaign_name,
+            objective_name=objective_name,
+            objective_direction=str(objective_direction),
+            variables=variables,
+            batch_size=int(batch_size),
+            initial_design_size=int(initial_design_size),
+            initial_design_method=str(initial_design_method),
+            random_seed=int(random_seed),
+        )
+    except ValueError as exc:
+        st.error(f"Could not build YAML preview: {exc}")
+
+    if NEW_CAMPAIGN_YAML_KEY not in st.session_state:
+        st.session_state[NEW_CAMPAIGN_YAML_KEY] = generated_yaml
+    if st.button("Regenerate YAML from structured fields"):
+        st.session_state[NEW_CAMPAIGN_YAML_KEY] = generated_yaml
+
+    st.warning(
+        "Advanced edits are allowed, but the YAML must pass BO Forge config validation "
+        "before files are written."
+    )
+    edited_yaml = st.text_area(
+        "Campaign YAML",
+        height=360,
+        key=NEW_CAMPAIGN_YAML_KEY,
+    )
+
+    if st.button("Create and load campaign", type="primary"):
+        _create_campaign_from_inputs(st, edited_yaml, config_output, log_output)
+
+
+def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[str, object]]:
+    variables: list[dict[str, object]] = []
+    for index in range(variable_count):
+        with st.expander(f"Variable {index + 1}", expanded=index < 2):
+            name_col, type_col = st.columns(2)
+            with name_col:
+                name = st.text_input(
+                    "Variable name",
+                    value=f"x{index + 1}",
+                    key=f"new_variable_{index}_name",
+                )
+            with type_col:
+                variable_type = st.selectbox(
+                    "Variable type",
+                    ["continuous", "integer", "discrete", "categorical"],
+                    key=f"new_variable_{index}_type",
+                )
+            variable: dict[str, object] = {"name": name, "type": variable_type}
+            if variable_type in {"continuous", "integer"}:
+                lower_col, upper_col = st.columns(2)
+                with lower_col:
+                    lower = st.number_input(
+                        "Lower",
+                        value=0.0,
+                        key=f"new_variable_{index}_lower",
+                    )
+                with upper_col:
+                    upper = st.number_input(
+                        "Upper",
+                        value=1.0,
+                        key=f"new_variable_{index}_upper",
+                    )
+                variable["lower"] = int(lower) if variable_type == "integer" else float(lower)
+                variable["upper"] = int(upper) if variable_type == "integer" else float(upper)
+            elif variable_type == "discrete":
+                values_text = st.text_input(
+                    "Discrete values",
+                    value="0.0, 0.5, 1.0",
+                    key=f"new_variable_{index}_discrete_values",
+                )
+                variable["values"] = parse_discrete_values_text(values_text, name)
+            else:
+                values_text = st.text_input(
+                    "Categorical labels",
+                    value="A, B, C",
+                    key=f"new_variable_{index}_categorical_values",
+                )
+                variable["values"] = parse_categorical_values_text(values_text, name)
+            variables.append(variable)
+    return variables
+
+
+def _create_campaign_from_inputs(
+    st: Any,
+    edited_yaml: str,
+    config_output: str,
+    log_output: str,
+) -> None:
+    try:
+        config_path = resolve_path_input(config_output, "Config output")
+        log_path = resolve_path_input(log_output, "Log output")
+        campaign = create_campaign_files(
+            config_text=edited_yaml,
+            config_path=config_path,
+            log_path=log_path,
+        )
+    except (BOForgeError, OSError, ValueError) as exc:
+        st.error(str(exc))
+        return
+
+    st.session_state[CONFIG_PATH_KEY] = str(config_path)
+    st.session_state[LOG_PATH_KEY] = str(log_path)
+    st.session_state[SESSION_KEY] = campaign
+    _clear_staged_suggestions(st)
+    st.success(f"Created and loaded campaign: {campaign.config.campaign_name}")
 
 
 def _path_changed(config_value: str, log_key: str, log_value: str) -> bool:

@@ -1,10 +1,10 @@
 # 🖥️ Streamlit App
 
-BO Forge v0.5.2 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
+BO Forge v0.5.3 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v0.5.2 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, and practical campaign tabs rather than a marketing-style landing page.
+The v0.5.3 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, and an in-app campaign creation flow.
 
 ## 🧰 Install
 
@@ -35,11 +35,15 @@ Then use the `Campaign Files` panel on the main workbench page to enter:
 
 Use a working log rather than editing seed example logs directly.
 
+You can also use `Create New` in the same panel to build a basic config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+
+For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
+
 ## 🔁 Workflow
 
 The app follows the same explicit BO Forge rhythm:
 
-1. load campaign files;
+1. create or load campaign files;
 2. validate and inspect campaign state;
 3. generate suggestions as a dry run;
 4. review staged suggestions;
@@ -70,9 +74,9 @@ Report and plot export actions write files to the selected output path.
 
 The app invalidates staged suggestions if the selected config path, config file, log path, or log file changes after suggestions are generated.
 
-## 🧪 CLI-Only Setup Checks
+## 🧪 CLI Setup Checks
 
-Campaign creation and environment checks remain CLI workflows:
+Environment checks remain CLI workflows. Empty-log creation is also still available through the CLI when you already have a config:
 
 ```bash
 ./.venv/bin/python -m bo_forge doctor

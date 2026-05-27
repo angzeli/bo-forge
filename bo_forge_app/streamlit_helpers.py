@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import re
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
 import pandas as pd
+import yaml
 
-from bo_forge.config import CampaignConfig
+from bo_forge.config import CampaignConfig, parse_campaign_config
+from bo_forge.errors import ConfigError
+from bo_forge.io import empty_campaign_log
 from bo_forge.session import CampaignSession, _format_campaign_report
 
 if TYPE_CHECKING:
@@ -19,6 +25,7 @@ LOG_PATH_KEY = "bo_forge_log_path"
 SESSION_KEY = "bo_forge_campaign_session"
 STAGED_SUGGESTION_BUNDLE_KEY = "bo_forge_staged_suggestion_bundle"
 LAST_APPENDED_FINGERPRINT_KEY = "bo_forge_last_appended_fingerprint"
+NEW_CAMPAIGN_YAML_KEY = "bo_forge_new_campaign_yaml"
 
 
 def resolve_path_input(value: str, label: str) -> Path:
@@ -32,6 +39,120 @@ def resolve_path_input(value: str, label: str) -> Path:
 def load_campaign_session(config_path: str | Path, log_path: str | Path) -> CampaignSession:
     """Load a BO Forge campaign session from config and log paths."""
     return CampaignSession.from_files(config_path=config_path, log_path=log_path)
+
+
+def default_new_campaign_paths(campaign_name: str) -> tuple[Path, Path]:
+    """Return suggested config/log paths for a new campaign name."""
+    slug = _campaign_slug(campaign_name)
+    return Path("configs") / f"{slug}.yaml", Path("examples") / f"{slug}_campaign_log.csv"
+
+
+def parse_discrete_values_text(value_text: str, variable_name: str) -> list[float]:
+    """Parse comma-separated numeric discrete values from app input."""
+    parts = value_text.split(",")
+    parsed: list[float] = []
+    for index, part in enumerate(parts):
+        stripped = part.strip()
+        if not stripped:
+            raise ValueError(
+                f"Discrete variable '{variable_name}' has a blank value at position {index + 1}."
+            )
+        try:
+            parsed.append(float(stripped))
+        except ValueError as exc:
+            raise ValueError(
+                f"Discrete variable '{variable_name}' has non-numeric value {stripped!r}."
+            ) from exc
+    return parsed
+
+
+def parse_categorical_values_text(value_text: str, variable_name: str) -> list[str]:
+    """Parse comma-separated categorical labels from app input."""
+    values: list[str] = []
+    seen: set[str] = set()
+    for index, part in enumerate(value_text.split(",")):
+        label = part.strip()
+        if not label:
+            raise ValueError(
+                f"Categorical variable '{variable_name}' has a blank label at position {index + 1}."
+            )
+        if label in seen:
+            raise ValueError(
+                f"Categorical variable '{variable_name}' has duplicate label {label!r}."
+            )
+        seen.add(label)
+        values.append(label)
+    return values
+
+
+def build_campaign_yaml_text(
+    *,
+    campaign_name: str,
+    objective_name: str,
+    objective_direction: str,
+    variables: list[dict[str, object]],
+    batch_size: int,
+    initial_design_size: int,
+    initial_design_method: str,
+    random_seed: int,
+) -> str:
+    """Build editable YAML text from structured app form values."""
+    raw = {
+        "campaign_name": campaign_name,
+        "objective": {
+            "name": objective_name,
+            "direction": objective_direction,
+        },
+        "variables": variables,
+        "bo": {
+            "batch_size": int(batch_size),
+            "initial_design_size": int(initial_design_size),
+            "acquisition": "log_ei",
+            "initial_design_method": initial_design_method,
+            "random_seed": int(random_seed),
+        },
+    }
+    return yaml.safe_dump(raw, sort_keys=False)
+
+
+def parse_campaign_config_text(config_text: str) -> CampaignConfig:
+    """Parse edited YAML text through BO Forge config validation."""
+    try:
+        raw = yaml.safe_load(config_text)
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"Could not parse campaign YAML: {exc}") from exc
+    return parse_campaign_config(raw)
+
+
+def create_campaign_files(
+    *,
+    config_text: str,
+    config_path: str | Path,
+    log_path: str | Path,
+) -> CampaignSession:
+    """Create a validated config and empty canonical log, then load the session."""
+    config = parse_campaign_config_text(config_text)
+    resolved_config_path = Path(config_path).expanduser()
+    resolved_log_path = Path(log_path).expanduser()
+    if resolved_config_path.exists():
+        raise FileExistsError(f"Config file already exists: {resolved_config_path}")
+    if resolved_log_path.exists():
+        raise FileExistsError(f"Campaign log already exists: {resolved_log_path}")
+
+    resolved_config_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    config_written = False
+    try:
+        _write_text_no_overwrite(resolved_config_path, config_text)
+        config_written = True
+        empty_log = empty_campaign_log(config)
+        _write_dataframe_no_overwrite(resolved_log_path, empty_log)
+    except Exception:
+        if config_written:
+            resolved_config_path.unlink(missing_ok=True)
+        raise
+    return CampaignSession.from_files(resolved_config_path, resolved_log_path)
 
 
 def file_fingerprint(path: str | Path) -> str:
@@ -205,3 +326,44 @@ def mark_bundle_appended(bundle: dict[str, object]) -> dict[str, object]:
     updated = dict(bundle)
     updated["appended"] = True
     return updated
+
+
+def _campaign_slug(campaign_name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", campaign_name.strip().lower()).strip("_")
+    return slug or "new_campaign"
+
+
+def _write_text_no_overwrite(path: Path, text: str) -> None:
+    temp_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(text)
+        os.link(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
+def _write_dataframe_no_overwrite(path: Path, df: pd.DataFrame) -> None:
+    temp_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            df.to_csv(temp_file, index=False)
+        os.link(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)

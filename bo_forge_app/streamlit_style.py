@@ -51,6 +51,17 @@ FORGE_SUITE_CSS = """
   padding-bottom: 3rem;
 }
 
+[data-testid="stHeader"] {
+  height: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+[data-testid="stToolbar"],
+[data-testid="stDecoration"] {
+  display: none !important;
+}
+
 [data-testid="stSidebar"] {
   background: rgba(255, 250, 241, 0.78);
   border-right: 1px solid var(--bf-line);

@@ -25,6 +25,7 @@ flowchart LR
     v045["v0.4.5<br/>Notebook depth"]
     v051["v0.5.1<br/>Workflow coverage"]
     v052["v0.5.2<br/>Forge Suite UI"]
+    v053["v0.5.3<br/>In-app campaign creation"]
     
     v01 -.-> v011
     v01 -.-> v012
@@ -43,9 +44,10 @@ flowchart LR
     v04 -.-> v045
     v05 -.-> v051
     v05 -.-> v052
+    v05 -.-> v053
     
     class v01,v02,v03,v04,v05 majorDone
-    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051,v052 patchDone
+    class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051,v052,v053 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorNext fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#111827;
@@ -53,7 +55,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.5.2`. Next planned milestone: `v0.5.3`, focused on final Streamlit robustness polish.
+Current baseline: `v0.5.3`. Next planned milestone: `v0.6.0`, focused on the next app/workflow layer.
 
 ### Patch Notes So Far
 
@@ -81,6 +83,7 @@ Current baseline: `v0.5.2`. Next planned milestone: `v0.5.3`, focused on final S
 | `v0.5.0` | Major | Local Streamlit campaign app MVP                                    |
 | `v0.5.1` | Patch | Streamlit workflow coverage                                         |
 | `v0.5.2` | Patch | Forge Suite UI polish and practical panels                          |
+| `v0.5.3` | Patch | In-app campaign creation and Streamlit header cleanup                |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -166,6 +169,7 @@ Status: MVP plus Forge Suite UI polish
 - Display and export progress and diagnostic plots.
 - Display cost and replicate summaries when configured.
 - Align the Streamlit UI with the Forge Suite workbench style.
+- Create new local campaign configs and empty canonical CSV logs inside the app.
 - Keep BO logic out of the app layer.
 
 ## 🔮 Later

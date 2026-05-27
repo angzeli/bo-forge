@@ -67,7 +67,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create New` campaign flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels.
 
 Campaign creation and environment checks remain CLI workflows:
 
@@ -76,7 +76,7 @@ Campaign creation and environment checks remain CLI workflows:
 ./.venv/bin/python -m bo_forge init-log --config configs/01_simple_2d_maximise_logei.yaml --log examples/new_campaign_log.csv
 ```
 
-See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings.
+See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings. See [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md) for a step-by-step app-created campaign tutorial.
 
 ## 🔁 Session API
 

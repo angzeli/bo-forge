@@ -16,6 +16,7 @@ bo-forge/
 │   ├── QUICKSTART.md
 │   ├── CLI.md
 │   ├── STREAMLIT_APP.md
+│   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
