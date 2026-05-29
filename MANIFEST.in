@@ -1,0 +1,11 @@
+include CHANGELOG.md
+include LICENSE
+include README.md
+include ROADMAP_PRE_V1.md
+include ROADMAP_AFTER_V1.md
+include requirements-lock.txt
+recursive-include configs *.yaml
+recursive-include docs *.md *.png
+include examples/quickstart.py
+recursive-include examples *_campaign_log.csv
+recursive-include notebooks *.ipynb

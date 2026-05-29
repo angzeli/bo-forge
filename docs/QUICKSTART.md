@@ -59,17 +59,19 @@ See [CLI.md](CLI.md) for the full command reference.
 The local Streamlit app wraps the same `CampaignSession` workflow:
 
 ```bash
-./.venv/bin/pip install -e ".[app]"
-./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
+pip install "bo-forge[app]"
+bo-forge-app
 ```
+
+For development from a clone, use `./.venv/bin/pip install -e ".[app]"` and `./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py`.
 
 Suggestions are generated as a dry run and staged in app session state. They are appended to the selected CSV log only after the explicit append button is clicked.
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v0.5.4 closes the local Streamlit prototype line and serves as the practical baseline for a later v1.0.0 release decision.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.0.0 is the first stable public release baseline for the local app, backend package, CLI, and documentation.
 
-Campaign creation and environment checks remain CLI workflows:
+Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
 ```bash
 ./.venv/bin/python -m bo_forge doctor

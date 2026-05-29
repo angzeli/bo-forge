@@ -1,13 +1,33 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "0.5.4"
-description = "Notebook-first Bayesian optimisation campaign tooling."
+version = "1.0.0"
+description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [
+    { name = "Angze Li" },
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = [
+    "bayesian-optimization",
+    "botorch",
+    "campaign",
+    "experimental-design",
+    "streamlit",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "botorch>=0.17",
     "gpytorch>=1.14",
@@ -20,12 +40,20 @@ dependencies = [
 
 [project.scripts]
 bo-forge = "bo_forge.cli:main"
+bo-forge-app = "bo_forge_app.cli:main"
+
+[project.urls]
+Repository = "https://github.com/angzeli/bo-forge"
+Issues = "https://github.com/angzeli/bo-forge/issues"
+Documentation = "https://github.com/angzeli/bo-forge/tree/main/docs"
+Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_PRE_V1.md"
 
 [project.optional-dependencies]
 app = [
     "streamlit>=1.57",
 ]
 dev = [
+    "build>=1.2",
     "ipykernel>=6.29",
     "ipywidgets>=8.1",
     "nbclient>=0.10",
@@ -34,10 +62,15 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.8",
     "streamlit>=1.57",
+    "twine>=5.0",
+    "wheel>=0.45",
 ]
 
 [tool.setuptools.packages.find]
-include = ["bo_forge*"]
+include = ["bo_forge", "bo_forge.*", "bo_forge_app", "bo_forge_app.*"]
+
+[tool.setuptools]
+include-package-data = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

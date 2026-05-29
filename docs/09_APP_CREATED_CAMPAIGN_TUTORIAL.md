@@ -19,8 +19,10 @@ The app writes both files:
 From the repository root:
 
 ```bash
-./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
+bo-forge-app
 ```
+
+From a source checkout, `./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py` also works.
 
 Open the `Campaign Files` workbench panel and choose the `Create Campaign` tab.
 

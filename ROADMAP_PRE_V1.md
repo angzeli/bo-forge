@@ -6,7 +6,7 @@ This roadmap is directional, not a release promise. BO Forge should stay useful 
 
 ```mermaid
 flowchart LR
-    v01["v0.1<br/>MVP foundation"] --> v02["v0.2<br/>Notebook engine"] --> v03["v0.3<br/>CLI workflow"] --> v04["v0.4<br/>Practical campaigns"] --> v05["v0.5<br/>Streamlit prototype"]
+    v01["v0.1<br/>MVP foundation"] --> v02["v0.2<br/>Notebook engine"] --> v03["v0.3<br/>CLI workflow"] --> v04["v0.4<br/>Practical campaigns"] --> v05["v0.5<br/>Streamlit prototype"] --> v10["v1.0<br/>Stable public release"]
 
     v011["v0.1.1<br/>Polish"]
     v012["v0.1.2<br/>Usability"]
@@ -48,7 +48,7 @@ flowchart LR
     v05 -.-> v053
     v05 -.-> v054
     
-    class v01,v02,v03,v04,v05 majorDone
+    class v01,v02,v03,v04,v05,v10 majorDone
     class v011,v012,v013,v021,v022,v023,v024,v031,v032,v033,v041,v042,v043,v044,v045,v051,v052,v053,v054 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
@@ -57,7 +57,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v0.5.4`. Next planned milestone: a later `v1.0.0` release decision based on the local Streamlit prototype baseline.
+Current baseline: `v1.0.0`. Post-1.0 directions have moved to [ROADMAP_AFTER_V1.md](ROADMAP_AFTER_V1.md).
 
 ### Patch Notes So Far
 
@@ -87,6 +87,7 @@ Current baseline: `v0.5.4`. Next planned milestone: a later `v1.0.0` release dec
 | `v0.5.2` | Patch | Forge Suite UI polish and practical panels                          |
 | `v0.5.3` | Patch | In-app campaign creation and Streamlit header cleanup                |
 | `v0.5.4` | Patch | Final Streamlit workbench polish and v1.0-ready baseline            |
+| `v1.0.0` | Stable | First stable public release, packaging, public API, and release docs |
 
 ## 📓 v0.1 - Notebook Sequential Campaign Demo
 
@@ -161,7 +162,7 @@ Status: completed
 
 ## 🖥️ v0.5 - Streamlit Prototype
 
-Status: MVP plus Forge Suite UI polish
+Status: completed
 
 - Build a thin Streamlit wrapper around the backend package.
 - Support local YAML config and CSV log path loading.
@@ -173,14 +174,21 @@ Status: MVP plus Forge Suite UI polish
 - Display cost and replicate summaries when configured.
 - Align the Streamlit UI with the Forge Suite workbench style.
 - Create new local campaign configs and empty canonical CSV logs inside the app.
-- Close the local Streamlit prototype line as the practical baseline for a later v1.0.0 release decision.
+- Close the local Streamlit prototype line as the practical baseline for v1.0.0 release hardening.
 - Keep BO logic out of the app layer.
 
-## 🔮 Later
+## 🚀 v1.0 - First Stable Public Release
 
-- FastAPI backend.
-- React frontend.
-- Database-backed campaign storage.
-- Multi-objective optimisation.
-- Multi-fidelity or contextual BO.
-- Authentication and multi-user campaign management.
+Status: completed
+
+- Harden package metadata for GitHub and PyPI release readiness.
+- Package both `bo_forge` and `bo_forge_app` explicitly.
+- Add the `bo-forge-app` console script for launching the packaged Streamlit workbench.
+- Add a public API reference, changelog, and release checklist.
+- Verify built wheel imports from an installed environment rather than the source checkout.
+- Confirm release hygiene, license presence, docs assets, and current install commands.
+- Keep BO behavior, CSV schema, CLI commands, notebook workflows, and app semantics unchanged.
+
+## 🔮 After v1.0
+
+Post-1.0 directions live in [ROADMAP_AFTER_V1.md](ROADMAP_AFTER_V1.md).

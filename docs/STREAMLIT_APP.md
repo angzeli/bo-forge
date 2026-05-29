@@ -1,16 +1,22 @@
 # 🖥️ Streamlit App
 
-BO Forge v0.5.4 provides a local Streamlit prototype around the existing `CampaignSession` workflow.
+BO Forge v1.0.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v0.5.4 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
+The v1.0.0 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
 
-v0.5.4 closes the local Streamlit prototype line and serves as the practical baseline for a later v1.0.0 release decision.
+v1.0.0 is the first stable public release baseline for the local app, backend package, CLI, and documentation.
 
 ## 🧰 Install
 
-Install the app extra from the project root:
+Install the app extra:
+
+```bash
+pip install "bo-forge[app]"
+```
+
+For development from a clone:
 
 ```bash
 ./.venv/bin/pip install -e ".[app]"
@@ -25,6 +31,12 @@ For development, the `dev` extra also includes Streamlit:
 ## ▶️ Run
 
 Start the local app:
+
+```bash
+bo-forge-app
+```
+
+From a source checkout, this also works:
 
 ```bash
 ./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py

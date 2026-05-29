@@ -15,16 +15,22 @@ bo-forge/
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── assets/                       # Tracked documentation screenshots
 │   ├── QUICKSTART.md
+│   ├── INSTALLATION.md
 │   ├── CLI.md
 │   ├── STREAMLIT_APP.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
+│   ├── PUBLIC_API.md
+│   ├── RELEASE_CHECKLIST.md
 │   └── REPOSITORY_STRUCTURE.md
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
-├── ROADMAP.md                        # Completed milestones and planned direction
+├── ROADMAP_PRE_V1.md                 # Milestones through v1.0.0
+├── ROADMAP_AFTER_V1.md               # Post-1.0 direction
+├── CHANGELOG.md                      # Release history
+├── MANIFEST.in                       # Source distribution file inclusion rules
 ├── pyproject.toml                    # Package metadata and dependencies
 ├── requirements-lock.txt             # Tested direct dependency snapshot
 ├── LICENSE                           # Project license
@@ -58,7 +64,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
-`bo_forge_app/` contains the local Streamlit wrapper. It should call `CampaignSession` and helper functions rather than reimplementing BO logic.
+`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
 
 ## 🚀 How To Use The Repository
 
@@ -67,6 +73,15 @@ Create a local environment and install the package:
 ```bash
 python3 -m venv .venv
 ./.venv/bin/pip install -e ".[dev]"
+```
+
+For installed use, the stable commands are:
+
+```bash
+pip install bo-forge
+pip install "bo-forge[app]"
+bo-forge --version
+bo-forge-app
 ```
 
 Run the clean quickstart script:

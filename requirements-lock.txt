@@ -1,12 +1,13 @@
-# Tested direct dependency snapshot for BO Forge v0.5.4.
+# Tested direct dependency snapshot for BO Forge v1.0.0.
 #
 # The normal install path is still:
 #   ./.venv/bin/pip install -e ".[dev]"
 #
-# This file records the known-good package versions used during the v0.5.4
+# This file records the known-good package versions used during the v1.0.0
 # release. It is intentionally limited to direct runtime/dev packages,
 # not every transitive dependency produced by `pip freeze`.
 botorch==0.17.2
+build==1.5.0
 gpytorch==1.15.2
 ipykernel==7.2.0
 ipywidgets==8.1.8
@@ -21,3 +22,5 @@ PyYAML==6.0.3
 ruff==0.15.12
 streamlit==1.57.0
 torch==2.11.0
+twine==6.2.0
+wheel==0.47.0

@@ -1,10 +1,8 @@
-# 🧪 BO Forge v0.5.4
+# 🧪 BO Forge v1.0.0
 
-BO Forge is a notebook-first Bayesian optimisation campaign tool with a small terminal workflow and local Streamlit prototype. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
+BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v0.5 adds a local Streamlit wrapper around the existing `CampaignSession` workflow. Suggestions are staged as a dry run before the user explicitly appends them to the CSV log, and the app now supports creating new local campaigns from inside the Forge Suite-inspired workbench.
-
-v0.5.4 closes the local Streamlit prototype line and serves as the practical baseline for a later v1.0.0 release decision.
+v1.0.0 is the first stable public release. It hardens the v0.x backend, YAML/CSV workflow, `CampaignSession`, `bo-forge` CLI, example notebooks, and Forge Suite-inspired local Streamlit workbench for GitHub and PyPI packaging.
 
 BO Forge deliberately supports only:
 
@@ -22,9 +20,51 @@ BO Forge deliberately supports only:
 - basic diagnostics
 - a notebook-first `CampaignSession` workflow
 - a small `bo-forge` CLI workflow
-- a local Streamlit app prototype
+- a local Streamlit workbench
 
-It intentionally does not yet cover qNEI, learned noise models, multi-objective optimisation, or a production web backend.
+It intentionally does not yet cover qNEI, learned noise models, multi-objective optimisation, database-backed storage, or a production multi-user web backend.
+
+---
+
+## 🧰 Install
+
+Install the backend package and CLI:
+
+```bash
+pip install bo-forge
+```
+
+Install the local Streamlit workbench:
+
+```bash
+pip install "bo-forge[app]"
+```
+
+For local development from a clone:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/pip install -e ".[dev]"
+```
+
+Check the installed version and environment:
+
+```bash
+bo-forge --version
+bo-forge doctor
+```
+
+Launch the packaged local app:
+
+```bash
+bo-forge-app
+```
+
+The module entrypoint is also supported:
+
+```bash
+python -m bo_forge --version
+```
 
 ---
 
@@ -69,15 +109,20 @@ bo-forge/
 
 ## 📚 Documentation
 
-- [docs/QUICKSTART.md](docs/QUICKSTART.md): setup, quickstart commands, session API example, notebooks, and diagnostics.
-- [docs/CLI.md](docs/CLI.md): terminal workflow and command reference.
-- [docs/STREAMLIT_APP.md](docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
-- [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
-- [docs/CLI_ERROR_EXAMPLES.md](docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
-- [docs/CSV_SCHEMA.md](docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
-- [docs/COMMON_ERRORS.md](docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
-- [docs/REPOSITORY_STRUCTURE.md](docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
-- [ROADMAP.md](ROADMAP.md): completed milestones and planned direction.
+- [docs/QUICKSTART.md](https://github.com/angzeli/bo-forge/blob/main/docs/QUICKSTART.md): setup, quickstart commands, session API example, notebooks, and diagnostics.
+- [docs/INSTALLATION.md](https://github.com/angzeli/bo-forge/blob/main/docs/INSTALLATION.md): pip install tutorial for core, app, development, wheel, and sdist installs.
+- [docs/CLI.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI.md): terminal workflow and command reference.
+- [docs/STREAMLIT_APP.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
+- [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](https://github.com/angzeli/bo-forge/blob/main/docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
+- [docs/CLI_ERROR_EXAMPLES.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
+- [docs/CSV_SCHEMA.md](https://github.com/angzeli/bo-forge/blob/main/docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
+- [docs/COMMON_ERRORS.md](https://github.com/angzeli/bo-forge/blob/main/docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
+- [docs/PUBLIC_API.md](https://github.com/angzeli/bo-forge/blob/main/docs/PUBLIC_API.md): stable public imports supported by the `bo_forge` package.
+- [docs/RELEASE_CHECKLIST.md](https://github.com/angzeli/bo-forge/blob/main/docs/RELEASE_CHECKLIST.md): GitHub and PyPI release checklist.
+- [docs/REPOSITORY_STRUCTURE.md](https://github.com/angzeli/bo-forge/blob/main/docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
+- [CHANGELOG.md](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md): release history.
+- [ROADMAP_PRE_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_PRE_V1.md): completed milestones through v1.0.0.
+- [ROADMAP_AFTER_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_AFTER_V1.md): post-1.0 direction.
 
 ---
 
@@ -85,7 +130,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v0.5.4 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.0.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 
