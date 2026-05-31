@@ -494,12 +494,15 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
 
 def _validate_structural_columns(df: pd.DataFrame) -> None:
     columns = list(df.columns)
-    if _has_multi_objective_columns(columns):
-        variable_columns, objective_columns = _variable_and_objective_columns(columns)
+    multi_objective_parts = _multi_objective_parts_from_columns(columns)
+    if multi_objective_parts is not None:
+        variable_columns, objective_columns, _ = multi_objective_parts
         if not variable_columns:
             raise LogValidationError("Campaign log must contain at least one variable column.")
-        if len(objective_columns) != 2:
-            raise LogValidationError("Multi-objective campaign log must contain two objectives.")
+        if len(objective_columns) < 2:
+            raise LogValidationError(
+                "Multi-objective campaign log must contain at least two objectives."
+            )
         return
 
     minimum_columns = [*BASE_COLUMNS, "variable", "objective", *RESULT_COLUMNS]
@@ -534,15 +537,10 @@ def _variable_and_objective_columns(
     columns: pd.Index | list[str],
 ) -> tuple[list[str], list[str]]:
     column_list = list(columns)
-    if _has_multi_objective_columns(column_list):
-        result_start = len(column_list) - 5
-        middle = column_list[len(BASE_COLUMNS) : result_start]
-        if len(middle) < 3:
-            raise LogValidationError(
-                "Multi-objective campaign log must contain at least one variable "
-                "column and two objective columns."
-            )
-        return middle[:-2], middle[-2:]
+    multi_objective_parts = _multi_objective_parts_from_columns(column_list)
+    if multi_objective_parts is not None:
+        variable_columns, objective_columns, _ = multi_objective_parts
+        return variable_columns, objective_columns
 
     start = len(BASE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
@@ -575,35 +573,55 @@ def _objective_column_from_columns(columns: pd.Index | list[str]) -> str:
 
 def _result_columns_from_columns(columns: pd.Index | list[str]) -> list[str]:
     column_list = list(columns)
-    if _has_multi_objective_columns(column_list):
-        return column_list[-5:]
+    multi_objective_parts = _multi_objective_parts_from_columns(column_list)
+    if multi_objective_parts is not None:
+        return multi_objective_parts[2]
     return [*RESULT_COLUMNS]
 
 
 def _has_multi_objective_columns(columns: pd.Index | list[str]) -> bool:
+    return _multi_objective_parts_from_columns(columns) is not None
+
+
+def _multi_objective_parts_from_columns(
+    columns: pd.Index | list[str],
+) -> tuple[list[str], list[str], list[str]] | None:
     column_list = list(columns)
-    if len(column_list) < len(BASE_COLUMNS) + 1 + 2 + 5:
-        return False
+    if len(column_list) < len(BASE_COLUMNS) + 1 + 2 + 4 + 1:
+        return None
     if column_list[: len(BASE_COLUMNS)] != BASE_COLUMNS or column_list[-1] != "acquisition":
-        return False
-    result_columns = column_list[-5:]
-    first_mean, first_std, second_mean, second_std, _ = result_columns
-    if not first_mean.startswith("predicted_mean_"):
-        return False
-    if not first_std.startswith("predicted_std_"):
-        return False
-    if not second_mean.startswith("predicted_mean_"):
-        return False
-    if not second_std.startswith("predicted_std_"):
-        return False
-    first_objective = first_mean.removeprefix("predicted_mean_")
-    second_objective = second_mean.removeprefix("predicted_mean_")
-    if first_std.removeprefix("predicted_std_") != first_objective:
-        return False
-    if second_std.removeprefix("predicted_std_") != second_objective:
-        return False
-    middle = column_list[len(BASE_COLUMNS) : -5]
-    return len(middle) >= 3 and middle[-2:] == [first_objective, second_objective]
+        return None
+
+    tail_length = len(column_list) - len(BASE_COLUMNS) - 1
+    max_objectives = max((tail_length - 1) // 3, 1)
+    for objective_count in range(max_objectives, 1, -1):
+        result_start = len(column_list) - 1 - 2 * objective_count
+        if result_start <= len(BASE_COLUMNS):
+            continue
+        result_columns = column_list[result_start:-1]
+        objective_names: list[str] = []
+        valid_result_columns = True
+        for index in range(0, len(result_columns), 2):
+            mean_column = result_columns[index]
+            std_column = result_columns[index + 1]
+            if not mean_column.startswith("predicted_mean_"):
+                valid_result_columns = False
+                break
+            objective_name = mean_column.removeprefix("predicted_mean_")
+            if std_column != f"predicted_std_{objective_name}":
+                valid_result_columns = False
+                break
+            objective_names.append(objective_name)
+        if not valid_result_columns:
+            continue
+
+        middle = column_list[len(BASE_COLUMNS) : result_start]
+        if len(middle) < objective_count + 1:
+            continue
+        if middle[-objective_count:] != objective_names:
+            continue
+        return middle[:-objective_count], objective_names, [*result_columns, "acquisition"]
+    return None
 
 
 def _is_blank(value: object) -> bool:

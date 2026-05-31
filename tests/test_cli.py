@@ -148,6 +148,36 @@ bo:
     return path
 
 
+def write_multi_objective_config(path: Path, *, initial_design_size: int = 10) -> Path:
+    path.write_text(
+        f"""
+campaign_name: multi_cli_test
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40
+  - name: waste_score
+    direction: minimize
+    reference_point: 25
+variables:
+  - name: temperature
+    type: continuous
+    lower: 20
+    upper: 100
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: qlog_ehvi
+  random_seed: 7
+  raw_samples: 8
+  num_restarts: 2
+  mc_samples: 8
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
@@ -211,6 +241,27 @@ def replicate_config(initial_design_size: int = 2) -> CampaignConfig:
         variables=cfg.variables,
         bo=cfg.bo,
         replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def multi_objective_config(initial_design_size: int = 10) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="multi_cli_test",
+        objective=ObjectiveConfig(name="yield_score", direction="maximize", reference_point=40.0),
+        objectives=(
+            ObjectiveConfig(name="yield_score", direction="maximize", reference_point=40.0),
+            ObjectiveConfig(name="waste_score", direction="minimize", reference_point=25.0),
+        ),
+        variables=(VariableConfig("temperature", "continuous", 20.0, 100.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            acquisition="qlog_ehvi",
+            random_seed=7,
+            raw_samples=8,
+            num_restarts=2,
+            mc_samples=8,
+        ),
     )
 
 
@@ -381,6 +432,42 @@ def replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def multi_objective_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "temperature": 35.0,
+                "yield_score": 55.0,
+                "waste_score": 20.0,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "suggested_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "sobol",
+                "temperature": 65.0,
+                "yield_score": "",
+                "waste_score": "",
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def write_log(path: Path, cfg: CampaignConfig, df: pd.DataFrame | None = None) -> Path:
     if df is None:
         df = empty_campaign_log(cfg)
@@ -412,7 +499,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.1.0\n"
+    assert captured.out == "bo-forge 1.1.1\n"
     assert captured.err == ""
 
 
@@ -421,7 +508,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.1.0\n"
+    assert completed.stdout == "bo-forge 1.1.1\n"
     assert completed.stderr == ""
 
 
@@ -759,6 +846,81 @@ def test_mark_observed_missing_row_returns_hint(
         "Hint: Check the row_id, pending status, campaign log path, and file permissions."
         in captured.err
     )
+
+
+@pytest.mark.parametrize(
+    "objective_args, expected_error",
+    [
+        (["--objective", "yield_score"], "Malformed --objective value"),
+        (
+            [
+                "--objective",
+                "yield_score=60",
+                "--objective",
+                "yield_score=61",
+                "--objective",
+                "waste_score=12",
+            ],
+            "Duplicate --objective value",
+        ),
+        (["--objective", "yield_score=60"], "missing=['waste_score']"),
+        (
+            [
+                "--objective",
+                "yield_score=60",
+                "--objective",
+                "waste_score=12",
+                "--objective",
+                "unknown=1",
+            ],
+            "extra=['unknown']",
+        ),
+        (
+            ["--objective", "yield_score=bad", "--objective", "waste_score=12"],
+            "must be numeric",
+        ),
+        (
+            [
+                "--objective-value",
+                "1.0",
+                "--objective",
+                "yield_score=60",
+                "--objective",
+                "waste_score=12",
+            ],
+            "Pass either --objective-value or --objective",
+        ),
+    ],
+)
+def test_multi_objective_cli_mark_observed_failures_are_byte_atomic(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    objective_args: list[str],
+    expected_error: str,
+) -> None:
+    config_path = write_multi_objective_config(tmp_path / "multi.yaml")
+    cfg = multi_objective_config()
+    log_path = write_log(tmp_path / "multi.csv", cfg, multi_objective_log(cfg))
+    before = log_path.read_bytes()
+
+    assert (
+        run(
+            [
+                "mark-observed",
+                *base_args(config_path, log_path),
+                "--row-id",
+                "suggested_0",
+                *objective_args,
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert expected_error in captured.err
+    assert log_path.read_bytes() == before
 
 
 def test_summary_status_next_action_and_report_outputs(

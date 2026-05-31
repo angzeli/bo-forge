@@ -102,14 +102,19 @@ bo-forge replicate-summary \
   --log examples/08_replicate_aware_working_log.csv
 ```
 
-For two-objective campaigns, `summary` includes Pareto and hypervolume fields, and `suggest` uses qLogEHVI after the initial design:
+For multi-objective campaigns, `summary` includes Pareto and hypervolume fields, and `suggest` uses qLogEHVI after the initial design:
 
 ```bash
+cp examples/10_multi_objective_mixed_constrained_campaign_log.csv \
+  examples/10_multi_objective_mixed_constrained_working_log.csv
+
 bo-forge suggest \
   --config configs/10_multi_objective_mixed_constrained_qlogehvi.yaml \
   --log examples/10_multi_objective_mixed_constrained_working_log.csv \
   --batch-size 2
 ```
+
+Copy the seed log before mutating commands so the committed example CSV stays unchanged.
 
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 
@@ -131,7 +136,7 @@ bo-forge mark-observed \
   --objective-value 1.95
 ```
 
-For two-objective campaigns, provide one `--objective name=value` argument per objective:
+For multi-objective campaigns, provide one `--objective name=value` argument per configured objective:
 
 ```bash
 bo-forge mark-observed \
@@ -142,7 +147,7 @@ bo-forge mark-observed \
   --objective waste_score=13.4
 ```
 
-The objective names must exactly match the YAML config. `--objective-value` is single-objective only.
+The objective names must exactly match the YAML config, with no missing, duplicate, or unknown names. `--objective-value` is single-objective only.
 
 For review-enabled campaigns, accept, reject, or defer suggestions before running them:
 
@@ -223,6 +228,15 @@ bo-forge plot \
   --log examples/10_multi_objective_mixed_constrained_working_log.csv \
   --kind hypervolume \
   --output reports/hypervolume.png
+
+cp examples/11_four_objective_mixed_constrained_campaign_log.csv \
+  examples/11_four_objective_mixed_constrained_working_log.csv
+
+bo-forge plot \
+  --config configs/11_four_objective_mixed_constrained_qlogehvi.yaml \
+  --log examples/11_four_objective_mixed_constrained_working_log.csv \
+  --kind pareto-parallel \
+  --output reports/pareto_parallel.png
 ```
 
 ## 🧭 Command Reference
@@ -239,12 +253,14 @@ bo-forge plot \
 | `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
 | `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and best-observed-objective fields. |
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
+| `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
+| `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
-| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE` | Mark a two-objective pending suggestion observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|hypervolume --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, or hypervolume figure. |
+| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...]` | Mark a multi-objective pending suggestion observed. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, or hypervolume figure. |
 
 ## 🧯 CLI Error Output
 

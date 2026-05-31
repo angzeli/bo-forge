@@ -7,6 +7,7 @@ import contextlib
 import importlib
 import importlib.util
 import io
+import math
 import os
 import platform
 import sys
@@ -90,6 +91,20 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(replicate_summary_parser)
     replicate_summary_parser.set_defaults(handler=_cmd_replicate_summary)
 
+    pareto_front_parser = subparsers.add_parser(
+        "pareto-front",
+        help="Print nondominated observed rows for a multi-objective campaign.",
+    )
+    _add_config_log_arguments(pareto_front_parser)
+    pareto_front_parser.set_defaults(handler=_cmd_pareto_front)
+
+    pareto_summary_parser = subparsers.add_parser(
+        "pareto-summary",
+        help="Print Pareto-front and hypervolume summary fields.",
+    )
+    _add_config_log_arguments(pareto_summary_parser)
+    pareto_summary_parser.set_defaults(handler=_cmd_pareto_summary)
+
     report_parser = subparsers.add_parser("report", help="Print or export a campaign report.")
     _add_config_log_arguments(report_parser)
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
@@ -156,6 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
             "cost-progress",
             "replicates",
             "pareto",
+            "pareto-parallel",
             "hypervolume",
         ],
         required=True,
@@ -274,6 +290,22 @@ def _cmd_replicate_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pareto_front(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if not campaign.config.is_multi_objective:
+        raise ConfigError("pareto-front requires a multi-objective config.")
+    _print_table(campaign.pareto_front())
+    return 0
+
+
+def _cmd_pareto_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if not campaign.config.is_multi_objective:
+        raise ConfigError("pareto-summary requires a multi-objective config.")
+    _print_table(campaign.pareto_summary())
+    return 0
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if args.output is None:
@@ -364,6 +396,16 @@ def _cmd_plot(args: argparse.Namespace) -> int:
             if not campaign.config.is_multi_objective:
                 raise ConfigError("plot --kind pareto requires a multi-objective config.")
             campaign.plot_pareto(save_path=args.output)
+        elif args.kind == "pareto-parallel":
+            if not campaign.config.is_multi_objective:
+                raise ConfigError(
+                    "plot --kind pareto-parallel requires a multi-objective config."
+                )
+            if len(campaign.config.objectives) < 3:
+                raise ConfigError(
+                    "plot --kind pareto-parallel requires at least three objectives."
+                )
+            campaign.plot_pareto_parallel(save_path=args.output)
         elif args.kind == "hypervolume":
             if not campaign.config.is_multi_objective:
                 raise ConfigError("plot --kind hypervolume requires a multi-objective config.")
@@ -435,11 +477,16 @@ def _parse_cli_objective_values(values: list[str]) -> dict[str, float]:
         if name in parsed:
             raise LogWriteError(f"Duplicate --objective value for objective '{name}'.")
         try:
-            parsed[name] = float(raw_value)
+            parsed_value = float(raw_value)
         except ValueError as exc:
             raise LogWriteError(
                 f"Objective value for '{name}' must be numeric: value={raw_value!r}."
             ) from exc
+        if not math.isfinite(parsed_value):
+            raise LogWriteError(
+                f"Objective value for '{name}' must be finite: value={raw_value!r}."
+            )
+        parsed[name] = parsed_value
     return parsed
 
 

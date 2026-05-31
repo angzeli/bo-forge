@@ -11,7 +11,11 @@ from botorch.acquisition import LogExpectedImprovement
 from botorch.exceptions.errors import BotorchError
 from torch.quasirandom import SobolEngine
 
-from bo_forge.acquisition import optimize_log_ei, optimize_qlog_ehvi
+from bo_forge.acquisition import (
+    build_qlog_ehvi_acquisition,
+    optimize_log_ei,
+    optimize_qlog_ehvi,
+)
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_violations_for_values
 from bo_forge.costs import budget_remaining, evaluate_cost
@@ -168,10 +172,15 @@ def _suggest_multi_objective_model_based(
             break
 
     if user_candidates is None or acquisition_value is None:
-        raise SuggestionError(
-            "Could not generate enough feasible, non-duplicate multi-objective "
-            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
-            f"Last rejection: {rejection_message}"
+        user_candidates, acquisition_value = _fallback_qlog_ehvi_candidate_batch(
+            config=config,
+            df=df,
+            model=model,
+            train_y_model=train_y_model,
+            ref_point=ref_point,
+            batch_size=batch_size,
+            fixed_features_list=fixed_features_list,
+            rejection_message=rejection_message,
         )
 
     x_unit_repaired = values_to_unit_cube(config, user_candidates)
@@ -198,6 +207,65 @@ def _suggest_multi_objective_model_based(
         rows.append(row)
 
     return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _fallback_qlog_ehvi_candidate_batch(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    model,
+    train_y_model: torch.Tensor,
+    ref_point: torch.Tensor,
+    batch_size: int,
+    fixed_features_list: list[dict[int, float]],
+    rejection_message: str,
+) -> tuple[list[tuple[object, ...]], torch.Tensor]:
+    acquisition = build_qlog_ehvi_acquisition(
+        config=config,
+        model=model,
+        train_y_model=train_y_model,
+        ref_point=ref_point,
+    )
+    assignments = fixed_features_list or [{}]
+    best_candidates: list[tuple[object, ...]] | None = None
+    best_value: torch.Tensor | None = None
+    best_scalar = -math.inf
+    model_dim = encoded_dimension(config)
+    pool_size = max(config.bo.raw_samples, 64)
+
+    for attempt in range(MAX_DECODE_RETRIES):
+        for assignment_index, fixed_features in enumerate(assignments):
+            engine = SobolEngine(
+                dimension=model_dim,
+                scramble=True,
+                seed=config.bo.random_seed + 104729 + attempt * 101 + assignment_index,
+            )
+            unit = engine.draw(pool_size * batch_size).to(dtype=torch.double)
+            candidate_batches = unit.reshape(pool_size, batch_size, model_dim)
+            for candidate_batch in candidate_batches:
+                for feature_index, value in fixed_features.items():
+                    candidate_batch[:, feature_index] = value
+                decoded_candidates = unit_cube_to_user_values(config, candidate_batch)
+                rejection = _candidate_batch_rejection_message(config, df, decoded_candidates)
+                if rejection is not None:
+                    rejection_message = rejection
+                    continue
+                repaired = values_to_unit_cube(config, decoded_candidates)
+                with torch.no_grad():
+                    value = acquisition(repaired).reshape(-1)[0]
+                scalar = float(value)
+                if math.isfinite(scalar) and scalar > best_scalar:
+                    best_candidates = decoded_candidates
+                    best_value = value.detach().reshape(1)
+                    best_scalar = scalar
+
+    if best_candidates is None or best_value is None:
+        raise SuggestionError(
+            "Could not generate enough feasible, non-duplicate multi-objective "
+            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+            f"Last rejection: {rejection_message}"
+        )
+    return best_candidates, best_value
 
 
 def _suggest_model_based(

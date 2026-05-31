@@ -27,9 +27,6 @@ from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
 from bo_forge.multi_objective import (
-    hypervolume,
-)
-from bo_forge.multi_objective import (
     pareto_front as _pareto_front,
 )
 from bo_forge.multi_objective import (
@@ -206,9 +203,11 @@ class CampaignSession:
             ("pending_suggestions", pending_count),
             ("initial_design_remaining", initial_design_remaining),
             ("next_iteration", next_iteration(self.df)),
-            ("pareto_count", len(self.pareto_front())),
-            ("hypervolume", hypervolume(self.config, self.df)),
         ]
+        pareto_summary = self.pareto_summary()
+        rows.extend(
+            (str(row["field"]), row["value"]) for _, row in pareto_summary.iterrows()
+        )
         return pd.DataFrame(rows, columns=["field", "value"])
 
     def _review_status_counts(self) -> dict[str, int]:
@@ -467,10 +466,16 @@ class CampaignSession:
         return _plot_replicates(self.config, self.df, **kwargs)
 
     def plot_pareto(self, **kwargs: Any) -> Any:
-        """Plot the 2D observed Pareto front for a multi-objective campaign."""
+        """Plot observed Pareto diagnostics for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_pareto as _plot_pareto
 
         return _plot_pareto(self.config, self.df, **kwargs)
+
+    def plot_pareto_parallel(self, **kwargs: Any) -> Any:
+        """Plot Pareto-front rows with normalized parallel coordinates."""
+        from bo_forge.diagnostics import plot_pareto_parallel as _plot_pareto_parallel
+
+        return _plot_pareto_parallel(self.config, self.df, **kwargs)
 
     def plot_hypervolume(self, **kwargs: Any) -> Any:
         """Plot hypervolume progress for a multi-objective campaign."""

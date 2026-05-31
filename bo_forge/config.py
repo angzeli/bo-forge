@@ -148,12 +148,12 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     review = _parse_review(raw.get("review"))
     replicates = _parse_replicates(raw.get("replicates"))
     if objectives and cost is not None:
-        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.0.")
+        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.1.")
     if objectives and review.enabled:
-        raise ConfigError("Multi-objective configs do not support review.enabled: true in v1.1.0.")
+        raise ConfigError("Multi-objective configs do not support review.enabled: true in v1.1.1.")
     if objectives and replicates.enabled:
         raise ConfigError(
-            "Multi-objective configs do not support replicates.enabled: true in v1.1.0."
+            "Multi-objective configs do not support replicates.enabled: true in v1.1.1."
         )
     bo = _parse_bo(raw.get("bo", {}), multi_objective=bool(objectives))
 
@@ -201,9 +201,9 @@ def _parse_objective(raw: Any) -> tuple[ObjectiveConfig, list[ObjectiveConfig]]:
 def _parse_objectives(raw: Any) -> list[ObjectiveConfig]:
     if not isinstance(raw, list):
         raise ConfigError("Config key 'objectives' must be a list.")
-    if len(raw) != 2:
+    if len(raw) < 2:
         raise ConfigError(
-            "Config key 'objectives' must contain exactly two objectives in v1.1.0."
+            "Config key 'objectives' must contain at least two objectives in v1.1.1."
         )
 
     objectives: list[ObjectiveConfig] = []

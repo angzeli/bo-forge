@@ -1,4 +1,4 @@
-"""Two-objective utilities for coupled qLogEHVI campaigns."""
+"""Multi-objective utilities for coupled qLogEHVI campaigns."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 
 from bo_forge.config import CampaignConfig
-from bo_forge.validation import get_observed_data, validate_campaign_data
+from bo_forge.validation import canonical_columns, get_observed_data, validate_campaign_data
 
 
 def objective_signs(config: CampaignConfig) -> torch.Tensor:
@@ -58,11 +58,11 @@ def pareto_front(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     validate_campaign_data(config, df)
     observed = get_observed_data(config, df)
     if observed.empty:
-        return observed.copy()
+        return pd.DataFrame(columns=canonical_columns(config))
 
     y_model = observed_objectives_to_model_tensor(config, observed)
     mask = is_non_dominated(y_model, maximize=True, deduplicate=False).cpu().numpy()
-    return observed.loc[mask].copy()
+    return sort_pareto_front(config, observed.loc[mask].copy())
 
 
 def hypervolume(config: CampaignConfig, df: pd.DataFrame) -> float:
@@ -79,7 +79,8 @@ def hypervolume(config: CampaignConfig, df: pd.DataFrame) -> float:
     if not bool(dominates_ref.any()):
         return 0.0
 
-    pareto_y = y_model[is_non_dominated(y_model, maximize=True, deduplicate=False)]
+    valid_y = y_model[dominates_ref]
+    pareto_y = valid_y[is_non_dominated(valid_y, maximize=True, deduplicate=False)]
     return float(Hypervolume(ref_point=ref_point).compute(pareto_y))
 
 
@@ -87,7 +88,7 @@ def hypervolume_progress(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFra
     """Return hypervolume after each observed row in campaign order."""
     _require_multi_objective(config)
     validate_campaign_data(config, df)
-    observed = get_observed_data(config, df).sort_values(["iteration", "row_id"])
+    observed = get_observed_data(config, df)
     rows = []
     for index in range(len(observed)):
         prefix = observed.iloc[: index + 1].copy()
@@ -95,19 +96,34 @@ def hypervolume_progress(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFra
             {
                 "observation": index + 1,
                 "row_id": str(prefix["row_id"].iloc[-1]),
+                "iteration": int(prefix["iteration"].iloc[-1]),
                 "hypervolume": hypervolume(config, prefix),
             }
         )
-    return pd.DataFrame(rows, columns=["observation", "row_id", "hypervolume"])
+    return pd.DataFrame(rows, columns=["observation", "row_id", "iteration", "hypervolume"])
 
 
 def pareto_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     """Return a compact two-column Pareto and hypervolume summary."""
     _require_multi_objective(config)
+    validate_campaign_data(config, df)
+    observed = get_observed_data(config, df)
     front = pareto_front(config, df)
+    observed_count = len(observed)
+    current_hypervolume = hypervolume(config, df)
     rows: list[tuple[str, object]] = [
+        ("objective_count", len(config.objectives)),
         ("pareto_count", len(front)),
-        ("hypervolume", hypervolume(config, df)),
+        ("pareto_fraction", len(front) / observed_count if observed_count else 0.0),
+        ("hypervolume", current_hypervolume),
+        ("hypervolume_is_zero", current_hypervolume == 0.0),
+        (
+            "zero_hypervolume_reason",
+            "No observed point currently dominates the configured reference point "
+            "in transformed objective space."
+            if current_hypervolume == 0.0
+            else None,
+        ),
     ]
     for objective in config.objectives:
         rows.extend(
@@ -117,6 +133,27 @@ def pareto_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
             ]
         )
     return pd.DataFrame(rows, columns=["field", "value"])
+
+
+def sort_pareto_front(config: CampaignConfig, front: pd.DataFrame) -> pd.DataFrame:
+    """Sort Pareto rows by objective preference and row_id for stable display."""
+    if front.empty:
+        return front.copy()
+
+    sortable = front.copy()
+    sort_columns: list[str] = []
+    ascending: list[bool] = []
+    for index, objective in enumerate(config.objectives):
+        sort_column = f"__objective_sort_{index}"
+        sortable[sort_column] = pd.to_numeric(sortable[objective.name])
+        sort_columns.append(sort_column)
+        ascending.append(objective.direction == "minimize")
+    sortable["__row_id_sort"] = sortable["row_id"].astype(str)
+    sort_columns.append("__row_id_sort")
+    ascending.append(True)
+
+    sorted_front = sortable.sort_values(sort_columns, ascending=ascending)
+    return sorted_front[front.columns].copy()
 
 
 def _require_multi_objective(config: CampaignConfig) -> None:

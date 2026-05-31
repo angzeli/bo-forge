@@ -12,6 +12,7 @@ API_NOTEBOOKS = [
 ]
 CLI_NOTEBOOK = Path("notebooks/04_cli_four_variable_campaign.ipynb")
 REPLICATE_NOTEBOOK = Path("notebooks/08_replicate_aware_campaign.ipynb")
+FOUR_OBJECTIVE_NOTEBOOK = Path("notebooks/11_four_objective_qlogehvi_campaign.ipynb")
 
 assert NOTEBOOKS, "No notebooks found under notebooks/*.ipynb"
 
@@ -43,6 +44,8 @@ def test_notebook_defines_15_step_target(notebook_path: Path) -> None:
     source = notebook_source(notebook_path)
     if notebook_path == REPLICATE_NOTEBOOK:
         assert "TARGET_REPLICATE_GROUPS = 15" in source
+    elif notebook_path == FOUR_OBJECTIVE_NOTEBOOK:
+        assert "TARGET_OBSERVED_ROWS = 50" in source
     else:
         assert "TARGET_OBSERVED_ROWS = 15" in source
 

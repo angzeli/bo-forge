@@ -20,13 +20,13 @@ The full cost + review + replicates schema is:
 row_id,iteration,status,source,review_status,review_note,replicate_group,replicate_index,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
 ```
 
-For v1.1 two-objective campaigns, the schema is:
+For v1.1 multi-objective campaigns, the schema scales with the configured objective order:
 
 ```text
-row_id,iteration,status,source,<variable columns...>,<objective_1>,<objective_2>,predicted_mean_<objective_1>,predicted_std_<objective_1>,predicted_mean_<objective_2>,predicted_std_<objective_2>,acquisition
+row_id,iteration,status,source,<variable columns...>,<objective_1>,...,<objective_m>,predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition
 ```
 
-Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains both objective values. Suggested rows keep both objective columns blank until the experiment is complete.
+Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains all configured objective values. Suggested rows keep every objective column blank until the experiment is complete.
 
 For `configs/01_simple_2d_maximise_logei.yaml`, the concrete columns are:
 
@@ -41,14 +41,14 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for two-objective campaigns. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for multi-objective campaigns. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
 | `replicate_group` | If replicates enabled | Nonblank replicate-group identifier. Rows in a group share one design. |
 | `replicate_index` | If replicates enabled | Zero-based non-negative integer, unique within each replicate group. |
 | variable columns | Yes | One column per configured variable, in YAML order, stored in original user units. |
 | objective column | Yes | The configured objective name, such as `activity` or `defect_rate`. |
-| objective columns | Multi-objective only | The two configured objective names. Observed rows must fill both values. |
+| objective columns | Multi-objective only | The configured objective names, in YAML order. Observed rows must fill every objective value. |
 | `cost_estimate` | If cost configured | Optional finite non-negative estimated cost. If filled, it must match the deterministic cost expression. Generated suggestions fill this column. |
 | `cost_actual` | If cost configured | Optional finite non-negative realised cost entered when marking observed. |
 | `predicted_mean` | Yes | Optional model prediction for suggested model-based rows. Blank is allowed. |
@@ -68,7 +68,7 @@ Suggested rows:
 - `status` must be `suggested`.
 - The objective cell must be blank.
 - Variable values must be filled and valid for the configured variable type.
-- `source` is usually `sobol`, `random`, `log_ei`, or `qlog_ei`.
+- `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, or `qlog_ehvi`.
 - For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
 - For cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
 
@@ -106,7 +106,7 @@ mark_observed(
 
 For cost-aware campaigns, `mark_observed(..., actual_cost=...)` records a finite non-negative realised cost in `cost_actual`. For review-enabled campaigns, only `review_status=accepted` rows can be marked observed.
 
-For multi-objective campaigns, use objective values keyed by objective name:
+For multi-objective campaigns, use objective values keyed by every configured objective name:
 
 ```python
 campaign.mark_observed(
@@ -160,13 +160,13 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-v1.1 supports exactly two objectives with coupled evaluation.
+v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.1.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
 - Reference points are written in user-facing objective units and should represent meaningfully worse outcomes than the region of interest.
-- Observed rows must contain both objective values.
-- Suggested rows must leave both objective values blank.
+- Observed rows must contain every objective value.
+- Suggested rows must leave every objective value blank.
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 

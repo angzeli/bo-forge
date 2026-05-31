@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for two-objective campaigns.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for multi-objective campaigns.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -111,15 +111,15 @@ expression: "1.0 + 2.0 * (solvent == 'Water')"
 
 ### `Config must define either 'objective' or 'objectives', not both`
 
-Single-objective campaigns use `objective:`. Two-objective campaigns use `objectives:`.
+Single-objective campaigns use `objective:`. Multi-objective campaigns use `objectives:`.
 
 Fix: keep exactly one objective section.
 
-### `objectives must contain exactly two objectives`
+### `objectives must contain at least two objectives`
 
-v1.1 supports exactly two coupled objectives.
+v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.1.1 is two to four objectives.
 
-Fix: define two objective mappings, each with `name`, `direction`, and `reference_point`.
+Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
 ### `reference_point`
 
@@ -222,7 +222,7 @@ The row says the experiment has been observed, but no result is present.
 
 Fix: enter the objective value, or change the row back to `suggested`.
 
-For multi-objective campaigns, every observed row must contain both objective values. Partial objective rows are not supported in v1.1.
+For multi-objective campaigns, every observed row must contain all configured objective values. Partial objective rows are not supported in v1.1.
 
 ### `status='suggested' but objective ... is filled`
 
@@ -230,7 +230,7 @@ A suggested row already has a result value.
 
 Fix: use `mark_observed()` to perform the transition, or manually set `status=observed` only if the rest of the row is valid.
 
-For multi-objective campaigns, suggested rows must leave both objective columns blank until both coupled objective values are available.
+For multi-objective campaigns, suggested rows must leave every objective column blank until all coupled objective values are available.
 
 ### `objective_value is not valid for multi-objective campaign logs`
 

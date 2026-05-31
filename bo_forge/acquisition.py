@@ -79,16 +79,11 @@ def optimize_qlog_ehvi(
         [[0.0] * model_dim, [1.0] * model_dim],
         dtype=torch.double,
     )
-    sampler = SobolQMCNormalSampler(
-        sample_shape=torch.Size([config.bo.mc_samples]),
-        seed=config.bo.random_seed,
-    )
-    partitioning = NondominatedPartitioning(ref_point=ref_point, Y=train_y_model)
-    acquisition = qLogExpectedHypervolumeImprovement(
+    acquisition = build_qlog_ehvi_acquisition(
+        config=config,
         model=model,
+        train_y_model=train_y_model,
         ref_point=ref_point,
-        partitioning=partitioning,
-        sampler=sampler,
     )
 
     optimize_kwargs = {
@@ -107,3 +102,23 @@ def optimize_qlog_ehvi(
     else:
         candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
     return candidates.detach(), acquisition_value.detach(), "qlog_ehvi"
+
+
+def build_qlog_ehvi_acquisition(
+    config: CampaignConfig,
+    model: Model,
+    train_y_model: torch.Tensor,
+    ref_point: torch.Tensor,
+) -> qLogExpectedHypervolumeImprovement:
+    """Construct the qLogEHVI acquisition used by optimizer and fallback paths."""
+    sampler = SobolQMCNormalSampler(
+        sample_shape=torch.Size([config.bo.mc_samples]),
+        seed=config.bo.random_seed,
+    )
+    partitioning = NondominatedPartitioning(ref_point=ref_point, Y=train_y_model)
+    return qLogExpectedHypervolumeImprovement(
+        model=model,
+        ref_point=ref_point,
+        partitioning=partitioning,
+        sampler=sampler,
+    )

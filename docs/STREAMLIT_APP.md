@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.1.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.1.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v1.1.0 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
+The v1.1.1 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
 
-v1.1.0 keeps the local app on the v1.0 workflow baseline. Two-objective qLogEHVI support is available through the backend, session API, CLI, and notebooks first; full app-specific multi-objective workflow polish is deferred.
+v1.1.1 keeps the local app on the v1.0 workflow baseline. Generalized coupled multi-objective qLogEHVI support is available through the backend, session API, CLI, and notebooks first; full app-specific multi-objective workflow polish is deferred.
 
 ## 🧰 Install
 
@@ -79,18 +79,6 @@ The app keeps file selection on the main workbench page, followed by four practi
 - `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
 - `Resolve`: review queue, rows ready to observe, mark-observed form, and actual-cost input when configured.
 - `Reports`: report preview/export and progress, diagnostics, cost-progress, or replicate plots when supported by the config.
-
-## 🖼️ Workbench Screenshots
-
-![Campaign Files and Create Campaign](assets/streamlit_campaign_files_create_campaign.png)
-
-![Campaign panel](assets/streamlit_campaign_panel.png)
-
-![Suggest panel](assets/streamlit_suggest_panel.png)
-
-![Resolve panel](assets/streamlit_resolve_panel.png)
-
-![Reports panel](assets/streamlit_reports_panel.png)
 
 ## ⚠️ Write Actions
 

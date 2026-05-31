@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from itertools import combinations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -288,10 +290,19 @@ def plot_pareto(
     save_path: str | Path | None = None,
     show: bool = False,
 ):
-    """Plot observed two-objective values and the nondominated Pareto front."""
+    """Plot observed Pareto diagnostics for a multi-objective campaign."""
     validate_campaign_data(config, df)
     if not config.is_multi_objective:
         raise ValueError("plot_pareto() requires a multi-objective config.")
+    if len(config.objectives) > 2:
+        return _plot_pairwise_pareto(
+            config,
+            df,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
     observed = get_observed_data(config, df)
     front = pareto_front(config, df)
     x_name, y_name = config.objective_names
@@ -299,7 +310,19 @@ def plot_pareto(
     _, ax = new_figure(figsize=(8, 6))
     if observed.empty:
         set_title(ax, f"{config.campaign_name}: no observations yet")
-        set_axis_labels(ax, x_name, y_name)
+        ax.text(
+            0.5,
+            0.5,
+            "No observed objective values yet.",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        set_axis_labels(
+            ax,
+            _objective_axis_label(config, x_name),
+            _objective_axis_label(config, y_name),
+        )
         return finalise_figure(
             ax,
             filename=filename,
@@ -316,17 +339,79 @@ def plot_pareto(
         label="observed",
     )
     if not front.empty:
-        front_sorted = _sort_pareto_for_display(config, front)
         ax.plot(
-            front_sorted[x_name].astype(float),
-            front_sorted[y_name].astype(float),
+            front[x_name].astype(float),
+            front[y_name].astype(float),
             color="#d97706",
             marker="o",
             label="Pareto front",
         )
     set_title(ax, f"{config.campaign_name}: Pareto front")
-    set_axis_labels(ax, x_name, y_name)
+    set_axis_labels(
+        ax,
+        _objective_axis_label(config, x_name),
+        _objective_axis_label(config, y_name),
+    )
     add_legend(ax)
+    return finalise_figure(
+        ax,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+    )
+
+
+def plot_pareto_parallel(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot Pareto-front rows with normalized parallel coordinates."""
+    validate_campaign_data(config, df)
+    if not config.is_multi_objective:
+        raise ValueError("plot_pareto_parallel() requires a multi-objective config.")
+    if len(config.objectives) < 3:
+        raise ValueError(
+            "plot_pareto_parallel() requires at least three objectives; use "
+            "plot_pareto() for a 2D Pareto scatter."
+        )
+    observed = get_observed_data(config, df)
+    front = pareto_front(config, df)
+
+    _, ax = new_figure(figsize=(10, 6))
+    if observed.empty or front.empty:
+        set_title(ax, f"{config.campaign_name}: no Pareto observations yet")
+        ax.text(
+            0.5,
+            0.5,
+            "No Pareto-front rows to display yet.",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        set_axis_labels(ax, "Objective", "Normalised value")
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    normalized = _normalise_pareto_parallel_values(config, observed, front)
+    x = list(range(len(config.objectives)))
+    for _, row in normalized.iterrows():
+        ax.plot(x, row.tolist(), color="#d97706", alpha=0.65, linewidth=1.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels([_objective_axis_label(config, name) for name in config.objective_names])
+    ax.set_ylim(-0.05, 1.05)
+    set_title(ax, f"{config.campaign_name}: Pareto trade-off profiles")
+    set_axis_labels(ax, "Objective", "Normalised value")
     return finalise_figure(
         ax,
         filename=filename,
@@ -345,7 +430,7 @@ def plot_hypervolume(
     save_path: str | Path | None = None,
     show: bool = False,
 ):
-    """Plot hypervolume progress for a two-objective campaign."""
+    """Plot hypervolume progress for a multi-objective campaign."""
     validate_campaign_data(config, df)
     if not config.is_multi_objective:
         raise ValueError("plot_hypervolume() requires a multi-objective config.")
@@ -354,6 +439,14 @@ def plot_hypervolume(
     _, ax = new_figure(figsize=(8, 6))
     if progress.empty:
         set_title(ax, f"{config.campaign_name}: no observations yet")
+        ax.text(
+            0.5,
+            0.5,
+            "No observed objective values yet.",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         set_axis_labels(ax, "Observation", "Hypervolume")
         return finalise_figure(
             ax,
@@ -446,10 +539,120 @@ def _directional_best_so_far(config: CampaignConfig, values: pd.Series) -> pd.Se
     return values.cummax() if config.objective.direction == "maximize" else values.cummin()
 
 
-def _sort_pareto_for_display(config: CampaignConfig, front: pd.DataFrame) -> pd.DataFrame:
-    first_objective = config.objectives[0]
-    ascending = first_objective.direction == "minimize"
-    return front.sort_values(first_objective.name, ascending=ascending)
+def _plot_pairwise_pareto(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None,
+    fig_folder: str | Path,
+    save_path: str | Path | None,
+    show: bool,
+):
+    observed = get_observed_data(config, df)
+    front = pareto_front(config, df)
+    objective_pairs = list(combinations(config.objective_names, 2))
+    column_count = min(3, len(objective_pairs))
+    row_count = math.ceil(len(objective_pairs) / column_count)
+
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        row_count,
+        column_count,
+        figsize=(5.2 * column_count, 4.5 * row_count),
+        facecolor="white",
+        constrained_layout=True,
+        squeeze=False,
+    )
+    flat_axes = list(axes.flat)
+    if observed.empty:
+        first_ax = flat_axes[0]
+        first_ax.text(
+            0.5,
+            0.5,
+            "No observed objective values yet.",
+            ha="center",
+            va="center",
+            transform=first_ax.transAxes,
+        )
+        set_title(first_ax, f"{config.campaign_name}: no observations yet")
+        for ax in flat_axes[1:]:
+            ax.set_visible(False)
+        return finalise_axes(
+            fig,
+            axes,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    for ax, (x_name, y_name) in zip(flat_axes, objective_pairs, strict=False):
+        ax.scatter(
+            observed[x_name].astype(float),
+            observed[y_name].astype(float),
+            color="#64748b",
+            alpha=0.55,
+            label="observed",
+        )
+        if not front.empty:
+            ax.scatter(
+                front[x_name].astype(float),
+                front[y_name].astype(float),
+                color="#d97706",
+                edgecolor="black",
+                linewidth=0.5,
+                label="full-space Pareto",
+            )
+        ax.set_title(f"{x_name} vs {y_name}", fontsize=12, fontweight="bold")
+        ax.set_xlabel(_objective_axis_label(config, x_name), fontsize=12, fontweight="bold")
+        ax.set_ylabel(_objective_axis_label(config, y_name), fontsize=12, fontweight="bold")
+        add_legend(ax)
+
+    for ax in flat_axes[len(objective_pairs) :]:
+        ax.set_visible(False)
+
+    fig.suptitle(
+        f"{config.campaign_name}: pairwise Pareto projections",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def _normalise_pareto_parallel_values(
+    config: CampaignConfig,
+    observed: pd.DataFrame,
+    front: pd.DataFrame,
+) -> pd.DataFrame:
+    normalized = pd.DataFrame(index=front.index)
+    for objective in config.objectives:
+        observed_values = pd.to_numeric(observed[objective.name])
+        front_values = pd.to_numeric(front[objective.name])
+        minimum = float(observed_values.min())
+        maximum = float(observed_values.max())
+        if math.isclose(minimum, maximum):
+            display_values = pd.Series(0.5, index=front.index)
+        else:
+            display_values = (front_values - minimum) / (maximum - minimum)
+            if objective.direction == "minimize":
+                display_values = 1.0 - display_values
+        normalized[objective.name] = display_values.astype(float)
+    return normalized
+
+
+def _objective_axis_label(config: CampaignConfig, objective_name: str) -> str:
+    objective = next(item for item in config.objectives if item.name == objective_name)
+    marker = "max" if objective.direction == "maximize" else "min"
+    return f"{objective.name} ({marker})"
 
 
 def _observation_tick_positions(count: int) -> list[int]:

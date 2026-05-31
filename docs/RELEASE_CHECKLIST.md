@@ -17,7 +17,6 @@ Confirm:
 
 - `LICENSE` exists.
 - `README.md` includes install commands for the core package, app extra, `bo-forge`, and `bo-forge-app`.
-- Screenshots referenced by docs exist under `docs/assets/`.
 - No tracked caches, working logs, latest-suggestion CSVs, notebook outputs, or runtime reports are present.
 
 ## 📦 Build
@@ -33,7 +32,7 @@ rm -rf dist/ build/
 Package-data boundary:
 
 - the wheel should contain only the importable `bo_forge` and `bo_forge_app` packages, entrypoint metadata, and license metadata;
-- release docs, screenshots, configs, examples, notebooks, and tests belong in the sdist, not in the wheel;
+- release docs, configs, examples, notebooks, and tests belong in the sdist, not in the wheel;
 - ignored working logs, latest-suggestion CSVs, and runtime reports should not appear in either artifact.
 
 `twine check` is the README/PyPI rendering gate.
@@ -44,7 +43,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.1.0-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.1.1-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -61,7 +60,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.1.0-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.1.1-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -76,7 +75,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.1.0.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.1.1.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -103,7 +102,7 @@ Confirm the full local loop still works:
 
 ## 🏷️ GitHub Release
 
-- Tag the release as `v1.1.0`.
+- Tag the release as `v1.1.1`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

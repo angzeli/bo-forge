@@ -61,7 +61,7 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_constraints(config, df)
     if config.is_multi_objective:
         _validate_multi_objectives(config, df)
-        _validate_nullable_numeric_columns(df, _multi_objective_result_columns(config))
+        _validate_finite_nullable_numeric_columns(df, _multi_objective_result_columns(config))
         _validate_nullable_numeric_columns(df, ["acquisition"])
         return
     _validate_objective(config, df)
@@ -539,12 +539,13 @@ def _validate_nullable_numeric_columns(df: pd.DataFrame, columns: Iterable[str])
     for column in columns:
         blank = _blank_mask(df[column])
         numeric = pd.to_numeric(df.loc[~blank, column], errors="coerce")
-        invalid = numeric.isna()
+        invalid = numeric.isna() | ~numeric.map(math.isfinite)
         if invalid.any():
             row_id = str(df.loc[~blank].loc[invalid, "row_id"].iloc[0])
             value = df.loc[~blank].loc[invalid, column].iloc[0]
             raise LogValidationError(
-                f"Row '{row_id}' has non-numeric value for column '{column}': value={value!r}."
+                f"Row '{row_id}' has non-finite numeric value for column "
+                f"'{column}': value={value!r}."
             )
 
 

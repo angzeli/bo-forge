@@ -1,15 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v1.1.1 - Generalized 3+ Objective qLogEHVI Campaigns
+
+This release generalizes the v1.1 multi-objective path from the initial two-objective qLogEHVI workflow to `m >= 2` coupled objectives.
+
+- Accepts two or more configured objectives with finite user-facing reference points.
+- Centralizes dynamic multi-objective CSV schema construction for objective and prediction metadata columns.
+- Generalizes Pareto-front extraction, deterministic Pareto ordering, hypervolume, and hypervolume progress.
+- Adds pairwise Pareto projections for `m >= 3` using one shared full-space Pareto set.
+- Adds Pareto parallel-coordinate plotting for campaigns with three or more objectives.
+- Adds read-only CLI `pareto-front` and `pareto-summary` commands plus `plot --kind pareto-parallel`.
+- Adds a four-objective mixed constrained config, seed log, and notebook demonstration.
+- Keeps coupled objective evaluation, shared-input multi-output `SingleTaskGP`, qLogEHVI, and existing mixed-variable repair semantics.
+- Defers decoupled objective evaluation, `ModelListGP`, noisy MOBO, scalarization, cost/review/replicate combinations for multi-objective campaigns, and Streamlit multi-objective workflow support.
+
 ## v1.1.0 - Two-Objective qLogEHVI Campaigns
 
 This release adds BO Forge's first post-1.0 modelling expansion.
 
-- Adds exactly-two-objective YAML configs with required reference points.
+- Adds the first coupled two-objective YAML configs with required reference points.
 - Adds strict coupled-objective CSV validation and `qlog_ehvi` suggestions.
 - Adds Pareto-front extraction, Pareto summaries, and hypervolume progress.
 - Extends `CampaignSession`, reports, diagnostics, and CLI `mark-observed` for multi-objective campaigns.
 - Adds a mixed constrained two-objective config, seed log, and notebook.
-- Defers 3+ objectives, decoupled objective evaluation, `ModelListGP`, cost/review/replicate combinations, and full Streamlit workflow polish.
+- Defers higher-objective counts, decoupled objective evaluation, `ModelListGP`, cost/review/replicate combinations, and full Streamlit workflow polish.
 
 ## v1.0.0 - First Stable Public Release
 

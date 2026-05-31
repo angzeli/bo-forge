@@ -13,7 +13,6 @@ bo-forge/
 ├── notebooks/                        # Notebook-first campaign workflows
 ├── reports/                          # Generated local reports and figures
 ├── docs/                             # Quickstart, schema, errors, and repository guides
-│   ├── assets/                       # Tracked documentation screenshots
 │   ├── QUICKSTART.md
 │   ├── INSTALLATION.md
 │   ├── CLI.md
@@ -51,7 +50,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
-- `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for two-objective campaigns.
+- `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
 - `replicates.py`: explicit replicate aggregation, summaries, and best group selection.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
@@ -133,7 +132,8 @@ The repository also includes:
 - `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example,
 - `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example,
 - `configs/08_replicate_aware_logei.yaml` as a replicate-aware example,
-- and `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml` as a coupled two-objective mixed constrained example.
+- `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml` as a coupled two-objective mixed constrained example,
+- and `configs/11_four_objective_mixed_constrained_qlogehvi.yaml` as a four-objective mixed constrained example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

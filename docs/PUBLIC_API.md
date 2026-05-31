@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.1.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.1.1.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -33,6 +33,7 @@ These names are supported imports from `bo_forge`:
 - `load_campaign_log`
 - `mark_observed`
 - `pareto_front`
+- `pareto_summary`
 - `review_suggestion`
 - `replicate_summary`
 - `suggest_next`
