@@ -11,12 +11,16 @@ from botorch.acquisition import LogExpectedImprovement
 from botorch.exceptions.errors import BotorchError
 from torch.quasirandom import SobolEngine
 
-from bo_forge.acquisition import optimize_log_ei
+from bo_forge.acquisition import optimize_log_ei, optimize_qlog_ehvi
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_violations_for_values
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
+from bo_forge.multi_objective import (
+    objectives_from_model_space,
+    reference_point_to_model_space,
+)
 from bo_forge.replicates import modeling_observed_data
 from bo_forge.transforms import (
     categorical_combination_count,
@@ -71,6 +75,14 @@ def suggest_next(
             count=min(requested_batch_size, remaining_initial),
         )
 
+    if config.is_multi_objective:
+        return _suggest_multi_objective_model_based(
+            config=config,
+            df=df,
+            observed_df=observed_df,
+            batch_size=requested_batch_size,
+        )
+
     if config.cost is not None:
         return _suggest_cost_aware_model_based(
             config=config,
@@ -113,6 +125,78 @@ def _suggest_initial_design(
             row[name] = value
         _populate_cost_fields(config, row, candidate)
         rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _suggest_multi_objective_model_based(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    torch.manual_seed(config.bo.random_seed)
+    combination_count = categorical_combination_count(config)
+    if combination_count > MAX_CATEGORICAL_COMBINATIONS:
+        raise SuggestionError(
+            "Multi-objective mixed-variable suggestions support at most "
+            f"{MAX_CATEGORICAL_COMBINATIONS} categorical combinations: "
+            f"configured={combination_count}."
+        )
+
+    model = fit_gp_model(config, observed_df)
+    _, train_y_model = dataframe_to_tensors(config, observed_df)
+    fixed_features_list = categorical_feature_assignments(config)
+    ref_point = reference_point_to_model_space(config)
+    user_candidates: list[tuple[object, ...]] | None = None
+    acquisition_value: torch.Tensor | None = None
+    rejection_message = "no candidate was decoded"
+    for attempt in range(MAX_DECODE_RETRIES):
+        torch.manual_seed(config.bo.random_seed + attempt)
+        x_unit_raw, acquisition_value, _ = optimize_qlog_ehvi(
+            config=config,
+            model=model,
+            train_y_model=train_y_model,
+            ref_point=ref_point,
+            batch_size=batch_size,
+            model_dim=encoded_dimension(config),
+            fixed_features_list=fixed_features_list,
+        )
+        decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
+        rejection_message = _candidate_batch_rejection_message(config, df, decoded_candidates)
+        if rejection_message is None:
+            user_candidates = decoded_candidates
+            break
+
+    if user_candidates is None or acquisition_value is None:
+        raise SuggestionError(
+            "Could not generate enough feasible, non-duplicate multi-objective "
+            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+            f"Last rejection: {rejection_message}"
+        )
+
+    x_unit_repaired = values_to_unit_cube(config, user_candidates)
+    with torch.no_grad():
+        posterior = model.posterior(x_unit_repaired)
+        mean_user = objectives_from_model_space(config, posterior.mean)
+        std = posterior.variance.clamp_min(0.0).sqrt()
+
+    rows = []
+    iteration = next_iteration(df)
+    acquisition_scalar = float(acquisition_value.reshape(-1)[0])
+    for index in range(batch_size):
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = "qlog_ehvi"
+        for name, value in zip(config.variable_names, user_candidates[index], strict=True):
+            row[name] = value
+        for objective_index, objective in enumerate(config.objectives):
+            row[f"predicted_mean_{objective.name}"] = float(mean_user[index, objective_index])
+            row[f"predicted_std_{objective.name}"] = float(std[index, objective_index])
+        row["acquisition"] = acquisition_scalar
+        rows.append(row)
+
     return pd.DataFrame(rows, columns=canonical_columns(config))
 
 

@@ -1,0 +1,7 @@
+row_id,iteration,status,source,catalyst_loading,reaction_time,base_equivalents,solvent,yield_score,waste_score,predicted_mean_yield_score,predicted_std_yield_score,predicted_mean_waste_score,predicted_std_waste_score,acquisition
+mo_seed_00,0,observed,manual,0.04,30,0.5,MeCN,48.0,19.0,,,,,
+mo_seed_01,1,observed,manual,0.08,55,1.0,DMF,63.5,16.0,,,,,
+mo_seed_02,2,observed,manual,0.14,70,1.0,Water,69.0,20.5,,,,,
+mo_seed_03,3,observed,manual,0.18,80,0.5,MeCN,71.0,14.5,,,,,
+mo_seed_04,4,observed,manual,0.11,50,1.5,DMF,66.0,12.0,,,,,
+mo_seed_05,5,observed,manual,0.15,65,1.0,MeCN,76.0,15.0,,,,,

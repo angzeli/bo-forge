@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, or `cost_log_ei`.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for two-objective campaigns.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -109,6 +109,24 @@ Fix: make the final expression numeric. Boolean arithmetic inside a numeric expr
 expression: "1.0 + 2.0 * (solvent == 'Water')"
 ```
 
+### `Config must define either 'objective' or 'objectives', not both`
+
+Single-objective campaigns use `objective:`. Two-objective campaigns use `objectives:`.
+
+Fix: keep exactly one objective section.
+
+### `objectives must contain exactly two objectives`
+
+v1.1 supports exactly two coupled objectives.
+
+Fix: define two objective mappings, each with `name`, `direction`, and `reference_point`.
+
+### `reference_point`
+
+Multi-objective reference points must be numeric and finite.
+
+Fix: set a user-facing value that is meaningfully worse than the region of interest for that objective.
+
 ## 🧾 CSV Schema Errors
 
 ### `Campaign log is missing required columns`
@@ -157,6 +175,7 @@ random
 log_ei
 qlog_ei
 cost_log_ei
+qlog_ehvi
 ```
 
 ### `review_status is not 'accepted'`
@@ -203,11 +222,34 @@ The row says the experiment has been observed, but no result is present.
 
 Fix: enter the objective value, or change the row back to `suggested`.
 
+For multi-objective campaigns, every observed row must contain both objective values. Partial objective rows are not supported in v1.1.
+
 ### `status='suggested' but objective ... is filled`
 
 A suggested row already has a result value.
 
 Fix: use `mark_observed()` to perform the transition, or manually set `status=observed` only if the rest of the row is valid.
+
+For multi-objective campaigns, suggested rows must leave both objective columns blank until both coupled objective values are available.
+
+### `objective_value is not valid for multi-objective campaign logs`
+
+The single-value transition path is only for single-objective campaigns.
+
+Fix: pass objective values keyed by name:
+
+```python
+campaign.mark_observed(
+    row_id="...",
+    objective_values={"yield_score": 71.2, "waste_score": 13.4},
+)
+```
+
+With the CLI, repeat `--objective` once per objective:
+
+```bash
+bo-forge mark-observed ... --objective yield_score=71.2 --objective waste_score=13.4
+```
 
 ### `Cannot generate new suggestions while unresolved status='suggested' rows exist`
 

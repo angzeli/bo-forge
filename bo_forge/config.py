@@ -27,6 +27,7 @@ RESERVED_COLUMNS = {
     "cost_actual",
     "utility",
 }
+RESERVED_COLUMN_PREFIXES = ("predicted_mean_", "predicted_std_")
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class VariableConfig:
 class ObjectiveConfig:
     name: str
     direction: str
+    reference_point: float | None = None
 
 
 @dataclass(frozen=True)
@@ -85,9 +87,10 @@ class BOConfig:
 @dataclass(frozen=True)
 class CampaignConfig:
     campaign_name: str
-    objective: ObjectiveConfig
+    objective: ObjectiveConfig | None
     variables: tuple[VariableConfig, ...]
     bo: BOConfig
+    objectives: tuple[ObjectiveConfig, ...] = ()
     constraints: tuple[ConstraintConfig, ...] = ()
     cost: CostConfig | None = None
     review: ReviewConfig = field(default_factory=ReviewConfig)
@@ -110,8 +113,24 @@ class CampaignConfig:
         return [variable.name for variable in self.variables]
 
     @property
+    def objective_names(self) -> list[str]:
+        """Return objective names in configured order."""
+        if self.objectives:
+            return [objective.name for objective in self.objectives]
+        if self.objective is None:
+            return []
+        return [self.objective.name]
+
+    @property
+    def is_multi_objective(self) -> bool:
+        """Return True when this campaign has multiple objectives."""
+        return bool(self.objectives)
+
+    @property
     def direction_sign(self) -> float:
         """Return the multiplier that converts objective values to maximization."""
+        if self.objective is None:
+            raise ConfigError("direction_sign is only available for single-objective configs.")
         return 1.0 if self.objective.direction == "maximize" else -1.0
 
 
@@ -121,19 +140,29 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         raise ConfigError("Config file must contain a YAML mapping at the top level.")
 
     campaign_name = _required_str(raw, "campaign_name", "campaign")
-    objective = _parse_objective(raw.get("objective"))
-    variables = _parse_variables(raw.get("variables"), objective.name)
+    objective, objectives = _parse_objective_section(raw)
+    objective_names = [item.name for item in objectives] if objectives else [objective.name]
+    variables = _parse_variables(raw.get("variables"), set(objective_names))
     constraints = _parse_constraints(raw.get("constraints", []), variables)
     cost = _parse_cost(raw.get("cost"), variables)
     review = _parse_review(raw.get("review"))
     replicates = _parse_replicates(raw.get("replicates"))
-    bo = _parse_bo(raw.get("bo", {}))
+    if objectives and cost is not None:
+        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.0.")
+    if objectives and review.enabled:
+        raise ConfigError("Multi-objective configs do not support review.enabled: true in v1.1.0.")
+    if objectives and replicates.enabled:
+        raise ConfigError(
+            "Multi-objective configs do not support replicates.enabled: true in v1.1.0."
+        )
+    bo = _parse_bo(raw.get("bo", {}), multi_objective=bool(objectives))
 
     return CampaignConfig(
         campaign_name=campaign_name,
         objective=objective,
         variables=tuple(variables),
         bo=bo,
+        objectives=tuple(objectives),
         constraints=tuple(constraints),
         cost=cost,
         review=review,
@@ -141,7 +170,18 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     )
 
 
-def _parse_objective(raw: Any) -> ObjectiveConfig:
+def _parse_objective_section(raw: dict[str, Any]) -> tuple[ObjectiveConfig, list[ObjectiveConfig]]:
+    has_single = "objective" in raw
+    has_multi = "objectives" in raw
+    if has_single and has_multi:
+        raise ConfigError("Config must define either 'objective' or 'objectives', not both.")
+    if has_multi:
+        objectives = _parse_objectives(raw.get("objectives"))
+        return objectives[0], objectives
+    return _parse_objective(raw.get("objective"))
+
+
+def _parse_objective(raw: Any) -> tuple[ObjectiveConfig, list[ObjectiveConfig]]:
     if not isinstance(raw, dict):
         raise ConfigError("Config key 'objective' must be a mapping.")
 
@@ -154,10 +194,53 @@ def _parse_objective(raw: Any) -> ObjectiveConfig:
         )
     if name in RESERVED_COLUMNS:
         raise ConfigError(f"Objective name '{name}' conflicts with a reserved CSV column.")
-    return ObjectiveConfig(name=name, direction=direction)
+    _reject_reserved_prefix_name(name, "Objective")
+    return ObjectiveConfig(name=name, direction=direction), []
 
 
-def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
+def _parse_objectives(raw: Any) -> list[ObjectiveConfig]:
+    if not isinstance(raw, list):
+        raise ConfigError("Config key 'objectives' must be a list.")
+    if len(raw) != 2:
+        raise ConfigError(
+            "Config key 'objectives' must contain exactly two objectives in v1.1.0."
+        )
+
+    objectives: list[ObjectiveConfig] = []
+    seen_names: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ConfigError(f"Objective at index {index} must be a mapping.")
+        unsupported = sorted(set(item) - {"name", "direction", "reference_point"})
+        if unsupported:
+            raise ConfigError(
+                f"Objective at index {index} has unsupported keys: {unsupported}."
+            )
+        name = _required_str(item, "name", f"objectives[{index}]")
+        direction = _required_str(item, "direction", f"objective '{name}'")
+        if direction not in {"maximize", "minimize"}:
+            raise ConfigError(
+                f"Objective '{name}' has invalid direction '{direction}'. "
+                "Expected 'maximize' or 'minimize'."
+            )
+        if name in seen_names:
+            raise ConfigError(f"Duplicate objective name '{name}'.")
+        if name in RESERVED_COLUMNS:
+            raise ConfigError(f"Objective name '{name}' conflicts with a reserved CSV column.")
+        _reject_reserved_prefix_name(name, "Objective")
+        reference_point = _required_float(item, "reference_point", f"objective '{name}'")
+        objectives.append(
+            ObjectiveConfig(
+                name=name,
+                direction=direction,
+                reference_point=reference_point,
+            )
+        )
+        seen_names.add(name)
+    return objectives
+
+
+def _parse_variables(raw: Any, objective_names: set[str]) -> list[VariableConfig]:
     if not isinstance(raw, list) or not raw:
         raise ConfigError("Config key 'variables' must be a non-empty list.")
 
@@ -177,12 +260,13 @@ def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
         _reject_unsupported_variable_keys(item, name, variable_type)
         if name in seen_names:
             raise ConfigError(f"Duplicate variable name '{name}'.")
-        if name == objective_name:
+        if name in objective_names:
             raise ConfigError(
-                f"Variable '{name}' conflicts with objective name '{objective_name}'."
+                f"Variable '{name}' conflicts with configured objective names."
             )
         if name in RESERVED_COLUMNS:
             raise ConfigError(f"Variable name '{name}' conflicts with a reserved CSV column.")
+        _reject_reserved_prefix_name(name, "Variable")
 
         if variable_type == "continuous":
             lower = _required_float(item, "lower", f"variable '{name}'")
@@ -231,15 +315,17 @@ def _parse_variables(raw: Any, objective_name: str) -> list[VariableConfig]:
     return variables
 
 
-def _parse_bo(raw: Any) -> BOConfig:
+def _parse_bo(raw: Any, *, multi_objective: bool = False) -> BOConfig:
     if not isinstance(raw, dict):
         raise ConfigError("Config key 'bo' must be a mapping when provided.")
 
-    acquisition = str(raw.get("acquisition", "log_ei"))
-    if acquisition != "log_ei":
+    default_acquisition = "qlog_ehvi" if multi_objective else "log_ei"
+    acquisition = str(raw.get("acquisition", default_acquisition))
+    supported = {"qlog_ehvi"} if multi_objective else {"log_ei"}
+    if acquisition not in supported:
         raise ConfigError(
             f"Unsupported acquisition '{acquisition}'. "
-            "BO Forge currently supports only 'log_ei'."
+            f"Expected one of {sorted(supported)}."
         )
     initial_design_method = str(raw.get("initial_design_method", "sobol"))
     if initial_design_method not in {"sobol", "random"}:
@@ -475,6 +561,15 @@ def _reject_unsupported_variable_keys(
             f"Variable '{name}' has unsupported keys for type='{variable_type}': "
             f"{unsupported}."
         )
+
+
+def _reject_reserved_prefix_name(name: str, context: str) -> None:
+    for prefix in RESERVED_COLUMN_PREFIXES:
+        if name.startswith(prefix):
+            raise ConfigError(
+                f"{context} name '{name}' conflicts with reserved CSV column prefix "
+                f"'{prefix}'."
+            )
 
 
 def _positive_int(value: Any, context: str) -> int:

@@ -51,13 +51,14 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
+- `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for two-objective campaigns.
 - `replicates.py`: explicit replicate aggregation, summaries, and best group selection.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
 - `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.
 - `models.py`: conversion from campaign logs to tensors and GP fitting.
-- `acquisition.py`: LogEI and qLogEI acquisition optimisation.
-- `suggestions.py`: Sobol and model-based candidate generation.
+- `acquisition.py`: LogEI, qLogEI, and qLogEHVI acquisition optimisation.
+- `suggestions.py`: Sobol, LogEI/qLogEI, and qLogEHVI candidate generation.
 - `diagnostics.py`: user-facing diagnostic plots.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
@@ -131,7 +132,8 @@ The repository also includes:
 - `configs/05_simple_mixed_logei.yaml` as a mixed-variable example,
 - `configs/06_mixed_constrained_logei.yaml` as a constrained mixed-variable example,
 - `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example,
-- and `configs/08_replicate_aware_logei.yaml` as a replicate-aware example.
+- `configs/08_replicate_aware_logei.yaml` as a replicate-aware example,
+- and `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml` as a coupled two-objective mixed constrained example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

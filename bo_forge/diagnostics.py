@@ -10,6 +10,7 @@ from matplotlib.ticker import MaxNLocator
 
 from bo_forge.config import CampaignConfig
 from bo_forge.costs import effective_row_cost
+from bo_forge.multi_objective import hypervolume_progress, pareto_front
 from bo_forge.plot_style import (
     add_legend,
     configure_plot_style,
@@ -43,6 +44,15 @@ def plot_progress(
 ):
     """Plot observed objective values and best-so-far progress."""
     validate_campaign_data(config, df)
+    if config.is_multi_objective:
+        return plot_hypervolume(
+            config,
+            df,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
     observed = get_observed_data(config, df)
 
     _, ax = new_figure(figsize=(8, 6))
@@ -85,6 +95,15 @@ def plot_diagnostics(
 ):
     """Plot dimension-aware diagnostics for observed campaign data."""
     validate_campaign_data(config, df)
+    if config.is_multi_objective:
+        return plot_pareto(
+            config,
+            df,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
     observed = get_observed_data(config, df)
     objective = config.objective.name
 
@@ -260,6 +279,102 @@ def plot_replicates(
     )
 
 
+def plot_pareto(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot observed two-objective values and the nondominated Pareto front."""
+    validate_campaign_data(config, df)
+    if not config.is_multi_objective:
+        raise ValueError("plot_pareto() requires a multi-objective config.")
+    observed = get_observed_data(config, df)
+    front = pareto_front(config, df)
+    x_name, y_name = config.objective_names
+
+    _, ax = new_figure(figsize=(8, 6))
+    if observed.empty:
+        set_title(ax, f"{config.campaign_name}: no observations yet")
+        set_axis_labels(ax, x_name, y_name)
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    ax.scatter(
+        observed[x_name].astype(float),
+        observed[y_name].astype(float),
+        color="#64748b",
+        alpha=0.65,
+        label="observed",
+    )
+    if not front.empty:
+        front_sorted = _sort_pareto_for_display(config, front)
+        ax.plot(
+            front_sorted[x_name].astype(float),
+            front_sorted[y_name].astype(float),
+            color="#d97706",
+            marker="o",
+            label="Pareto front",
+        )
+    set_title(ax, f"{config.campaign_name}: Pareto front")
+    set_axis_labels(ax, x_name, y_name)
+    add_legend(ax)
+    return finalise_figure(
+        ax,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+    )
+
+
+def plot_hypervolume(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot hypervolume progress for a two-objective campaign."""
+    validate_campaign_data(config, df)
+    if not config.is_multi_objective:
+        raise ValueError("plot_hypervolume() requires a multi-objective config.")
+    progress = hypervolume_progress(config, df)
+
+    _, ax = new_figure(figsize=(8, 6))
+    if progress.empty:
+        set_title(ax, f"{config.campaign_name}: no observations yet")
+        set_axis_labels(ax, "Observation", "Hypervolume")
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    ax.plot(progress["observation"], progress["hypervolume"], marker="o")
+    set_title(ax, f"{config.campaign_name}: hypervolume progress")
+    set_axis_labels(ax, "Observation", "Hypervolume")
+    return finalise_figure(
+        ax,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+    )
+
+
 def _plot_high_dimensional_diagnostics(
     config: CampaignConfig,
     observed: pd.DataFrame,
@@ -329,6 +444,12 @@ def _plot_high_dimensional_diagnostics(
 
 def _directional_best_so_far(config: CampaignConfig, values: pd.Series) -> pd.Series:
     return values.cummax() if config.objective.direction == "maximize" else values.cummin()
+
+
+def _sort_pareto_for_display(config: CampaignConfig, front: pd.DataFrame) -> pd.DataFrame:
+    first_objective = config.objectives[0]
+    ascending = first_objective.direction == "minimize"
+    return front.sort_values(first_objective.name, ascending=ascending)
 
 
 def _observation_tick_positions(count: int) -> list[int]:

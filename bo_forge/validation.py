@@ -19,11 +19,20 @@ RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
 UTILITY_COLUMNS = ["utility"]
 VALID_STATUSES = {"suggested", "observed"}
 VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei", "cost_log_ei"}
+VALID_MULTI_OBJECTIVE_SOURCES = {"manual", "random", "sobol", "qlog_ehvi"}
 VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
 
 def canonical_columns(config: CampaignConfig) -> list[str]:
     """Return canonical CSV columns for a campaign."""
+    if config.is_multi_objective:
+        return [
+            *BASE_COLUMNS,
+            *config.variable_names,
+            *config.objective_names,
+            *_multi_objective_result_columns(config),
+            "acquisition",
+        ]
     return [
         *BASE_COLUMNS,
         *(REVIEW_COLUMNS if config.review.enabled else []),
@@ -45,11 +54,16 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_row_id(df)
     _validate_iteration(df)
     _validate_status(df)
-    _validate_source(df)
+    _validate_source(config, df)
     _validate_review(config, df)
     _validate_variables(config, df)
     _validate_replicates(config, df)
     _validate_constraints(config, df)
+    if config.is_multi_objective:
+        _validate_multi_objectives(config, df)
+        _validate_nullable_numeric_columns(df, _multi_objective_result_columns(config))
+        _validate_nullable_numeric_columns(df, ["acquisition"])
+        return
     _validate_objective(config, df)
     _validate_nullable_numeric_columns(df, RESULT_COLUMNS)
     if config.cost is not None:
@@ -158,14 +172,15 @@ def _validate_status(df: pd.DataFrame) -> None:
         )
 
 
-def _validate_source(df: pd.DataFrame) -> None:
-    invalid = ~df["source"].isin(VALID_SOURCES)
+def _validate_source(config: CampaignConfig, df: pd.DataFrame) -> None:
+    valid_sources = VALID_MULTI_OBJECTIVE_SOURCES if config.is_multi_objective else VALID_SOURCES
+    invalid = ~df["source"].isin(valid_sources)
     if invalid.any():
         row_id = str(df.loc[invalid, "row_id"].iloc[0])
         value = df.loc[invalid, "source"].iloc[0]
         raise LogValidationError(
             f"Row '{row_id}' has invalid source '{value}'. "
-            f"Expected one of {sorted(VALID_SOURCES)}."
+            f"Expected one of {sorted(valid_sources)}."
         )
 
 
@@ -431,6 +446,61 @@ def _validate_objective(config: CampaignConfig, df: pd.DataFrame) -> None:
         raise LogValidationError(
             f"Row '{row_id}' has non-finite objective '{objective_name}': value={value!r}."
         )
+
+
+def _validate_multi_objectives(config: CampaignConfig, df: pd.DataFrame) -> None:
+    observed = df["status"] == "observed"
+    suggested = df["status"] == "suggested"
+    for objective in config.objectives:
+        values = df[objective.name]
+        blank = _blank_mask(values)
+
+        missing_observed = observed & blank
+        if missing_observed.any():
+            row_id = str(df.loc[missing_observed, "row_id"].iloc[0])
+            raise LogValidationError(
+                f"Row '{row_id}' has status='observed' but objective "
+                f"'{objective.name}' is blank."
+            )
+
+        filled_suggested = suggested & ~blank
+        if filled_suggested.any():
+            row_id = str(df.loc[filled_suggested, "row_id"].iloc[0])
+            value = df.loc[filled_suggested, objective.name].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has status='suggested' but objective "
+                f"'{objective.name}' is filled: value={value!r}."
+            )
+
+        numeric = pd.to_numeric(values.loc[observed], errors="coerce")
+        invalid_numeric = numeric.isna()
+        if invalid_numeric.any():
+            row_id = str(df.loc[observed].loc[invalid_numeric, "row_id"].iloc[0])
+            value = df.loc[observed].loc[invalid_numeric, objective.name].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-numeric objective '{objective.name}': "
+                f"value={value!r}."
+            )
+        non_finite = ~numeric.map(math.isfinite)
+        if non_finite.any():
+            row_id = str(df.loc[observed].loc[non_finite, "row_id"].iloc[0])
+            value = df.loc[observed].loc[non_finite, objective.name].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-finite objective '{objective.name}': "
+                f"value={value!r}."
+            )
+
+
+def _multi_objective_result_columns(config: CampaignConfig) -> list[str]:
+    columns: list[str] = []
+    for objective in config.objectives:
+        columns.extend(
+            [
+                f"predicted_mean_{objective.name}",
+                f"predicted_std_{objective.name}",
+            ]
+        )
+    return columns
 
 
 def _validate_constraints(config: CampaignConfig, df: pd.DataFrame) -> None:

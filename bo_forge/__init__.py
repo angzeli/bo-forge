@@ -1,6 +1,6 @@
-"""BO Forge v1.0.0."""
+"""BO Forge v1.1.0."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from bo_forge.config import (
     BOConfig,
@@ -21,6 +21,7 @@ from bo_forge.errors import (
     SuggestionError,
 )
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
+from bo_forge.multi_objective import hypervolume, hypervolume_progress, pareto_front
 from bo_forge.replicates import (
     aggregate_observed_replicates,
     best_replicate_group,
@@ -51,8 +52,11 @@ __all__ = [
     "best_replicate_group",
     "evaluate_cost",
     "get_observed_data",
+    "hypervolume",
+    "hypervolume_progress",
     "load_campaign_log",
     "mark_observed",
+    "pareto_front",
     "review_suggestion",
     "replicate_summary",
     "suggest_next",

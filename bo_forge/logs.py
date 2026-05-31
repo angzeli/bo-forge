@@ -18,6 +18,7 @@ from bo_forge.validation import (
     RESULT_COLUMNS,
     REVIEW_COLUMNS,
     UTILITY_COLUMNS,
+    VALID_MULTI_OBJECTIVE_SOURCES,
     VALID_REVIEW_STATUSES,
     VALID_SOURCES,
     VALID_STATUSES,
@@ -68,7 +69,8 @@ def append_suggestions(log_path: str | Path, suggestions: pd.DataFrame) -> None:
 def mark_observed(
     log_path: str | Path,
     row_id: str,
-    objective_value: float,
+    objective_value: float | None = None,
+    objective_values: dict[str, float] | None = None,
     actual_cost: float | None = None,
 ) -> None:
     """Mark a suggested row as observed by filling the objective value in place."""
@@ -80,17 +82,14 @@ def mark_observed(
     if not isinstance(row_id, str) or not row_id.strip():
         raise LogWriteError("row_id must be a non-empty string.")
 
-    objective = _objective_column_from_columns(_read_csv(path).columns)
-    try:
-        objective_float = float(objective_value)
-    except (TypeError, ValueError) as exc:
-        raise LogWriteError(
-            f"Objective value for row '{row_id}' must be numeric: value={objective_value!r}."
-        ) from exc
-    if not math.isfinite(objective_float):
-        raise LogWriteError(
-            f"Objective value for row '{row_id}' must be finite: value={objective_value!r}."
-        )
+    columns = _read_csv(path).columns
+    objective_columns = _variable_and_objective_columns(columns)[1]
+    parsed_objective_values = _parse_mark_observed_objective_values(
+        row_id=row_id,
+        objective_columns=objective_columns,
+        objective_value=objective_value,
+        objective_values=objective_values,
+    )
     actual_cost_text = None
     if actual_cost is not None:
         try:
@@ -134,19 +133,100 @@ def mark_observed(
             "has no cost columns."
         )
 
-    objective_cell = df.at[index, objective]
-    if not _is_blank(objective_cell):
-        raise LogWriteError(
-            f"Cannot mark row '{row_id}' observed because objective '{objective}' "
-            f"is already filled: value={objective_cell!r}."
-        )
+    for objective in objective_columns:
+        objective_cell = df.at[index, objective]
+        if not _is_blank(objective_cell):
+            raise LogWriteError(
+                f"Cannot mark row '{row_id}' observed because objective '{objective}' "
+                f"is already filled: value={objective_cell!r}."
+            )
 
-    df.at[index, objective] = f"{objective_float:.17g}"
+    for objective, objective_float in parsed_objective_values.items():
+        df.at[index, objective] = f"{objective_float:.17g}"
     df.at[index, "status"] = "observed"
     if actual_cost_text is not None:
         df.at[index, "cost_actual"] = actual_cost_text
     _validate_structural_log(df)
     _atomic_write_and_validate(path, df)
+
+
+def _parse_mark_observed_objective_values(
+    *,
+    row_id: str,
+    objective_columns: list[str],
+    objective_value: float | None,
+    objective_values: dict[str, float] | None,
+) -> dict[str, float]:
+    if len(objective_columns) == 1:
+        if objective_values is not None:
+            expected = set(objective_columns)
+            actual = set(objective_values)
+            if actual != expected:
+                raise LogWriteError(
+                    "objective_values for a single-objective campaign must contain exactly "
+                    f"{sorted(expected)}: actual={sorted(actual)}."
+                )
+            if objective_value is not None:
+                raise LogWriteError(
+                    "Pass either objective_value or objective_values, not both."
+                )
+            return {
+                objective_columns[0]: _finite_objective_value(
+                    row_id,
+                    objective_columns[0],
+                    objective_values[objective_columns[0]],
+                )
+            }
+        if objective_value is None:
+            raise LogWriteError(
+                f"Objective value for row '{row_id}' is required for single-objective logs."
+            )
+        return {
+            objective_columns[0]: _finite_objective_value(
+                row_id,
+                objective_columns[0],
+                objective_value,
+            )
+        }
+
+    if objective_value is not None:
+        raise LogWriteError(
+            "objective_value is not valid for multi-objective campaign logs; "
+            "pass objective_values with every configured objective."
+        )
+    if objective_values is None:
+        raise LogWriteError(
+            "objective_values is required for multi-objective campaign logs."
+        )
+    expected = set(objective_columns)
+    actual = set(objective_values)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        raise LogWriteError(
+            "objective_values keys must exactly match configured objective columns: "
+            f"missing={missing}, extra={extra}."
+        )
+    return {
+        objective: _finite_objective_value(row_id, objective, objective_values[objective])
+        for objective in objective_columns
+    }
+
+
+def _finite_objective_value(row_id: str, objective: str, value: object) -> float:
+    try:
+        objective_float = float(value)
+    except (TypeError, ValueError) as exc:
+        raise LogWriteError(
+            f"Objective value for row '{row_id}' and objective '{objective}' must be "
+            f"numeric: value={value!r}."
+        ) from exc
+    if not math.isfinite(objective_float):
+        raise LogWriteError(
+            f"Objective value for row '{row_id}' and objective '{objective}' must be "
+            f"finite: value={value!r}."
+        )
+    return objective_float
 
 
 def review_suggestion(
@@ -292,12 +372,14 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
         raise LogValidationError(f"Row '{row_id}' has invalid status '{value}'.")
 
     invalid_source = ~df["source"].isin(VALID_SOURCES)
+    if _has_multi_objective_columns(df.columns):
+        invalid_source = ~df["source"].isin(VALID_MULTI_OBJECTIVE_SOURCES)
     if invalid_source.any():
         row_id = str(df.loc[invalid_source, "row_id"].iloc[0])
         value = df.loc[invalid_source, "source"].iloc[0]
         raise LogValidationError(f"Row '{row_id}' has invalid source '{value}'.")
 
-    variable_columns, objective = _variable_and_objective_columns(df.columns)
+    variable_columns, objective_columns = _variable_and_objective_columns(df.columns)
     for column in variable_columns:
         invalid = df[column].map(_is_blank)
         if invalid.any():
@@ -307,32 +389,33 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
                 f"Row '{row_id}' has blank value for variable '{column}': value={value!r}."
             )
 
-    objective_blank = df[objective].map(_is_blank)
     observed = df["status"] == "observed"
     suggested = df["status"] == "suggested"
-    missing_observed = observed & objective_blank
-    if missing_observed.any():
-        row_id = str(df.loc[missing_observed, "row_id"].iloc[0])
-        raise LogValidationError(
-            f"Row '{row_id}' has status='observed' but objective '{objective}' is blank."
-        )
-    filled_suggested = suggested & ~objective_blank
-    if filled_suggested.any():
-        row_id = str(df.loc[filled_suggested, "row_id"].iloc[0])
-        value = df.loc[filled_suggested, objective].iloc[0]
-        raise LogValidationError(
-            f"Row '{row_id}' has status='suggested' but objective '{objective}' "
-            f"is filled: value={value!r}."
-        )
+    for objective in objective_columns:
+        objective_blank = df[objective].map(_is_blank)
+        missing_observed = observed & objective_blank
+        if missing_observed.any():
+            row_id = str(df.loc[missing_observed, "row_id"].iloc[0])
+            raise LogValidationError(
+                f"Row '{row_id}' has status='observed' but objective '{objective}' is blank."
+            )
+        filled_suggested = suggested & ~objective_blank
+        if filled_suggested.any():
+            row_id = str(df.loc[filled_suggested, "row_id"].iloc[0])
+            value = df.loc[filled_suggested, objective].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has status='suggested' but objective '{objective}' "
+                f"is filled: value={value!r}."
+            )
 
-    numeric_objective = pd.to_numeric(df.loc[observed, objective], errors="coerce")
-    invalid_objective = numeric_objective.isna() | ~numeric_objective.map(math.isfinite)
-    if invalid_objective.any():
-        row_id = str(df.loc[observed].loc[invalid_objective, "row_id"].iloc[0])
-        value = df.loc[observed].loc[invalid_objective, objective].iloc[0]
-        raise LogValidationError(
-            f"Row '{row_id}' has non-finite objective '{objective}': value={value!r}."
-        )
+        numeric_objective = pd.to_numeric(df.loc[observed, objective], errors="coerce")
+        invalid_objective = numeric_objective.isna() | ~numeric_objective.map(math.isfinite)
+        if invalid_objective.any():
+            row_id = str(df.loc[observed].loc[invalid_objective, "row_id"].iloc[0])
+            value = df.loc[observed].loc[invalid_objective, objective].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-finite objective '{objective}': value={value!r}."
+            )
 
     if _has_review_columns(df.columns):
         invalid_review = ~df["review_status"].isin(VALID_REVIEW_STATUSES)
@@ -383,7 +466,7 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
                 f"Row '{row_id}' has invalid replicate_index '{value}'."
             )
 
-    numeric_columns = [*RESULT_COLUMNS]
+    numeric_columns = [*_result_columns_from_columns(df.columns)]
     if _has_cost_columns(df.columns):
         numeric_columns.extend([*COST_COLUMNS, *UTILITY_COLUMNS])
 
@@ -411,6 +494,14 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
 
 def _validate_structural_columns(df: pd.DataFrame) -> None:
     columns = list(df.columns)
+    if _has_multi_objective_columns(columns):
+        variable_columns, objective_columns = _variable_and_objective_columns(columns)
+        if not variable_columns:
+            raise LogValidationError("Campaign log must contain at least one variable column.")
+        if len(objective_columns) != 2:
+            raise LogValidationError("Multi-objective campaign log must contain two objectives.")
+        return
+
     minimum_columns = [*BASE_COLUMNS, "variable", "objective", *RESULT_COLUMNS]
     if len(columns) < len(minimum_columns):
         raise LogValidationError(
@@ -431,15 +522,28 @@ def _validate_structural_columns(df: pd.DataFrame) -> None:
         )
     if has_utility and not _has_cost_columns(columns):
         raise LogValidationError("Campaign log has utility column but no cost columns.")
-    variable_columns, objective = _variable_and_objective_columns(columns)
+    variable_columns, objective_columns = _variable_and_objective_columns(columns)
     if not variable_columns:
         raise LogValidationError("Campaign log must contain at least one variable column.")
-    if objective in variable_columns:
-        raise LogValidationError(f"Objective column '{objective}' is duplicated as a variable.")
+    for objective in objective_columns:
+        if objective in variable_columns:
+            raise LogValidationError(f"Objective column '{objective}' is duplicated as a variable.")
 
 
-def _variable_and_objective_columns(columns: pd.Index | list[str]) -> tuple[list[str], str]:
+def _variable_and_objective_columns(
+    columns: pd.Index | list[str],
+) -> tuple[list[str], list[str]]:
     column_list = list(columns)
+    if _has_multi_objective_columns(column_list):
+        result_start = len(column_list) - 5
+        middle = column_list[len(BASE_COLUMNS) : result_start]
+        if len(middle) < 3:
+            raise LogValidationError(
+                "Multi-objective campaign log must contain at least one variable "
+                "column and two objective columns."
+            )
+        return middle[:-2], middle[-2:]
+
     start = len(BASE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         start += len(REVIEW_COLUMNS)
@@ -457,11 +561,49 @@ def _variable_and_objective_columns(columns: pd.Index | list[str]) -> tuple[list
         raise LogValidationError(
             "Campaign log must contain at least one variable column and one objective column."
         )
-    return middle[:-1], middle[-1]
+    return middle[:-1], [middle[-1]]
 
 
 def _objective_column_from_columns(columns: pd.Index | list[str]) -> str:
-    return _variable_and_objective_columns(columns)[1]
+    objective_columns = _variable_and_objective_columns(columns)[1]
+    if len(objective_columns) != 1:
+        raise LogWriteError(
+            "objective_value is only valid for single-objective campaign logs."
+        )
+    return objective_columns[0]
+
+
+def _result_columns_from_columns(columns: pd.Index | list[str]) -> list[str]:
+    column_list = list(columns)
+    if _has_multi_objective_columns(column_list):
+        return column_list[-5:]
+    return [*RESULT_COLUMNS]
+
+
+def _has_multi_objective_columns(columns: pd.Index | list[str]) -> bool:
+    column_list = list(columns)
+    if len(column_list) < len(BASE_COLUMNS) + 1 + 2 + 5:
+        return False
+    if column_list[: len(BASE_COLUMNS)] != BASE_COLUMNS or column_list[-1] != "acquisition":
+        return False
+    result_columns = column_list[-5:]
+    first_mean, first_std, second_mean, second_std, _ = result_columns
+    if not first_mean.startswith("predicted_mean_"):
+        return False
+    if not first_std.startswith("predicted_std_"):
+        return False
+    if not second_mean.startswith("predicted_mean_"):
+        return False
+    if not second_std.startswith("predicted_std_"):
+        return False
+    first_objective = first_mean.removeprefix("predicted_mean_")
+    second_objective = second_mean.removeprefix("predicted_mean_")
+    if first_std.removeprefix("predicted_std_") != first_objective:
+        return False
+    if second_std.removeprefix("predicted_std_") != second_objective:
+        return False
+    middle = column_list[len(BASE_COLUMNS) : -5]
+    return len(middle) >= 3 and middle[-2:] == [first_objective, second_objective]
 
 
 def _is_blank(value: object) -> bool:

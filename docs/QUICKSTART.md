@@ -69,7 +69,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.0.0 is the first stable public release baseline for the local app, backend package, CLI, and documentation.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.1.0 keeps the local app on the stable v1.0 workflow while adding multi-objective support to the backend, session, CLI, and notebooks.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -137,6 +137,8 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.replicate_summary()` | Return group-level replicate counts, mean, std, SEM, min, and max when replicates are enabled. |
 | `campaign.best_replicate_group()` | Return the best replicate group by mean objective. |
+| `campaign.pareto_front()` | Return nondominated observed rows for a two-objective campaign. |
+| `campaign.pareto_summary()` | Return Pareto-count, reference-point, direction, and hypervolume fields. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
 | `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
@@ -145,6 +147,8 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.plot_progress(save_path=None)` | Plot objective and best-so-far progress; returns figure/axes objects. |
 | `campaign.plot_cost_progress(save_path=None)` | Plot best observed objective against cumulative effective cost. |
 | `campaign.plot_replicates(save_path=None)` | Plot raw replicate observations and replicate-group mean summaries. |
+| `campaign.plot_pareto(save_path=None)` | Plot observed two-objective values and the nondominated Pareto front. |
+| `campaign.plot_hypervolume(save_path=None)` | Plot hypervolume progress for a two-objective campaign. |
 | `campaign.plot_diagnostics(save_path=None)` | Plot dimension-aware diagnostics; returns figure/axes objects. |
 
 ## 🧱 Lower-Level API
@@ -186,6 +190,43 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/06_mixed_constrained_logei.yaml`: maximises a constrained mixed-variable synthetic yield.
 - `configs/07_cost_aware_human_review_logei.yaml`: adds deterministic cost estimates, budget tracking, and human-review decisions.
 - `configs/08_replicate_aware_logei.yaml`: adds explicit replicate rows and mean-aggregated model fitting.
+- `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml`: adds coupled two-objective qLogEHVI with mixed variables and constraints.
+
+## 🎯 Two-Objective qLogEHVI Campaigns
+
+v1.1 supports exactly two coupled objectives:
+
+```yaml
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40.0
+  - name: waste_score
+    direction: minimize
+    reference_point: 25.0
+bo:
+  acquisition: qlog_ehvi
+```
+
+Every observed row must contain both objective values. Suggested rows leave both objective columns blank until the experiment has been run.
+
+```python
+campaign = CampaignSession.from_files(
+    "configs/10_multi_objective_mixed_constrained_qlogehvi.yaml",
+    "examples/10_multi_objective_mixed_constrained_campaign_log.csv",
+)
+
+suggestions = campaign.suggest_next(batch_size=2)
+campaign.append_suggestions(suggestions)
+campaign.mark_observed(
+    row_id=suggestions.loc[0, "row_id"],
+    objective_values={"yield_score": 71.2, "waste_score": 13.4},
+)
+campaign.pareto_front()
+campaign.plot_hypervolume(save_path="reports/hypervolume.png")
+```
+
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. Hypervolume is reported as `0.0` when no observed point dominates the reference point. Cost, review, replicates, 3+ objectives, and decoupled objective evaluation are deferred beyond v1.1.
 
 ## 🧪 Mixed-Variable Campaigns
 

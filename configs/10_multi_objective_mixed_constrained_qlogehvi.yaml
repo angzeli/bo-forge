@@ -1,0 +1,38 @@
+campaign_name: multi_objective_solvent_screen
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40.0
+  - name: waste_score
+    direction: minimize
+    reference_point: 25.0
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.02
+    upper: 0.20
+  - name: reaction_time
+    type: integer
+    lower: 20
+    upper: 90
+  - name: base_equivalents
+    type: discrete
+    values: [0.5, 1.0, 1.5]
+  - name: solvent
+    type: categorical
+    values: [MeCN, DMF, Water]
+constraints:
+  - name: water_needs_longer_time
+    expression: "solvent != 'Water' or reaction_time >= 45"
+  - name: high_base_needs_lower_loading
+    expression: "base_equivalents < 1.5 or catalyst_loading <= 0.19"
+bo:
+  batch_size: 2
+  initial_design_size: 6
+  acquisition: qlog_ehvi
+  initial_design_method: sobol
+  random_seed: 11
+  raw_samples: 128
+  num_restarts: 8
+  mc_samples: 32
+  min_normalized_distance: 0.02

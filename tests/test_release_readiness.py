@@ -41,8 +41,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert "pip install bo-forge" in tutorial
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-1.0.0-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-1.0.0.tar.gz" in tutorial
+    assert "dist/bo_forge-1.1.0-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-1.1.0.tar.gz" in tutorial
     assert "pip check" in tutorial
 
 
@@ -98,10 +98,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-1.0.0-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-1.0.0.tar.gz"))
-    assert wheels, "No v1.0.0 wheel was built."
-    assert sdists, "No v1.0.0 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-1.1.0-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-1.1.0.tar.gz"))
+    assert wheels, "No v1.1.0 wheel was built."
+    assert sdists, "No v1.1.0 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -139,13 +139,13 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-1.0.0.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-1.1.0.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge_app/streamlit_app.py" in names
     assert "bo_forge_app/cli.py" in names
-    assert "bo_forge-1.0.0.dist-info/entry_points.txt" in names
-    assert "bo_forge-1.0.0.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-1.1.0.dist-info/entry_points.txt" in names
+    assert "bo_forge-1.1.0.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -157,14 +157,20 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-1.0.0/README.md" in names
-    assert "bo_forge-1.0.0/ROADMAP_PRE_V1.md" in names
-    assert "bo_forge-1.0.0/ROADMAP_AFTER_V1.md" in names
-    assert "bo_forge-1.0.0/docs/PUBLIC_API.md" in names
-    assert "bo_forge-1.0.0/docs/assets/streamlit_campaign_panel.png" in names
-    assert "bo_forge-1.0.0/examples/quickstart.py" in names
-    assert "bo_forge-1.0.0/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
-    assert "bo_forge-1.0.0/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-1.1.0/README.md" in names
+    assert "bo_forge-1.1.0/ROADMAP_PRE_V1.md" in names
+    assert "bo_forge-1.1.0/ROADMAP_AFTER_V1.md" in names
+    assert "bo_forge-1.1.0/docs/PUBLIC_API.md" in names
+    assert "bo_forge-1.1.0/docs/assets/streamlit_campaign_panel.png" in names
+    assert "bo_forge-1.1.0/examples/quickstart.py" in names
+    assert "bo_forge-1.1.0/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert (
+        "bo_forge-1.1.0/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        in names
+    )
+    assert "bo_forge-1.1.0/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.1.0/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-1.1.0/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -206,7 +212,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 1.0.0\n"
+    assert completed.stdout == "bo-forge 1.1.0\n"
 
     source_root = str(PROJECT_ROOT.resolve())
     script = f"""
@@ -222,7 +228,7 @@ assert scripts["bo-forge-app"] == "bo_forge_app.cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "1.0.0"
+assert bo_forge.__version__ == "1.1.0"
 
 real_import = builtins.__import__
 def block_streamlit(name, *args, **kwargs):

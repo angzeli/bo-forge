@@ -1,28 +1,28 @@
-# 🧪 BO Forge v1.0.0
+# 🧪 BO Forge v1.1.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.0.0 is the first stable public release. It hardens the v0.x backend, YAML/CSV workflow, `CampaignSession`, `bo-forge` CLI, example notebooks, and Forge Suite-inspired local Streamlit workbench for GitHub and PyPI packaging.
+v1.1.0 builds on the first stable public release with coupled two-objective qLogEHVI campaigns, Pareto-front reporting, and hypervolume progress while keeping the same YAML/CSV/session/CLI foundation.
 
 BO Forge deliberately supports only:
 
 - continuous, integer, discrete, and categorical variables
-- one objective
+- single-objective campaigns, plus coupled two-objective campaigns
 - maximize or minimize direction
 - Sobol or random initial suggestions
 - BoTorch `SingleTaskGP`
-- LogEI for single suggestions and qLogEI for batches
+- LogEI/qLogEI for single-objective campaigns and qLogEHVI for two-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
 - optional cost-aware ranking and human review
 - optional replicate tracking and replicate-aware aggregation
 - resume from existing logs
-- basic diagnostics
+- basic diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
 
-It intentionally does not yet cover qNEI, learned noise models, multi-objective optimisation, database-backed storage, or a production multi-user web backend.
+It intentionally does not yet cover qNEI, learned noise models, decoupled or asynchronous multi-objective evaluation, 3+ objectives, database-backed storage, or a production multi-user web backend.
 
 ---
 
@@ -130,7 +130,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.0.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.1.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

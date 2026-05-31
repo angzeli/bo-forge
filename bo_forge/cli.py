@@ -129,9 +129,15 @@ def build_parser() -> argparse.ArgumentParser:
     mark_parser.add_argument("--row-id", required=True, help="Suggested row_id to mark observed.")
     mark_parser.add_argument(
         "--objective-value",
-        required=True,
         type=float,
         help="Observed objective value in user-facing units.",
+    )
+    mark_parser.add_argument(
+        "--objective",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Observed multi-objective value; repeat once per objective.",
     )
     mark_parser.add_argument(
         "--actual-cost",
@@ -144,7 +150,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(plot_parser)
     plot_parser.add_argument(
         "--kind",
-        choices=["progress", "diagnostics", "cost-progress", "replicates"],
+        choices=[
+            "progress",
+            "diagnostics",
+            "cost-progress",
+            "replicates",
+            "pareto",
+            "hypervolume",
+        ],
         required=True,
         help="Plot type to export.",
     )
@@ -304,7 +317,28 @@ def _cmd_review(args: argparse.Namespace) -> int:
 
 def _cmd_mark_observed(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    campaign.mark_observed(args.row_id, args.objective_value, actual_cost=args.actual_cost)
+    objective_values = _parse_cli_objective_values(args.objective)
+    if args.objective_value is not None and objective_values:
+        raise LogWriteError("Pass either --objective-value or --objective, not both.")
+    if campaign.config.is_multi_objective:
+        if args.objective_value is not None:
+            raise LogWriteError(
+                "--objective-value is not valid for multi-objective campaigns; "
+                "use repeated --objective name=value arguments."
+            )
+        if args.actual_cost is not None:
+            raise LogWriteError("--actual-cost is not valid for multi-objective campaigns.")
+        campaign.mark_observed(args.row_id, objective_values=objective_values)
+    else:
+        if objective_values:
+            raise LogWriteError(
+                "--objective is not valid for single-objective campaigns; use --objective-value."
+            )
+        campaign.mark_observed(
+            args.row_id,
+            objective_value=args.objective_value,
+            actual_cost=args.actual_cost,
+        )
     print(f"Marked row {args.row_id} as observed in campaign log: {args.log}")
     return 0
 
@@ -326,6 +360,14 @@ def _cmd_plot(args: argparse.Namespace) -> int:
                     "plot --kind replicates requires a config with replicates.enabled: true."
                 )
             campaign.plot_replicates(save_path=args.output)
+        elif args.kind == "pareto":
+            if not campaign.config.is_multi_objective:
+                raise ConfigError("plot --kind pareto requires a multi-objective config.")
+            campaign.plot_pareto(save_path=args.output)
+        elif args.kind == "hypervolume":
+            if not campaign.config.is_multi_objective:
+                raise ConfigError("plot --kind hypervolume requires a multi-objective config.")
+            campaign.plot_hypervolume(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:
@@ -375,6 +417,30 @@ def _write_empty_log(df: pd.DataFrame, path: Path) -> Path:
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
     return path
+
+
+def _parse_cli_objective_values(values: list[str]) -> dict[str, float]:
+    parsed: dict[str, float] = {}
+    for item in values:
+        if "=" not in item:
+            raise LogWriteError(
+                f"Malformed --objective value '{item}'. Expected NAME=VALUE."
+            )
+        name, raw_value = item.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise LogWriteError(
+                f"Malformed --objective value '{item}'. Objective name is blank."
+            )
+        if name in parsed:
+            raise LogWriteError(f"Duplicate --objective value for objective '{name}'.")
+        try:
+            parsed[name] = float(raw_value)
+        except ValueError as exc:
+            raise LogWriteError(
+                f"Objective value for '{name}' must be numeric: value={raw_value!r}."
+            ) from exc
+    return parsed
 
 
 def _doctor_import(module_name: str) -> None:

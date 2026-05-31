@@ -26,6 +26,15 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
+from bo_forge.multi_objective import (
+    hypervolume,
+)
+from bo_forge.multi_objective import (
+    pareto_front as _pareto_front,
+)
+from bo_forge.multi_objective import (
+    pareto_summary as _pareto_summary,
+)
 from bo_forge.replicates import (
     best_replicate_group as _best_replicate_group,
 )
@@ -84,6 +93,8 @@ class CampaignSession:
     def summary(self) -> pd.DataFrame:
         """Return a notebook-friendly two-column summary of campaign state."""
         self.validate()
+        if self.config.is_multi_objective:
+            return self._multi_objective_summary()
         observed = self.observed_data()
         pending = self.pending_suggestions()
         observed_count = len(observed)
@@ -164,6 +175,40 @@ class CampaignSession:
                     ("best_replicate_mean", best_replicate_mean),
                 ]
             )
+        return pd.DataFrame(rows, columns=["field", "value"])
+
+    def _multi_objective_summary(self) -> pd.DataFrame:
+        observed = self.observed_data()
+        pending = self.pending_suggestions()
+        observed_count = len(observed)
+        pending_count = len(pending)
+        initial_design_remaining = max(
+            self.config.bo.initial_design_size - observed_count,
+            0,
+        )
+        rows: list[tuple[str, object]] = [
+            ("campaign_name", self.config.campaign_name),
+            ("campaign_status", self.campaign_status()),
+            ("objectives", ", ".join(self.config.objective_names)),
+            (
+                "directions",
+                ", ".join(objective.direction for objective in self.config.objectives),
+            ),
+            (
+                "reference_points",
+                ", ".join(
+                    f"{objective.name}={objective.reference_point:g}"
+                    for objective in self.config.objectives
+                ),
+            ),
+            ("total_rows", len(self.df)),
+            ("observed_rows", observed_count),
+            ("pending_suggestions", pending_count),
+            ("initial_design_remaining", initial_design_remaining),
+            ("next_iteration", next_iteration(self.df)),
+            ("pareto_count", len(self.pareto_front())),
+            ("hypervolume", hypervolume(self.config, self.df)),
+        ]
         return pd.DataFrame(rows, columns=["field", "value"])
 
     def _review_status_counts(self) -> dict[str, int]:
@@ -290,6 +335,14 @@ class CampaignSession:
 
     def report(self) -> dict[str, pd.DataFrame]:
         """Return read-only campaign report tables for notebook display."""
+        if self.config.is_multi_objective:
+            return {
+                "summary": self.summary(),
+                "next_action": self.next_action(),
+                "pareto_summary": self.pareto_summary(),
+                "pareto_front": self.pareto_front(),
+                "pending_suggestions": self.pending_suggestions(),
+            }
         return {
             "summary": self.summary(),
             "next_action": self.next_action(),
@@ -311,6 +364,11 @@ class CampaignSession:
 
     def best_observation(self) -> pd.DataFrame:
         """Return the best observed row as a canonical-order copy."""
+        if self.config.is_multi_objective:
+            raise ValueError(
+                "best_observation() is only defined for single-objective campaigns; "
+                "use pareto_front() for multi-objective campaigns."
+            )
         observed = self.observed_data()
         columns = canonical_columns(self.config)
         if observed.empty:
@@ -323,6 +381,14 @@ class CampaignSession:
         else:
             best_index = values.idxmin()
         return observed.loc[[best_index], columns].copy()
+
+    def pareto_front(self) -> pd.DataFrame:
+        """Return nondominated observed rows for a multi-objective campaign."""
+        return _pareto_front(self.config, self.df)
+
+    def pareto_summary(self) -> pd.DataFrame:
+        """Return Pareto-front and hypervolume summary fields."""
+        return _pareto_summary(self.config, self.df)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -352,11 +418,18 @@ class CampaignSession:
     def mark_observed(
         self,
         row_id: str,
-        objective_value: float,
+        objective_value: float | None = None,
+        objective_values: dict[str, float] | None = None,
         actual_cost: float | None = None,
     ) -> pd.DataFrame:
         """Mark one pending suggestion observed, reload, and return the refreshed log."""
-        _mark_observed(self.log_path, row_id, objective_value, actual_cost=actual_cost)
+        _mark_observed(
+            self.log_path,
+            row_id,
+            objective_value=objective_value,
+            objective_values=objective_values,
+            actual_cost=actual_cost,
+        )
         return self.reload()
 
     def review_suggestion(
@@ -393,6 +466,18 @@ class CampaignSession:
 
         return _plot_replicates(self.config, self.df, **kwargs)
 
+    def plot_pareto(self, **kwargs: Any) -> Any:
+        """Plot the 2D observed Pareto front for a multi-objective campaign."""
+        from bo_forge.diagnostics import plot_pareto as _plot_pareto
+
+        return _plot_pareto(self.config, self.df, **kwargs)
+
+    def plot_hypervolume(self, **kwargs: Any) -> Any:
+        """Plot hypervolume progress for a multi-objective campaign."""
+        from bo_forge.diagnostics import plot_hypervolume as _plot_hypervolume
+
+        return _plot_hypervolume(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -401,6 +486,20 @@ def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
 
 
 def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
+    if "pareto_front" in tables:
+        return "\n\n".join(
+            [
+                "BO Forge Campaign Report\n========================",
+                "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
+                "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+                "Pareto Summary\n--------------\n\n"
+                + _format_report_table(tables["pareto_summary"], "No Pareto summary available."),
+                "Pareto Front\n------------\n\n"
+                + _format_report_table(tables["pareto_front"], "No Pareto observations yet."),
+                "Pending Suggestions\n-------------------\n\n"
+                + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
+            ]
+        )
     return "\n\n".join(
         [
             "BO Forge Campaign Report\n========================",

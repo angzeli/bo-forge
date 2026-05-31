@@ -20,6 +20,14 @@ The full cost + review + replicates schema is:
 row_id,iteration,status,source,review_status,review_note,replicate_group,replicate_index,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
 ```
 
+For v1.1 two-objective campaigns, the schema is:
+
+```text
+row_id,iteration,status,source,<variable columns...>,<objective_1>,<objective_2>,predicted_mean_<objective_1>,predicted_std_<objective_1>,predicted_mean_<objective_2>,predicted_std_<objective_2>,acquisition
+```
+
+Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains both objective values. Suggested rows keep both objective columns blank until the experiment is complete.
+
 For `configs/01_simple_2d_maximise_logei.yaml`, the concrete columns are:
 
 ```text
@@ -33,19 +41,25 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, or `cost_log_ei`. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for two-objective campaigns. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
 | `replicate_group` | If replicates enabled | Nonblank replicate-group identifier. Rows in a group share one design. |
 | `replicate_index` | If replicates enabled | Zero-based non-negative integer, unique within each replicate group. |
 | variable columns | Yes | One column per configured variable, in YAML order, stored in original user units. |
 | objective column | Yes | The configured objective name, such as `activity` or `defect_rate`. |
+| objective columns | Multi-objective only | The two configured objective names. Observed rows must fill both values. |
 | `cost_estimate` | If cost configured | Optional finite non-negative estimated cost. If filled, it must match the deterministic cost expression. Generated suggestions fill this column. |
 | `cost_actual` | If cost configured | Optional finite non-negative realised cost entered when marking observed. |
 | `predicted_mean` | Yes | Optional model prediction for suggested model-based rows. Blank is allowed. |
 | `predicted_std` | Yes | Optional posterior standard deviation. Blank is allowed. |
 | `acquisition` | Yes | Optional acquisition value. Blank is allowed. |
 | `utility` | If cost configured | Optional cost-aware utility. Model-based cost-aware suggestions fill this column. |
+
+For multi-objective campaigns, prediction columns are objective-specific:
+
+- `predicted_mean_<objective_name>`;
+- `predicted_std_<objective_name>`.
 
 ## 🚦 Status Rules
 
@@ -92,6 +106,17 @@ mark_observed(
 
 For cost-aware campaigns, `mark_observed(..., actual_cost=...)` records a finite non-negative realised cost in `cost_actual`. For review-enabled campaigns, only `review_status=accepted` rows can be marked observed.
 
+For multi-objective campaigns, use objective values keyed by objective name:
+
+```python
+campaign.mark_observed(
+    row_id="suggested_row_id_here",
+    objective_values={"yield_score": 71.2, "waste_score": 13.4},
+)
+```
+
+The keys must exactly match the configured objective names. Passing a single `objective_value` to a multi-objective campaign fails clearly.
+
 Review decisions do not change `status`; they update `review_status` in place:
 
 ```python
@@ -130,6 +155,22 @@ Blank `utility` is expected for initial Sobol/random suggestions, because no mod
 If a config defines `constraints`, every CSV row must satisfy every constraint regardless of `status` or `source`.
 
 This means manual historical rows, Sobol/random initial suggestions, and LogEI/qLogEI model suggestions all follow the same feasibility rules. A row that violates a constraint fails CSV validation with the row ID, constraint name, and expression.
+
+For multi-objective campaigns, constraints apply to every row in the same way. qLogEHVI suggestions are repaired and checked against configured variable domains, constraints, exact duplicates, and encoded-space near-duplicate thresholds.
+
+## 🎯 Multi-Objective Rules
+
+v1.1 supports exactly two objectives with coupled evaluation.
+
+- A config uses `objectives:` instead of `objective:`.
+- Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
+- Reference points are written in user-facing objective units and should represent meaningfully worse outcomes than the region of interest.
+- Observed rows must contain both objective values.
+- Suggested rows must leave both objective values blank.
+- Hypervolume is computed in internal maximisation space after applying objective directions.
+- If no observed point dominates the reference point, hypervolume is reported as `0.0`.
+
+Cost, review, and replicate columns are not supported for multi-objective campaigns in v1.1.
 
 ## 🧑‍⚖️ Review And Budget Rules
 

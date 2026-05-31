@@ -102,6 +102,15 @@ bo-forge replicate-summary \
   --log examples/08_replicate_aware_working_log.csv
 ```
 
+For two-objective campaigns, `summary` includes Pareto and hypervolume fields, and `suggest` uses qLogEHVI after the initial design:
+
+```bash
+bo-forge suggest \
+  --config configs/10_multi_objective_mixed_constrained_qlogehvi.yaml \
+  --log examples/10_multi_objective_mixed_constrained_working_log.csv \
+  --batch-size 2
+```
+
 Generate suggestions, save a suggestions CSV, and append the same suggestions to the canonical log:
 
 ```bash
@@ -121,6 +130,19 @@ bo-forge mark-observed \
   --row-id ROW_ID_FROM_SUGGESTIONS \
   --objective-value 1.95
 ```
+
+For two-objective campaigns, provide one `--objective name=value` argument per objective:
+
+```bash
+bo-forge mark-observed \
+  --config configs/10_multi_objective_mixed_constrained_qlogehvi.yaml \
+  --log examples/10_multi_objective_mixed_constrained_working_log.csv \
+  --row-id ROW_ID_FROM_SUGGESTIONS \
+  --objective yield_score=71.2 \
+  --objective waste_score=13.4
+```
+
+The objective names must exactly match the YAML config. `--objective-value` is single-objective only.
 
 For review-enabled campaigns, accept, reject, or defer suggestions before running them:
 
@@ -189,6 +211,18 @@ bo-forge plot \
   --log examples/08_replicate_aware_working_log.csv \
   --kind replicates \
   --output reports/replicates.png
+
+bo-forge plot \
+  --config configs/10_multi_objective_mixed_constrained_qlogehvi.yaml \
+  --log examples/10_multi_objective_mixed_constrained_working_log.csv \
+  --kind pareto \
+  --output reports/pareto.png
+
+bo-forge plot \
+  --config configs/10_multi_objective_mixed_constrained_qlogehvi.yaml \
+  --log examples/10_multi_objective_mixed_constrained_working_log.csv \
+  --kind hypervolume \
+  --output reports/hypervolume.png
 ```
 
 ## 🧭 Command Reference
@@ -209,7 +243,8 @@ bo-forge plot \
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates --output PATH` | Export one progress, diagnostics, cost-progress, or replicate-summary figure. |
+| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE` | Mark a two-objective pending suggestion observed. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|hypervolume --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, or hypervolume figure. |
 
 ## 🧯 CLI Error Output
 
