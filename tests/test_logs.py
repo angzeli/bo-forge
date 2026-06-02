@@ -8,10 +8,11 @@ from bo_forge.config import (
     CampaignConfig,
     CostConfig,
     ObjectiveConfig,
+    ReplicateConfig,
     ReviewConfig,
     VariableConfig,
 )
-from bo_forge.errors import LogWriteError
+from bo_forge.errors import LogValidationError, LogWriteError
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
 from bo_forge.validation import canonical_columns
 
@@ -34,6 +35,17 @@ def cost_review_config() -> CampaignConfig:
         bo=cfg.bo,
         cost=CostConfig(expression="1.0 + x", budget=10.0),
         review=ReviewConfig(enabled=True),
+    )
+
+
+def replicate_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
     )
 
 
@@ -95,6 +107,18 @@ def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None
     assert df.loc[0, "status"] == "observed"
     assert float(df.loc[0, "activity"]) == pytest.approx(1.7)
     assert float(df.loc[0, "x"]) == pytest.approx(0.4)
+
+
+def test_append_suggestions_without_config_still_supports_non_replicate_logs(
+    tmp_path: Path,
+) -> None:
+    cfg = config()
+    log_path = tmp_path / "campaign.csv"
+
+    append_suggestions(log_path, suggestion("non_replicate"))
+
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "row_id"] == "non_replicate"
 
 
 def test_review_suggestion_and_mark_observed_with_actual_cost(tmp_path: Path) -> None:
@@ -169,6 +193,149 @@ def test_append_suggestions_rejects_duplicate_row_id(tmp_path: Path) -> None:
 
     with pytest.raises(LogWriteError, match="duplicate row_id 'same'"):
         append_suggestions(log_path, suggestion("same"))
+
+
+def test_append_suggestions_rejects_duplicate_replicate_pair_structurally(
+    tmp_path: Path,
+) -> None:
+    cfg = replicate_config()
+    rows = pd.DataFrame(
+        [
+            {
+                "row_id": "repeat_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.4,
+                "activity": "",
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.0,
+            },
+            {
+                "row_id": "repeat_1",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.4,
+                "activity": "",
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.0,
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+    log_path = tmp_path / "campaign.csv"
+
+    with pytest.raises(LogValidationError, match="Duplicate replicate row"):
+        append_suggestions(log_path, rows)
+
+    assert not log_path.exists()
+
+
+def test_append_suggestions_with_config_rejects_typed_equivalent_replicate_group_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = replicate_config()
+    existing = pd.DataFrame(
+        [
+            {
+                "row_id": "observed_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.4,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    log_path = tmp_path / "campaign.csv"
+    existing.to_csv(log_path, index=False)
+    suggestions = pd.DataFrame(
+        [
+            {
+                "row_id": "bad_repeat",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": "0.4000",
+                "activity": "",
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.0,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogValidationError, match="same design must share"):
+        append_suggestions(log_path, suggestions, config=cfg)
+
+    assert log_path.read_bytes() == before
+
+
+def test_append_suggestions_requires_config_for_replicate_logs_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = replicate_config()
+    existing = pd.DataFrame(
+        [
+            {
+                "row_id": "observed_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.4,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    log_path = tmp_path / "campaign.csv"
+    existing.to_csv(log_path, index=False)
+    suggestions = pd.DataFrame(
+        [
+            {
+                "row_id": "bad_repeat",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.4,
+                "activity": "",
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.0,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="Replicate append requires config-aware validation"):
+        append_suggestions(log_path, suggestions)
+
+    assert log_path.read_bytes() == before
 
 
 def test_mark_observed_rejects_missing_row_id(tmp_path: Path) -> None:

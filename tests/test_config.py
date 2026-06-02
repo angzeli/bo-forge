@@ -162,12 +162,159 @@ variables:
     upper: 1
 replicates:
   enabled: true
+  suggestion_policy: new_only
+  replicate_threshold: 0.25
+  min_repeats_at_best: 2
+  max_repeats_per_group: 4
+  noise_floor: 1.0e-6
 """,
     )
 
     config = CampaignConfig.from_yaml(path)
 
     assert config.replicates.enabled
+    assert config.replicates.suggestion_policy == "new_only"
+    assert config.replicates.replicate_threshold == 0.25
+    assert config.replicates.min_repeats_at_best == 2
+    assert config.replicates.max_repeats_per_group == 4
+    assert config.replicates.noise_floor == pytest.approx(1.0e-6)
+
+
+def test_replicates_defaults_preserve_noisy_repeat_policy(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: replicate_defaults
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.replicates.suggestion_policy == "uncertain_best"
+    assert config.replicates.replicate_threshold == pytest.approx(0.10)
+    assert config.replicates.min_repeats_at_best == 3
+    assert config.replicates.max_repeats_per_group == 5
+    assert config.replicates.noise_floor == pytest.approx(1.0e-8)
+
+
+def test_single_objective_replicates_default_to_uncertain_best(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: single_replicates
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.replicates.suggestion_policy == "uncertain_best"
+
+
+def test_multi_objective_replicates_default_to_new_only_when_policy_omitted(
+    tmp_path: Path,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: multi_replicates
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 0
+  - name: waste_score
+    direction: minimize
+    reference_point: 1
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.replicates.enabled
+    assert config.replicates.suggestion_policy == "new_only"
+
+
+def test_multi_objective_replicates_accept_explicit_new_only(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: multi_replicates
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 0
+  - name: waste_score
+    direction: minimize
+    reference_point: 1
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  suggestion_policy: new_only
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.replicates.suggestion_policy == "new_only"
+
+
+def test_multi_objective_replicates_reject_explicit_uncertain_best(
+    tmp_path: Path,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: multi_replicates
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 0
+  - name: waste_score
+    direction: minimize
+    reference_point: 1
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  suggestion_policy: uncertain_best
+""",
+    )
+
+    with pytest.raises(ConfigError, match="single-objective campaigns"):
+        CampaignConfig.from_yaml(path)
 
 
 def test_replicates_unknown_key_fails(tmp_path: Path) -> None:
@@ -212,6 +359,69 @@ replicates:
     )
 
     with pytest.raises(ConfigError, match="replicates.enabled must be a boolean"):
+        CampaignConfig.from_yaml(path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("suggestion_policy", "always_repeat", "suggestion_policy"),
+        ("replicate_threshold", 0, "replicate_threshold"),
+        ("noise_floor", -1, "noise_floor"),
+        ("min_repeats_at_best", 0, "min_repeats_at_best"),
+        ("max_repeats_per_group", 0, "max_repeats_per_group"),
+    ],
+)
+def test_replicates_invalid_policy_controls_fail(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    rendered = f'"{value}"' if isinstance(value, str) else value
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: bad_replicates
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  {field}: {rendered}
+""",
+    )
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
+def test_replicates_min_repeats_must_not_exceed_max(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_replicates
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  min_repeats_at_best: 6
+  max_repeats_per_group: 5
+""",
+    )
+
+    with pytest.raises(ConfigError, match="min_repeats_at_best.*<="):
         CampaignConfig.from_yaml(path)
 
 

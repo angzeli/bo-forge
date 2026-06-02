@@ -37,7 +37,11 @@ def load_campaign_log(path: str | Path, config: CampaignConfig) -> pd.DataFrame:
     return df
 
 
-def append_suggestions(log_path: str | Path, suggestions: pd.DataFrame) -> None:
+def append_suggestions(
+    log_path: str | Path,
+    suggestions: pd.DataFrame,
+    config: CampaignConfig | None = None,
+) -> None:
     """Append suggested rows to a campaign log and validate the written file."""
     path = Path(log_path)
     if suggestions.empty:
@@ -63,6 +67,13 @@ def append_suggestions(log_path: str | Path, suggestions: pd.DataFrame) -> None:
 
     combined = pd.concat([existing, suggestions], ignore_index=True)
     _validate_structural_log(combined)
+    if config is not None:
+        validate_campaign_data(config, combined)
+    elif _has_replicate_columns(combined.columns):
+        raise LogWriteError(
+            "Replicate append requires config-aware validation; use "
+            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+        )
     _atomic_write_and_validate(path, combined)
 
 
@@ -465,6 +476,20 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
             raise LogValidationError(
                 f"Row '{row_id}' has invalid replicate_index '{value}'."
             )
+        replicate_pairs = (
+            df["replicate_group"].astype(str)
+            + "\0"
+            + replicate_index.astype(int).astype(str)
+        )
+        duplicated_pair = replicate_pairs[replicate_pairs.duplicated()]
+        if not duplicated_pair.empty:
+            index = int(duplicated_pair.index[0])
+            group = str(df.at[index, "replicate_group"])
+            replicate = int(replicate_index.at[index])
+            raise LogValidationError(
+                f"Duplicate replicate row for replicate_group='{group}', "
+                f"replicate_index={replicate}."
+            )
 
     numeric_columns = [*_result_columns_from_columns(df.columns)]
     if _has_cost_columns(df.columns):
@@ -592,11 +617,17 @@ def _multi_objective_parts_from_columns(
     if column_list[: len(BASE_COLUMNS)] != BASE_COLUMNS or column_list[-1] != "acquisition":
         return None
 
-    tail_length = len(column_list) - len(BASE_COLUMNS) - 1
+    start = len(BASE_COLUMNS)
+    if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
+        start += len(REVIEW_COLUMNS)
+    if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
+        start += len(REPLICATE_COLUMNS)
+
+    tail_length = len(column_list) - start - 1
     max_objectives = max((tail_length - 1) // 3, 1)
     for objective_count in range(max_objectives, 1, -1):
         result_start = len(column_list) - 1 - 2 * objective_count
-        if result_start <= len(BASE_COLUMNS):
+        if result_start <= start:
             continue
         result_columns = column_list[result_start:-1]
         objective_names: list[str] = []
@@ -615,7 +646,7 @@ def _multi_objective_parts_from_columns(
         if not valid_result_columns:
             continue
 
-        middle = column_list[len(BASE_COLUMNS) : result_start]
+        middle = column_list[start:result_start]
         if len(middle) < objective_count + 1:
             continue
         if middle[-objective_count:] != objective_names:

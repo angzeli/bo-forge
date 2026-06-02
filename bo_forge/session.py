@@ -178,9 +178,10 @@ class CampaignSession:
         observed = self.observed_data()
         pending = self.pending_suggestions()
         observed_count = len(observed)
+        training_observed_count = len(modeling_observed_data(self.config, observed))
         pending_count = len(pending)
         initial_design_remaining = max(
-            self.config.bo.initial_design_size - observed_count,
+            self.config.bo.initial_design_size - training_observed_count,
             0,
         )
         rows: list[tuple[str, object]] = [
@@ -204,6 +205,35 @@ class CampaignSession:
             ("initial_design_remaining", initial_design_remaining),
             ("next_iteration", next_iteration(self.df)),
         ]
+        if self.config.review.enabled:
+            review_counts = self._review_status_counts()
+            rows.extend(
+                [
+                    ("pending_review", review_counts["pending"]),
+                    ("accepted_pending", review_counts["accepted"]),
+                    ("rejected", review_counts["rejected"]),
+                    ("deferred", review_counts["deferred"]),
+                ]
+            )
+        if self.config.replicates.enabled:
+            replicate_summary = self.replicate_summary()
+            rows.extend(
+                [
+                    ("replicate_groups", len(replicate_summary)),
+                    (
+                        "replicated_groups",
+                        int((replicate_summary["n_replicates"] > 1).sum())
+                        if not replicate_summary.empty
+                        else 0,
+                    ),
+                    (
+                        "max_replicates_per_group",
+                        int(replicate_summary["n_replicates"].max())
+                        if not replicate_summary.empty
+                        else 0,
+                    ),
+                ]
+            )
         pareto_summary = self.pareto_summary()
         rows.extend(
             (str(row["field"]), row["value"]) for _, row in pareto_summary.iterrows()
@@ -291,20 +321,32 @@ class CampaignSession:
             elif self.config.review.enabled:
                 action = "run_accepted_suggestions"
                 reason = "There are accepted suggestions awaiting experimental results."
-                suggested_call = (
-                    "campaign.pending_suggestions(); "
-                    "campaign.mark_observed(row_id, objective_value, actual_cost=...)"
-                )
+                if self.config.is_multi_objective:
+                    suggested_call = (
+                        "campaign.pending_suggestions(); "
+                        "campaign.mark_observed(row_id, objective_values={...})"
+                    )
+                else:
+                    suggested_call = (
+                        "campaign.pending_suggestions(); "
+                        "campaign.mark_observed(row_id, objective_value, actual_cost=...)"
+                    )
             else:
                 action = "resolve_pending_suggestions"
                 reason = (
                     "There are unresolved suggested rows; record results before "
                     "requesting more."
                 )
-                suggested_call = (
-                    "campaign.pending_suggestions(); "
-                    "campaign.mark_observed(row_id, objective_value)"
-                )
+                if self.config.is_multi_objective:
+                    suggested_call = (
+                        "campaign.pending_suggestions(); "
+                        "campaign.mark_observed(row_id, objective_values={...})"
+                    )
+                else:
+                    suggested_call = (
+                        "campaign.pending_suggestions(); "
+                        "campaign.mark_observed(row_id, objective_value)"
+                    )
         elif campaign_status == "ready_for_initial_design":
             action = "suggest_initial_design"
             reason = "Observed rows are below initial_design_size; request Sobol suggestions."
@@ -335,13 +377,18 @@ class CampaignSession:
     def report(self) -> dict[str, pd.DataFrame]:
         """Return read-only campaign report tables for notebook display."""
         if self.config.is_multi_objective:
-            return {
+            tables = {
                 "summary": self.summary(),
                 "next_action": self.next_action(),
                 "pareto_summary": self.pareto_summary(),
                 "pareto_front": self.pareto_front(),
                 "pending_suggestions": self.pending_suggestions(),
             }
+            if self.config.review.enabled:
+                tables["review_queue"] = self.review_queue()
+            if self.config.replicates.enabled:
+                tables["replicate_summary"] = self.replicate_summary()
+            return tables
         return {
             "summary": self.summary(),
             "next_action": self.next_action(),
@@ -411,7 +458,7 @@ class CampaignSession:
 
     def append_suggestions(self, suggestions: pd.DataFrame) -> pd.DataFrame:
         """Append suggestions to disk, reload the session, and return the refreshed log."""
-        _append_suggestions(self.log_path, suggestions)
+        _append_suggestions(self.log_path, suggestions, config=self.config)
         return self.reload()
 
     def mark_observed(
@@ -492,19 +539,36 @@ def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
 
 def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
     if "pareto_front" in tables:
-        return "\n\n".join(
-            [
-                "BO Forge Campaign Report\n========================",
-                "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
-                "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
-                "Pareto Summary\n--------------\n\n"
-                + _format_report_table(tables["pareto_summary"], "No Pareto summary available."),
-                "Pareto Front\n------------\n\n"
-                + _format_report_table(tables["pareto_front"], "No Pareto observations yet."),
-                "Pending Suggestions\n-------------------\n\n"
-                + _format_report_table(tables["pending_suggestions"], "No pending suggestions."),
-            ]
+        sections = [
+            "BO Forge Campaign Report\n========================",
+            "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
+            "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+            "Pareto Summary\n--------------\n\n"
+            + _format_report_table(tables["pareto_summary"], "No Pareto summary available."),
+            "Pareto Front\n------------\n\n"
+            + _format_report_table(tables["pareto_front"], "No Pareto observations yet."),
+        ]
+        if "replicate_summary" in tables:
+            sections.append(
+                "Replicate Summary\n-----------------\n\n"
+                + _format_report_table(
+                    tables["replicate_summary"],
+                    "No replicate groups observed.",
+                )
+            )
+        sections.append(
+            "Pending Suggestions\n-------------------\n\n"
+            + _format_report_table(tables["pending_suggestions"], "No pending suggestions.")
         )
+        if "review_queue" in tables:
+            sections.append(
+                "Review Queue\n------------\n\n"
+                + _format_report_table(
+                    tables["review_queue"],
+                    "No suggestions awaiting review.",
+                )
+            )
+        return "\n\n".join(sections)
     return "\n\n".join(
         [
             "BO Forge Campaign Report\n========================",

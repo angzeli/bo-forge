@@ -7,7 +7,10 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+import pandas as pd
+
 import bo_forge
+from bo_forge.session import CampaignSession
 from bo_forge_app.cli import packaged_streamlit_app_path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,9 +44,84 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert "pip install bo-forge" in tutorial
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-1.1.1-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-1.1.1.tar.gz" in tutorial
+    assert "dist/bo_forge-1.1.2-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-1.1.2.tar.gz" in tutorial
     assert "pip check" in tutorial
+
+
+def test_quickstart_has_no_stale_v0_4_current_feature_wording() -> None:
+    quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
+
+    stale_phrases = [
+        "v0.4.3 adds optional deterministic cost",
+        "v0.4.3 uses greedy",
+        "v0.4.4 adds optional explicit replicate",
+    ]
+    for phrase in stale_phrases:
+        assert phrase not in quickstart
+
+
+def test_replicate_ready_cli_demo_exercises_repeat_path() -> None:
+    quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
+
+    assert "/tmp/bo_forge_08_repeat_ready.csv" in quickstart
+    assert "uncertain_best" in quickstart
+    assert "rep_seed_3a" in quickstart
+    assert "configs/08_replicate_aware_logei.yaml" in quickstart
+
+
+def test_replicate_ready_demo_executes_repeat_path(tmp_path: Path) -> None:
+    config_path = PROJECT_ROOT / "configs" / "08_replicate_aware_logei.yaml"
+    seed_log_path = PROJECT_ROOT / "examples" / "08_replicate_aware_campaign_log.csv"
+    working_log_path = tmp_path / "bo_forge_08_repeat_ready.csv"
+    working_log_path.write_bytes(seed_log_path.read_bytes())
+    df = pd.read_csv(working_log_path, keep_default_na=False)
+    df.loc[len(df)] = [
+        "rep_seed_3a",
+        3,
+        "observed",
+        "manual",
+        "rep_3",
+        0,
+        0.85,
+        430,
+        1.10,
+        "",
+        "",
+        "",
+    ]
+    df.to_csv(working_log_path, index=False)
+
+    campaign = CampaignSession.from_files(config_path, working_log_path)
+    suggestions = campaign.suggest_next(batch_size=3)
+
+    existing_groups = set(df["replicate_group"].astype(str))
+    repeat_rows = suggestions[
+        suggestions["replicate_group"].astype(str).isin(existing_groups)
+    ]
+    exploration_rows = suggestions[
+        ~suggestions["replicate_group"].astype(str).isin(existing_groups)
+    ]
+
+    assert len(suggestions) == 3
+    assert not repeat_rows.empty
+    for group, group_suggestions in repeat_rows.groupby("replicate_group"):
+        existing_indexes = df.loc[df["replicate_group"] == group, "replicate_index"].astype(
+            int
+        )
+        expected_indexes = list(
+            range(
+                int(existing_indexes.max()) + 1,
+                int(existing_indexes.max()) + 1 + len(group_suggestions),
+            )
+        )
+        assert sorted(group_suggestions["replicate_index"].astype(int).tolist()) == (
+            expected_indexes
+        )
+    assert len(exploration_rows) == 1
+    exploration = exploration_rows.iloc[0]
+    assert exploration["replicate_group"] == exploration["row_id"]
+    assert int(exploration["replicate_index"]) == 0
 
 
 def test_public_api_exports_are_importable() -> None:
@@ -86,10 +164,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-1.1.1-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-1.1.1.tar.gz"))
-    assert wheels, "No v1.1.1 wheel was built."
-    assert sdists, "No v1.1.1 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-1.1.2-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-1.1.2.tar.gz"))
+    assert wheels, "No v1.1.2 wheel was built."
+    assert sdists, "No v1.1.2 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -127,13 +205,13 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-1.1.1.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-1.1.2.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge_app/streamlit_app.py" in names
     assert "bo_forge_app/cli.py" in names
-    assert "bo_forge-1.1.1.dist-info/entry_points.txt" in names
-    assert "bo_forge-1.1.1.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-1.1.2.dist-info/entry_points.txt" in names
+    assert "bo_forge-1.1.2.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -145,25 +223,25 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-1.1.1/README.md" in names
-    assert "bo_forge-1.1.1/ROADMAP_PRE_V1.md" in names
-    assert "bo_forge-1.1.1/ROADMAP_AFTER_V1.md" in names
-    assert "bo_forge-1.1.1/docs/PUBLIC_API.md" in names
-    assert "bo_forge-1.1.1/examples/quickstart.py" in names
-    assert "bo_forge-1.1.1/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert "bo_forge-1.1.2/README.md" in names
+    assert "bo_forge-1.1.2/ROADMAP_PRE_V1.md" in names
+    assert "bo_forge-1.1.2/ROADMAP_AFTER_V1.md" in names
+    assert "bo_forge-1.1.2/docs/PUBLIC_API.md" in names
+    assert "bo_forge-1.1.2/examples/quickstart.py" in names
+    assert "bo_forge-1.1.2/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
     assert (
-        "bo_forge-1.1.1/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.1.2/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
         in names
     )
     assert (
-        "bo_forge-1.1.1/examples/11_four_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.1.2/examples/11_four_objective_mixed_constrained_campaign_log.csv"
         in names
     )
-    assert "bo_forge-1.1.1/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.1.1/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.1.1/notebooks/01_maximisation_logei_campaign.ipynb" in names
-    assert "bo_forge-1.1.1/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.1.1/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.1.2/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.1.2/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.1.2/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-1.1.2/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.1.2/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -205,7 +283,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 1.1.1\n"
+    assert completed.stdout == "bo-forge 1.1.2\n"
 
     source_root = str(PROJECT_ROOT.resolve())
     script = f"""
@@ -221,7 +299,7 @@ assert scripts["bo-forge-app"] == "bo_forge_app.cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "1.1.1"
+assert bo_forge.__version__ == "1.1.2"
 
 real_import = builtins.__import__
 def block_streamlit(name, *args, **kwargs):

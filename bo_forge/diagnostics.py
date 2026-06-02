@@ -12,7 +12,11 @@ from matplotlib.ticker import MaxNLocator
 
 from bo_forge.config import CampaignConfig
 from bo_forge.costs import effective_row_cost
-from bo_forge.multi_objective import hypervolume_progress, pareto_front
+from bo_forge.multi_objective import (
+    hypervolume_progress,
+    multi_objective_observed_data,
+    pareto_front,
+)
 from bo_forge.plot_style import (
     add_legend,
     configure_plot_style,
@@ -234,6 +238,16 @@ def plot_replicates(
 
     observed = get_observed_data(config, df)
     summary = replicate_summary(config, df)
+    if config.is_multi_objective:
+        return _plot_multi_objective_replicates(
+            config,
+            observed,
+            summary,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
     _, ax = new_figure(figsize=(9, 6))
     if summary.empty:
         set_title(ax, f"{config.campaign_name}: no replicate observations yet")
@@ -281,6 +295,98 @@ def plot_replicates(
     )
 
 
+def _plot_multi_objective_replicates(
+    config: CampaignConfig,
+    observed: pd.DataFrame,
+    summary: pd.DataFrame,
+    *,
+    filename: str | Path | None,
+    fig_folder: str | Path,
+    save_path: str | Path | None,
+    show: bool,
+):
+    objective_count = len(config.objectives)
+    column_count = min(2, objective_count)
+    row_count = math.ceil(objective_count / column_count)
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        row_count,
+        column_count,
+        figsize=(7.2 * column_count, 4.8 * row_count),
+        facecolor="white",
+        constrained_layout=True,
+        squeeze=False,
+    )
+    flat_axes = list(axes.flat)
+    if summary.empty:
+        first_ax = flat_axes[0]
+        first_ax.text(
+            0.5,
+            0.5,
+            "No replicate observations yet.",
+            ha="center",
+            va="center",
+            transform=first_ax.transAxes,
+        )
+        set_title(first_ax, f"{config.campaign_name}: no replicate observations yet")
+        set_axis_labels(first_ax, "Replicate group index", "Objective value")
+        for ax in flat_axes[1:]:
+            ax.set_visible(False)
+        return finalise_axes(
+            fig,
+            axes,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
+
+    group_positions = {
+        group: index + 1
+        for index, group in enumerate(summary["replicate_group"].astype(str).tolist())
+    }
+    x = list(range(1, len(summary) + 1))
+    for ax, objective in zip(flat_axes, config.objectives, strict=False):
+        raw_x = observed["replicate_group"].astype(str).map(group_positions)
+        raw_y = pd.to_numeric(observed[objective.name])
+        ax.scatter(raw_x, raw_y, color="#64748b", alpha=0.75, label="raw observation")
+        mean = pd.to_numeric(summary[f"{objective.name}_mean"])
+        sem = pd.to_numeric(summary[f"{objective.name}_sem"])
+        ax.errorbar(
+            x,
+            mean,
+            yerr=sem,
+            fmt="o-",
+            color="#2563eb",
+            ecolor="#1d4ed8",
+            capsize=4,
+            label="group mean +/- SEM",
+        )
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(index) for index in x])
+        set_title(ax, f"{objective.name} replicates")
+        set_axis_labels(ax, "Replicate group index", _objective_axis_label(config, objective.name))
+        add_legend(ax)
+
+    for ax in flat_axes[objective_count:]:
+        ax.set_visible(False)
+    fig.suptitle(
+        f"{config.campaign_name}: replicate summaries",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
 def plot_pareto(
     config: CampaignConfig,
     df: pd.DataFrame,
@@ -303,7 +409,7 @@ def plot_pareto(
             save_path=save_path,
             show=show,
         )
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     front = pareto_front(config, df)
     x_name, y_name = config.objective_names
 
@@ -380,7 +486,7 @@ def plot_pareto_parallel(
             "plot_pareto_parallel() requires at least three objectives; use "
             "plot_pareto() for a 2D Pareto scatter."
         )
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     front = pareto_front(config, df)
 
     _, ax = new_figure(figsize=(10, 6))
@@ -548,7 +654,7 @@ def _plot_pairwise_pareto(
     save_path: str | Path | None,
     show: bool,
 ):
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     front = pareto_front(config, df)
     objective_pairs = list(combinations(config.objective_names, 2))
     column_count = min(3, len(objective_pairs))

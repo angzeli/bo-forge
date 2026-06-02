@@ -167,7 +167,14 @@ def cost_review_mixed_config(
     )
 
 
-def replicate_config(initial_design_size: int = 3) -> CampaignConfig:
+def replicate_config(
+    initial_design_size: int = 3,
+    *,
+    suggestion_policy: str = "uncertain_best",
+    replicate_threshold: float = 0.10,
+    min_repeats_at_best: int = 3,
+    max_repeats_per_group: int = 5,
+) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="replicate_test",
         objective=ObjectiveConfig(name="activity", direction="maximize"),
@@ -183,7 +190,13 @@ def replicate_config(initial_design_size: int = 3) -> CampaignConfig:
             num_restarts=2,
             mc_samples=16,
         ),
-        replicates=ReplicateConfig(enabled=True),
+        replicates=ReplicateConfig(
+            enabled=True,
+            suggestion_policy=suggestion_policy,
+            replicate_threshold=replicate_threshold,
+            min_repeats_at_best=min_repeats_at_best,
+            max_repeats_per_group=max_repeats_per_group,
+        ),
     )
 
 
@@ -304,7 +317,7 @@ def test_replicate_suggestions_set_group_to_row_id_and_start_at_zero() -> None:
 
 def test_replicate_initial_design_counts_groups_not_raw_rows() -> None:
     cfg = replicate_config(initial_design_size=4)
-    df = replicate_observed_log(cfg)
+    df = replicate_observed_log(cfg).astype(object)
 
     suggestions = suggest_next(cfg, df)
 
@@ -312,8 +325,8 @@ def test_replicate_initial_design_counts_groups_not_raw_rows() -> None:
 
 
 def test_replicate_model_based_suggestions_use_aggregated_observations() -> None:
-    cfg = replicate_config(initial_design_size=3)
-    df = replicate_observed_log(cfg)
+    cfg = replicate_config(initial_design_size=3, suggestion_policy="new_only")
+    df = replicate_observed_log(cfg).astype(object)
 
     suggestions = suggest_next(cfg, df)
 
@@ -329,6 +342,539 @@ def test_replicate_model_based_suggestions_use_aggregated_observations() -> None
         float(suggestions.loc[0, "temperature"]),
     )
     assert suggested_design not in existing_designs
+
+
+def test_replicate_uncertain_best_policy_suggests_same_group_repeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(initial_design_size=3, replicate_threshold=0.10)
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert suggestions.loc[0, "replicate_group"] == "group_1"
+    assert int(suggestions.loc[0, "replicate_index"]) == 1
+    assert float(suggestions.loc[0, "x"]) == pytest.approx(0.4)
+    assert float(suggestions.loc[0, "temperature"]) == pytest.approx(550.0)
+    assert float(suggestions.loc[0, "predicted_mean"]) == pytest.approx(2.0)
+    assert float(suggestions.loc[0, "predicted_std"]) == pytest.approx(0.2)
+
+
+def test_uncertain_best_uses_next_replicate_index_from_all_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = replicate_config(initial_design_size=3, replicate_threshold=0.10)
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        review=ReviewConfig(enabled=True),
+        replicates=base.replicates,
+    )
+    df = replicate_observed_log(cfg).astype(object)
+    df.loc[:, "review_status"] = "accepted"
+    df.loc[:, "review_note"] = ""
+    rejected = df.loc[df["replicate_group"] == "group_1"].iloc[[0]].copy()
+    rejected.loc[:, "row_id"] = "rejected_repeat"
+    rejected.loc[:, "status"] = "suggested"
+    rejected.loc[:, "review_status"] = "rejected"
+    rejected.loc[:, "review_note"] = "do not run"
+    rejected.loc[:, "replicate_index"] = 1
+    rejected.loc[:, "activity"] = ""
+    df = pd.concat([df, rejected], ignore_index=True)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "replicate_group"] == "group_1"
+    assert int(suggestions.loc[0, "replicate_index"]) == 2
+
+
+def test_replicate_repeat_suggestion_round_trips_as_same_group_duplicate(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(initial_design_size=3, replicate_threshold=0.10)
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    suggestions = suggest_next(cfg, df)
+    log_path = tmp_path / "campaign.csv"
+    df.to_csv(log_path, index=False)
+
+    append_suggestions(log_path, suggestions, config=cfg)
+    mark_observed(log_path, str(suggestions.loc[0, "row_id"]), objective_value=1.45)
+
+    written = load_campaign_log(log_path, cfg)
+    repeated = written.loc[written["replicate_group"] == "group_1"]
+    assert len(repeated) == 2
+    assert sorted(repeated["replicate_index"].astype(int).tolist()) == [0, 1]
+
+
+def test_suggestion_quality_marks_intentional_replicate_without_duplicate_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(initial_design_size=3, replicate_threshold=0.10)
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    suggestions = suggest_next(cfg, df)
+
+    summary = suggestion_quality_summary(cfg, df, suggestions)
+
+    assert bool(summary.loc[0, "duplicate_allowed_by_replicates"])
+    assert not bool(summary.loc[0, "is_exact_duplicate"])
+    assert summary.loc[0, "nearest_existing_distance"] == pytest.approx(0.0)
+    assert bool(summary.loc[0, "passes_distance_threshold"])
+
+
+def test_suggestion_quality_allows_intentional_replicate_batch_duplicates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=3,
+    )
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    summary = suggestion_quality_summary(cfg, df, suggestions)
+
+    assert suggestions["replicate_index"].astype(int).tolist() == [1, 2]
+    assert summary["duplicate_allowed_by_replicates"].astype(bool).all()
+    assert not summary["is_exact_duplicate"].astype(bool).any()
+    assert summary["passes_distance_threshold"].astype(bool).all()
+
+
+def test_cost_replicate_uncertain_best_fills_cost_without_utility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = replicate_config(initial_design_size=3, replicate_threshold=0.10)
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        cost=CostConfig(
+            expression="1.0 + x",
+            weight=0.5,
+            budget=100.0,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        replicates=base.replicates,
+    )
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert float(suggestions.loc[0, "cost_estimate"]) == pytest.approx(1.4)
+    assert str(suggestions.loc[0, "utility"]) == ""
+
+
+def test_uncertain_best_fills_remaining_batch_with_exploration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=2,
+    )
+    df = replicate_observed_log(cfg)
+    captured: dict[str, pd.DataFrame] = {}
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    def fake_model_based(**kwargs):
+        captured["df"] = kwargs["df"]
+        row = {
+            "row_id": "new_suggestion",
+            "iteration": 99,
+            "status": "suggested",
+            "source": "log_ei",
+            "replicate_group": "new_suggestion",
+            "replicate_index": 0,
+            "x": 0.9,
+            "temperature": 700.0,
+            "activity": "",
+            "predicted_mean": 1.5,
+            "predicted_std": 0.1,
+            "acquisition": 0.2,
+        }
+        return pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(suggestions_module, "_suggest_model_based", fake_model_based)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert len(suggestions) == 2
+    assert suggestions.loc[0, "replicate_group"] == "group_1"
+    assert int(suggestions.loc[0, "replicate_index"]) == 1
+    assert suggestions.loc[1, "replicate_group"] == "new_suggestion"
+    assert suggestions["iteration"].astype(int).nunique() == 1
+    staged = captured["df"].loc[captured["df"]["replicate_group"] == "group_1"]
+    assert sorted(staged["replicate_index"].astype(int).tolist()) == [0, 1]
+
+
+def test_uncertain_best_batch_fill_avoids_duplicate_repeat_design(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=2,
+    )
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    def fake_model_based(**kwargs):
+        staged_df = kwargs["df"]
+        repeat_design = staged_df.loc[
+            staged_df["replicate_group"] == "group_1",
+            ["x", "temperature"],
+        ].iloc[-1]
+        assert float(repeat_design["x"]) == pytest.approx(0.4)
+        assert float(repeat_design["temperature"]) == pytest.approx(550.0)
+        row = {
+            "row_id": "new_suggestion",
+            "iteration": 99,
+            "status": "suggested",
+            "source": "log_ei",
+            "replicate_group": "new_suggestion",
+            "replicate_index": 0,
+            "x": 0.95,
+            "temperature": 730.0,
+            "activity": "",
+            "predicted_mean": 1.5,
+            "predicted_std": 0.1,
+            "acquisition": 0.2,
+        }
+        return pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(suggestions_module, "_suggest_model_based", fake_model_based)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    designs = {
+        (float(row["x"]), float(row["temperature"]))
+        for _, row in suggestions.iterrows()
+    }
+    assert designs == {(0.4, 550.0), (0.95, 730.0)}
+
+
+def test_cost_aware_uncertain_best_repeat_then_cost_exploration_fill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=2,
+    )
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        cost=CostConfig(
+            expression="1.0 + x",
+            weight=0.5,
+            budget=10.0,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        replicates=base.replicates,
+    )
+    df = replicate_observed_log(cfg)
+    captured: dict[str, object] = {}
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    def fake_cost_aware(**kwargs):
+        captured["config"] = kwargs["config"]
+        captured["df"] = kwargs["df"]
+        row = {
+            "row_id": "cost_suggestion",
+            "iteration": 99,
+            "status": "suggested",
+            "source": "cost_log_ei",
+            "replicate_group": "cost_suggestion",
+            "replicate_index": 0,
+            "x": 0.9,
+            "temperature": 700.0,
+            "activity": "",
+            "cost_estimate": 1.9,
+            "cost_actual": "",
+            "predicted_mean": 1.5,
+            "predicted_std": 0.1,
+            "acquisition": 0.8,
+            "utility": -0.15,
+        }
+        return pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(suggestions_module, "_suggest_cost_aware_model_based", fake_cost_aware)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert len(suggestions) == 2
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert str(suggestions.loc[0, "utility"]) == ""
+    assert suggestions.loc[1, "source"] == "cost_log_ei"
+    assert captured["config"].cost.budget == pytest.approx(8.6)
+    staged = captured["df"].loc[captured["df"]["replicate_group"] == "group_1"]
+    assert sorted(staged["replicate_index"].astype(int).tolist()) == [0, 1]
+
+
+def test_repeat_batch_fill_underfills_on_candidate_exhaustion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=2,
+    )
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        cost=CostConfig(
+            expression="1.0 + x",
+            weight=0.5,
+            budget=6.81,
+            candidate_pool_size=16,
+            top_k=8,
+        ),
+        replicates=base.replicates,
+    )
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    def exhausted_cost_aware(**_kwargs):
+        raise suggestions_module._CandidateGenerationExhausted(
+            "remaining budget exhausted"
+        )
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(
+        suggestions_module,
+        "_suggest_cost_aware_model_based",
+        exhausted_cost_aware,
+    )
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "replicate_group"] == "group_1"
+    assert int(suggestions.loc[0, "replicate_index"]) == 1
+    assert float(suggestions.loc[0, "cost_estimate"]) == pytest.approx(1.4)
+
+
+def test_repeat_batch_fill_reraises_unexpected_suggestion_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        min_repeats_at_best=2,
+    )
+    df = replicate_observed_log(cfg)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    def unexpected_model_based(**_kwargs):
+        raise SuggestionError("unexpected internal issue")
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(
+        suggestions_module,
+        "_suggest_model_based",
+        unexpected_model_based,
+    )
+
+    with pytest.raises(SuggestionError) as exc_info:
+        suggest_next(cfg, df, batch_size=2)
+    message = str(exc_info.value)
+    assert "Repeat suggestions were generated, but exploration fill failed" in message
+    assert "unexpected internal issue" in message
+
+
+def test_replicate_uncertain_best_policy_respects_max_repeat_cutoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(
+        initial_design_size=3,
+        replicate_threshold=0.10,
+        max_repeats_per_group=5,
+    )
+    df = replicate_observed_log(cfg)
+    extra_rows = []
+    for replicate_index in range(1, 5):
+        row = df.loc[df["replicate_group"] == "group_1"].iloc[0].copy()
+        row["row_id"] = f"rep_1_extra_{replicate_index}"
+        row["replicate_index"] = replicate_index
+        row["activity"] = 1.4 + 0.01 * replicate_index
+        extra_rows.append(row)
+    df = pd.concat([df, pd.DataFrame(extra_rows)], ignore_index=True)
+
+    class FakePosterior:
+        mean = torch.tensor([[0.5], [2.0], [1.0]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04], [0.01]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    fallback = pd.DataFrame(
+        [
+            {
+                "row_id": "new_suggestion",
+                "iteration": 99,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "new_suggestion",
+                "replicate_index": 0,
+                "x": 0.9,
+                "temperature": 700.0,
+                "activity": "",
+                "predicted_mean": 1.5,
+                "predicted_std": 0.1,
+                "acquisition": 0.2,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    monkeypatch.setattr(suggestions_module, "_suggest_model_based", lambda **_kwargs: fallback)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "replicate_group"] == "new_suggestion"
+
+
+def test_replicate_new_only_policy_skips_active_repeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config(initial_design_size=3, suggestion_policy="new_only")
+    df = replicate_observed_log(cfg)
+    fallback = pd.DataFrame(
+        [
+            {
+                "row_id": "new_suggestion",
+                "iteration": 99,
+                "status": "suggested",
+                "source": "log_ei",
+                "replicate_group": "new_suggestion",
+                "replicate_index": 0,
+                "x": 0.9,
+                "temperature": 700.0,
+                "activity": "",
+                "predicted_mean": 1.5,
+                "predicted_std": 0.1,
+                "acquisition": 0.2,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    monkeypatch.setattr(suggestions_module, "_suggest_model_based", lambda **_kwargs: fallback)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "replicate_group"] == "new_suggestion"
 
 
 def test_suggest_next_refuses_pending_suggestions() -> None:
@@ -380,7 +926,7 @@ def test_one_by_one_sobol_suggestions_do_not_repeat_after_csv_round_trip(tmp_pat
         assert candidate not in seen
         seen.add(candidate)
 
-        append_suggestions(log_path, suggestions)
+        append_suggestions(log_path, suggestions, config=cfg)
         mark_observed(log_path, str(suggestions.loc[0, "row_id"]), float(index))
         df = load_campaign_log(log_path, cfg)
 
@@ -691,6 +1237,7 @@ def test_suggestion_quality_summary_reports_constraints_duplicates_and_distances
         "is_feasible",
         "violated_constraints",
         "is_exact_duplicate",
+        "duplicate_allowed_by_replicates",
         "nearest_existing_distance",
         "nearest_batch_distance",
         "passes_distance_threshold",

@@ -171,6 +171,8 @@ bo-forge mark-observed \
   --actual-cost 2.7
 ```
 
+For multi-objective review-enabled campaigns, use the same `review` command, then mark accepted rows observed with repeated `--objective name=value` arguments. `--actual-cost` remains single-objective cost-workflow only.
+
 ## 📄 Reports And Plots
 
 Print a plain-text campaign report:

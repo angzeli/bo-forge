@@ -1,0 +1,184 @@
+import pandas as pd
+import pytest
+import torch
+
+import bo_forge.models as models_module
+from bo_forge.config import (
+    BOConfig,
+    CampaignConfig,
+    ObjectiveConfig,
+    ReplicateConfig,
+    VariableConfig,
+)
+from bo_forge.models import dataframe_to_training_tensors, fit_gp_model
+from bo_forge.validation import canonical_columns
+
+
+def replicate_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="replicate_model",
+        objective=ObjectiveConfig("activity", "maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "activity": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def multi_replicate_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="multi_replicate_model",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 1.0),
+        ),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_ehvi"),
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def multi_replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "yield_score": 0.6,
+                "waste_score": 0.4,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "yield_score": 0.8,
+                "waste_score": 0.2,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def test_dataframe_to_training_tensors_includes_replicate_yvar() -> None:
+    cfg = replicate_config()
+
+    tensors = dataframe_to_training_tensors(cfg, replicate_log(cfg))
+
+    assert tensors.train_x.shape == torch.Size([1, 1])
+    assert tensors.train_y.squeeze(-1).tolist() == pytest.approx([1.2])
+    assert tensors.train_yvar is not None
+    assert tensors.train_yvar.squeeze(-1).tolist() == pytest.approx([0.04])
+
+
+def test_dataframe_to_training_tensors_supports_multi_objective_yvar() -> None:
+    cfg = multi_replicate_config()
+
+    tensors = dataframe_to_training_tensors(cfg, multi_replicate_log(cfg))
+
+    assert tensors.train_y.shape == torch.Size([1, 2])
+    assert tensors.train_y.squeeze(0).tolist() == pytest.approx([0.7, -0.3])
+    assert tensors.train_yvar is not None
+    assert tensors.train_yvar.squeeze(0).tolist() == pytest.approx([0.01, 0.01])
+
+
+def test_dataframe_to_training_tensors_keeps_learned_noise_without_repeats() -> None:
+    cfg = replicate_config()
+    df = replicate_log(cfg).iloc[[0]].copy()
+
+    tensors = dataframe_to_training_tensors(cfg, df)
+
+    assert tensors.train_yvar is None
+
+
+def test_fit_gp_model_passes_train_yvar_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = replicate_config()
+    captured: dict[str, object] = {}
+
+    class FakeModel:
+        likelihood = object()
+
+    def fake_single_task_gp(*args: object, **kwargs: object) -> FakeModel:
+        captured["kwargs"] = kwargs
+        return FakeModel()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", fake_single_task_gp)
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    fit_gp_model(cfg, replicate_log(cfg))
+
+    assert "train_Yvar" in captured["kwargs"]
+    assert captured["kwargs"]["train_Yvar"].squeeze(-1).tolist() == pytest.approx([0.04])
+
+
+def test_fit_gp_model_omits_train_yvar_when_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = replicate_config()
+    captured: dict[str, object] = {}
+
+    class FakeModel:
+        likelihood = object()
+
+    def fake_single_task_gp(*args: object, **kwargs: object) -> FakeModel:
+        captured["kwargs"] = kwargs
+        return FakeModel()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", fake_single_task_gp)
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    fit_gp_model(cfg, replicate_log(cfg).iloc[[0]].copy())
+
+    assert "train_Yvar" not in captured["kwargs"]

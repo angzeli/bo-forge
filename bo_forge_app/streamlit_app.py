@@ -527,13 +527,30 @@ def _render_overview(st: Any, campaign: Any) -> None:
         with st.expander("Raw next-action table", expanded=False):
             st.dataframe(format_dataframe_for_display(campaign.next_action()), width="stretch")
 
-    _render_table_section(
-        st,
-        "Best Observation",
-        campaign.best_observation(),
-        empty_kind="best_observation",
-        expanded_raw=False,
-    )
+    if campaign.config.is_multi_objective:
+        _render_table_section(
+            st,
+            "Pareto Summary",
+            campaign.pareto_summary(),
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
+        _render_table_section(
+            st,
+            "Pareto Front",
+            compact_dataframe(campaign.pareto_front()),
+            empty_kind="observed_rows",
+            raw_df=campaign.pareto_front(),
+            expanded_raw=False,
+        )
+    else:
+        _render_table_section(
+            st,
+            "Best Observation",
+            campaign.best_observation(),
+            empty_kind="best_observation",
+            expanded_raw=False,
+        )
     if campaign.config.cost is not None:
         cost_summary = campaign.cost_summary()
         _render_metric_grid(
@@ -549,13 +566,14 @@ def _render_overview(st: Any, campaign: Any) -> None:
         with st.expander("Raw cost summary table", expanded=False):
             st.dataframe(format_dataframe_for_display(cost_summary), width="stretch")
     if campaign.config.replicates.enabled:
-        _render_table_section(
-            st,
-            "Best Replicate Group",
-            campaign.best_replicate_group(),
-            empty_kind="replicate_summary",
-            expanded_raw=False,
-        )
+        if not campaign.config.is_multi_objective:
+            _render_table_section(
+                st,
+                "Best Replicate Group",
+                campaign.best_replicate_group(),
+                empty_kind="replicate_summary",
+                expanded_raw=False,
+            )
         _render_table_section(
             st,
             "Replicate Summary",
@@ -779,6 +797,14 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
         empty_kind="pending_suggestions",
         expanded_raw=False,
     )
+    if campaign.config.is_multi_objective:
+        _render_empty_state(
+            st,
+            "Multi-objective observation entry is not supported in the app yet.",
+            "Use the CLI or CampaignSession.mark_observed(..., objective_values={...}) "
+            "to record coupled objective values.",
+        )
+        return
     if observable.empty:
         return
 
@@ -1119,11 +1145,18 @@ def _compact_replicate_summary(df: Any) -> Any:
         "n_replicates",
         "objective_mean",
         "objective_std",
+        "objective_sem",
         "objective_min",
         "objective_max",
     ]
     if getattr(df, "empty", True):
         return df
+    columns.extend(
+        column
+        for column in df.columns
+        if column.endswith(("_mean", "_std", "_sem", "_min", "_max"))
+        and column not in columns
+    )
     return df.loc[:, [column for column in columns if column in df.columns]]
 
 

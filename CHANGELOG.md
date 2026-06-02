@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v1.1.2 - Multi-Objective Review And Replicate Support
+
+This release adds noisy replicate-aware GP fitting plus review and replicate metadata support to coupled multi-objective qLogEHVI campaigns while keeping multi-objective cost-aware ranking deferred.
+
+- Allows multi-objective configs to use `review.enabled: true`, `replicates.enabled: true`, or both.
+- Keeps multi-objective configs with `cost:` rejected.
+- Extends `replicates:` with optional noisy-BO controls for repeat policy, uncertainty threshold, repeat bounds, and noise floor.
+- Fits replicate-enabled campaigns with group means and replicate-derived `train_Yvar` when empirical replicate variance is available.
+- Adds a single-objective `uncertain_best` repeat policy that can intentionally suggest another row in the current best replicate group.
+- Extends multi-objective CSV schemas with optional review and replicate metadata columns.
+- Makes qLogEHVI suggestions fill review and replicate metadata when configured.
+- Uses replicate group-mean objective vectors and per-objective replicate variance for multi-objective model fitting, while Pareto fronts, hypervolume, and hypervolume progress remain group-mean diagnostics.
+- Adds per-objective multi-objective replicate summary columns such as `<objective>_mean`, `<objective>_std`, and `<objective>_sem`.
+- Extends reports, CLI review/mark-observed/replicate-summary flows, and replicate plots for multi-objective review+replicate campaigns.
+- Adds a minimal Streamlit guard so unsupported multi-objective observation entry is not shown as a single-objective form.
+
 ## v1.1.1 - Generalized 3+ Objective qLogEHVI Campaigns
 
 This release generalizes the v1.1 multi-objective path from the initial two-objective qLogEHVI workflow to `m >= 2` coupled objectives.
@@ -12,7 +28,7 @@ This release generalizes the v1.1 multi-objective path from the initial two-obje
 - Adds read-only CLI `pareto-front` and `pareto-summary` commands plus `plot --kind pareto-parallel`.
 - Adds a four-objective mixed constrained config, seed log, and notebook demonstration.
 - Keeps coupled objective evaluation, shared-input multi-output `SingleTaskGP`, qLogEHVI, and existing mixed-variable repair semantics.
-- Defers decoupled objective evaluation, `ModelListGP`, noisy MOBO, scalarization, cost/review/replicate combinations for multi-objective campaigns, and Streamlit multi-objective workflow support.
+- Defers decoupled objective evaluation, `ModelListGP`, noisy MOBO acquisitions, scalarization, cost/review/replicate combinations for multi-objective campaigns, and Streamlit multi-objective workflow support.
 
 ## v1.1.0 - Two-Objective qLogEHVI Campaigns
 

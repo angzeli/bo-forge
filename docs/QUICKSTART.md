@@ -69,7 +69,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.1.1 keeps the local app on the stable v1.0 workflow while adding generalized multi-objective support to the backend, session, CLI, and notebooks.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.1.2 keeps the local app on the stable v1.0 workflow while adding generalized multi-objective support to the backend, session, CLI, and notebooks.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -136,7 +136,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.cost_summary()` | Return cost, reserved-cost, budget, and best-objective fields when cost is configured. |
 | `campaign.best_observation()` | Return a canonical-column-order copy of the best observed row, or an empty canonical DataFrame. |
 | `campaign.replicate_summary()` | Return group-level replicate counts, mean, std, SEM, min, and max when replicates are enabled. |
-| `campaign.best_replicate_group()` | Return the best replicate group by mean objective. |
+| `campaign.best_replicate_group()` | Return the best single-objective replicate group by mean objective. Multi-objective replicate campaigns should use `campaign.replicate_summary()` and `campaign.pareto_front()`. |
 | `campaign.pareto_front()` | Return nondominated observed rows for a multi-objective campaign. |
 | `campaign.pareto_summary()` | Return Pareto-count, reference-point, direction, and hypervolume fields. |
 | `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
@@ -175,11 +175,13 @@ shutil.copyfile(seed_log_path, log_path)
 
 df = load_campaign_log(log_path, config)
 suggestions = suggest_next(config, df)
-append_suggestions(log_path, suggestions)
+append_suggestions(log_path, suggestions, config=config)
 
 # After running the suggested experiment:
 mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.95)
 ```
+
+Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config=config)` for production workflows. Passing the config lets BO Forge prevalidate the combined CSV log before writing. The backward-compatible `append_suggestions(log_path, suggestions)` form remains available for non-replicate logs, but replicate logs require config-aware append validation.
 
 ## ⚙️ Example Configs
 
@@ -190,13 +192,13 @@ mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.9
 - `configs/05_simple_mixed_logei.yaml`: maximises a mixed continuous/integer/discrete/categorical synthetic yield.
 - `configs/06_mixed_constrained_logei.yaml`: maximises a constrained mixed-variable synthetic yield.
 - `configs/07_cost_aware_human_review_logei.yaml`: adds deterministic cost estimates, budget tracking, and human-review decisions.
-- `configs/08_replicate_aware_logei.yaml`: adds explicit replicate rows and mean-aggregated model fitting.
+- `configs/08_replicate_aware_logei.yaml`: adds explicit replicate rows, replicate-derived observation variance, and noisy GP fitting.
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml`: adds coupled two-objective qLogEHVI with mixed variables and constraints.
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml`: generalizes qLogEHVI to a four-objective mixed constrained campaign.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.1.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.1.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -231,7 +233,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. Hypervolume is reported as `0.0` when no observed point dominates the reference point. Cost, review, replicates, and decoupled objective evaluation are deferred for multi-objective campaigns beyond v1.1.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.1.2 supports review and replicate metadata for coupled multi-objective campaigns; cost-aware multi-objective ranking and decoupled objective evaluation remain deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 
@@ -289,7 +291,7 @@ Use `campaign.suggestion_quality(suggestions)` to inspect feasibility, constrain
 
 The v0.4.2 constraint and diversity design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_03_mixed_variable_and_constrained_bo_worked.ipynb` for repair-aware constrained mixed-variable BO, and `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_02_batch_bo_for_parallel_experimentation_worked.ipynb` for within-batch distance summaries.
 
-v0.4.3 adds optional deterministic cost and review sections:
+Cost-aware and review-enabled campaigns use optional deterministic `cost` and `review` sections:
 
 ```yaml
 cost:
@@ -303,7 +305,7 @@ review:
   enabled: true
 ```
 
-Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank. Model-based cost-aware suggestions use `source=cost_log_ei` and fill `utility = acquisition - cost.weight * cost_estimate`. For `batch_size > 1`, v0.4.3 uses greedy single-candidate utility rather than joint cost-aware qLogEI.
+Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank. Model-based cost-aware exploration suggestions use `source=cost_log_ei` and fill `utility = acquisition - cost.weight * cost_estimate`. For `batch_size > 1`, BO Forge uses greedy single-candidate utility rather than joint cost-aware qLogEI. If a cost-aware replicate campaign uses the active `uncertain_best` repeat policy, the repeat suggestion fills `cost_estimate` but keeps `source=log_ei` or `qlog_ei` and leaves `utility` blank because it is a repeat decision, not a cost-utility-ranked new exploration candidate.
 
 When `cost_estimate` is filled, validation checks it against the deterministic cost expression. Use `cost_actual` for realised experiment costs that differ from the estimate.
 
@@ -319,24 +321,54 @@ Budget semantics are:
 - accepted pending suggestions reserve `cost_estimate`;
 - pending, rejected, and deferred suggestions do not reserve budget.
 
-The v0.4.3 cost and review design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_04_budget_aware_and_human_in_the_loop_bo_workflows_worked.ipynb`, especially acquisition-minus-cost utility, cumulative-cost comparison, and accepted/rejected workflow history.
+The cost and review design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_04_budget_aware_and_human_in_the_loop_bo_workflows_worked.ipynb`, especially acquisition-minus-cost utility, cumulative-cost comparison, and accepted/rejected workflow history.
 
-v0.4.4 adds optional explicit replicate tracking:
+Replicate-aware campaigns use optional explicit replicate tracking:
 
 ```yaml
 replicates:
   enabled: true
+  suggestion_policy: uncertain_best
+  replicate_threshold: 0.10
+  min_repeats_at_best: 3
+  max_repeats_per_group: 5
+  noise_floor: 1.0e-8
 ```
 
 When replicates are enabled, the CSV log adds `replicate_group` and `replicate_index` after `source` or after review columns. `replicate_index` is zero-based. Rows in the same replicate group must have identical typed user-space design values, and repeated design rows are allowed only when they share one `replicate_group`.
 
-Generated suggestions remain exploration suggestions in v0.4.4: BO Forge avoids existing designs, sets `replicate_group=row_id`, and sets `replicate_index=0`. It does not automatically suggest repeating an existing design.
+For model fitting, observed replicate rows are aggregated by group mean. When at least one group has 2+ observations, BO Forge passes replicate-derived observation variance into BoTorch as `train_Yvar`: repeated groups use `std^2 / n_replicates`, singleton groups use the weighted pooled replicate variance, and `replicates.noise_floor` prevents zero-noise fixed-noise fits. If no group has repeated observations yet, BO Forge keeps the learned-noise GP behavior.
 
-For model fitting, observed replicate rows are aggregated by group mean. Public CSV logs still store every raw replicate row. `campaign.best_observation()` remains the best raw observed row, while `campaign.best_replicate_group()` returns the best group by mean objective. For single-replicate groups, `objective_std` and `objective_sem` are `NaN`.
+With the default single-objective `suggestion_policy: uncertain_best`, BO Forge may suggest another observation in the current best replicate group when its posterior standard deviation is above `replicate_threshold` or the group has fewer than `min_repeats_at_best` observations. If a repeat policy produces fewer rows than the requested batch size, BO Forge fills the remaining slots with normal exploration suggestions when budget and design space allow. Set `suggestion_policy: new_only` to disable active repeat suggestions while still using replicate-derived `train_Yvar`. `replicate_threshold` is in objective units and should be tuned to the assay or measurement-noise scale.
+
+Generated exploration suggestions still avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`. Policy-driven repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`, without adding new CSV columns.
+
+The committed `examples/08_replicate_aware_campaign_log.csv` still has one initial-design slot left, so a first CLI suggestion may be Sobol. To exercise the active `uncertain_best` repeat path from a throwaway repeat-ready log, use a temporary copy with one extra observed design:
+
+```bash
+cp examples/08_replicate_aware_campaign_log.csv /tmp/bo_forge_08_repeat_ready.csv
+./.venv/bin/python - <<'PY'
+import pandas as pd
+
+path = "/tmp/bo_forge_08_repeat_ready.csv"
+df = pd.read_csv(path, keep_default_na=False)
+df.loc[len(df)] = [
+    "rep_seed_3a", 3, "observed", "manual", "rep_3", 0,
+    0.85, 430, 1.10, "", "", "",
+]
+df.to_csv(path, index=False)
+PY
+./.venv/bin/python -m bo_forge suggest \
+  --config configs/08_replicate_aware_logei.yaml \
+  --log /tmp/bo_forge_08_repeat_ready.csv \
+  --batch-size 3
+```
+
+Public CSV logs still store every raw replicate row. `campaign.best_observation()` remains the best raw observed row, while `campaign.best_replicate_group()` returns the best single-objective group by mean objective. For multi-objective replicate campaigns, qLogEHVI uses group means plus per-objective `train_Yvar`, but active repeat selection is deferred; MO replicate configs default to `suggestion_policy: new_only`, and explicit `uncertain_best` fails clearly. Use `campaign.replicate_summary()` and `campaign.pareto_front()` to inspect group-level statistics and group-mean Pareto rows. For single-replicate groups, `objective_std` and `objective_sem` are `NaN`.
 
 Cost and review summaries remain row-level when combined with replicates. Replicate summaries are group-level, so a replicate group may contain multiple rows with their own costs and review states.
 
-The v0.4.4 replicate design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 6/tutorial_01_noisy_and_replication_aware_bo_worked.ipynb`, especially explicit repeated measurements, noisy best-vs-model recommendation, and replicate-aware diagnostics.
+The replicate-aware noisy BO design is inspired by `/Users/liangze/Desktop/from-pytorch-to-bayesian-optimisation/part_6/tutorial_01_noisy_and_replication_aware_bo.ipynb`, especially empirical replicate variance, noisy GP fitting, and repeat-vs-explore decisions.
 
 ## 📓 Example Notebooks
 

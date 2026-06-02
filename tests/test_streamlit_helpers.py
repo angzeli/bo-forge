@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 
-from bo_forge.config import CampaignConfig
+from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
 from bo_forge_app.streamlit_helpers import (
@@ -208,6 +209,32 @@ def test_dataframe_display_helpers_compact_without_mutating_source() -> None:
     assert compact["row_id"].iloc[0] == "8a69540f...b3a67ed"
     assert compact["activity"].iloc[0] == 10
     assert compact["precursor_ratio"].iloc[0] == 0.1671
+
+
+def test_compact_replicate_summary_keeps_multi_objective_sem_columns() -> None:
+    summary = pd.DataFrame(
+        [
+            {
+                "replicate_group": "group_0",
+                "n_replicates": 2,
+                "yield_score_mean": 0.7,
+                "yield_score_std": 0.1,
+                "yield_score_sem": 0.07,
+                "yield_score_min": 0.6,
+                "yield_score_max": 0.8,
+                "waste_score_mean": 0.3,
+                "waste_score_std": 0.1,
+                "waste_score_sem": 0.07,
+                "waste_score_min": 0.2,
+                "waste_score_max": 0.4,
+            }
+        ]
+    )
+
+    compact = streamlit_app._compact_replicate_summary(summary)
+
+    assert "yield_score_sem" in compact.columns
+    assert "waste_score_sem" in compact.columns
 
 
 def test_empty_state_messages_are_defined() -> None:
@@ -690,6 +717,90 @@ def test_app_modules_import_without_streamlit_runtime() -> None:
     assert hasattr(streamlit_app, "_render_campaign_files_panel")
     assert hasattr(streamlit_app, "_render_create_new_campaign")
     assert hasattr(streamlit_app, "_render_campaign_state_blocks")
+
+
+def test_streamlit_resolve_panel_shows_multi_objective_unsupported_state() -> None:
+    cfg = CampaignConfig(
+        campaign_name="mo_app",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 1.0),
+        ),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_ehvi"),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "suggested_1",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "qlog_ehvi",
+                "x": 0.5,
+                "yield_score": "",
+                "waste_score": "",
+                "predicted_mean_yield_score": 0.6,
+                "predicted_std_yield_score": 0.1,
+                "predicted_mean_waste_score": 0.4,
+                "predicted_std_waste_score": 0.1,
+                "acquisition": 0.2,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    campaign = CampaignSession(
+        config_path=Path("config.yaml"),
+        log_path=Path("campaign.csv"),
+        config=cfg,
+        df=df,
+    )
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        markdown_messages: list[str] = []
+        subheaders: list[str] = []
+        button_labels: list[str] = []
+        number_input_labels: list[str] = []
+
+        @classmethod
+        def markdown(cls, body: str, unsafe_allow_html: bool = False) -> None:
+            cls.markdown_messages.append(body)
+
+        @classmethod
+        def subheader(cls, label: str) -> None:
+            cls.subheaders.append(label)
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            cls.button_labels.append(label)
+            return False
+
+        @classmethod
+        def number_input(cls, label: str, *_args: object, **_kwargs: object) -> float:
+            cls.number_input_labels.append(label)
+            return 0.0
+
+    streamlit_app._render_resolve(FakeStreamlit, campaign, feature_flags(cfg))
+
+    rendered = "\n".join(FakeStreamlit.markdown_messages)
+    assert "Multi-objective observation entry is not supported in the app yet." in rendered
+    assert "Mark row observed" not in FakeStreamlit.button_labels
+    assert not any(label.startswith("Observed ") for label in FakeStreamlit.number_input_labels)
 
 
 def test_workbench_header_uses_bo_brand_mark() -> None:

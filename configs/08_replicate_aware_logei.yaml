@@ -16,6 +16,11 @@ variables:
 
 replicates:
   enabled: true
+  suggestion_policy: uncertain_best
+  replicate_threshold: 0.10
+  min_repeats_at_best: 3
+  max_repeats_per_group: 5
+  noise_floor: 1.0e-8
 
 bo:
   batch_size: 1

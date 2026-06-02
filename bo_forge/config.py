@@ -69,6 +69,11 @@ class ReviewConfig:
 @dataclass(frozen=True)
 class ReplicateConfig:
     enabled: bool = False
+    suggestion_policy: str = "uncertain_best"
+    replicate_threshold: float = 0.10
+    min_repeats_at_best: int = 3
+    max_repeats_per_group: int = 5
+    noise_floor: float = 1.0e-8
 
 
 @dataclass(frozen=True)
@@ -146,15 +151,12 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     constraints = _parse_constraints(raw.get("constraints", []), variables)
     cost = _parse_cost(raw.get("cost"), variables)
     review = _parse_review(raw.get("review"))
-    replicates = _parse_replicates(raw.get("replicates"))
+    replicates = _parse_replicates(
+        raw.get("replicates"),
+        multi_objective=bool(objectives),
+    )
     if objectives and cost is not None:
-        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.1.")
-    if objectives and review.enabled:
-        raise ConfigError("Multi-objective configs do not support review.enabled: true in v1.1.1.")
-    if objectives and replicates.enabled:
-        raise ConfigError(
-            "Multi-objective configs do not support replicates.enabled: true in v1.1.1."
-        )
+        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.2.")
     bo = _parse_bo(raw.get("bo", {}), multi_objective=bool(objectives))
 
     return CampaignConfig(
@@ -203,7 +205,7 @@ def _parse_objectives(raw: Any) -> list[ObjectiveConfig]:
         raise ConfigError("Config key 'objectives' must be a list.")
     if len(raw) < 2:
         raise ConfigError(
-            "Config key 'objectives' must contain at least two objectives in v1.1.1."
+            "Config key 'objectives' must contain at least two objectives."
         )
 
     objectives: list[ObjectiveConfig] = []
@@ -443,18 +445,69 @@ def _parse_review(raw: Any) -> ReviewConfig:
     return ReviewConfig(enabled=enabled)
 
 
-def _parse_replicates(raw: Any) -> ReplicateConfig:
+def _parse_replicates(raw: Any, *, multi_objective: bool = False) -> ReplicateConfig:
     if raw is None:
         return ReplicateConfig()
     if not isinstance(raw, dict):
         raise ConfigError("Config key 'replicates' must be a mapping when provided.")
-    unsupported = sorted(set(raw) - {"enabled"})
+    supported = {
+        "enabled",
+        "suggestion_policy",
+        "replicate_threshold",
+        "min_repeats_at_best",
+        "max_repeats_per_group",
+        "noise_floor",
+    }
+    unsupported = sorted(set(raw) - supported)
     if unsupported:
         raise ConfigError(f"Config key 'replicates' has unsupported keys: {unsupported}.")
     enabled = raw.get("enabled", False)
     if not isinstance(enabled, bool):
         raise ConfigError("replicates.enabled must be a boolean.")
-    return ReplicateConfig(enabled=enabled)
+    default_policy = "new_only" if multi_objective and enabled else "uncertain_best"
+    suggestion_policy = str(raw.get("suggestion_policy", default_policy))
+    if suggestion_policy not in {"uncertain_best", "new_only"}:
+        raise ConfigError(
+            "replicates.suggestion_policy must be one of "
+            "['new_only', 'uncertain_best']."
+        )
+    if multi_objective and enabled and suggestion_policy == "uncertain_best":
+        raise ConfigError(
+            "replicates.suggestion_policy='uncertain_best' is only supported for "
+            "single-objective campaigns in v1.1.2; use 'new_only' for "
+            "multi-objective replicate campaigns."
+        )
+    replicate_threshold = _positive_float(
+        raw.get("replicate_threshold", 0.10),
+        "replicates.replicate_threshold",
+    )
+    min_repeats_at_best = _positive_int(
+        raw.get("min_repeats_at_best", 3),
+        "replicates.min_repeats_at_best",
+    )
+    max_repeats_per_group = _positive_int(
+        raw.get("max_repeats_per_group", 5),
+        "replicates.max_repeats_per_group",
+    )
+    if min_repeats_at_best > max_repeats_per_group:
+        raise ConfigError(
+            "replicates.min_repeats_at_best must be <= "
+            "replicates.max_repeats_per_group: "
+            f"min_repeats_at_best={min_repeats_at_best}, "
+            f"max_repeats_per_group={max_repeats_per_group}."
+        )
+    noise_floor = _positive_float(
+        raw.get("noise_floor", 1.0e-8),
+        "replicates.noise_floor",
+    )
+    return ReplicateConfig(
+        enabled=enabled,
+        suggestion_policy=suggestion_policy,
+        replicate_threshold=replicate_threshold,
+        min_repeats_at_best=min_repeats_at_best,
+        max_repeats_per_group=max_repeats_per_group,
+        noise_floor=noise_floor,
+    )
 
 
 def _required_str(raw: dict[str, Any], key: str, context: str) -> str:
@@ -597,6 +650,13 @@ def _non_negative_float(value: Any, context: str) -> float:
         raise ConfigError(f"{context} must be finite.")
     if parsed < 0:
         raise ConfigError(f"{context} must be >= 0: value={parsed:g}.")
+    return parsed
+
+
+def _positive_float(value: Any, context: str) -> float:
+    parsed = _non_negative_float(value, context)
+    if parsed <= 0:
+        raise ConfigError(f"{context} must be > 0: value={parsed:g}.")
     return parsed
 
 

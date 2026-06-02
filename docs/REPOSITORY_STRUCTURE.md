@@ -51,7 +51,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
 - `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
-- `replicates.py`: explicit replicate aggregation, summaries, and best group selection.
+- `replicates.py`: explicit replicate aggregation, replicate-derived observation variance, summaries, and best group selection.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
 - `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.

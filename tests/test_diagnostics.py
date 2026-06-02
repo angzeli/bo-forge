@@ -3,6 +3,7 @@ from pathlib import Path
 import matplotlib
 import pandas as pd
 import pytest
+from matplotlib import pyplot as plt
 
 from bo_forge.config import (
     BOConfig,
@@ -22,6 +23,12 @@ from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
 
 matplotlib.use("Agg")
+
+
+@pytest.fixture(autouse=True)
+def close_matplotlib_figures() -> None:
+    yield
+    plt.close("all")
 
 
 def config() -> CampaignConfig:

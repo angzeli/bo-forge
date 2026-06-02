@@ -9,10 +9,12 @@ from bo_forge.config import (
     CampaignConfig,
     ConstraintConfig,
     ObjectiveConfig,
+    ReplicateConfig,
+    ReviewConfig,
     VariableConfig,
 )
 from bo_forge.errors import ConfigError, LogValidationError, LogWriteError
-from bo_forge.logs import append_suggestions, mark_observed
+from bo_forge.logs import append_suggestions, mark_observed, review_suggestion
 from bo_forge.multi_objective import (
     hypervolume,
     hypervolume_progress,
@@ -22,7 +24,13 @@ from bo_forge.multi_objective import (
 )
 from bo_forge.session import CampaignSession
 from bo_forge.suggestions import suggest_next
-from bo_forge.validation import canonical_columns, validate_campaign_data
+from bo_forge.validation import (
+    canonical_columns,
+    design_key_for_values,
+    design_tuples,
+    has_pending_suggestions,
+    validate_campaign_data,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +39,13 @@ def close_matplotlib_figures() -> None:
     plt.close("all")
 
 
-def multi_config(batch_size: int = 2, initial_design_size: int = 3) -> CampaignConfig:
+def multi_config(
+    batch_size: int = 2,
+    initial_design_size: int = 3,
+    *,
+    review: bool = False,
+    replicates: bool = False,
+) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="multi",
         objective=ObjectiveConfig("yield_score", "maximize", 40.0),
@@ -52,6 +66,8 @@ def multi_config(batch_size: int = 2, initial_design_size: int = 3) -> CampaignC
             num_restarts=2,
             mc_samples=8,
         ),
+        review=ReviewConfig(enabled=review),
+        replicates=ReplicateConfig(enabled=replicates),
     )
 
 
@@ -102,23 +118,28 @@ def observed_multi_log(cfg: CampaignConfig) -> pd.DataFrame:
             (85.0, "Water", 72.0, 16.0),
         ]
     ):
-        rows.append(
-            {
-                "row_id": f"obs_{index}",
-                "iteration": index,
-                "status": "observed",
-                "source": "manual",
-                "temperature": temperature,
-                "solvent": solvent,
-                "yield_score": yield_score,
-                "waste_score": waste_score,
-                "predicted_mean_yield_score": "",
-                "predicted_std_yield_score": "",
-                "predicted_mean_waste_score": "",
-                "predicted_std_waste_score": "",
-                "acquisition": "",
-            }
-        )
+        row = {
+            "row_id": f"obs_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "temperature": temperature,
+            "solvent": solvent,
+            "yield_score": yield_score,
+            "waste_score": waste_score,
+            "predicted_mean_yield_score": "",
+            "predicted_std_yield_score": "",
+            "predicted_mean_waste_score": "",
+            "predicted_std_waste_score": "",
+            "acquisition": "",
+        }
+        if cfg.review.enabled:
+            row["review_status"] = "accepted"
+            row["review_note"] = ""
+        if cfg.replicates.enabled:
+            row["replicate_group"] = f"group_{index}"
+            row["replicate_index"] = 0
+        rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
@@ -187,6 +208,8 @@ bo:
     config = CampaignConfig.from_yaml(path)
 
     assert config.is_multi_objective
+    if config.replicates.enabled:
+        assert config.replicates.suggestion_policy == "new_only"
     assert config.objective_names == ["yield_score", "waste_score"]
     assert [objective.reference_point for objective in config.objectives] == [40.0, 25.0]
 
@@ -264,35 +287,86 @@ def test_invalid_multi_objective_configs_fail(
 
 
 @pytest.mark.parametrize(
-    "extra_yaml, message",
+    "extra_yaml",
     [
-        (
-            """
-cost:
-  expression: "1.0 + temperature"
-""",
-            "cost",
-        ),
-        (
-            """
+        """
 review:
   enabled: true
 """,
-            "review.enabled",
-        ),
-        (
-            """
+        """
 replicates:
   enabled: true
 """,
-            "replicates.enabled",
-        ),
+        """
+review:
+  enabled: true
+replicates:
+  enabled: true
+""",
     ],
 )
-def test_multi_objective_rejects_cost_review_and_replicates(
+def test_multi_objective_accepts_review_and_replicates(
     tmp_path: Path,
     extra_yaml: str,
-    message: str,
+) -> None:
+    path = tmp_path / "campaign.yaml"
+    path.write_text(
+        f"""
+campaign_name: multi
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40
+  - name: waste_score
+    direction: minimize
+    reference_point: 25
+variables:
+  - name: temperature
+    type: continuous
+    lower: 20
+    upper: 100
+{extra_yaml}
+""",
+        encoding="utf-8",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.is_multi_objective
+
+
+@pytest.mark.parametrize(
+    "extra_yaml",
+    [
+        """
+cost:
+  expression: "1.0 + temperature"
+""",
+        """
+cost:
+  expression: "1.0 + temperature"
+review:
+  enabled: true
+""",
+        """
+cost:
+  expression: "1.0 + temperature"
+replicates:
+  enabled: true
+""",
+        """
+cost:
+  expression: "1.0 + temperature"
+review:
+  enabled: true
+replicates:
+  enabled: true
+""",
+    ],
+)
+def test_multi_objective_still_rejects_cost(
+    tmp_path: Path,
+    extra_yaml: str,
 ) -> None:
     path = tmp_path / "bad.yaml"
     path.write_text(
@@ -315,7 +389,7 @@ variables:
         encoding="utf-8",
     )
 
-    with pytest.raises(ConfigError, match=message):
+    with pytest.raises(ConfigError, match="cost"):
         CampaignConfig.from_yaml(path)
 
 
@@ -369,6 +443,32 @@ def test_multi_objective_canonical_schema_and_validation() -> None:
         "iteration",
         "status",
         "source",
+        "temperature",
+        "solvent",
+        "yield_score",
+        "waste_score",
+        "predicted_mean_yield_score",
+        "predicted_std_yield_score",
+        "predicted_mean_waste_score",
+        "predicted_std_waste_score",
+        "acquisition",
+    ]
+    validate_campaign_data(cfg, df)
+
+
+def test_multi_objective_review_and_replicate_canonical_schema() -> None:
+    cfg = multi_config(review=True, replicates=True)
+    df = observed_multi_log(cfg)
+
+    assert canonical_columns(cfg) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "review_status",
+        "review_note",
+        "replicate_group",
+        "replicate_index",
         "temperature",
         "solvent",
         "yield_score",
@@ -496,6 +596,47 @@ def test_pareto_front_and_hypervolume() -> None:
     assert progress["observation"].tolist() == [1, 2, 3, 4]
 
 
+def test_multi_objective_replicate_pareto_uses_group_mean_vectors() -> None:
+    cfg = multi_config(replicates=True)
+    df = observed_multi_log(cfg).iloc[:3].copy()
+    df.loc[1, ["replicate_group", "replicate_index"]] = ["group_0", 1]
+    df.loc[1, ["temperature", "solvent"]] = df.loc[0, ["temperature", "solvent"]].to_numpy()
+    df.loc[0, ["yield_score", "waste_score"]] = [50.0, 20.0]
+    df.loc[1, ["yield_score", "waste_score"]] = [70.0, 10.0]
+
+    front = pareto_front(cfg, df)
+    group_0 = front.loc[front["replicate_group"] == "group_0"].iloc[0]
+
+    assert "row_id" not in front.columns
+    assert {"replicate_group", "n_replicates", "first_row_id", "last_iteration"}.issubset(
+        front.columns
+    )
+    assert group_0["yield_score"] == pytest.approx(60.0)
+    assert group_0["waste_score"] == pytest.approx(15.0)
+    assert hypervolume(cfg, df) > 0.0
+    progress = hypervolume_progress(cfg, df)
+    assert progress["hypervolume"].is_monotonic_increasing
+
+
+def test_multi_objective_replicate_hypervolume_progress_is_best_so_far() -> None:
+    cfg = multi_config(replicates=True)
+    df = observed_multi_log(cfg).iloc[:3].copy()
+    df.loc[1, ["replicate_group", "replicate_index"]] = ["group_0", 1]
+    df.loc[1, ["temperature", "solvent"]] = df.loc[0, ["temperature", "solvent"]].to_numpy()
+    df.loc[0, ["yield_score", "waste_score"]] = [50.0, 20.0]
+    df.loc[1, ["yield_score", "waste_score"]] = [10.0, 45.0]
+
+    raw_prefix_values = [
+        hypervolume(cfg, df.iloc[: index + 1].copy()) for index in range(len(df))
+    ]
+
+    assert raw_prefix_values[1] < raw_prefix_values[0]
+    progress = hypervolume_progress(cfg, df)
+    expected = pd.Series(raw_prefix_values).cummax().tolist()
+    assert progress["hypervolume"].tolist() == pytest.approx(expected)
+    assert progress["hypervolume"].is_monotonic_increasing
+
+
 def test_four_objective_pareto_front_uses_full_space_and_stable_order() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg)
@@ -604,6 +745,72 @@ def test_four_objective_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> No
     assert suggestions[prediction_columns].apply(pd.to_numeric).map(pd.notna).all().all()
 
 
+def test_multi_objective_qlog_ehvi_suggestions_fill_review_and_replicate_fields() -> None:
+    cfg = multi_config(review=True, replicates=True)
+    df = observed_multi_log(cfg)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    validate_campaign_data(cfg, suggestions)
+    row = suggestions.iloc[0]
+    assert row["source"] == "qlog_ehvi"
+    assert row["review_status"] == "pending"
+    assert row["review_note"] == ""
+    assert row["replicate_group"] == row["row_id"]
+    assert row["replicate_group"] not in set(df["replicate_group"].astype(str))
+    assert int(row["replicate_index"]) == 0
+
+
+@pytest.mark.parametrize(
+    ("review_status", "blocks"),
+    [
+        ("pending", True),
+        ("accepted", True),
+        ("rejected", False),
+        ("deferred", False),
+    ],
+)
+def test_multi_objective_review_status_controls_suggestion_blocking(
+    review_status: str,
+    blocks: bool,
+) -> None:
+    cfg = multi_config(review=True)
+    df = observed_multi_log(cfg)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    suggestions.loc[:, "review_status"] = review_status
+    combined = pd.concat([df, suggestions], ignore_index=True)
+
+    assert has_pending_suggestions(combined, cfg) is blocks
+
+
+def test_multi_objective_next_action_uses_objective_values_for_pending_rows(
+    tmp_path: Path,
+) -> None:
+    cfg = multi_config()
+    df = observed_multi_log(cfg)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    campaign = CampaignSession(
+        config_path=tmp_path / "config.yaml",
+        log_path=tmp_path / "campaign.csv",
+        config=cfg,
+        df=pd.concat([df, suggestions], ignore_index=True),
+    )
+
+    assert "objective_values" in campaign.next_action()["suggested_call"].iloc[0]
+    assert "objective_value)" not in campaign.next_action()["suggested_call"].iloc[0]
+
+
+def test_rejected_multi_objective_suggestions_remain_duplicate_protected() -> None:
+    cfg = multi_config(review=True)
+    df = observed_multi_log(cfg)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    suggestions.loc[:, "review_status"] = "rejected"
+    combined = pd.concat([df, suggestions], ignore_index=True)
+    candidate = tuple(suggestions.iloc[0][variable.name] for variable in cfg.variables)
+
+    assert design_key_for_values(cfg, candidate) in design_tuples(cfg, combined)
+
+
 def test_mark_observed_writes_both_objectives(tmp_path: Path) -> None:
     cfg = multi_config(initial_design_size=10)
     log_path = tmp_path / "campaign.csv"
@@ -623,6 +830,95 @@ def test_mark_observed_writes_both_objectives(tmp_path: Path) -> None:
     assert row["status"] == "observed"
     assert float(row["yield_score"]) == 61.0
     assert float(row["waste_score"]) == 14.0
+
+
+def test_multi_objective_review_append_and_mark_observed_round_trip(tmp_path: Path) -> None:
+    cfg = multi_config(review=True, initial_design_size=10)
+    log_path = tmp_path / "campaign.csv"
+    df = observed_multi_log(cfg)
+    df.to_csv(log_path, index=False)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    append_suggestions(log_path, suggestions)
+    row_id = str(suggestions["row_id"].iloc[0])
+
+    with pytest.raises(LogWriteError, match="review_status"):
+        mark_observed(
+            log_path,
+            row_id,
+            objective_values={"yield_score": 61.0, "waste_score": 14.0},
+        )
+
+    review_suggestion(log_path, row_id, "accept", "ready")
+    mark_observed(
+        log_path,
+        row_id,
+        objective_values={"yield_score": 61.0, "waste_score": 14.0},
+    )
+
+    written = pd.read_csv(log_path, keep_default_na=False)
+    row = written.loc[written["row_id"] == row_id].iloc[0]
+    assert row["status"] == "observed"
+    assert row["review_status"] == "accepted"
+    assert row["review_note"] == "ready"
+
+
+def test_multi_objective_replicate_append_and_mark_observed_round_trip(
+    tmp_path: Path,
+) -> None:
+    cfg = multi_config(replicates=True, initial_design_size=10)
+    log_path = tmp_path / "campaign.csv"
+    df = observed_multi_log(cfg)
+    df.to_csv(log_path, index=False)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    append_suggestions(log_path, suggestions, config=cfg)
+    row_id = str(suggestions["row_id"].iloc[0])
+
+    mark_observed(
+        log_path,
+        row_id,
+        objective_values={"yield_score": 61.0, "waste_score": 14.0},
+    )
+
+    written = pd.read_csv(log_path, keep_default_na=False)
+    row = written.loc[written["row_id"] == row_id].iloc[0]
+    assert row["status"] == "observed"
+    assert row["replicate_group"] == row_id
+    assert int(row["replicate_index"]) == 0
+    assert float(row["yield_score"]) == 61.0
+    assert float(row["waste_score"]) == 14.0
+
+
+def test_multi_objective_review_replicate_append_and_mark_observed_round_trip(
+    tmp_path: Path,
+) -> None:
+    cfg = multi_config(review=True, replicates=True, initial_design_size=10)
+    log_path = tmp_path / "campaign.csv"
+    df = observed_multi_log(cfg)
+    df.to_csv(log_path, index=False)
+    suggestions = suggest_next(cfg, df, batch_size=1)
+    append_suggestions(log_path, suggestions, config=cfg)
+    row_id = str(suggestions["row_id"].iloc[0])
+
+    with pytest.raises(LogWriteError, match="review_status"):
+        mark_observed(
+            log_path,
+            row_id,
+            objective_values={"yield_score": 61.0, "waste_score": 14.0},
+        )
+
+    review_suggestion(log_path, row_id, "accept", "ready")
+    mark_observed(
+        log_path,
+        row_id,
+        objective_values={"yield_score": 61.0, "waste_score": 14.0},
+    )
+
+    written = pd.read_csv(log_path, keep_default_na=False)
+    row = written.loc[written["row_id"] == row_id].iloc[0]
+    assert row["status"] == "observed"
+    assert row["review_status"] == "accepted"
+    assert row["replicate_group"] == row_id
+    assert int(row["replicate_index"]) == 0
 
 
 def test_mark_observed_rejects_single_objective_value_for_multi(tmp_path: Path) -> None:
@@ -701,6 +997,28 @@ bo:
     assert "hypervolume" in set(campaign.summary()["field"])
     with pytest.raises(ValueError, match="pareto_front"):
         campaign.best_observation()
+
+
+def test_multi_objective_review_replicate_report_includes_sections(tmp_path: Path) -> None:
+    cfg = multi_config(review=True, replicates=True)
+    df = observed_multi_log(cfg)
+    campaign = CampaignSession(
+        config_path=tmp_path / "config.yaml",
+        log_path=tmp_path / "campaign.csv",
+        config=cfg,
+        df=df,
+    )
+
+    report = campaign.report()
+    text = campaign.export_report(tmp_path / "report.txt").read_text()
+
+    assert "review_queue" in report
+    assert "replicate_summary" in report
+    assert "Review Queue" in text
+    assert "Replicate Summary" in text
+    assert "objective_values" in campaign.next_action()["suggested_call"].iloc[0] or (
+        campaign.campaign_status() != "has_pending_suggestions"
+    )
 
 
 def test_four_objective_session_report_and_plots(tmp_path: Path) -> None:
@@ -795,6 +1113,24 @@ def test_pairwise_pareto_plot_projects_full_space_membership(tmp_path: Path) -> 
         and float(y) == pytest.approx(float(obs_d["selectivity"]))
         for x, y in pareto_offsets
     )
+
+
+def test_multi_objective_plot_replicates_labels_every_objective(tmp_path: Path) -> None:
+    cfg = multi_config(replicates=True)
+    df = observed_multi_log(cfg)
+    campaign = CampaignSession(
+        config_path=tmp_path / "config.yaml",
+        log_path=tmp_path / "log.csv",
+        config=cfg,
+        df=df,
+    )
+
+    _, axes = campaign.plot_replicates(save_path=tmp_path / "replicates.png")
+
+    assert (tmp_path / "replicates.png").exists()
+    titles = [axis.get_title() for axis in axes.flat if axis.get_visible()]
+    assert any("yield_score" in title for title in titles)
+    assert any("waste_score" in title for title in titles)
 
 
 def test_pareto_parallel_plot_handles_mixed_directions_and_constant_objective(
@@ -1013,6 +1349,71 @@ bo:
     )
     assert pareto_path.exists()
     assert parallel_path.exists()
+
+
+def test_cli_multi_objective_review_replicate_workflow(tmp_path: Path) -> None:
+    from bo_forge.cli import run
+
+    cfg = multi_config(review=True, replicates=True, initial_design_size=10)
+    config_path = tmp_path / "config.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text(
+        """
+campaign_name: multi
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40
+  - name: waste_score
+    direction: minimize
+    reference_point: 25
+variables:
+  - name: temperature
+    type: continuous
+    lower: 20
+    upper: 100
+  - name: solvent
+    type: categorical
+    values: [MeCN, Water]
+review:
+  enabled: true
+replicates:
+  enabled: true
+bo:
+  acquisition: qlog_ehvi
+  initial_design_size: 10
+  raw_samples: 8
+  num_restarts: 2
+  mc_samples: 8
+""",
+        encoding="utf-8",
+    )
+    df = observed_multi_log(cfg)
+    df.to_csv(log_path, index=False)
+
+    common = ["--config", str(config_path), "--log", str(log_path)]
+    assert run(["suggest", *common, "--batch-size", "1", "--append"]) == 0
+    written = pd.read_csv(log_path, keep_default_na=False)
+    row_id = str(written.loc[written["status"] == "suggested", "row_id"].iloc[0])
+    assert run(["review", *common, "--row-id", row_id, "--decision", "accept"]) == 0
+    assert (
+        run(
+            [
+                "mark-observed",
+                *common,
+                "--row-id",
+                row_id,
+                "--objective",
+                "yield_score=62",
+                "--objective",
+                "waste_score=13",
+            ]
+        )
+        == 0
+    )
+    assert run(["replicate-summary", *common]) == 0
+    assert run(["pareto-front", *common]) == 0
+    assert run(["pareto-summary", *common]) == 0
 
 
 def test_cli_pareto_parallel_requires_three_objectives(tmp_path: Path) -> None:

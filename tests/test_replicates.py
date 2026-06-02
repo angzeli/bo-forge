@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -14,8 +15,10 @@ from bo_forge.replicates import (
     aggregate_observed_replicates,
     best_replicate_group,
     modeling_observed_data,
+    modeling_observed_data_with_variance,
     replicate_summary,
 )
+from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
 
 
@@ -82,6 +85,60 @@ def replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def multi_replicate_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="multi_replicates",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 1.0),
+        ),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_ehvi"),
+        replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def multi_replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "rep_0a",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "yield_score": 0.6,
+                "waste_score": 0.4,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "rep_0b",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "yield_score": 0.8,
+                "waste_score": 0.2,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_aggregate_observed_replicates_returns_exact_columns_and_stats() -> None:
     cfg = replicate_config()
     observed = replicate_log(cfg)
@@ -129,6 +186,27 @@ def test_modeling_observed_data_uses_group_means() -> None:
     assert model_df["activity"].tolist() == pytest.approx([1.2, 1.3])
 
 
+def test_modeling_observed_data_returns_replicate_yvar_with_singleton_fallback() -> None:
+    cfg = replicate_config()
+
+    model_df, yvar_df = modeling_observed_data_with_variance(cfg, replicate_log(cfg))
+
+    assert list(model_df["activity"]) == pytest.approx([1.2, 1.3])
+    assert yvar_df is not None
+    assert list(yvar_df.columns) == ["activity"]
+    assert yvar_df["activity"].iloc[0] == pytest.approx(0.08 / 2)
+    assert yvar_df["activity"].iloc[1] == pytest.approx(0.08)
+
+
+def test_modeling_observed_data_without_replicated_group_has_no_yvar() -> None:
+    cfg = replicate_config()
+    df = replicate_log(cfg).iloc[[2]].copy()
+
+    _, yvar_df = modeling_observed_data_with_variance(cfg, df)
+
+    assert yvar_df is None
+
+
 def test_best_replicate_group_respects_maximize_and_minimize_direction() -> None:
     max_cfg = replicate_config(direction="maximize")
     min_cfg = replicate_config(direction="minimize")
@@ -136,3 +214,64 @@ def test_best_replicate_group_respects_maximize_and_minimize_direction() -> None
 
     assert best_replicate_group(max_cfg, df)["replicate_group"].iloc[0] == "group_1"
     assert best_replicate_group(min_cfg, df)["replicate_group"].iloc[0] == "group_0"
+
+
+def test_multi_objective_replicate_summary_uses_per_objective_stat_columns() -> None:
+    cfg = multi_replicate_config()
+    df = multi_replicate_log(cfg)
+
+    summary = replicate_summary(cfg, df)
+    model_df = modeling_observed_data(cfg, df)
+
+    assert list(summary.columns) == [
+        "replicate_group",
+        "x",
+        "n_replicates",
+        "yield_score_mean",
+        "yield_score_std",
+        "yield_score_sem",
+        "yield_score_min",
+        "yield_score_max",
+        "waste_score_mean",
+        "waste_score_std",
+        "waste_score_sem",
+        "waste_score_min",
+        "waste_score_max",
+    ]
+    row = summary.iloc[0]
+    assert row["yield_score_mean"] == pytest.approx(0.7)
+    assert row["waste_score_mean"] == pytest.approx(0.3)
+    assert list(model_df.columns) == ["x", "yield_score", "waste_score"]
+    assert model_df.iloc[0]["yield_score"] == pytest.approx(0.7)
+    assert model_df.iloc[0]["waste_score"] == pytest.approx(0.3)
+
+
+def test_multi_objective_modeling_observed_data_returns_per_objective_yvar() -> None:
+    cfg = multi_replicate_config()
+
+    _, yvar_df = modeling_observed_data_with_variance(cfg, multi_replicate_log(cfg))
+
+    assert yvar_df is not None
+    assert list(yvar_df.columns) == ["yield_score", "waste_score"]
+    assert yvar_df.iloc[0]["yield_score"] == pytest.approx(0.02 / 2)
+    assert yvar_df.iloc[0]["waste_score"] == pytest.approx(0.02 / 2)
+
+
+def test_best_replicate_group_rejects_multi_objective_configs() -> None:
+    cfg = multi_replicate_config()
+
+    with pytest.raises(ValueError, match="single-objective replicate campaigns"):
+        best_replicate_group(cfg, multi_replicate_log(cfg))
+
+
+def test_session_best_replicate_group_rejects_multi_objective_configs() -> None:
+    cfg = multi_replicate_config()
+    campaign = CampaignSession(
+        config_path=Path("config.yaml"),
+        log_path=Path("campaign.csv"),
+        config=cfg,
+        df=multi_replicate_log(cfg),
+    )
+
+    with pytest.raises(ValueError, match="single-objective replicate campaigns"):
+        campaign.best_replicate_group()

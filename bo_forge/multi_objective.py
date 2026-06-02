@@ -8,6 +8,7 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 
 from bo_forge.config import CampaignConfig
+from bo_forge.replicates import aggregate_observed_replicates
 from bo_forge.validation import canonical_columns, get_observed_data, validate_campaign_data
 
 
@@ -56,9 +57,9 @@ def pareto_front(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     """Return nondominated observed rows in user-facing units."""
     _require_multi_objective(config)
     validate_campaign_data(config, df)
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     if observed.empty:
-        return pd.DataFrame(columns=canonical_columns(config))
+        return pd.DataFrame(columns=_pareto_front_columns(config))
 
     y_model = observed_objectives_to_model_tensor(config, observed)
     mask = is_non_dominated(y_model, maximize=True, deduplicate=False).cpu().numpy()
@@ -69,7 +70,7 @@ def hypervolume(config: CampaignConfig, df: pd.DataFrame) -> float:
     """Return observed hypervolume, or 0.0 when no point dominates the reference point."""
     _require_multi_objective(config)
     validate_campaign_data(config, df)
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     if observed.empty:
         return 0.0
 
@@ -85,19 +86,21 @@ def hypervolume(config: CampaignConfig, df: pd.DataFrame) -> float:
 
 
 def hypervolume_progress(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
-    """Return hypervolume after each observed row in campaign order."""
+    """Return cumulative best-so-far hypervolume after each observed row."""
     _require_multi_objective(config)
     validate_campaign_data(config, df)
     observed = get_observed_data(config, df)
     rows = []
+    best_hypervolume = 0.0
     for index in range(len(observed)):
         prefix = observed.iloc[: index + 1].copy()
+        best_hypervolume = max(best_hypervolume, hypervolume(config, prefix))
         rows.append(
             {
                 "observation": index + 1,
                 "row_id": str(prefix["row_id"].iloc[-1]),
                 "iteration": int(prefix["iteration"].iloc[-1]),
-                "hypervolume": hypervolume(config, prefix),
+                "hypervolume": best_hypervolume,
             }
         )
     return pd.DataFrame(rows, columns=["observation", "row_id", "iteration", "hypervolume"])
@@ -107,7 +110,7 @@ def pareto_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     """Return a compact two-column Pareto and hypervolume summary."""
     _require_multi_objective(config)
     validate_campaign_data(config, df)
-    observed = get_observed_data(config, df)
+    observed = multi_objective_observed_data(config, df)
     front = pareto_front(config, df)
     observed_count = len(observed)
     current_hypervolume = hypervolume(config, df)
@@ -148,12 +151,55 @@ def sort_pareto_front(config: CampaignConfig, front: pd.DataFrame) -> pd.DataFra
         sortable[sort_column] = pd.to_numeric(sortable[objective.name])
         sort_columns.append(sort_column)
         ascending.append(objective.direction == "minimize")
-    sortable["__row_id_sort"] = sortable["row_id"].astype(str)
+    tie_breaker = "row_id" if "row_id" in sortable.columns else "replicate_group"
+    sortable["__row_id_sort"] = sortable[tie_breaker].astype(str)
     sort_columns.append("__row_id_sort")
     ascending.append(True)
 
     sorted_front = sortable.sort_values(sort_columns, ascending=ascending)
     return sorted_front[front.columns].copy()
+
+
+def multi_objective_observed_data(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
+    """Return observed rows used for multi-objective Pareto and hypervolume utilities."""
+    _require_multi_objective(config)
+    observed = get_observed_data(config, df)
+    if not config.replicates.enabled:
+        return observed
+    if observed.empty:
+        return pd.DataFrame(columns=_pareto_front_columns(config))
+
+    aggregate = aggregate_observed_replicates(config, observed)
+    rows: list[dict[str, object]] = []
+    for group, group_df in observed.groupby("replicate_group", sort=False):
+        summary = aggregate.loc[aggregate["replicate_group"] == group].iloc[0]
+        row: dict[str, object] = {
+            "replicate_group": group,
+            "n_replicates": int(summary["n_replicates"]),
+            "first_row_id": str(group_df["row_id"].iloc[0]),
+            "first_iteration": int(group_df["iteration"].iloc[0]),
+            "last_iteration": int(group_df["iteration"].iloc[-1]),
+        }
+        for variable_name in config.variable_names:
+            row[variable_name] = summary[variable_name]
+        for objective in config.objectives:
+            row[objective.name] = float(summary[f"{objective.name}_mean"])
+        rows.append(row)
+    return pd.DataFrame(rows, columns=_pareto_front_columns(config))
+
+
+def _pareto_front_columns(config: CampaignConfig) -> list[str]:
+    if config.replicates.enabled:
+        return [
+            "replicate_group",
+            *config.variable_names,
+            "n_replicates",
+            *config.objective_names,
+            "first_row_id",
+            "first_iteration",
+            "last_iteration",
+        ]
+    return canonical_columns(config)
 
 
 def _require_multi_objective(config: CampaignConfig) -> None:

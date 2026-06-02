@@ -4,6 +4,7 @@ import matplotlib
 import pandas as pd
 import pytest
 
+import bo_forge.session as session_module
 from bo_forge import CampaignSession
 from bo_forge.config import (
     BOConfig,
@@ -14,6 +15,7 @@ from bo_forge.config import (
     ReviewConfig,
     VariableConfig,
 )
+from bo_forge.errors import LogValidationError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, mark_observed
 from bo_forge.validation import canonical_columns
@@ -404,6 +406,7 @@ def test_session_suggestion_quality_is_read_only(tmp_path: Path) -> None:
         "is_feasible",
         "violated_constraints",
         "is_exact_duplicate",
+        "duplicate_allowed_by_replicates",
         "nearest_existing_distance",
         "nearest_batch_distance",
         "passes_distance_threshold",
@@ -926,6 +929,89 @@ def test_append_suggestions_and_mark_observed_auto_reload(tmp_path: Path) -> Non
     assert campaign.df.loc[campaign.df["row_id"] == row_id, "status"].iloc[0] == "observed"
     observed_value = float(campaign.df.loc[campaign.df["row_id"] == row_id, "score"].iloc[0])
     assert observed_value == pytest.approx(1.2)
+
+
+def test_session_append_invalid_replicate_suggestion_leaves_csv_bytes_unchanged(
+    tmp_path: Path,
+) -> None:
+    base = replicate_config(initial_design_size=2)
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        review=ReviewConfig(enabled=True),
+        replicates=base.replicates,
+    )
+    df = replicate_log(base)
+    df.insert(4, "review_status", "accepted")
+    df.insert(5, "review_note", "")
+    df = df.loc[:, canonical_columns(cfg)]
+    log_path = write_log(tmp_path / "campaign.csv", cfg, df)
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+    bad_suggestion = campaign.df.loc[campaign.df["replicate_group"] == "group_1"].iloc[
+        [0]
+    ].copy().astype(object)
+    bad_suggestion.loc[:, "row_id"] = "bad_repeat"
+    bad_suggestion.loc[:, "status"] = "suggested"
+    bad_suggestion.loc[:, "review_status"] = "pending"
+    bad_suggestion.loc[:, "review_note"] = ""
+    bad_suggestion.loc[:, "score"] = ""
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogValidationError, match="Duplicate replicate row"):
+        campaign.append_suggestions(bad_suggestion)
+
+    assert log_path.read_bytes() == before
+
+
+def test_session_append_suggestions_uses_config_aware_low_level_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = config(initial_design_size=1)
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=tmp_path / "campaign.csv",
+        config=cfg,
+        df=empty_campaign_log(cfg),
+    )
+    suggestions = pd.DataFrame(
+        [
+            {
+                "row_id": "suggested_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "sobol",
+                "x": 0.4,
+                "score": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    captured: dict[str, object] = {}
+
+    def fake_append(log_path, appended, config=None):
+        captured["log_path"] = log_path
+        captured["appended"] = appended
+        captured["config"] = config
+
+    monkeypatch.setattr(session_module, "_append_suggestions", fake_append)
+    monkeypatch.setattr(campaign, "reload", lambda: campaign.df)
+
+    campaign.append_suggestions(suggestions)
+
+    assert captured["log_path"] == campaign.log_path
+    assert captured["appended"] is suggestions
+    assert captured["config"] is cfg
 
 
 def test_reload_reflects_disk_changes(tmp_path: Path) -> None:

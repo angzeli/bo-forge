@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from dataclasses import replace
 
 import pandas as pd
 import torch
@@ -25,7 +26,7 @@ from bo_forge.multi_objective import (
     objectives_from_model_space,
     reference_point_to_model_space,
 )
-from bo_forge.replicates import modeling_observed_data
+from bo_forge.replicates import aggregate_observed_replicates, modeling_observed_data
 from bo_forge.transforms import (
     categorical_combination_count,
     categorical_feature_assignments,
@@ -51,6 +52,10 @@ _GENERATION_FAILURE_HINT = (
     "The feasible design space may be exhausted, constraints may be too restrictive, "
     "or bo.min_normalized_distance may be too large."
 )
+
+
+class _CandidateGenerationExhausted(SuggestionError):
+    """Internal signal for expected budget or design-space exhaustion."""
 
 
 def suggest_next(
@@ -86,6 +91,27 @@ def suggest_next(
             observed_df=observed_df,
             batch_size=requested_batch_size,
         )
+
+    if (
+        config.replicates.enabled
+        and config.replicates.suggestion_policy == "uncertain_best"
+    ):
+        repeat_suggestions = _suggest_uncertain_best_replicate(
+            config=config,
+            df=df,
+            observed_df=observed_df,
+            batch_size=requested_batch_size,
+        )
+        if repeat_suggestions is not None:
+            if len(repeat_suggestions) >= requested_batch_size:
+                return repeat_suggestions
+            return _fill_replicate_batch_with_exploration(
+                config=config,
+                df=df,
+                observed_df=observed_df,
+                repeat_suggestions=repeat_suggestions,
+                batch_size=requested_batch_size,
+            )
 
     if config.cost is not None:
         return _suggest_cost_aware_model_based(
@@ -198,6 +224,8 @@ def _suggest_multi_objective_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = "qlog_ehvi"
+        _populate_replicate_fields(config, row)
+        _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, user_candidates[index], strict=True):
             row[name] = value
         for objective_index, objective in enumerate(config.objectives):
@@ -268,6 +296,165 @@ def _fallback_qlog_ehvi_candidate_batch(
     return best_candidates, best_value
 
 
+def _suggest_uncertain_best_replicate(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame | None:
+    aggregate = aggregate_observed_replicates(config, observed_df)
+    if aggregate.empty:
+        return None
+
+    model = fit_gp_model(config, observed_df)
+    model_df = modeling_observed_data(config, observed_df)
+    x_unit = values_to_unit_cube(
+        config,
+        [
+            tuple(row[variable.name] for variable in config.variables)
+            for _, row in model_df.iterrows()
+        ],
+    )
+    with torch.no_grad():
+        posterior = model.posterior(x_unit)
+        mean_model = posterior.mean.squeeze(-1)
+        std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
+
+    best_index = int(torch.argmax(mean_model).item())
+    best_group = aggregate.iloc[best_index]
+    n_replicates = int(best_group["n_replicates"])
+    posterior_std = float(std[best_index])
+    if (
+        posterior_std <= config.replicates.replicate_threshold
+        and n_replicates >= config.replicates.min_repeats_at_best
+    ):
+        return None
+    if n_replicates >= config.replicates.max_repeats_per_group:
+        return None
+
+    candidate = tuple(best_group[variable.name] for variable in config.variables)
+    repeat_count = 1
+    if n_replicates < config.replicates.min_repeats_at_best:
+        repeat_count = config.replicates.min_repeats_at_best - n_replicates
+    repeat_count = min(
+        batch_size,
+        repeat_count,
+        config.replicates.max_repeats_per_group - n_replicates,
+    )
+    if config.cost is not None:
+        remaining = budget_remaining(config, df)
+        if remaining is not None:
+            repeat_cost = evaluate_cost(config, candidate)
+            if repeat_cost > 0:
+                repeat_count = min(repeat_count, int(remaining // repeat_cost))
+                if repeat_count < 1:
+                    return None
+
+    group = str(best_group["replicate_group"])
+    group_rows = df.loc[df["replicate_group"].astype(str) == group]
+    group_row_count = int(len(group_rows))
+    if group_row_count >= config.replicates.max_repeats_per_group:
+        return None
+    repeat_count = min(
+        repeat_count,
+        config.replicates.max_repeats_per_group - group_row_count,
+    )
+    if repeat_count < 1:
+        return None
+    next_replicate_index = int(pd.to_numeric(group_rows["replicate_index"]).max()) + 1
+    iteration = next_iteration(df)
+    source = "log_ei" if repeat_count == 1 else "qlog_ei"
+    mean_user = objective_from_model_space(config, mean_model[best_index])
+    rows = []
+    for offset in range(repeat_count):
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = source
+        row["replicate_group"] = group
+        row["replicate_index"] = next_replicate_index + offset
+        _populate_review_fields(config, row)
+        for name, value in zip(config.variable_names, candidate, strict=True):
+            row[name] = value
+        row["predicted_mean"] = float(mean_user)
+        row["predicted_std"] = posterior_std
+        row["acquisition"] = 0.0
+        _populate_cost_fields(config, row, candidate)
+        rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _fill_replicate_batch_with_exploration(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    repeat_suggestions: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    remaining = batch_size - len(repeat_suggestions)
+    if remaining <= 0:
+        return repeat_suggestions
+
+    df_with_repeats = pd.concat([df, repeat_suggestions], ignore_index=True)
+    filler_config = _config_with_repeat_budget_reserved(config, repeat_suggestions)
+    try:
+        if config.cost is not None:
+            filler = _suggest_cost_aware_model_based(
+                config=filler_config,
+                df=df_with_repeats,
+                observed_df=observed_df,
+                batch_size=remaining,
+            )
+        else:
+            filler = _suggest_model_based(
+                config=config,
+                df=df_with_repeats,
+                observed_df=observed_df,
+                batch_size=remaining,
+            )
+    except _CandidateGenerationExhausted:
+        return repeat_suggestions
+    except SuggestionError as exc:
+        raise SuggestionError(
+            "Repeat suggestions were generated, but exploration fill failed: "
+            f"{exc}"
+        ) from exc
+
+    filler = filler.copy()
+    filler.loc[:, "iteration"] = repeat_suggestions["iteration"].iloc[0]
+    return pd.concat([repeat_suggestions, filler], ignore_index=True).loc[
+        :,
+        canonical_columns(config),
+    ]
+
+
+def _config_with_repeat_budget_reserved(
+    config: CampaignConfig,
+    repeat_suggestions: pd.DataFrame,
+) -> CampaignConfig:
+    if config.cost is None or config.cost.budget is None or repeat_suggestions.empty:
+        return config
+    repeat_cost = sum(
+        evaluate_cost(
+            config,
+            tuple(row[variable.name] for variable in config.variables),
+        )
+        for _, row in repeat_suggestions.iterrows()
+    )
+    if repeat_cost <= 0:
+        return config
+    return replace(
+        config,
+        cost=replace(
+            config.cost,
+            budget=max(0.0, config.cost.budget - float(repeat_cost)),
+        ),
+    )
+
+
 def _suggest_model_based(
     config: CampaignConfig,
     df: pd.DataFrame,
@@ -307,7 +494,7 @@ def _suggest_model_based(
             break
 
     if user_candidates is None or acquisition_value is None or source is None:
-        raise SuggestionError(
+        raise _CandidateGenerationExhausted(
             "Could not generate enough feasible, non-duplicate suggestions after "
             f"{MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
             f"Last rejection: {rejection_message}"
@@ -465,7 +652,7 @@ def _choose_cost_aware_candidate(
                 ),
             )
 
-    raise SuggestionError(
+    raise _CandidateGenerationExhausted(
         "Could not generate enough budget-feasible cost-aware suggestions after "
         f"{MAX_DECODE_RETRIES} retries. The feasible design space may be exhausted, "
         "constraints may be too restrictive, bo.min_normalized_distance may be too "
@@ -695,9 +882,34 @@ def suggestion_quality_summary(
         violations = constraint_violations_for_values(config, candidate)
         violation_names = [constraint.name for constraint in violations]
         candidate_key = suggestion_keys[index]
+        existing_duplicate_allowed_by_replicates = _duplicate_allowed_by_replicates(
+            config,
+            df,
+            row,
+            candidate,
+        )
+        batch_duplicate_allowed_by_replicates = (
+            _same_batch_duplicate_allowed_by_replicates(
+                config,
+                df,
+                suggestions,
+                candidate_key,
+                suggestion_keys,
+            )
+        )
+        duplicate_allowed_by_replicates = (
+            existing_duplicate_allowed_by_replicates
+            or batch_duplicate_allowed_by_replicates
+        )
         is_exact_duplicate = (
-            candidate_key in existing_keys
-            or suggestion_keys.count(candidate_key) > 1
+            (
+                candidate_key in existing_keys
+                and not existing_duplicate_allowed_by_replicates
+            )
+            or (
+                suggestion_keys.count(candidate_key) > 1
+                and not batch_duplicate_allowed_by_replicates
+            )
         )
         batch_comparisons = [
             other_candidate
@@ -717,7 +929,7 @@ def suggestion_quality_summary(
         distances = [
             distance for distance in (nearest_existing, nearest_batch) if distance is not None
         ]
-        passes_distance_threshold = (
+        passes_distance_threshold = duplicate_allowed_by_replicates or (
             True if threshold <= 0 or not distances else min(distances) >= threshold
         )
         rows.append(
@@ -726,6 +938,7 @@ def suggestion_quality_summary(
                 "is_feasible": len(violation_names) == 0,
                 "violated_constraints": ", ".join(violation_names),
                 "is_exact_duplicate": is_exact_duplicate,
+                "duplicate_allowed_by_replicates": duplicate_allowed_by_replicates,
                 "nearest_existing_distance": nearest_existing,
                 "nearest_batch_distance": nearest_batch,
                 "passes_distance_threshold": passes_distance_threshold,
@@ -739,6 +952,7 @@ def suggestion_quality_summary(
             "is_feasible",
             "violated_constraints",
             "is_exact_duplicate",
+            "duplicate_allowed_by_replicates",
             "nearest_existing_distance",
             "nearest_batch_distance",
             "passes_distance_threshold",
@@ -754,6 +968,91 @@ def _candidate_values_from_df(
         tuple(row[variable.name] for variable in config.variables)
         for _, row in df.iterrows()
     ]
+
+
+def _duplicate_allowed_by_replicates(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    row: pd.Series,
+    candidate: tuple[object, ...],
+) -> bool:
+    if not config.replicates.enabled or "replicate_group" not in df.columns:
+        return False
+    if "replicate_group" not in row or "replicate_index" not in row:
+        return False
+
+    group = str(row["replicate_group"])
+    group_rows = df.loc[df["replicate_group"].astype(str) == group]
+    if group_rows.empty:
+        return False
+
+    candidate_key = design_key_for_values(config, candidate)
+    group_keys = {
+        design_key_for_values(
+            config,
+            [existing_row[variable.name] for variable in config.variables],
+        )
+        for _, existing_row in group_rows.iterrows()
+    }
+    if group_keys != {candidate_key}:
+        return False
+
+    replicate_index = pd.to_numeric(pd.Series([row["replicate_index"]]), errors="coerce").iloc[0]
+    if pd.isna(replicate_index) or not math.isfinite(float(replicate_index)):
+        return False
+    existing_indices = set(pd.to_numeric(group_rows["replicate_index"], errors="coerce"))
+    return int(replicate_index) not in {int(index) for index in existing_indices}
+
+
+def _same_batch_duplicate_allowed_by_replicates(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    suggestions: pd.DataFrame,
+    candidate_key: tuple[object, ...],
+    suggestion_keys: list[tuple[object, ...]],
+) -> bool:
+    if not config.replicates.enabled or "replicate_group" not in suggestions.columns:
+        return False
+    matching_indices = [
+        index for index, key in enumerate(suggestion_keys) if key == candidate_key
+    ]
+    if len(matching_indices) <= 1:
+        return False
+
+    matching_rows = suggestions.iloc[matching_indices]
+    groups = {str(value) for value in matching_rows["replicate_group"]}
+    if len(groups) != 1:
+        return False
+    group = next(iter(groups))
+    group_rows = df.loc[df["replicate_group"].astype(str) == group]
+    if group_rows.empty:
+        return False
+
+    group_keys = {
+        design_key_for_values(
+            config,
+            [existing_row[variable.name] for variable in config.variables],
+        )
+        for _, existing_row in group_rows.iterrows()
+    }
+    if group_keys != {candidate_key}:
+        return False
+
+    suggested_indices = pd.to_numeric(
+        matching_rows["replicate_index"],
+        errors="coerce",
+    )
+    if suggested_indices.isna().any():
+        return False
+    suggested_index_values = [int(value) for value in suggested_indices]
+    if len(suggested_index_values) != len(set(suggested_index_values)):
+        return False
+
+    existing_indices = {
+        int(index)
+        for index in pd.to_numeric(group_rows["replicate_index"], errors="coerce")
+    }
+    return existing_indices.isdisjoint(suggested_index_values)
 
 
 def _nearest_normalized_distance(

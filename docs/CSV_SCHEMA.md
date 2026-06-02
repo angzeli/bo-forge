@@ -23,7 +23,7 @@ row_id,iteration,status,source,review_status,review_note,replicate_group,replica
 For v1.1 multi-objective campaigns, the schema scales with the configured objective order:
 
 ```text
-row_id,iteration,status,source,<variable columns...>,<objective_1>,...,<objective_m>,predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition
+row_id,iteration,status,source,[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition
 ```
 
 Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains all configured objective values. Suggested rows keep every objective column blank until the experiment is complete.
@@ -138,7 +138,7 @@ Blank objective values are valid only for `status=suggested`.
 
 Blank `predicted_mean`, `predicted_std`, and `acquisition` values are allowed because Sobol/manual rows may not have model predictions.
 
-Blank `utility` is expected for initial Sobol/random suggestions, because no model acquisition exists yet. Blank `cost_actual` is allowed until the experiment has been run.
+Blank `utility` is expected for initial Sobol/random suggestions, because no model acquisition exists yet. Blank `cost_actual` is allowed until the experiment has been run. In cost-aware replicate campaigns, a policy-driven `uncertain_best` repeat suggestion fills `cost_estimate` but may leave `utility` blank and keep `source=log_ei` or `qlog_ei`, because it is a repeat decision rather than a cost-utility-ranked new exploration candidate.
 
 ## 🧬 Duplicate Rules
 
@@ -160,7 +160,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.1.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.1.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -170,7 +170,7 @@ v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested ra
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Cost, review, and replicate columns are not supported for multi-objective campaigns in v1.1.
+Review and replicate metadata are supported for multi-objective campaigns in v1.1.2. Cost columns remain unsupported for multi-objective campaigns; configs combining `objectives:` with `cost:` fail validation.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -194,9 +194,14 @@ Replicates are explicit CSV metadata, not silently inferred.
 - `replicate_index` is zero-based, non-negative, integer-valued, and unique within each group.
 - Rows in the same group must have identical typed user-space design values.
 - Manual replicate rows are allowed when explicitly grouped.
-- Generated suggestions remain exploration suggestions: they avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
+- Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
+- For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
+- If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.1.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
+
+For model fitting, replicate-enabled campaigns use one training row per `replicate_group`. The training objective is the group mean. When at least one group has 2+ observations, BO Forge passes replicate-derived observation variance to BoTorch as `train_Yvar`: repeated groups use `std^2 / n_replicates`, singleton groups use the weighted pooled replicate variance, and every value is clamped by `replicates.noise_floor`. If no group has repeated observations yet, BO Forge keeps the current learned-noise GP behavior.
 
 Aggregate replicate summaries use these columns:
 
@@ -205,6 +210,14 @@ replicate_group,<variable columns...>,n_replicates,objective_mean,objective_std,
 ```
 
 For single-replicate groups, `objective_std` and `objective_sem` are `NaN`.
+
+For multi-objective replicate summaries, each objective gets its own statistic columns:
+
+```text
+replicate_group,<variable columns...>,n_replicates,<objective>_mean,<objective>_std,<objective>_sem,<objective>_min,<objective>_max,...
+```
+
+Pareto fronts and hypervolume use one group-mean objective vector per `replicate_group` when multi-objective replicates are enabled. Multi-objective qLogEHVI also consumes replicate-derived per-objective `train_Yvar`, but active repeat selection for multi-objective campaigns remains deferred.
 
 ## 🧪 Variable Value Rules
 

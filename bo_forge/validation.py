@@ -28,6 +28,8 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
     if config.is_multi_objective:
         return [
             *BASE_COLUMNS,
+            *(REVIEW_COLUMNS if config.review.enabled else []),
+            *(REPLICATE_COLUMNS if config.replicates.enabled else []),
             *config.variable_names,
             *config.objective_names,
             *_multi_objective_result_columns(config),

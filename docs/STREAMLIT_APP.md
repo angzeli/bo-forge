@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.1.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.1.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v1.1.1 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
+The v1.1.2 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
 
-v1.1.1 keeps the local app on the v1.0 workflow baseline. Generalized coupled multi-objective qLogEHVI support is available through the backend, session API, CLI, and notebooks first; full app-specific multi-objective workflow polish is deferred.
+v1.1.2 keeps the local app on the v1.0 workflow baseline. Generalized coupled multi-objective qLogEHVI support is available through the backend, session API, CLI, and notebooks first; full app-specific multi-objective workflow polish is deferred.
 
 ## 🧰 Install
 
