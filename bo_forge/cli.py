@@ -358,9 +358,13 @@ def _cmd_mark_observed(args: argparse.Namespace) -> int:
                 "--objective-value is not valid for multi-objective campaigns; "
                 "use repeated --objective name=value arguments."
             )
-        if args.actual_cost is not None:
-            raise LogWriteError("--actual-cost is not valid for multi-objective campaigns.")
-        campaign.mark_observed(args.row_id, objective_values=objective_values)
+        if args.actual_cost is not None and campaign.config.cost is None:
+            raise LogWriteError("--actual-cost requires a config with a cost section.")
+        campaign.mark_observed(
+            args.row_id,
+            objective_values=objective_values,
+            actual_cost=args.actual_cost,
+        )
     else:
         if objective_values:
             raise LogWriteError(

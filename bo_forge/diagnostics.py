@@ -192,7 +192,8 @@ def plot_cost_progress(
     _, ax = new_figure(figsize=(8, 6))
     if observed.empty:
         set_title(ax, f"{config.campaign_name}: no observations yet")
-        set_axis_labels(ax, "Cumulative cost", config.objective.name)
+        y_label = "Hypervolume" if config.is_multi_objective else config.objective.name
+        set_axis_labels(ax, "Cumulative cost", y_label)
         return finalise_figure(
             ax,
             filename=filename,
@@ -206,6 +207,20 @@ def plot_cost_progress(
     for _, row in observed.iterrows():
         running_cost += effective_row_cost(config, row)
         cumulative_costs.append(running_cost)
+
+    if config.is_multi_objective:
+        progress = hypervolume_progress(config, df)
+        ax.plot(cumulative_costs, progress["hypervolume"], marker="o", label="hypervolume")
+        set_title(ax, f"{config.campaign_name}: cost progress")
+        set_axis_labels(ax, "Cumulative cost", "Hypervolume")
+        add_legend(ax)
+        return finalise_figure(
+            ax,
+            filename=filename,
+            fig_folder=fig_folder,
+            save_path=save_path,
+            show=show,
+        )
 
     values = pd.to_numeric(observed[config.objective.name])
     best = _directional_best_so_far(config, values)

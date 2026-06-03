@@ -8,6 +8,7 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
+    CostConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -43,6 +44,7 @@ def multi_config(
     batch_size: int = 2,
     initial_design_size: int = 3,
     *,
+    cost: bool = False,
     review: bool = False,
     replicates: bool = False,
 ) -> CampaignConfig:
@@ -66,6 +68,15 @@ def multi_config(
             num_restarts=2,
             mc_samples=8,
         ),
+        cost=CostConfig(
+            expression="1.0 + 0.02 * temperature + 2.0 * (solvent == 'Water')",
+            weight=0.5,
+            budget=20.0,
+            candidate_pool_size=16,
+            top_k=8,
+        )
+        if cost
+        else None,
         review=ReviewConfig(enabled=review),
         replicates=ReplicateConfig(enabled=replicates),
     )
@@ -139,6 +150,11 @@ def observed_multi_log(cfg: CampaignConfig) -> pd.DataFrame:
         if cfg.replicates.enabled:
             row["replicate_group"] = f"group_{index}"
             row["replicate_index"] = 0
+        if cfg.cost is not None:
+            cost_estimate = 1.0 + 0.02 * temperature + (2.0 if solvent == "Water" else 0.0)
+            row["cost_estimate"] = cost_estimate
+            row["cost_actual"] = ""
+            row["utility"] = ""
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
@@ -364,14 +380,14 @@ replicates:
 """,
     ],
 )
-def test_multi_objective_still_rejects_cost(
+def test_multi_objective_accepts_cost_combinations(
     tmp_path: Path,
     extra_yaml: str,
 ) -> None:
-    path = tmp_path / "bad.yaml"
+    path = tmp_path / "cost.yaml"
     path.write_text(
         f"""
-campaign_name: bad
+campaign_name: cost_multi
 objectives:
   - name: yield_score
     direction: maximize
@@ -389,8 +405,10 @@ variables:
         encoding="utf-8",
     )
 
-    with pytest.raises(ConfigError, match="cost"):
-        CampaignConfig.from_yaml(path)
+    cfg = CampaignConfig.from_yaml(path)
+
+    assert cfg.is_multi_objective
+    assert cfg.cost is not None
 
 
 @pytest.mark.parametrize(
@@ -482,6 +500,35 @@ def test_multi_objective_review_and_replicate_canonical_schema() -> None:
     validate_campaign_data(cfg, df)
 
 
+def test_multi_objective_cost_review_replicate_canonical_schema() -> None:
+    cfg = multi_config(cost=True, review=True, replicates=True)
+    df = observed_multi_log(cfg)
+
+    assert canonical_columns(cfg) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "review_status",
+        "review_note",
+        "replicate_group",
+        "replicate_index",
+        "temperature",
+        "solvent",
+        "yield_score",
+        "waste_score",
+        "cost_estimate",
+        "cost_actual",
+        "predicted_mean_yield_score",
+        "predicted_std_yield_score",
+        "predicted_mean_waste_score",
+        "predicted_std_waste_score",
+        "acquisition",
+        "utility",
+    ]
+    validate_campaign_data(cfg, df)
+
+
 def test_four_objective_canonical_schema_and_validation() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg)
@@ -509,6 +556,22 @@ def test_four_objective_canonical_schema_and_validation() -> None:
         "predicted_std_energy_use",
         "acquisition",
     ]
+    validate_campaign_data(cfg, df)
+
+
+def test_cost_aware_multi_objective_example_config_and_log_validate() -> None:
+    cfg = CampaignConfig.from_yaml(
+        "configs/12_cost_aware_multi_objective_qlogehvi.yaml"
+    )
+    df = pd.read_csv(
+        "examples/12_cost_aware_multi_objective_campaign_log.csv",
+        keep_default_na=False,
+    )
+
+    assert cfg.is_multi_objective
+    assert cfg.cost is not None
+    assert cfg.objective_names == ["yield", "selectivity", "waste"]
+    assert list(df.columns) == canonical_columns(cfg)
     validate_campaign_data(cfg, df)
 
 
@@ -726,6 +789,46 @@ def test_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> None:
     assert suggestions[["yield_score", "waste_score"]].map(lambda value: value == "").all().all()
 
 
+def test_initial_multi_objective_cost_suggestions_fill_cost_and_leave_utility_blank() -> None:
+    cfg = multi_config(cost=True, initial_design_size=6)
+    df = observed_multi_log(cfg)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    validate_campaign_data(cfg, suggestions)
+    assert set(suggestions["source"]) == {"sobol"}
+    assert suggestions["cost_estimate"].map(lambda value: float(value) >= 0).all()
+    assert suggestions["cost_actual"].map(lambda value: value == "").all()
+    assert suggestions["utility"].map(lambda value: value == "").all()
+
+
+def test_cost_aware_multi_objective_qlog_ehvi_suggestions_fill_batch_utility() -> None:
+    cfg = multi_config(cost=True)
+    df = observed_multi_log(cfg)
+    before = df.copy(deep=True)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    pd.testing.assert_frame_equal(df, before)
+    validate_campaign_data(cfg, suggestions)
+    assert set(suggestions["source"]) == {"cost_qlog_ehvi"}
+    assert suggestions[["yield_score", "waste_score"]].map(lambda value: value == "").all().all()
+    costs = pd.to_numeric(suggestions["cost_estimate"])
+    acquisition = float(suggestions["acquisition"].iloc[0])
+    utility = float(suggestions["utility"].iloc[0])
+    assert suggestions["utility"].astype(float).nunique() == 1
+    assert utility == pytest.approx(acquisition - cfg.cost.weight * float(costs.sum()))
+    prediction_columns = [
+        column
+        for objective in cfg.objectives
+        for column in [
+            f"predicted_mean_{objective.name}",
+            f"predicted_std_{objective.name}",
+        ]
+    ]
+    assert suggestions[prediction_columns].apply(pd.to_numeric).map(pd.notna).all().all()
+
+
 def test_four_objective_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg)
@@ -759,6 +862,32 @@ def test_multi_objective_qlog_ehvi_suggestions_fill_review_and_replicate_fields(
     assert row["replicate_group"] == row["row_id"]
     assert row["replicate_group"] not in set(df["replicate_group"].astype(str))
     assert int(row["replicate_index"]) == 0
+
+
+def test_multi_objective_cost_summary_report_and_cost_progress_plot(tmp_path: Path) -> None:
+    cfg = multi_config(cost=True)
+    df = observed_multi_log(cfg)
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=tmp_path / "campaign.csv",
+        config=cfg,
+        df=df,
+    )
+
+    summary = campaign.cost_summary()
+    assert set(summary["field"]) == {
+        "total_observed_cost",
+        "accepted_pending_cost",
+        "budget",
+        "budget_remaining",
+        "current_hypervolume",
+        "pareto_count",
+    }
+    report = campaign.report()
+    assert "cost_summary" in report
+    output_path = tmp_path / "cost-progress.png"
+    campaign.plot_cost_progress(save_path=output_path)
+    assert output_path.is_file()
 
 
 @pytest.mark.parametrize(

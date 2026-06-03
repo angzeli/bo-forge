@@ -1,5 +1,19 @@
 # 📝 BO Forge Changelog
 
+## v1.1.3 - Cost-Aware Multi-Objective qLogEHVI
+
+This release adds deterministic cost-aware ranking to coupled multi-objective qLogEHVI campaigns while preserving v1.1.2 review and replicate behavior.
+
+- Allows multi-objective configs to combine `objectives:` with `cost:`, `review:`, `replicates:`, or any combination of those sections.
+- Adds multi-objective cost CSV columns: `cost_estimate`, `cost_actual`, and `utility`.
+- Adds `cost_qlog_ehvi` model-based suggestions with batch-level utility `acquisition - cost.weight * total_batch_cost`.
+- Keeps initial Sobol/random multi-objective suggestions source-compatible while filling `cost_estimate` and leaving `utility` blank.
+- Extends multi-objective `mark_observed(..., objective_values={...}, actual_cost=...)` and CLI `--actual-cost` support for cost-enabled logs.
+- Adds multi-objective cost summaries with current hypervolume, Pareto count, budget, reserved cost, and budget remaining.
+- Makes cost-progress plots for multi-objective cost campaigns show cumulative effective cost against best-so-far hypervolume.
+- Adds a three-objective cost-aware multi-objective config, seed log, and notebook demonstration.
+- Keeps cost deterministic and variable-only; cost is not modeled as another objective and no learned cost surrogate is added.
+
 ## v1.1.2 - Multi-Objective Review And Replicate Support
 
 This release adds noisy replicate-aware GP fitting plus review and replicate metadata support to coupled multi-objective qLogEHVI campaigns while keeping multi-objective cost-aware ranking deferred.

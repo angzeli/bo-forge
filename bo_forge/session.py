@@ -273,6 +273,18 @@ class CampaignSession:
             return pd.DataFrame(
                 columns=["field", "value"],
             )
+        if self.config.is_multi_objective:
+            pareto = self.pareto_summary()
+            pareto_values = dict(zip(pareto["field"], pareto["value"], strict=True))
+            rows = [
+                ("total_observed_cost", observed_effective_cost(self.config, self.df)),
+                ("accepted_pending_cost", accepted_pending_estimated_cost(self.config, self.df)),
+                ("budget", self.config.cost.budget),
+                ("budget_remaining", budget_remaining(self.config, self.df)),
+                ("current_hypervolume", pareto_values.get("hypervolume")),
+                ("pareto_count", pareto_values.get("pareto_count")),
+            ]
+            return pd.DataFrame(rows, columns=["field", "value"])
         best = self.best_observation()
         best_value = None if best.empty else float(best[self.config.objective.name].iloc[0])
         rows = [
@@ -322,9 +334,14 @@ class CampaignSession:
                 action = "run_accepted_suggestions"
                 reason = "There are accepted suggestions awaiting experimental results."
                 if self.config.is_multi_objective:
+                    observed_call = (
+                        "campaign.mark_observed(row_id, objective_values={...}, actual_cost=...)"
+                        if self.config.cost is not None
+                        else "campaign.mark_observed(row_id, objective_values={...})"
+                    )
                     suggested_call = (
                         "campaign.pending_suggestions(); "
-                        "campaign.mark_observed(row_id, objective_values={...})"
+                        f"{observed_call}"
                     )
                 else:
                     suggested_call = (
@@ -338,9 +355,14 @@ class CampaignSession:
                     "requesting more."
                 )
                 if self.config.is_multi_objective:
+                    observed_call = (
+                        "campaign.mark_observed(row_id, objective_values={...}, actual_cost=...)"
+                        if self.config.cost is not None
+                        else "campaign.mark_observed(row_id, objective_values={...})"
+                    )
                     suggested_call = (
                         "campaign.pending_suggestions(); "
-                        "campaign.mark_observed(row_id, objective_values={...})"
+                        f"{observed_call}"
                     )
                 else:
                     suggested_call = (
@@ -388,6 +410,8 @@ class CampaignSession:
                 tables["review_queue"] = self.review_queue()
             if self.config.replicates.enabled:
                 tables["replicate_summary"] = self.replicate_summary()
+            if self.config.cost is not None:
+                tables["cost_summary"] = self.cost_summary()
             return tables
         return {
             "summary": self.summary(),
@@ -555,6 +579,11 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
                     tables["replicate_summary"],
                     "No replicate groups observed.",
                 )
+            )
+        if "cost_summary" in tables:
+            sections.append(
+                "Cost Summary\n------------\n\n"
+                + _format_report_table(tables["cost_summary"], "No cost model configured.")
             )
         sections.append(
             "Pending Suggestions\n-------------------\n\n"

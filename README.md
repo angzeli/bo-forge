@@ -1,8 +1,8 @@
-# 🧪 BO Forge v1.1.2
+# 🧪 BO Forge v1.1.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.1.2 builds on the first stable public release with coupled multi-objective qLogEHVI campaigns, Pareto-front reporting, hypervolume progress, noisy replicate-aware GP fitting, and review/replicate metadata support while keeping the same YAML/CSV/session/CLI foundation.
+v1.1.3 builds on the first stable public release with coupled multi-objective qLogEHVI campaigns, Pareto-front reporting, hypervolume progress, noisy replicate-aware GP fitting, review/replicate metadata support, and deterministic cost-aware multi-objective batch ranking while keeping the same YAML/CSV/session/CLI foundation.
 
 BO Forge deliberately supports only:
 
@@ -22,7 +22,7 @@ BO Forge deliberately supports only:
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
 
-It intentionally does not yet cover qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, cost-aware multi-objective ranking, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -130,7 +130,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.1.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.1.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

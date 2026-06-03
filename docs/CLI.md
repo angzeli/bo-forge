@@ -171,7 +171,7 @@ bo-forge mark-observed \
   --actual-cost 2.7
 ```
 
-For multi-objective review-enabled campaigns, use the same `review` command, then mark accepted rows observed with repeated `--objective name=value` arguments. `--actual-cost` remains single-objective cost-workflow only.
+For multi-objective review-enabled campaigns, use the same `review` command, then mark accepted rows observed with repeated `--objective name=value` arguments. If the multi-objective config has a `cost:` section, add `--actual-cost VALUE` to record realised cost.
 
 ## 📄 Reports And Plots
 
@@ -253,7 +253,7 @@ bo-forge plot \
 | `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
 | `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
 | `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
-| `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and best-observed-objective fields. |
+| `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and either best-observed-objective or multi-objective hypervolume/Pareto fields. |
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
@@ -261,7 +261,7 @@ bo-forge plot \
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
-| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...]` | Mark a multi-objective pending suggestion observed. |
+| `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
 | `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, or hypervolume figure. |
 
 ## 🧯 CLI Error Output

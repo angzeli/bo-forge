@@ -69,7 +69,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.1.2 keeps the local app on the stable v1.0 workflow while adding generalized multi-objective support to the backend, session, CLI, and notebooks.
+The app uses a Forge Suite-inspired workbench layout with main-page campaign file controls, a `Create Campaign` flow, and `Campaign`, `Suggest`, `Resolve`, and `Reports` panels. v1.1.3 keeps the local app on the stable v1.0 workflow while adding generalized multi-objective and cost-aware multi-objective support to the backend, session, CLI, and notebooks.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -195,10 +195,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/08_replicate_aware_logei.yaml`: adds explicit replicate rows, replicate-derived observation variance, and noisy GP fitting.
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml`: adds coupled two-objective qLogEHVI with mixed variables and constraints.
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml`: generalizes qLogEHVI to a four-objective mixed constrained campaign.
+- `configs/12_cost_aware_multi_objective_qlogehvi.yaml`: adds deterministic cost-aware batch ranking to a three-objective qLogEHVI campaign.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.1.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.1.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -233,7 +234,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.1.2 supports review and replicate metadata for coupled multi-objective campaigns; cost-aware multi-objective ranking and decoupled objective evaluation remain deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.1.3 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 
@@ -305,7 +306,7 @@ review:
   enabled: true
 ```
 
-Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank. Model-based cost-aware exploration suggestions use `source=cost_log_ei` and fill `utility = acquisition - cost.weight * cost_estimate`. For `batch_size > 1`, BO Forge uses greedy single-candidate utility rather than joint cost-aware qLogEI. If a cost-aware replicate campaign uses the active `uncertain_best` repeat policy, the repeat suggestion fills `cost_estimate` but keeps `source=log_ei` or `qlog_ei` and leaves `utility` blank because it is a repeat decision, not a cost-utility-ranked new exploration candidate.
+Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank. Single-objective model-based cost-aware exploration suggestions use `source=cost_log_ei` and fill `utility = acquisition - cost.weight * cost_estimate`. Multi-objective model-based cost-aware suggestions use `source=cost_qlog_ehvi`; `acquisition` stores the qLogEHVI batch acquisition value and `utility = acquisition - cost.weight * total_batch_cost` is repeated on every row in the selected batch. If a cost-aware replicate campaign uses the active `uncertain_best` repeat policy, the repeat suggestion fills `cost_estimate` but keeps `source=log_ei` or `qlog_ei` and leaves `utility` blank because it is a repeat decision, not a cost-utility-ranked new exploration candidate.
 
 When `cost_estimate` is filled, validation checks it against the deterministic cost expression. Use `cost_actual` for realised experiment costs that differ from the estimate.
 

@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for multi-objective campaigns.
+- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qlog_ehvi`, or `cost_qlog_ehvi` for cost-aware multi-objective campaigns.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -117,7 +117,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.1.2 is two to four objectives.
+v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.1.3 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -176,6 +176,7 @@ log_ei
 qlog_ei
 cost_log_ei
 qlog_ehvi
+cost_qlog_ehvi
 ```
 
 ### `review_status is not 'accepted'`

@@ -23,7 +23,7 @@ row_id,iteration,status,source,review_status,review_note,replicate_group,replica
 For v1.1 multi-objective campaigns, the schema scales with the configured objective order:
 
 ```text
-row_id,iteration,status,source,[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition
+row_id,iteration,status,source,[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,[cost_estimate,cost_actual],predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition,[utility]
 ```
 
 Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains all configured objective values. Suggested rows keep every objective column blank until the experiment is complete.
@@ -41,7 +41,7 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, or `qlog_ehvi` for multi-objective campaigns. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qlog_ehvi`, or `cost_qlog_ehvi` for cost-aware multi-objective campaigns. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
 | `replicate_group` | If replicates enabled | Nonblank replicate-group identifier. Rows in a group share one design. |
@@ -68,9 +68,10 @@ Suggested rows:
 - `status` must be `suggested`.
 - The objective cell must be blank.
 - Variable values must be filled and valid for the configured variable type.
-- `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, or `qlog_ehvi`.
+- `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_ehvi`, or `cost_qlog_ehvi`.
 - For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
-- For cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
+- For single-objective cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
+- For multi-objective cost-aware model suggestions, `source=cost_qlog_ehvi`, `acquisition` stores the qLogEHVI batch acquisition value, and `utility = acquisition - cost.weight * total_batch_cost` is repeated on every row in the selected batch.
 
 Observed rows:
 
@@ -160,7 +161,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.1.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.1.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -170,7 +171,7 @@ v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested ra
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Review and replicate metadata are supported for multi-objective campaigns in v1.1.2. Cost columns remain unsupported for multi-objective campaigns; configs combining `objectives:` with `cost:` fail validation.
+Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.1.3. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -197,7 +198,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.1.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.1.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 

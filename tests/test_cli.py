@@ -178,6 +178,42 @@ bo:
     return path
 
 
+def write_multi_objective_cost_config(path: Path, *, initial_design_size: int = 10) -> Path:
+    path.write_text(
+        f"""
+campaign_name: multi_cost_cli_test
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40
+  - name: waste_score
+    direction: minimize
+    reference_point: 25
+variables:
+  - name: temperature
+    type: continuous
+    lower: 20
+    upper: 100
+cost:
+  expression: "1.0 + 0.02 * temperature"
+  weight: 0.5
+  budget: 20
+  candidate_pool_size: 16
+  top_k: 8
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: qlog_ehvi
+  random_seed: 7
+  raw_samples: 8
+  num_restarts: 2
+  mc_samples: 8
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
@@ -244,7 +280,7 @@ def replicate_config(initial_design_size: int = 2) -> CampaignConfig:
     )
 
 
-def multi_objective_config(initial_design_size: int = 10) -> CampaignConfig:
+def multi_objective_config(initial_design_size: int = 10, *, cost: bool = False) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="multi_cli_test",
         objective=ObjectiveConfig(name="yield_score", direction="maximize", reference_point=40.0),
@@ -262,6 +298,15 @@ def multi_objective_config(initial_design_size: int = 10) -> CampaignConfig:
             num_restarts=2,
             mc_samples=8,
         ),
+        cost=CostConfig(
+            expression="1.0 + 0.02 * temperature",
+            weight=0.5,
+            budget=20.0,
+            candidate_pool_size=16,
+            top_k=8,
+        )
+        if cost
+        else None,
     )
 
 
@@ -443,11 +488,14 @@ def multi_objective_log(cfg: CampaignConfig) -> pd.DataFrame:
                 "temperature": 35.0,
                 "yield_score": 55.0,
                 "waste_score": 20.0,
+                "cost_estimate": 1.7,
+                "cost_actual": "",
                 "predicted_mean_yield_score": "",
                 "predicted_std_yield_score": "",
                 "predicted_mean_waste_score": "",
                 "predicted_std_waste_score": "",
                 "acquisition": "",
+                "utility": "",
             },
             {
                 "row_id": "suggested_0",
@@ -457,11 +505,14 @@ def multi_objective_log(cfg: CampaignConfig) -> pd.DataFrame:
                 "temperature": 65.0,
                 "yield_score": "",
                 "waste_score": "",
+                "cost_estimate": 2.3,
+                "cost_actual": "",
                 "predicted_mean_yield_score": "",
                 "predicted_std_yield_score": "",
                 "predicted_mean_waste_score": "",
                 "predicted_std_waste_score": "",
                 "acquisition": "",
+                "utility": "",
             },
         ],
         columns=canonical_columns(cfg),
@@ -499,7 +550,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.1.2\n"
+    assert captured.out == "bo-forge 1.1.3\n"
     assert captured.err == ""
 
 
@@ -508,7 +559,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.1.2\n"
+    assert completed.stdout == "bo-forge 1.1.3\n"
     assert completed.stderr == ""
 
 
@@ -890,6 +941,17 @@ def test_mark_observed_missing_row_returns_hint(
             ],
             "Pass either --objective-value or --objective",
         ),
+        (
+            [
+                "--objective",
+                "yield_score=60",
+                "--objective",
+                "waste_score=12",
+                "--actual-cost",
+                "3.2",
+            ],
+            "--actual-cost requires a config with a cost section",
+        ),
     ],
 )
 def test_multi_objective_cli_mark_observed_failures_are_byte_atomic(
@@ -921,6 +983,39 @@ def test_multi_objective_cli_mark_observed_failures_are_byte_atomic(
     assert "Error:" in captured.err
     assert expected_error in captured.err
     assert log_path.read_bytes() == before
+
+
+def test_multi_objective_cli_mark_observed_accepts_actual_cost_for_cost_config(
+    tmp_path: Path,
+) -> None:
+    config_path = write_multi_objective_cost_config(tmp_path / "multi_cost.yaml")
+    cfg = multi_objective_config(cost=True)
+    log_path = write_log(tmp_path / "multi_cost.csv", cfg, multi_objective_log(cfg))
+
+    assert (
+        run(
+            [
+                "mark-observed",
+                *base_args(config_path, log_path),
+                "--row-id",
+                "suggested_0",
+                "--objective",
+                "yield_score=70",
+                "--objective",
+                "waste_score=14",
+                "--actual-cost",
+                "2.5",
+            ]
+        )
+        == 0
+    )
+
+    df = load_campaign_log(log_path, cfg)
+    row = df.loc[df["row_id"] == "suggested_0"].iloc[0]
+    assert row["status"] == "observed"
+    assert float(row["yield_score"]) == pytest.approx(70.0)
+    assert float(row["waste_score"]) == pytest.approx(14.0)
+    assert float(row["cost_actual"]) == pytest.approx(2.5)
 
 
 def test_summary_status_next_action_and_report_outputs(

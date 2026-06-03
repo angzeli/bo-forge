@@ -155,8 +155,6 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         raw.get("replicates"),
         multi_objective=bool(objectives),
     )
-    if objectives and cost is not None:
-        raise ConfigError("Multi-objective configs do not support 'cost' in v1.1.2.")
     bo = _parse_bo(raw.get("bo", {}), multi_objective=bool(objectives))
 
     return CampaignConfig(

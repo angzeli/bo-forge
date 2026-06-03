@@ -133,7 +133,8 @@ The repository also includes:
 - `configs/07_cost_aware_human_review_logei.yaml` as a cost-aware human-review example,
 - `configs/08_replicate_aware_logei.yaml` as a replicate-aware example,
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml` as a coupled two-objective mixed constrained example,
-- and `configs/11_four_objective_mixed_constrained_qlogehvi.yaml` as a four-objective mixed constrained example.
+- `configs/11_four_objective_mixed_constrained_qlogehvi.yaml` as a four-objective mixed constrained example,
+- and `configs/12_cost_aware_multi_objective_qlogehvi.yaml` as a three-objective cost-aware qLogEHVI example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

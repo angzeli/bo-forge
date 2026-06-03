@@ -614,7 +614,13 @@ def _multi_objective_parts_from_columns(
     column_list = list(columns)
     if len(column_list) < len(BASE_COLUMNS) + 1 + 2 + 4 + 1:
         return None
-    if column_list[: len(BASE_COLUMNS)] != BASE_COLUMNS or column_list[-1] != "acquisition":
+    has_utility = column_list[-len(UTILITY_COLUMNS) :] == UTILITY_COLUMNS
+    acquisition_index = len(column_list) - (len(UTILITY_COLUMNS) if has_utility else 0) - 1
+    if (
+        column_list[: len(BASE_COLUMNS)] != BASE_COLUMNS
+        or acquisition_index < 0
+        or column_list[acquisition_index] != "acquisition"
+    ):
         return None
 
     start = len(BASE_COLUMNS)
@@ -623,13 +629,13 @@ def _multi_objective_parts_from_columns(
     if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
         start += len(REPLICATE_COLUMNS)
 
-    tail_length = len(column_list) - start - 1
+    tail_length = acquisition_index - start
     max_objectives = max((tail_length - 1) // 3, 1)
     for objective_count in range(max_objectives, 1, -1):
-        result_start = len(column_list) - 1 - 2 * objective_count
+        result_start = acquisition_index - 2 * objective_count
         if result_start <= start:
             continue
-        result_columns = column_list[result_start:-1]
+        result_columns = column_list[result_start:acquisition_index]
         objective_names: list[str] = []
         valid_result_columns = True
         for index in range(0, len(result_columns), 2):
@@ -647,6 +653,10 @@ def _multi_objective_parts_from_columns(
             continue
 
         middle = column_list[start:result_start]
+        if middle[-len(COST_COLUMNS) :] == COST_COLUMNS:
+            middle = middle[: -len(COST_COLUMNS)]
+        elif has_utility:
+            raise LogValidationError("Campaign log has utility column but no cost columns.")
         if len(middle) < objective_count + 1:
             continue
         if middle[-objective_count:] != objective_names:
@@ -677,6 +687,16 @@ def _has_replicate_columns(columns: pd.Index | list[str]) -> bool:
 
 def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
     column_list = list(columns)
+    multi_objective_parts = _multi_objective_parts_from_columns(column_list)
+    if multi_objective_parts is not None:
+        variable_columns, objective_columns, _ = multi_objective_parts
+        start = len(BASE_COLUMNS)
+        if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
+            start += len(REVIEW_COLUMNS)
+        if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
+            start += len(REPLICATE_COLUMNS)
+        cost_start = start + len(variable_columns) + len(objective_columns)
+        return column_list[cost_start : cost_start + len(COST_COLUMNS)] == COST_COLUMNS
     has_utility = column_list[-len(UTILITY_COLUMNS) :] == UTILITY_COLUMNS
     result_end = len(column_list) - (len(UTILITY_COLUMNS) if has_utility else 0)
     middle = column_list[len(BASE_COLUMNS) : result_end - len(RESULT_COLUMNS)]

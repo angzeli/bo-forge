@@ -19,7 +19,7 @@ RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
 UTILITY_COLUMNS = ["utility"]
 VALID_STATUSES = {"suggested", "observed"}
 VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei", "cost_log_ei"}
-VALID_MULTI_OBJECTIVE_SOURCES = {"manual", "random", "sobol", "qlog_ehvi"}
+VALID_MULTI_OBJECTIVE_SOURCES = {"manual", "random", "sobol", "qlog_ehvi", "cost_qlog_ehvi"}
 VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
 
@@ -32,8 +32,10 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
             *(REPLICATE_COLUMNS if config.replicates.enabled else []),
             *config.variable_names,
             *config.objective_names,
+            *(COST_COLUMNS if config.cost is not None else []),
             *_multi_objective_result_columns(config),
             "acquisition",
+            *(UTILITY_COLUMNS if config.cost is not None else []),
         ]
     return [
         *BASE_COLUMNS,
@@ -65,6 +67,10 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
         _validate_multi_objectives(config, df)
         _validate_finite_nullable_numeric_columns(df, _multi_objective_result_columns(config))
         _validate_nullable_numeric_columns(df, ["acquisition"])
+        if config.cost is not None:
+            _validate_nonnegative_nullable_numeric_columns(df, COST_COLUMNS)
+            _validate_finite_nullable_numeric_columns(df, UTILITY_COLUMNS)
+            _validate_cost_expression(config, df)
         return
     _validate_objective(config, df)
     _validate_nullable_numeric_columns(df, RESULT_COLUMNS)

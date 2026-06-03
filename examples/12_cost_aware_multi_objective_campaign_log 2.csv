@@ -1,0 +1,6 @@
+row_id,iteration,status,source,review_status,review_note,catalyst_loading,reaction_time,base_equivalents,solvent,yield,selectivity,waste,energy_use,cost_estimate,cost_actual,predicted_mean_yield,predicted_std_yield,predicted_mean_selectivity,predicted_std_selectivity,predicted_mean_waste,predicted_std_waste,predicted_mean_energy_use,predicted_std_energy_use,acquisition,utility
+seed_000,0,observed,manual,accepted,,0.05,30,0.5,MeCN,0.3264,0.4103,0.5290,0.3743,1.85,,,,,,,,,,,
+seed_001,1,observed,manual,accepted,,0.12,60,1.0,MeCN,0.8048,0.5712,0.5740,0.6271,2.7,,,,,,,,,,,
+seed_002,2,observed,manual,accepted,,0.16,80,1.5,DMF,0.5875,0.3788,0.7498,0.9057,3.35,,,,,,,,,,,
+seed_003,3,observed,manual,accepted,,0.08,50,1.0,Water,0.3044,0.8259,0.3238,0.4429,4.0,,,,,,,,,,,
+seed_004,4,observed,manual,accepted,,0.18,70,0.5,DMF,0.6862,0.6269,0.7162,0.7900,2.65,,,,,,,,,,,
