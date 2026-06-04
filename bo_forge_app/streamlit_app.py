@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import math
+import os
+import time
+from hashlib import sha1
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -47,6 +51,15 @@ from bo_forge_app.streamlit_style import (
     forge_status_label,
 )
 
+ACTIVE_PANEL_KEY = "bo_forge_active_panel"
+CAMPAIGN_FILE_MODE_KEY = "bo_forge_campaign_file_mode"
+FLASH_MESSAGE_KEY = "bo_forge_flash_message"
+NEW_CAMPAIGN_FORM_YAML_KEY = "bo_forge_new_campaign_form_yaml"
+REPORT_PREVIEW_KEY = "bo_forge_report_preview_text"
+STAGED_FRESHNESS_MESSAGE_KEY = "bo_forge_staged_freshness_message"
+VALIDATION_CACHE_KEY = "bo_forge_validation_cache"
+WORKFLOW_PANELS = ["Overview", "Suggest", "Resolve", "Reports", "Data"]
+
 
 def main() -> None:
     """Run the Streamlit app."""
@@ -62,7 +75,7 @@ def render_app() -> None:
     campaign = st.session_state.get(SESSION_KEY)
     _render_workbench_header(st, campaign_loaded=campaign is not None)
 
-    _render_campaign_files_panel(st)
+    _render_campaign_source_bar(st)
     campaign = st.session_state.get(SESSION_KEY)
     if campaign is None:
         _render_empty_state(
@@ -74,17 +87,13 @@ def render_app() -> None:
         return
 
     flags = feature_flags(campaign.config)
-    overview_tab, suggest_tab, resolve_tab, reports_tab = st.tabs(
-        ["Campaign", "Suggest", "Resolve", "Reports"]
+    active_panel = st.radio(
+        "Workbench panel",
+        WORKFLOW_PANELS,
+        horizontal=True,
+        key=ACTIVE_PANEL_KEY,
     )
-    with overview_tab:
-        _render_overview(st, campaign)
-    with suggest_tab:
-        _render_suggest(st, campaign)
-    with resolve_tab:
-        _render_resolve(st, campaign, flags)
-    with reports_tab:
-        _render_reports(st, campaign, flags)
+    _render_active_workflow_panel(st, campaign, flags, str(active_panel))
 
 
 def _render_workbench_header(st: Any, *, campaign_loaded: bool) -> None:
@@ -117,49 +126,123 @@ def _render_workbench_header(st: Any, *, campaign_loaded: bool) -> None:
     )
 
 
-def _render_campaign_files_panel(st: Any) -> None:
+def _render_campaign_source_bar(st: Any) -> None:
+    campaign = st.session_state.get(SESSION_KEY)
+    current_config = str(st.session_state.get(CONFIG_PATH_KEY, ""))
+    current_log = str(st.session_state.get(LOG_PATH_KEY, ""))
+    validation_label = _cached_validation_label(st, campaign)
+
+    bundle = st.session_state.get(STAGED_SUGGESTION_BUNDLE_KEY)
+    staged_label = "Staged batch present" if bundle is not None else "No staged batch"
+    last_freshness_message = st.session_state.get(STAGED_FRESHNESS_MESSAGE_KEY)
+    if bundle is not None and last_freshness_message:
+        staged_label = str(last_freshness_message)
+
     st.markdown(
-        """
-        <section class="bf-panel bf-file-panel">
+        f"""
+        <section class="bf-source-bar">
           <div class="bf-panel-header">
             <div>
-              <p class="bf-kicker">Local campaign files</p>
-              <h2 class="bf-panel-title">Campaign Files</h2>
+              <p class="bf-kicker">Campaign source</p>
+              <h2 class="bf-panel-title">Local YAML + CSV</h2>
               <p class="bf-panel-note">
-                Select or create the YAML config and CSV log that define the active campaign.
-                Relative paths are resolved from the project working directory.
+                Config: {escape(current_config or "not selected")}<br>
+                Log: {escape(current_log or "not selected")}
               </p>
+            </div>
+            <div class="bf-chip-row">
+              <span class="bf-chip">{escape(validation_label)}</span>
+              <span class="bf-chip">{escape(staged_label)}</span>
             </div>
           </div>
         </section>
         """,
         unsafe_allow_html=True,
     )
-    load_tab, create_tab = st.tabs(["Load Existing", "Create Campaign"])
-    with load_tab:
-        _render_load_existing_campaign(st)
-    with create_tab:
-        _render_create_new_campaign(st)
+    _render_flash_message(st)
+
+    mode = st.radio(
+        "Campaign file action",
+        ["Load Existing", "Create Campaign"],
+        horizontal=True,
+        key=CAMPAIGN_FILE_MODE_KEY,
+    )
+    with st.expander(str(mode), expanded=campaign is None):
+        if mode == "Load Existing":
+            _render_load_existing_campaign(st)
+        else:
+            _render_create_new_campaign(st)
+
+
+def _render_campaign_files_panel(st: Any) -> None:
+    """Backward-compatible wrapper for tests and imports."""
+    _render_campaign_source_bar(st)
+
+
+def _render_active_workflow_panel(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    active_panel: str,
+) -> None:
+    panel = active_panel if active_panel in WORKFLOW_PANELS else WORKFLOW_PANELS[0]
+    view_data = _collect_panel_view_data(campaign, panel)
+    renderers = {
+        "Overview": lambda: _render_overview(st, campaign, view_data),
+        "Suggest": lambda: _render_suggest(st, campaign),
+        "Resolve": lambda: _render_resolve(st, campaign, flags, view_data),
+        "Reports": lambda: _render_reports(st, campaign, flags, view_data),
+        "Data": lambda: _render_data(st, campaign, flags, view_data),
+    }
+    renderers[panel]()
+
+
+def _collect_panel_view_data(campaign: Any, panel: str) -> dict[str, Any]:
+    view_data: dict[str, Any] = {}
+    with _TimedBlock(f"collect:{panel}"):
+        if panel in {"Overview", "Data", "Reports"}:
+            view_data["summary"] = campaign.summary()
+            view_data["next_action"] = campaign.next_action()
+        if panel in {"Overview", "Data"}:
+            view_data["observed"] = campaign.observed_data()
+            view_data["pending"] = campaign.pending_suggestions()
+        if panel == "Resolve":
+            view_data["pending"] = campaign.pending_suggestions()
+            view_data["observable"] = observable_rows(campaign.config, campaign.df)
+            if campaign.config.review.enabled:
+                view_data["review_queue"] = campaign.review_queue()
+        if panel in {"Overview", "Data"} and campaign.config.is_multi_objective:
+            view_data["pareto_summary"] = campaign.pareto_summary()
+            if panel == "Data":
+                view_data["pareto_front"] = campaign.pareto_front()
+        if panel in {"Overview", "Data"} and campaign.config.cost is not None:
+            view_data["cost_summary"] = campaign.cost_summary()
+        if panel in {"Overview", "Data"} and campaign.config.replicates.enabled:
+            view_data["replicate_summary"] = campaign.replicate_summary()
+    return view_data
+
+
+def _view_data_value(view_data: dict[str, Any], key: str, fallback: Any) -> Any:
+    if key in view_data:
+        return view_data[key]
+    return fallback()
+
+
+class _TimedBlock:
+    def __init__(self, label: str) -> None:
+        self.label = label
+        self.started = 0.0
+
+    def __enter__(self) -> None:
+        self.started = time.perf_counter()
+
+    def __exit__(self, *_args: object) -> None:
+        if os.environ.get("BO_FORGE_STREAMLIT_DEBUG_TIMINGS"):
+            elapsed_ms = (time.perf_counter() - self.started) * 1000.0
+            print(f"[bo_forge_app] {self.label}: {elapsed_ms:.1f} ms")
 
 
 def _render_load_existing_campaign(st: Any) -> None:
-    config_col, log_col = st.columns(2)
-    with config_col:
-        config_value = st.text_input(
-            "YAML config path",
-            value=st.session_state.get(CONFIG_PATH_KEY, ""),
-            placeholder="configs/01_simple_2d_maximise_logei.yaml",
-        )
-    with log_col:
-        log_value = st.text_input(
-            "CSV log path",
-            value=st.session_state.get(LOG_PATH_KEY, ""),
-            placeholder="examples/01_simple_2d_maximise_logei_working_log.csv",
-        )
-
-    if _path_changed(config_value, LOG_PATH_KEY, log_value):
-        _clear_staged_suggestions(st)
-
     _render_callout(
         st,
         "Write actions modify local files",
@@ -167,14 +250,34 @@ def _render_load_existing_campaign(st: Any) -> None:
         "Report and plot exports write files to the selected output path.",
     )
 
-    action_col, reload_col = st.columns([1, 1])
-    with action_col:
-        if st.button("Load campaign", type="primary"):
-            _load_campaign_from_inputs(st, config_value, log_value)
-    with reload_col:
-        if st.button("Reload from disk"):
-            _clear_staged_suggestions(st)
-            _load_campaign_from_inputs(st, config_value, log_value)
+    with st.form("load_existing_campaign_form"):
+        config_col, log_col = st.columns(2)
+        with config_col:
+            config_value = st.text_input(
+                "YAML config path",
+                value=st.session_state.get(CONFIG_PATH_KEY, ""),
+                placeholder="configs/01_simple_2d_maximise_logei.yaml",
+            )
+        with log_col:
+            log_value = st.text_input(
+                "CSV log path",
+                value=st.session_state.get(LOG_PATH_KEY, ""),
+                placeholder="examples/01_simple_2d_maximise_logei_working_log.csv",
+            )
+        action_col, reload_col = st.columns([1, 1])
+        with action_col:
+            load_clicked = st.form_submit_button("Load campaign", type="primary")
+        with reload_col:
+            reload_clicked = st.form_submit_button("Reload from disk")
+
+    if _path_changed(config_value, LOG_PATH_KEY, log_value):
+        _clear_staged_suggestions(st)
+
+    if load_clicked:
+        _load_campaign_from_inputs(st, config_value, log_value)
+    if reload_clicked:
+        _clear_staged_suggestions(st)
+        _load_campaign_from_inputs(st, config_value, log_value)
 
     current_config = st.session_state.get(CONFIG_PATH_KEY)
     current_log = st.session_state.get(LOG_PATH_KEY)
@@ -204,20 +307,40 @@ def _render_create_new_campaign(st: Any) -> None:
             key="new_campaign_log_output_path",
         )
 
+    advanced_multi_objective = st.checkbox(
+        "Advanced multi-objective campaign",
+        value=False,
+        key="new_campaign_advanced_multi_objective",
+        help="Generate an objectives: config with 2-4 coupled objectives.",
+    )
+
     _render_section_label(st, "Objective")
-    objective_col, direction_col = st.columns(2)
-    with objective_col:
-        objective_name = st.text_input(
-            "Objective name",
-            value="activity",
-            key="new_campaign_objective_name",
+    objective_name = "activity"
+    objective_direction = "maximize"
+    objectives: list[dict[str, object]] | None = None
+    if advanced_multi_objective:
+        objective_count = st.number_input(
+            "Objective count",
+            min_value=2,
+            max_value=4,
+            value=2,
+            key="new_campaign_objective_count",
         )
-    with direction_col:
-        objective_direction = st.selectbox(
-            "Objective direction",
-            ["maximize", "minimize"],
-            key="new_campaign_objective_direction",
-        )
+        objectives = _collect_new_campaign_objectives(st, int(objective_count))
+    else:
+        objective_col, direction_col = st.columns(2)
+        with objective_col:
+            objective_name = st.text_input(
+                "Objective name",
+                value="activity",
+                key="new_campaign_objective_name",
+            )
+        with direction_col:
+            objective_direction = st.selectbox(
+                "Objective direction",
+                ["maximize", "minimize"],
+                key="new_campaign_objective_direction",
+            )
 
     _render_section_label(st, "BO settings")
     bo_col_1, bo_col_2, bo_col_3, bo_col_4 = st.columns(4)
@@ -251,6 +374,53 @@ def _render_create_new_campaign(st: Any) -> None:
     generated_yaml = ""
     try:
         variables = _collect_new_campaign_variables(st, int(variable_count))
+        review_enabled = False
+        replicates_enabled = False
+        cost_settings = None
+        if advanced_multi_objective:
+            _render_section_label(st, "Advanced sections")
+            review_enabled = st.checkbox(
+                "Enable review",
+                value=False,
+                key="new_campaign_review_enabled",
+            )
+            replicates_enabled = st.checkbox(
+                "Enable replicates",
+                value=False,
+                key="new_campaign_replicates_enabled",
+            )
+            cost_enabled = st.checkbox(
+                "Enable deterministic cost",
+                value=False,
+                key="new_campaign_cost_enabled",
+            )
+            if cost_enabled:
+                cost_col_1, cost_col_2, cost_col_3 = st.columns(3)
+                with cost_col_1:
+                    cost_expression = st.text_input(
+                        "Cost expression",
+                        value="1.0",
+                        key="new_campaign_cost_expression",
+                    )
+                with cost_col_2:
+                    cost_weight = st.number_input(
+                        "Cost weight",
+                        min_value=0.0,
+                        value=1.0,
+                        key="new_campaign_cost_weight",
+                    )
+                with cost_col_3:
+                    cost_budget = st.number_input(
+                        "Budget",
+                        min_value=0.0,
+                        value=100.0,
+                        key="new_campaign_cost_budget",
+                    )
+                cost_settings = {
+                    "expression": cost_expression,
+                    "weight": float(cost_weight),
+                    "budget": float(cost_budget),
+                }
         generated_yaml = build_campaign_yaml_text(
             campaign_name=campaign_name,
             objective_name=objective_name,
@@ -260,27 +430,40 @@ def _render_create_new_campaign(st: Any) -> None:
             initial_design_size=int(initial_design_size),
             initial_design_method=str(initial_design_method),
             random_seed=int(random_seed),
+            objectives=objectives,
+            review_enabled=review_enabled,
+            replicates_enabled=replicates_enabled,
+            cost=cost_settings,
         )
     except ValueError as exc:
         st.error(f"Could not build YAML preview: {exc}")
 
     if NEW_CAMPAIGN_YAML_KEY not in st.session_state:
         st.session_state[NEW_CAMPAIGN_YAML_KEY] = generated_yaml
-    if st.button("Regenerate YAML from form"):
+        st.session_state[NEW_CAMPAIGN_FORM_YAML_KEY] = generated_yaml
+    if st.button("Update YAML preview from form"):
         st.session_state[NEW_CAMPAIGN_YAML_KEY] = generated_yaml
+        st.session_state[NEW_CAMPAIGN_FORM_YAML_KEY] = generated_yaml
+
+    preview_is_stale = st.session_state.get(NEW_CAMPAIGN_FORM_YAML_KEY) != generated_yaml
 
     _render_section_label(st, "Generated YAML Preview")
     _render_artifact_note(
         st,
         "Editable before writing",
         "Advanced edits are allowed, but the YAML must pass BO Forge config validation "
-        "before files are written.",
+        "before files are written. Create campaign writes this editable YAML preview.",
     )
     edited_yaml = st.text_area(
         "Campaign YAML",
         height=360,
         key=NEW_CAMPAIGN_YAML_KEY,
     )
+    if preview_is_stale:
+        st.warning(
+            "Structured form values changed after this YAML preview was generated. "
+            "Use Update YAML preview from form before creating the campaign."
+        )
 
     validate_col, create_col = st.columns([1, 1])
     with validate_col:
@@ -304,6 +487,9 @@ def _render_create_new_campaign(st: Any) -> None:
     )
     with create_col:
         if st.button("Create campaign", type="primary"):
+            if preview_is_stale:
+                st.error("Update YAML preview from form before creating the campaign.")
+                return
             _create_campaign_from_inputs(st, edited_yaml, config_output, log_output)
 
 
@@ -349,6 +535,38 @@ def _render_artifact_note(st: Any, title: str, detail: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def _collect_new_campaign_objectives(st: Any, objective_count: int) -> list[dict[str, object]]:
+    objectives: list[dict[str, object]] = []
+    for index in range(objective_count):
+        name_col, direction_col, reference_col = st.columns(3)
+        with name_col:
+            name = st.text_input(
+                f"Objective {index + 1} name",
+                value=["yield", "selectivity", "waste", "energy_use"][index],
+                key=f"new_objective_{index}_name",
+            )
+        with direction_col:
+            direction = st.selectbox(
+                f"Objective {index + 1} direction",
+                ["maximize", "minimize"],
+                key=f"new_objective_{index}_direction",
+            )
+        with reference_col:
+            reference_point = st.number_input(
+                f"Objective {index + 1} reference point",
+                value=0.0,
+                key=f"new_objective_{index}_reference_point",
+            )
+        objectives.append(
+            {
+                "name": name,
+                "direction": str(direction),
+                "reference_point": float(reference_point),
+            }
+        )
+    return objectives
 
 
 def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[str, object]]:
@@ -438,10 +656,11 @@ def _create_campaign_from_inputs(
     st.session_state[LOG_PATH_KEY] = str(log_path)
     st.session_state[SESSION_KEY] = campaign
     _clear_staged_suggestions(st)
-    _render_result_card(
+    _clear_report_preview(st)
+    _refresh_validation_cache(st, campaign, config_path, log_path)
+    _flash_and_rerun(
         st,
-        "Campaign created and loaded",
-        f"Config: {config_path} | Log: {log_path}. The campaign is now active.",
+        f"Campaign created and loaded. Config: {config_path} | Log: {log_path}.",
     )
 
 
@@ -478,19 +697,20 @@ def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> No
     st.session_state[LOG_PATH_KEY] = str(log_path)
     st.session_state[SESSION_KEY] = campaign
     _clear_staged_suggestions(st)
-    st.success("Campaign loaded.")
+    _clear_report_preview(st)
+    _refresh_validation_cache(st, campaign, config_path, log_path)
+    _flash_and_rerun(st, "Campaign loaded.")
 
 
-def _render_overview(st: Any, campaign: Any) -> None:
+def _render_overview(st: Any, campaign: Any, view_data: dict[str, Any]) -> None:
     _render_panel_intro(
         st,
-        "Campaign",
-        "Inspect campaign state, next action, observed data, and pending rows.",
+        "Overview",
+        "Inspect campaign status, next action, and compact decision summaries.",
     )
-    try:
-        campaign.validate()
-    except BOForgeError as exc:
-        st.error(f"Validation failed: {exc}")
+    validation_state = _cached_validation_state(st, campaign)
+    if validation_state["label"] == "Validation issue":
+        st.error(f"Validation failed: {validation_state['error']}")
         _render_table_section(
             st,
             "Campaign Log",
@@ -499,15 +719,21 @@ def _render_overview(st: Any, campaign: Any) -> None:
             expanded_raw=True,
         )
         return
-    else:
+    if validation_state["label"] == "Valid":
         _render_result_card(
             st,
             "Campaign log is valid",
             "The selected CSV matches the active config.",
         )
+    else:
+        _render_callout(
+            st,
+            str(validation_state["label"]),
+            "The config or log file metadata changed. Reload from disk to refresh validation.",
+        )
 
-    _render_campaign_state_blocks(st, campaign)
-    summary = campaign.summary()
+    summary = _view_data_value(view_data, "summary", campaign.summary)
+    _render_campaign_state_blocks(st, campaign, view_data)
     _render_metric_grid(
         st,
         [
@@ -519,28 +745,12 @@ def _render_overview(st: Any, campaign: Any) -> None:
         ],
     )
 
-    col_left, col_right = st.columns(2)
-    with col_left:
-        with st.expander("Raw summary table", expanded=False):
-            st.dataframe(format_dataframe_for_display(summary), width="stretch")
-    with col_right:
-        with st.expander("Raw next-action table", expanded=False):
-            st.dataframe(format_dataframe_for_display(campaign.next_action()), width="stretch")
-
     if campaign.config.is_multi_objective:
         _render_table_section(
             st,
             "Pareto Summary",
-            campaign.pareto_summary(),
+            _view_data_value(view_data, "pareto_summary", campaign.pareto_summary),
             empty_kind="report_preview",
-            expanded_raw=False,
-        )
-        _render_table_section(
-            st,
-            "Pareto Front",
-            compact_dataframe(campaign.pareto_front()),
-            empty_kind="observed_rows",
-            raw_df=campaign.pareto_front(),
             expanded_raw=False,
         )
     else:
@@ -552,20 +762,13 @@ def _render_overview(st: Any, campaign: Any) -> None:
             expanded_raw=False,
         )
     if campaign.config.cost is not None:
-        cost_summary = campaign.cost_summary()
-        _render_metric_grid(
-            st,
-            [
-                ("Observed cost", _summary_value(cost_summary, "total_observed_cost")),
-                ("Accepted pending", _summary_value(cost_summary, "accepted_pending_cost")),
-                ("Budget", _summary_value(cost_summary, "budget")),
-                ("Remaining", _summary_value(cost_summary, "budget_remaining")),
-                ("Best objective", _summary_value(cost_summary, "best_observed_objective")),
-            ],
-        )
-        with st.expander("Raw cost summary table", expanded=False):
-            st.dataframe(format_dataframe_for_display(cost_summary), width="stretch")
+        _render_cost_metric_cards(st, campaign, view_data.get("cost_summary"))
     if campaign.config.replicates.enabled:
+        replicate_summary = _view_data_value(
+            view_data,
+            "replicate_summary",
+            campaign.replicate_summary,
+        )
         if not campaign.config.is_multi_objective:
             _render_table_section(
                 st,
@@ -577,33 +780,118 @@ def _render_overview(st: Any, campaign: Any) -> None:
         _render_table_section(
             st,
             "Replicate Summary",
-            _compact_replicate_summary(campaign.replicate_summary()),
+            _compact_replicate_summary(replicate_summary),
             empty_kind="replicate_summary",
-            raw_df=campaign.replicate_summary(),
+            raw_df=replicate_summary,
             expanded_raw=False,
         )
 
+    observed = view_data.get("observed")
+    pending = view_data.get("pending")
+    _render_metric_grid(
+        st,
+        [
+            ("Observed preview rows", min(len(observed), 8) if observed is not None else ""),
+            ("Pending preview rows", min(len(pending), 8) if pending is not None else ""),
+        ],
+    )
+
+
+def _render_data(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    view_data: dict[str, Any],
+) -> None:
+    _render_panel_intro(
+        st,
+        "Data",
+        "Inspect full raw tables and backend summaries.",
+    )
+    summary = _view_data_value(view_data, "summary", campaign.summary)
+    next_action = _view_data_value(view_data, "next_action", campaign.next_action)
+    observed = _view_data_value(view_data, "observed", campaign.observed_data)
+    pending = _view_data_value(view_data, "pending", campaign.pending_suggestions)
+
+    _render_table_section(
+        st,
+        "Summary",
+        summary,
+        empty_kind="report_preview",
+        expanded_raw=True,
+    )
+    _render_table_section(
+        st,
+        "Next Action",
+        next_action,
+        empty_kind="pending_suggestions",
+        expanded_raw=False,
+    )
     _render_table_section(
         st,
         "Observed Rows",
-        campaign.observed_data(),
+        observed,
         empty_kind="observed_rows",
         expanded_raw=False,
     )
     _render_table_section(
         st,
         "Pending Suggestions",
-        campaign.pending_suggestions(),
+        pending,
         empty_kind="pending_suggestions",
         expanded_raw=True,
     )
+    if campaign.config.is_multi_objective:
+        _render_table_section(
+            st,
+            "Pareto Summary",
+            _view_data_value(view_data, "pareto_summary", campaign.pareto_summary),
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
+        _render_table_section(
+            st,
+            "Pareto Front",
+            _view_data_value(view_data, "pareto_front", campaign.pareto_front),
+            empty_kind="observed_rows",
+            expanded_raw=False,
+        )
+    if flags["has_cost"]:
+        _render_table_section(
+            st,
+            "Cost Summary",
+            _view_data_value(view_data, "cost_summary", campaign.cost_summary),
+            empty_kind="cost_summary",
+            expanded_raw=False,
+        )
+    if flags["has_replicates"]:
+        replicate_summary = _view_data_value(
+            view_data,
+            "replicate_summary",
+            campaign.replicate_summary,
+        )
+        _render_table_section(
+            st,
+            "Replicate Summary",
+            replicate_summary,
+            empty_kind="replicate_summary",
+            expanded_raw=False,
+        )
     with st.expander("Show full raw campaign log", expanded=False):
         st.dataframe(format_dataframe_for_display(campaign.df), width="stretch")
 
 
-def _render_campaign_state_blocks(st: Any, campaign: Any) -> None:
-    status = campaign.campaign_status()
-    next_action = campaign.next_action()
+def _render_campaign_state_blocks(
+    st: Any,
+    campaign: Any,
+    view_data: dict[str, Any] | None = None,
+) -> None:
+    view_data = view_data or {}
+    summary = view_data.get("summary")
+    status = str(_summary_value(summary, "campaign_status")) if summary is not None else ""
+    if not status:
+        status = campaign.campaign_status()
+    next_action = _view_data_value(view_data, "next_action", campaign.next_action)
     action = ""
     reason = ""
     if not next_action.empty:
@@ -640,15 +928,20 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         ["1. Generate dry-run suggestions", "2. Inspect quality", "3. Append explicitly"],
     )
     config_path, log_path = _current_paths(st)
-    batch_size = st.number_input(
-        "Batch size",
-        min_value=1,
-        max_value=32,
-        value=max(1, int(campaign.config.bo.batch_size)),
-        step=1,
-    )
+    with st.form("suggest_dry_run_form"):
+        batch_size = st.number_input(
+            "Batch size",
+            min_value=1,
+            max_value=32,
+            value=max(1, int(campaign.config.bo.batch_size)),
+            step=1,
+        )
+        generate_clicked = st.form_submit_button(
+            "Generate suggestions (dry run)",
+            type="primary",
+        )
 
-    if st.button("Generate suggestions (dry run)", type="primary"):
+    if generate_clicked:
         try:
             suggestions = campaign.suggest_next(batch_size=int(batch_size))
             bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
@@ -656,6 +949,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             st.error(str(exc))
         else:
             st.session_state[STAGED_SUGGESTION_BUNDLE_KEY] = bundle
+            st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
             st.success("Suggestions staged. Review them before appending.")
 
     bundle = st.session_state.get(STAGED_SUGGESTION_BUNDLE_KEY)
@@ -665,6 +959,8 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         return
 
     raw_reason = _current_invalidation_reason(st, bundle)
+    if raw_reason is None:
+        st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
     disabled_reason = append_disabled_reason(
         bundle,
         config_path,
@@ -672,6 +968,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
     )
     if raw_reason and raw_reason != "No staged suggestions.":
+        st.session_state[STAGED_FRESHNESS_MESSAGE_KEY] = raw_reason
         _render_callout(st, "Append state", disabled_reason or raw_reason)
         if _should_clear_staged_bundle(raw_reason):
             _clear_staged_suggestions(st)
@@ -697,14 +994,16 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         expanded_raw=False,
     )
 
-    export_path = Path(
-        st.text_input(
-            "Staged suggestions CSV export path",
-            value=str(default_export_path(log_path, "staged_suggestions", "csv")),
-            key="staged_suggestions_export_path",
+    with st.form("staged_suggestions_export_form"):
+        export_path = Path(
+            st.text_input(
+                "Staged suggestions CSV export path",
+                value=str(default_export_path(log_path, "staged_suggestions", "csv")),
+                key="staged_suggestions_export_path",
+            )
         )
-    )
-    if st.button("Export staged suggestions CSV"):
+        export_clicked = st.form_submit_button("Export staged suggestions CSV")
+    if export_clicked:
         try:
             written_path = export_staged_suggestions_csv(suggestions, export_path)
         except OSError as exc:
@@ -733,7 +1032,12 @@ def _render_suggest(st: Any, campaign: Any) -> None:
     if disabled_reason is not None:
         _render_callout(st, "Append disabled", disabled_reason)
 
-    if st.button("Append staged suggestions", disabled=disabled_reason is not None):
+    with st.form("append_staged_suggestions_form"):
+        append_clicked = st.form_submit_button(
+            "Append staged suggestions",
+            disabled=disabled_reason is not None,
+        )
+    if append_clicked:
         try:
             campaign.append_suggestions(suggestions)
         except BOForgeError as exc:
@@ -741,17 +1045,25 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             return
         st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = bundle["suggestions_fingerprint"]
         _clear_staged_suggestions(st)
+        _clear_report_preview(st)
         st.session_state[SESSION_KEY] = campaign
-        st.success("Staged suggestions appended to the campaign log.")
+        _refresh_validation_cache(st, campaign, config_path, log_path)
+        _flash_and_rerun(st, "Staged suggestions appended to the campaign log.")
 
 
-def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
+def _render_resolve(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    view_data: dict[str, Any] | None = None,
+) -> None:
     _render_panel_intro(
         st,
         "Resolve",
         "Review suggested rows and record experimental outcomes.",
     )
-    pending = campaign.pending_suggestions()
+    view_data = view_data or {}
+    pending = _view_data_value(view_data, "pending", campaign.pending_suggestions)
     with st.expander("Pending Suggestions", expanded=False):
         if pending.empty:
             _render_empty_state(st, *empty_state_message("pending_suggestions"))
@@ -759,11 +1071,15 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
             st.dataframe(compact_dataframe(pending), width="stretch")
             with st.expander("Show full raw pending suggestions", expanded=False):
                 st.dataframe(format_dataframe_for_display(pending), width="stretch")
-    observable = observable_rows(campaign.config, campaign.df)
+    observable = _view_data_value(
+        view_data,
+        "observable",
+        lambda: observable_rows(campaign.config, campaign.df),
+    )
 
     if flags["has_review"]:
         st.subheader("Review Queue")
-        review_queue = campaign.review_queue()
+        review_queue = _view_data_value(view_data, "review_queue", campaign.review_queue)
         if review_queue.empty:
             _render_empty_state(st, *empty_state_message("review_queue"))
         else:
@@ -771,18 +1087,23 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
             with st.expander("Show full raw review queue", expanded=False):
                 st.dataframe(format_dataframe_for_display(review_queue), width="stretch")
         if not review_queue.empty:
-            row_id = st.selectbox("Review row_id", review_queue["row_id"].astype(str).tolist())
-            decision = st.selectbox("Decision", ["accept", "reject", "defer"])
-            note = st.text_input("Review note", value="")
-            if st.button("Apply review decision"):
+            with st.form("review_decision_form"):
+                row_id = st.selectbox("Review row_id", review_queue["row_id"].astype(str).tolist())
+                decision = st.selectbox("Decision", ["accept", "reject", "defer"])
+                note = st.text_input("Review note", value="")
+                review_clicked = st.form_submit_button("Apply review decision")
+            if review_clicked:
                 try:
                     campaign.review_suggestion(row_id, decision, note)
                 except BOForgeError as exc:
                     st.error(str(exc))
                 else:
                     _clear_staged_suggestions(st)
+                    _clear_report_preview(st)
                     st.session_state[SESSION_KEY] = campaign
-                    st.success("Review decision recorded.")
+                    config_path, log_path = _current_paths(st)
+                    _refresh_validation_cache(st, campaign, config_path, log_path)
+                    _flash_and_rerun(st, "Review decision recorded.")
     else:
         _render_empty_state(
             st,
@@ -797,152 +1118,269 @@ def _render_resolve(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
         empty_kind="pending_suggestions",
         expanded_raw=False,
     )
-    if campaign.config.is_multi_objective:
-        _render_empty_state(
-            st,
-            "Multi-objective observation entry is not supported in the app yet.",
-            "Use the CLI or CampaignSession.mark_observed(..., objective_values={...}) "
-            "to record coupled objective values.",
-        )
-        return
     if observable.empty:
         return
 
-    st.subheader("Mark Observed")
+    st.subheader(
+        "Record Coupled Objectives" if campaign.config.is_multi_objective else "Mark Observed"
+    )
     option_map = observable_row_options(campaign.config, campaign.df)
-    selected_label = st.selectbox("Observed suggestion", list(option_map))
-    observed_row_id = option_map[selected_label]
-    selected_row = observable.loc[observable["row_id"].astype(str) == observed_row_id]
-    if not selected_row.empty:
-        _render_selected_row_preview(st, campaign, selected_row.iloc[0])
-    objective_name = campaign.config.objective.name
-    objective_value = st.number_input(f"Observed {objective_name}", value=0.0, format="%.8f")
-    actual_cost = None
-    if flags["has_cost"]:
-        record_actual_cost = st.checkbox("Record actual cost")
-        if record_actual_cost:
-            actual_cost = st.number_input(
-                "Actual cost (optional)",
-                min_value=0.0,
+    with st.form("mark_observed_form"):
+        selected_label = st.selectbox("Observed suggestion", list(option_map))
+        observed_row_id = option_map[selected_label]
+        selected_row = observable.loc[observable["row_id"].astype(str) == observed_row_id]
+        if not selected_row.empty:
+            _render_selected_row_preview(st, campaign, selected_row.iloc[0])
+        if campaign.config.is_multi_objective:
+            objective_inputs = {
+                objective.name: st.text_input(
+                    f"Observed {objective.name}",
+                    value="",
+                    key=_stable_widget_key(
+                        "observed_objective",
+                        observed_row_id,
+                        objective.name,
+                    ),
+                    help="Required. Enter a finite numeric value.",
+                )
+                for objective in campaign.config.objectives
+            }
+            actual_cost_text = _render_actual_cost_input(
+                st,
+                flags,
+                key_suffix=observed_row_id,
+            )
+            mark_clicked = st.form_submit_button("Record coupled objectives")
+        else:
+            objective_name = campaign.config.objective.name
+            objective_value = st.number_input(
+                f"Observed {objective_name}",
                 value=0.0,
                 format="%.8f",
-                help="Leave blank by not enabling this checkbox to use estimated cost.",
+                key=_stable_widget_key("observed_objective", observed_row_id, objective_name),
             )
+            actual_cost_text = _render_actual_cost_input(
+                st,
+                flags,
+                key_suffix=observed_row_id,
+            )
+            mark_clicked = st.form_submit_button("Mark row observed")
 
-    if st.button("Mark row observed"):
+    if not mark_clicked:
+        return
+
+    selected_row = observable.loc[observable["row_id"].astype(str) == observed_row_id]
+    if campaign.config.is_multi_objective:
         try:
+            objective_values = _parse_multi_objective_inputs(
+                objective_inputs,
+                campaign.config.objective_names,
+            )
+            actual_cost = _parse_actual_cost_input(actual_cost_text)
             campaign.mark_observed(
                 row_id=observed_row_id,
-                objective_value=float(objective_value),
-                actual_cost=None if actual_cost is None else float(actual_cost),
+                objective_values=objective_values,
+                actual_cost=actual_cost,
             )
-        except BOForgeError as exc:
+        except (BOForgeError, ValueError) as exc:
             st.error(str(exc))
         else:
             _clear_staged_suggestions(st)
+            _clear_report_preview(st)
             st.session_state[SESSION_KEY] = campaign
-            st.success("Observation recorded.")
+            config_path, log_path = _current_paths(st)
+            _refresh_validation_cache(st, campaign, config_path, log_path)
+            _flash_and_rerun(st, "Coupled objective values recorded.")
+        return
+
+    try:
+        actual_cost = _parse_actual_cost_input(actual_cost_text)
+        campaign.mark_observed(
+            row_id=observed_row_id,
+            objective_value=float(objective_value),
+            actual_cost=None if actual_cost is None else float(actual_cost),
+        )
+    except (BOForgeError, ValueError) as exc:
+        st.error(str(exc))
+    else:
+        _clear_staged_suggestions(st)
+        _clear_report_preview(st)
+        st.session_state[SESSION_KEY] = campaign
+        config_path, log_path = _current_paths(st)
+        _refresh_validation_cache(st, campaign, config_path, log_path)
+        _flash_and_rerun(st, "Observation recorded.")
 
 
-def _render_reports(st: Any, campaign: Any, flags: dict[str, bool]) -> None:
+def _render_actual_cost_input(
+    st: Any,
+    flags: dict[str, bool],
+    *,
+    key_suffix: str | None = None,
+) -> str | None:
+    if not flags["has_cost"]:
+        return None
+    return st.text_input(
+        "Actual cost (optional)",
+        value="",
+        key=_stable_widget_key("actual_cost", key_suffix or "default"),
+        help="Leave blank to use the estimated cost.",
+    )
+
+
+def _parse_actual_cost_input(actual_cost_text: str | None) -> float | None:
+    if actual_cost_text is None or not actual_cost_text.strip():
+        return None
+    try:
+        actual_cost = float(actual_cost_text)
+    except ValueError as exc:
+        raise ValueError("Actual cost must be numeric when provided.") from exc
+    if not math.isfinite(actual_cost) or actual_cost < 0:
+        raise ValueError("Actual cost must be finite and nonnegative when provided.")
+    return actual_cost
+
+
+def _parse_multi_objective_inputs(
+    values: dict[str, str],
+    objective_names: list[str],
+) -> dict[str, float]:
+    parsed: dict[str, float] = {}
+    for name in objective_names:
+        raw_value = values.get(name, "").strip()
+        if not raw_value:
+            raise ValueError(f"Observed {name} is required.")
+        try:
+            value = float(raw_value)
+        except ValueError as exc:
+            raise ValueError(f"Observed {name} must be numeric.") from exc
+        if not math.isfinite(value):
+            raise ValueError(f"Observed {name} must be finite.")
+        parsed[name] = value
+    return parsed
+
+
+def _stable_widget_key(namespace: str, *parts: object) -> str:
+    raw = "|".join(str(part) for part in (namespace, *parts))
+    digest = sha1(raw.encode("utf-8")).hexdigest()[:12]
+    return f"{namespace}_{digest}"
+
+
+def _render_reports(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    view_data: dict[str, Any] | None = None,
+) -> None:
     _render_panel_intro(
         st,
         "Reports",
         "Preview reports and export campaign figures.",
     )
+    view_data = view_data or {}
     _, log_path = _current_paths(st)
 
-    st.subheader("Report Preview")
-    try:
-        report_text = campaign_report_text(campaign)
-    except BOForgeError as exc:
-        st.error(str(exc))
-    else:
-        summary = campaign.summary()
-        _render_metric_grid(
-            st,
-            [
-                (
-                    "Status",
-                    humanize_campaign_status(str(_summary_value(summary, "campaign_status"))),
-                ),
-                ("Observed", _summary_value(summary, "observed_rows")),
-                ("Pending", _summary_value(summary, "pending_suggestions")),
-                ("Best objective", _summary_value(summary, "best_objective_value")),
-            ],
-        )
-        with st.expander("Raw report text", expanded=False):
-            st.text_area("Campaign report", value=report_text, height=360)
+    summary = _view_data_value(view_data, "summary", campaign.summary)
+    _render_metric_grid(
+        st,
+        [
+            ("Status", humanize_campaign_status(str(_summary_value(summary, "campaign_status")))),
+            ("Observed", _summary_value(summary, "observed_rows")),
+            ("Pending", _summary_value(summary, "pending_suggestions")),
+            (
+                "Hypervolume"
+                if campaign.config.is_multi_objective
+                else "Best objective",
+                _summary_value(summary, "hypervolume")
+                if campaign.config.is_multi_objective
+                else _summary_value(summary, "best_objective_value"),
+            ),
+        ],
+    )
 
-    with st.expander("Report export settings", expanded=True):
+    with st.form("report_actions_form"):
         report_path = Path(
             st.text_input(
                 "Report export path",
                 value=str(default_export_path(log_path, "campaign_report", "txt")),
             )
         )
-        if st.button("Export report"):
-            try:
-                written_path = campaign.export_report(report_path)
-            except (BOForgeError, OSError) as exc:
-                st.error(str(exc))
-            else:
-                st.success(f"Wrote report: {written_path}")
+        preview_clicked = st.form_submit_button("Preview report")
+        export_clicked = st.form_submit_button("Export report")
+    if preview_clicked:
+        try:
+            st.session_state[REPORT_PREVIEW_KEY] = campaign_report_text(campaign)
+        except BOForgeError as exc:
+            st.error(str(exc))
+    report_text = st.session_state.get(REPORT_PREVIEW_KEY)
+    if report_text:
+        with st.expander("Raw report text", expanded=True):
+            st.text_area("Campaign report", value=str(report_text), height=360)
+    if export_clicked:
+        try:
+            written_path = campaign.export_report(report_path)
+        except (BOForgeError, OSError) as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Wrote report: {written_path}")
 
+    plot_options = _available_plot_options(campaign, flags, log_path)
+    if not plot_options:
+        _render_empty_state(st, *empty_state_message("plots"))
+        return
+    labels = [option["label"] for option in plot_options]
+    selected_label = st.selectbox("Plot kind", labels, key="reports_plot_kind")
+    selected_plot = next(option for option in plot_options if option["label"] == selected_label)
+    _render_plot_controls(
+        st,
+        str(selected_plot["label"]),
+        str(selected_plot["key"]),
+        selected_plot["plotter"],
+        selected_plot["path"],
+    )
+
+
+def _available_plot_options(
+    campaign: Any,
+    flags: dict[str, bool],
+    log_path: Path,
+) -> list[dict[str, Any]]:
     plot_kinds = available_plot_kinds(campaign.config)
-    if "progress" in plot_kinds:
-        _render_plot_controls(
-            st,
-            "Progress",
-            "progress",
-            campaign.plot_progress,
-            default_export_path(log_path, "progress", "png"),
-        )
-    if "diagnostics" in plot_kinds:
-        _render_plot_controls(
-            st,
-            "Diagnostics",
-            "diagnostics",
-            campaign.plot_diagnostics,
-            default_export_path(log_path, "diagnostics", "png"),
-        )
+    options: list[dict[str, Any]] = []
+    mapping = {
+        "progress": ("Progress", "plot_progress"),
+        "diagnostics": ("Diagnostics", "plot_diagnostics"),
+        "pareto": ("Pareto", "plot_pareto"),
+        "pareto_parallel": ("Pareto Parallel", "plot_pareto_parallel"),
+        "hypervolume": ("Hypervolume", "plot_hypervolume"),
+    }
+    for kind, (label, plotter_name) in mapping.items():
+        if kind in plot_kinds:
+            options.append(
+                {
+                    "label": label,
+                    "key": kind,
+                    "plotter": getattr(campaign, plotter_name),
+                    "path": default_export_path(log_path, kind, "png"),
+                }
+            )
     if flags["has_cost"]:
-        cost_summary = campaign.cost_summary()
-        _render_metric_grid(
-            st,
-            [
-                ("Observed cost", _summary_value(cost_summary, "total_observed_cost")),
-                ("Accepted pending", _summary_value(cost_summary, "accepted_pending_cost")),
-                ("Budget", _summary_value(cost_summary, "budget")),
-                ("Remaining", _summary_value(cost_summary, "budget_remaining")),
-                ("Best objective", _summary_value(cost_summary, "best_observed_objective")),
-            ],
-        )
-        with st.expander("Raw cost summary table", expanded=False):
-            st.dataframe(format_dataframe_for_display(cost_summary), width="stretch")
-        _render_plot_controls(
-            st,
-            "Cost Progress",
-            "cost_progress",
-            campaign.plot_cost_progress,
-            default_export_path(log_path, "cost_progress", "png"),
+        options.append(
+            {
+                "label": "Cost Progress",
+                "key": "cost_progress",
+                "plotter": campaign.plot_cost_progress,
+                "path": default_export_path(log_path, "cost_progress", "png"),
+            }
         )
     if flags["has_replicates"]:
-        _render_table_section(
-            st,
-            "Replicate Summary",
-            _compact_replicate_summary(campaign.replicate_summary()),
-            empty_kind="replicate_summary",
-            raw_df=campaign.replicate_summary(),
-            expanded_raw=False,
+        options.append(
+            {
+                "label": "Replicates",
+                "key": "replicates",
+                "plotter": campaign.plot_replicates,
+                "path": default_export_path(log_path, "replicates", "png"),
+            }
         )
-        _render_plot_controls(
-            st,
-            "Replicates",
-            "replicates",
-            campaign.plot_replicates,
-            default_export_path(log_path, "replicates", "png"),
-        )
+    return options
 
 
 def _render_plot_controls(
@@ -961,7 +1399,7 @@ def _render_plot_controls(
         """,
         unsafe_allow_html=True,
     )
-    with st.expander(f"{label} plot settings", expanded=True):
+    with st.form(f"{key_suffix}_plot_form"):
         export_path = Path(
             st.text_input(
                 f"{label} export path",
@@ -971,9 +1409,9 @@ def _render_plot_controls(
         )
         col_show, col_export = st.columns(2)
         with col_show:
-            show_clicked = st.button(f"Show {label.lower()} plot", key=f"{key_suffix}_show")
+            show_clicked = st.form_submit_button(f"Show {label.lower()} plot")
         with col_export:
-            export_clicked = st.button(f"Export {label.lower()} plot", key=f"{key_suffix}_export")
+            export_clicked = st.form_submit_button(f"Export {label.lower()} plot")
 
     if show_clicked:
         try:
@@ -1071,17 +1509,35 @@ def _render_metric_grid(st: Any, metrics: list[tuple[str, object]]) -> None:
     for label, value in metrics:
         display_value = format_number_for_display(value)
         cards.append(
-            f"""
-            <div class="forge-metric">
-              <p class="forge-metric-label">{escape(str(label))}</p>
-              <p class="forge-metric-value">{escape(str(display_value))}</p>
-            </div>
-            """
+            '<div class="forge-metric">'
+            f'<p class="forge-metric-label">{escape(str(label))}</p>'
+            f'<p class="forge-metric-value">{escape(str(display_value))}</p>'
+            "</div>"
         )
     st.markdown(
         f'<div class="forge-metric-grid">{"".join(cards)}</div>',
         unsafe_allow_html=True,
     )
+
+
+def _render_cost_metric_cards(st: Any, campaign: Any, cost_summary: Any | None = None) -> None:
+    summary = cost_summary if cost_summary is not None else campaign.cost_summary()
+    if campaign.config.is_multi_objective:
+        metrics = [
+            ("Budget", _summary_value(summary, "budget")),
+            ("Remaining", _summary_value(summary, "budget_remaining")),
+            ("Current hypervolume", _summary_value(summary, "current_hypervolume")),
+            ("Pareto count", _summary_value(summary, "pareto_count")),
+        ]
+    else:
+        metrics = [
+            ("Observed cost", _summary_value(summary, "total_observed_cost")),
+            ("Accepted pending", _summary_value(summary, "accepted_pending_cost")),
+            ("Budget", _summary_value(summary, "budget")),
+            ("Remaining", _summary_value(summary, "budget_remaining")),
+            ("Best objective", _summary_value(summary, "best_observed_objective")),
+        ]
+    _render_metric_grid(st, metrics)
 
 
 def _render_step_flow(st: Any, steps: list[str]) -> None:
@@ -1164,6 +1620,78 @@ def _current_paths(st: Any) -> tuple[Path, Path]:
     return Path(st.session_state[CONFIG_PATH_KEY]), Path(st.session_state[LOG_PATH_KEY])
 
 
+def _cached_validation_label(st: Any, campaign: Any | None) -> str:
+    return str(_cached_validation_state(st, campaign)["label"])
+
+
+def _cached_validation_state(st: Any, campaign: Any | None) -> dict[str, str]:
+    if campaign is None:
+        return {"label": "Not loaded", "error": ""}
+    cache = st.session_state.get(VALIDATION_CACHE_KEY)
+    expected = _validation_cache_signature(
+        st.session_state.get(CONFIG_PATH_KEY, ""),
+        st.session_state.get(LOG_PATH_KEY, ""),
+    )
+    if not isinstance(cache, dict):
+        return {"label": "Reload to validate", "error": ""}
+    if cache.get("signature") != expected:
+        return {"label": "Reload to validate", "error": ""}
+    return {
+        "label": str(cache.get("label", "Reload to validate")),
+        "error": str(cache.get("error", "")),
+    }
+
+
+def _refresh_validation_cache(
+    st: Any,
+    campaign: Any,
+    config_path: Path,
+    log_path: Path,
+) -> None:
+    try:
+        campaign.validate()
+    except BOForgeError as exc:
+        label = "Validation issue"
+        error = str(exc)
+    else:
+        label = "Valid"
+        error = ""
+    st.session_state[VALIDATION_CACHE_KEY] = {
+        "signature": _validation_cache_signature(config_path, log_path),
+        "label": label,
+        "error": error,
+    }
+
+
+def _validation_cache_signature(config_path: object, log_path: object) -> tuple[object, object]:
+    return (_file_metadata_signature(config_path), _file_metadata_signature(log_path))
+
+
+def _file_metadata_signature(path_value: object) -> tuple[str, int | None, int | None]:
+    path = Path(str(path_value)).expanduser()
+    resolved = path.resolve(strict=False)
+    try:
+        stat_result = path.stat()
+    except OSError:
+        return (str(resolved), None, None)
+    return (str(resolved), int(stat_result.st_size), int(stat_result.st_mtime_ns))
+
+
+def _render_flash_message(st: Any) -> None:
+    message = st.session_state.pop(FLASH_MESSAGE_KEY, None)
+    if message:
+        st.success(str(message))
+
+
+def _flash_and_rerun(st: Any, message: str) -> None:
+    st.session_state[FLASH_MESSAGE_KEY] = message
+    rerun = getattr(st, "rerun", None)
+    if callable(rerun):
+        rerun()
+    elif hasattr(st, "success"):
+        st.success(message)
+
+
 def _current_invalidation_reason(st: Any, bundle: dict[str, object] | None) -> str | None:
     config_path, log_path = _current_paths(st)
     try:
@@ -1188,6 +1716,11 @@ def _should_clear_staged_bundle(reason: str) -> bool:
 
 def _clear_staged_suggestions(st: Any) -> None:
     st.session_state.pop(STAGED_SUGGESTION_BUNDLE_KEY, None)
+    st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
+
+
+def _clear_report_preview(st: Any) -> None:
+    st.session_state.pop(REPORT_PREVIEW_KEY, None)
 
 
 if __name__ == "__main__":

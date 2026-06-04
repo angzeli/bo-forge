@@ -1,8 +1,10 @@
-# 🧪 BO Forge v1.1.3
+# 🧪 BO Forge v1.1.4
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.1.3 builds on the first stable public release with coupled multi-objective qLogEHVI campaigns, Pareto-front reporting, hypervolume progress, noisy replicate-aware GP fitting, review/replicate metadata support, and deterministic cost-aware multi-objective batch ranking while keeping the same YAML/CSV/session/CLI foundation.
+v1.1.4 builds on the first stable public release with coupled multi-objective qLogEHVI campaigns, Pareto-front reporting, hypervolume progress, noisy replicate-aware GP fitting, review/replicate metadata support, and deterministic cost-aware multi-objective batch ranking while keeping the same YAML/CSV/session/CLI foundation.
+
+v1.1.4 also closes the v1.1.x line with a faster local Streamlit workbench: active-panel rendering, less redundant raw data display, coupled multi-objective observation entry, lazy reports/plots, and Forge Suite UI performance polish.
 
 BO Forge deliberately supports only:
 
@@ -121,8 +123,8 @@ bo-forge/
 - [docs/RELEASE_CHECKLIST.md](https://github.com/angzeli/bo-forge/blob/main/docs/RELEASE_CHECKLIST.md): GitHub and PyPI release checklist.
 - [docs/REPOSITORY_STRUCTURE.md](https://github.com/angzeli/bo-forge/blob/main/docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
 - [CHANGELOG.md](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md): release history.
-- [ROADMAP_PRE_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_PRE_V1.md): completed milestones through v1.0.0.
-- [ROADMAP_AFTER_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_AFTER_V1.md): post-1.0 direction.
+- [ROADMAP_V0_TO_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V0_TO_V1.md): completed milestones through v1.0.0.
+- [ROADMAP_V1_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md): v1.x direction.
 
 ---
 
@@ -130,7 +132,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.1.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.1.4 environment is recorded in `requirements-lock.txt`.
 
 ---
 

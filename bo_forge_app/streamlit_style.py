@@ -26,7 +26,7 @@ FORGE_SUITE_CSS = """
   --bf-accent-strong: #7d3524;
   --bf-gold: #d6a84f;
   --bf-sage: #7f9a7a;
-  --bf-shadow-soft: 0 14px 36px rgba(72, 45, 24, 0.10);
+  --bf-shadow-soft: 0 8px 20px rgba(72, 45, 24, 0.08);
   --bf-radius-xl: 32px;
   --bf-radius-lg: 22px;
   --bf-radius-md: 16px;
@@ -38,23 +38,11 @@ FORGE_SUITE_CSS = """
 .stApp {
   color: var(--bf-ink);
   background:
-    radial-gradient(circle at 14% 8%, rgba(214, 168, 79, 0.34), transparent 27rem),
-    radial-gradient(circle at 86% 12%, rgba(127, 154, 122, 0.24), transparent 29rem),
     linear-gradient(135deg, #fff7e8 0%, #f8efe1 45%, #efe3d1 100%);
 }
 
 .stApp::before {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  content: "";
-  pointer-events: none;
-  opacity: 0.24;
-  background-image:
-    linear-gradient(rgba(42, 29, 22, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(42, 29, 22, 0.035) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: linear-gradient(to bottom, black, transparent 80%);
+  content: none;
 }
 
 .block-container {
@@ -95,6 +83,7 @@ p, label, span, div {
 
 .bf-workbench-header,
 .bf-panel,
+.bf-source-bar,
 .bf-status-block,
 .forge-card,
 .forge-empty,
@@ -105,14 +94,13 @@ p, label, span, div {
   border: 1px solid var(--bf-line);
   background: var(--bf-card);
   box-shadow: var(--bf-shadow-soft);
-  backdrop-filter: blur(16px);
 }
 
 .bf-workbench-header {
   position: relative;
   overflow: hidden;
   margin-bottom: 0.85rem;
-  padding: clamp(1rem, 2.2vw, 1.55rem);
+  padding: clamp(0.9rem, 1.8vw, 1.35rem);
   border-radius: var(--bf-radius-xl);
 }
 
@@ -126,7 +114,7 @@ p, label, span, div {
   pointer-events: none;
   border: 1px solid rgba(87, 60, 40, 0.12);
   border-radius: 50%;
-  opacity: 0.62;
+  opacity: 0.28;
   background: repeating-conic-gradient(
     from 12deg,
     rgba(159, 79, 50, 0.09) 0deg 10deg,
@@ -243,11 +231,17 @@ p, label, span, div {
   border-radius: var(--bf-radius-lg);
 }
 
+.bf-source-bar {
+  margin: 0.5rem 0 0.55rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--bf-radius-lg);
+  background: rgba(255, 253, 247, 0.92);
+}
+
 .bf-file-panel {
   margin-bottom: 0.55rem;
   background:
-    linear-gradient(145deg, rgba(255, 253, 248, 0.92), rgba(255, 246, 229, 0.72)),
-    radial-gradient(circle at 92% 14%, rgba(214, 168, 79, 0.18), transparent 17rem);
+    linear-gradient(145deg, rgba(255, 253, 248, 0.92), rgba(255, 246, 229, 0.72));
 }
 
 .bf-panel-header {

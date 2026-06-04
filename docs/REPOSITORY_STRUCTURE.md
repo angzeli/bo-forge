@@ -26,8 +26,8 @@ bo-forge/
 │   └── REPOSITORY_STRUCTURE.md
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
-├── ROADMAP_PRE_V1.md                 # Milestones through v1.0.0
-├── ROADMAP_AFTER_V1.md               # Post-1.0 direction
+├── ROADMAP_V0_TO_V1.md               # Milestones through v1.0.0
+├── ROADMAP_V1_X.md                   # v1.x direction
 ├── CHANGELOG.md                      # Release history
 ├── MANIFEST.in                       # Source distribution file inclusion rules
 ├── pyproject.toml                    # Package metadata and dependencies

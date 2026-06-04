@@ -57,7 +57,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.0.0`. Post-1.0 directions have moved to [ROADMAP_AFTER_V1.md](ROADMAP_AFTER_V1.md).
+Current baseline: `v1.0.0`. v1.x directions have moved to [ROADMAP_V1_X.md](ROADMAP_V1_X.md).
 
 ### Patch Notes So Far
 
@@ -191,4 +191,4 @@ Status: completed
 
 ## 🔮 After v1.0
 
-Post-1.0 directions live in [ROADMAP_AFTER_V1.md](ROADMAP_AFTER_V1.md).
+v1.x directions live in [ROADMAP_V1_X.md](ROADMAP_V1_X.md).

@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.1.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.1.4 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v1.1.3 UI uses a Forge Suite-inspired workbench style: warm paper tones, compact status chips, rounded panels, practical campaign tabs, in-app campaign creation, compact tables, and clearer empty states.
+The v1.1.4 UI uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
-v1.1.3 keeps the local app on the v1.0 workflow baseline. Generalized coupled multi-objective qLogEHVI and deterministic multi-objective cost-aware ranking are available through the backend, session API, CLI, and notebooks first; full app-specific multi-objective workflow polish is deferred.
+v1.1.4 keeps backend behavior owned by `CampaignSession` while surfacing the v1.1 multi-objective, review, replicate, and deterministic cost-aware workflows in the local app.
 
 ## 🧰 Install
 
@@ -36,20 +36,21 @@ Start the local app:
 bo-forge-app
 ```
 
-From a source checkout, this also works:
+From a source checkout, the raw Streamlit command is available as a development
+fallback:
 
 ```bash
 ./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
 ```
 
-Then use the `Campaign Files` panel on the main workbench page to enter:
+Then use the compact campaign source bar to enter:
 
 - a YAML config path, such as `configs/01_simple_2d_maximise_logei.yaml`;
 - a CSV log path, preferably an ignored working log such as `examples/01_simple_2d_maximise_logei_working_log.csv`.
 
 Use a working log rather than editing seed example logs directly.
 
-You can also use `Create Campaign` in the same panel to build a basic config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The default builder creates a single-objective campaign; advanced mode supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
 
 For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
 
@@ -73,12 +74,13 @@ Exporting staged suggestions writes a separate CSV file only. It does not modify
 
 ## 🧭 Panels
 
-The app keeps file selection on the main workbench page, followed by four practical campaign panels:
+The app keeps file selection in the source bar, followed by five practical campaign panels. Only the active panel renders on each Streamlit rerun:
 
-- `Campaign`: validation, campaign status, next action, summary, best observation, observed rows, pending suggestions, and full log preview.
+- `Overview`: validation, campaign status, next action, compact metrics, best-observation or Pareto summary, and compact cost/replicate summaries.
 - `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
-- `Resolve`: review queue, rows ready to observe, mark-observed form, and actual-cost input when configured.
-- `Reports`: report preview/export and progress, diagnostics, cost-progress, or replicate plots when supported by the config.
+- `Resolve`: review queue, observable suggestions, single-objective mark-observed, coupled multi-objective objective entry, and actual-cost input when configured.
+- `Reports`: report preview/export and supported plot controls. Report text and figures are generated only after explicit actions.
+- `Data`: raw summary and next-action tables, observed rows, pending rows, Pareto tables, cost/replicate summaries, and the full raw log.
 
 ## ⚠️ Write Actions
 
@@ -103,4 +105,8 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - no authentication or multi-user state;
 - no database storage;
 - no FastAPI or React frontend;
-- no new BO models, acquisitions, or CSV schemas beyond the backend package.
+- no new BO models, acquisitions, or CSV schemas beyond the backend package;
+- Streamlit cost support surfaces deterministic cost metadata and ranking, not a
+  learned cost model;
+- multi-objective replicate active-repeat selection remains deferred; multi-objective
+  replicate configs use the backend `new_only` policy in v1.1.4.

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 
-from bo_forge.config import BOConfig, CampaignConfig, ObjectiveConfig, VariableConfig
+from bo_forge.config import BOConfig, CampaignConfig, CostConfig, ObjectiveConfig, VariableConfig
 from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
@@ -158,6 +158,34 @@ def test_build_campaign_yaml_text_parses_through_config_validation() -> None:
     assert config.objective.name == "yield"
     assert config.variable_names == ["temperature", "solvent"]
     assert config.bo.batch_size == 2
+
+
+def test_build_campaign_yaml_text_supports_advanced_multi_objective_sections() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="advanced_app_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        objectives=[
+            {"name": "yield", "direction": "maximize", "reference_point": 0.2},
+            {"name": "waste", "direction": "minimize", "reference_point": 0.9},
+        ],
+        variables=[{"name": "x", "type": "continuous", "lower": 0.0, "upper": 1.0}],
+        batch_size=2,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        review_enabled=True,
+        replicates_enabled=True,
+        cost={"expression": "1.0 + x", "weight": 0.5, "budget": 10.0},
+    )
+
+    config = parse_campaign_config_text(text)
+
+    assert config.is_multi_objective
+    assert config.objective_names == ["yield", "waste"]
+    assert config.review.enabled
+    assert config.replicates.enabled
+    assert config.cost is not None
 
 
 def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
@@ -642,7 +670,7 @@ def test_create_campaign_from_inputs_sets_session_state_and_clears_staged(
         "app_created"
     )
     assert "bo_forge_staged_suggestion_bundle" not in FakeStreamlit.session_state
-    assert "Campaign created and loaded" in "\n".join(FakeStreamlit.markdown_messages)
+    assert "Campaign created and loaded" in "\n".join(FakeStreamlit.success_messages)
 
 
 @pytest.mark.parametrize(
@@ -687,10 +715,27 @@ def test_available_plot_kinds_follow_config_features() -> None:
     plain = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
     cost = CampaignConfig.from_yaml("configs/07_cost_aware_human_review_logei.yaml")
     replicate = CampaignConfig.from_yaml("configs/08_replicate_aware_logei.yaml")
+    multi = CampaignConfig.from_yaml("configs/10_multi_objective_mixed_constrained_qlogehvi.yaml")
+    four_objective = CampaignConfig.from_yaml(
+        "configs/11_four_objective_mixed_constrained_qlogehvi.yaml"
+    )
+    multi_cost = CampaignConfig.from_yaml("configs/12_cost_aware_multi_objective_qlogehvi.yaml")
 
     assert available_plot_kinds(plain) == ["progress", "diagnostics"]
     assert available_plot_kinds(cost) == ["progress", "diagnostics", "cost_progress"]
     assert available_plot_kinds(replicate) == ["progress", "diagnostics", "replicates"]
+    assert available_plot_kinds(multi) == ["pareto", "hypervolume"]
+    assert available_plot_kinds(four_objective) == [
+        "pareto",
+        "hypervolume",
+        "pareto_parallel",
+    ]
+    assert available_plot_kinds(multi_cost) == [
+        "pareto",
+        "hypervolume",
+        "pareto_parallel",
+        "cost_progress",
+    ]
 
 
 def test_default_export_path_uses_reports_directory() -> None:
@@ -714,12 +759,134 @@ def test_app_modules_import_without_streamlit_runtime() -> None:
     assert hasattr(streamlit_app, "main")
     assert hasattr(streamlit_app, "render_app")
     assert hasattr(streamlit_app, "_render_workbench_header")
+    assert hasattr(streamlit_app, "_render_campaign_source_bar")
     assert hasattr(streamlit_app, "_render_campaign_files_panel")
     assert hasattr(streamlit_app, "_render_create_new_campaign")
     assert hasattr(streamlit_app, "_render_campaign_state_blocks")
+    assert hasattr(streamlit_app, "_render_data")
 
 
-def test_streamlit_resolve_panel_shows_multi_objective_unsupported_state() -> None:
+def test_streamlit_resolve_panel_marks_multi_objective_rows_observed(
+    tmp_path: Path,
+) -> None:
+    cfg = CampaignConfig(
+        campaign_name="mo_app",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 1.0),
+        ),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_ehvi"),
+        cost=CostConfig(expression="1.0 + x", budget=10.0),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "suggested_1",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "qlog_ehvi",
+                "x": 0.5,
+                "yield_score": "",
+                "waste_score": "",
+                "cost_estimate": 1.5,
+                "cost_actual": "",
+                "predicted_mean_yield_score": 0.6,
+                "predicted_std_yield_score": 0.1,
+                "predicted_mean_waste_score": 0.4,
+                "predicted_std_waste_score": 0.1,
+                "acquisition": 0.2,
+                "utility": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    log_path = tmp_path / "campaign.csv"
+    df.to_csv(log_path, index=False)
+    campaign = CampaignSession(
+        config_path=Path("config.yaml"),
+        log_path=log_path,
+        config=cfg,
+        df=df,
+    )
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state: dict[str, object] = {
+            "bo_forge_config_path": "config.yaml",
+            "bo_forge_log_path": str(log_path),
+        }
+        markdown_messages: list[str] = []
+        subheaders: list[str] = []
+        form_submit_labels: list[str] = []
+        text_values = {
+            "Observed yield_score": "0.8",
+            "Observed waste_score": "0.35",
+            "Actual cost (optional)": "1.7",
+        }
+
+        @classmethod
+        def markdown(cls, body: str, unsafe_allow_html: bool = False) -> None:
+            cls.markdown_messages.append(body)
+
+        @classmethod
+        def subheader(cls, label: str) -> None:
+            cls.subheaders.append(label)
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def selectbox(cls, _label: str, options: list[str], **_kwargs: object) -> str:
+            return options[0]
+
+        @classmethod
+        def text_input(cls, label: str, *_args: object, **_kwargs: object) -> str:
+            return cls.text_values.get(label, "")
+
+        @classmethod
+        def form_submit_button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            cls.form_submit_labels.append(label)
+            return label == "Record coupled objectives"
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError(message)
+
+    streamlit_app._render_resolve(FakeStreamlit, campaign, feature_flags(cfg))
+
+    refreshed = pd.read_csv(log_path, keep_default_na=False)
+    row = refreshed.loc[refreshed["row_id"] == "suggested_1"].iloc[0]
+    assert row["status"] == "observed"
+    assert float(row["yield_score"]) == pytest.approx(0.8)
+    assert float(row["waste_score"]) == pytest.approx(0.35)
+    assert float(row["cost_actual"]) == pytest.approx(1.7)
+    assert "Record coupled objectives" in FakeStreamlit.form_submit_labels
+
+
+def test_streamlit_resolve_panel_rejects_incomplete_multi_objective_entry(
+    tmp_path: Path,
+) -> None:
     cfg = CampaignConfig(
         campaign_name="mo_app",
         objective=ObjectiveConfig("yield_score", "maximize", 0.0),
@@ -749,9 +916,12 @@ def test_streamlit_resolve_panel_shows_multi_objective_unsupported_state() -> No
         ],
         columns=canonical_columns(cfg),
     )
+    log_path = tmp_path / "campaign.csv"
+    df.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
     campaign = CampaignSession(
         config_path=Path("config.yaml"),
-        log_path=Path("campaign.csv"),
+        log_path=log_path,
         config=cfg,
         df=df,
     )
@@ -764,18 +934,16 @@ def test_streamlit_resolve_panel_shows_multi_objective_unsupported_state() -> No
             return None
 
     class FakeStreamlit:
-        markdown_messages: list[str] = []
-        subheaders: list[str] = []
-        button_labels: list[str] = []
-        number_input_labels: list[str] = []
+        session_state: dict[str, object] = {}
+        errors: list[str] = []
 
         @classmethod
-        def markdown(cls, body: str, unsafe_allow_html: bool = False) -> None:
-            cls.markdown_messages.append(body)
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
 
         @classmethod
-        def subheader(cls, label: str) -> None:
-            cls.subheaders.append(label)
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
 
         @classmethod
         def dataframe(cls, *_args: object, **_kwargs: object) -> None:
@@ -786,21 +954,33 @@ def test_streamlit_resolve_panel_shows_multi_objective_unsupported_state() -> No
             return _Context()
 
         @classmethod
-        def button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
-            cls.button_labels.append(label)
-            return False
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
 
         @classmethod
-        def number_input(cls, label: str, *_args: object, **_kwargs: object) -> float:
-            cls.number_input_labels.append(label)
-            return 0.0
+        def selectbox(cls, _label: str, options: list[str], **_kwargs: object) -> str:
+            return options[0]
+
+        @classmethod
+        def text_input(cls, label: str, *_args: object, **_kwargs: object) -> str:
+            return "0.8" if label == "Observed yield_score" else ""
+
+        @classmethod
+        def form_submit_button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            return label == "Record coupled objectives"
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("Incomplete entry should not be recorded.")
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            cls.errors.append(message)
 
     streamlit_app._render_resolve(FakeStreamlit, campaign, feature_flags(cfg))
 
-    rendered = "\n".join(FakeStreamlit.markdown_messages)
-    assert "Multi-objective observation entry is not supported in the app yet." in rendered
-    assert "Mark row observed" not in FakeStreamlit.button_labels
-    assert not any(label.startswith("Observed ") for label in FakeStreamlit.number_input_labels)
+    assert log_path.read_bytes() == before
+    assert FakeStreamlit.errors == ["Observed waste_score is required."]
 
 
 def test_workbench_header_uses_bo_brand_mark() -> None:
@@ -848,6 +1028,654 @@ def test_forge_action_labels_are_stable() -> None:
     assert forge_action_label("suggest_bo") == "Suggest BO candidates"
 
 
+def test_active_panel_dispatch_renders_only_selected_panel(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    class FakeCampaign:
+        config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+
+    def fake_collect(_campaign: object, panel: str) -> dict[str, object]:
+        calls.append(f"collect:{panel}")
+        return {}
+
+    monkeypatch.setattr(streamlit_app, "_collect_panel_view_data", fake_collect)
+    monkeypatch.setattr(
+        streamlit_app,
+        "_render_overview",
+        lambda *_args, **_kwargs: calls.append("Overview"),
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_render_suggest",
+        lambda *_args, **_kwargs: calls.append("Suggest"),
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_render_resolve",
+        lambda *_args, **_kwargs: calls.append("Resolve"),
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_render_reports",
+        lambda *_args, **_kwargs: calls.append("Reports"),
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_render_data",
+        lambda *_args, **_kwargs: calls.append("Data"),
+    )
+
+    streamlit_app._render_active_workflow_panel(object(), FakeCampaign(), {}, "Resolve")
+
+    assert calls == ["collect:Resolve", "Resolve"]
+
+
+def test_source_bar_does_not_fingerprint_staged_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": "configs/campaign.yaml",
+            "bo_forge_log_path": "examples/campaign.csv",
+            "bo_forge_staged_suggestion_bundle": {"suggestions": simple_suggestions()},
+        }
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def radio(cls, *_args: object, **_kwargs: object) -> str:
+            return "Load Existing"
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+    monkeypatch.setattr(
+        streamlit_app,
+        "_current_invalidation_reason",
+        lambda *_args, **_kwargs: pytest.fail("source bar should not hash files"),
+    )
+    monkeypatch.setattr(streamlit_app, "_render_load_existing_campaign", lambda *_args: None)
+
+    streamlit_app._render_campaign_source_bar(FakeStreamlit)
+
+
+def test_source_bar_uses_cached_validation_without_validating(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign_name: cached\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+    signature = streamlit_app._validation_cache_signature(config_path, log_path)
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeCampaign:
+        def validate(self) -> None:
+            raise AssertionError("source bar should not validate during render")
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_campaign_session": FakeCampaign(),
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_validation_cache": {"signature": signature, "label": "Valid"},
+        }
+        markdown_messages: list[str] = []
+
+        @classmethod
+        def markdown(cls, body: str, **_kwargs: object) -> None:
+            cls.markdown_messages.append(body)
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def radio(cls, *_args: object, **_kwargs: object) -> str:
+            return "Load Existing"
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+    monkeypatch.setattr(streamlit_app, "_render_load_existing_campaign", lambda *_args: None)
+
+    streamlit_app._render_campaign_source_bar(FakeStreamlit)
+
+    assert "Valid" in "\n".join(FakeStreamlit.markdown_messages)
+
+
+def test_cached_validation_status_detects_changed_file_metadata(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign_name: cached\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_validation_cache": {
+                "signature": streamlit_app._validation_cache_signature(config_path, log_path),
+                "label": "Validation issue",
+            },
+        }
+
+    assert streamlit_app._cached_validation_label(FakeStreamlit, object()) == (
+        "Validation issue"
+    )
+
+    log_path.write_text("row_id\nchanged\n", encoding="utf-8")
+
+    assert streamlit_app._cached_validation_label(FakeStreamlit, object()) == (
+        "Reload to validate"
+    )
+
+
+def test_overview_uses_cached_validation_without_validating(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "01_simple_2d_maximise_logei_campaign_log.csv")
+    campaign = load_campaign_session("configs/01_simple_2d_maximise_logei.yaml", log_path)
+    view_data = {
+        "summary": campaign.summary(),
+        "next_action": campaign.next_action(),
+        "observed": campaign.observed_data(),
+        "pending": campaign.pending_suggestions(),
+    }
+    campaign.validate = lambda: pytest.fail("Overview should use cached validation state")
+    signature = streamlit_app._validation_cache_signature(
+        "configs/01_simple_2d_maximise_logei.yaml",
+        log_path,
+    )
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": "configs/01_simple_2d_maximise_logei.yaml",
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_validation_cache": {"signature": signature, "label": "Valid", "error": ""},
+        }
+        markdown_messages: list[str] = []
+        errors: list[str] = []
+
+        @classmethod
+        def markdown(cls, body: str, **_kwargs: object) -> None:
+            cls.markdown_messages.append(body)
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            cls.errors.append(message)
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+    streamlit_app._render_overview(
+        FakeStreamlit,
+        campaign,
+        view_data,
+    )
+
+    assert FakeStreamlit.errors == []
+    assert "Campaign log is valid" in "\n".join(FakeStreamlit.markdown_messages)
+
+
+def test_overview_renders_cached_validation_error(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign_name: cached\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+    signature = streamlit_app._validation_cache_signature(config_path, log_path)
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeCampaign:
+        df = pd.DataFrame([{"row_id": "bad"}])
+
+        def validate(self) -> None:
+            raise AssertionError("Overview should not validate during render")
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_validation_cache": {
+                "signature": signature,
+                "label": "Validation issue",
+                "error": "bad CSV",
+            },
+        }
+        errors: list[str] = []
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            cls.errors.append(message)
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+    streamlit_app._render_overview(FakeStreamlit, FakeCampaign(), {})
+
+    assert FakeStreamlit.errors == ["Validation failed: bad CSV"]
+
+
+def test_successful_dry_run_clears_stale_staged_freshness(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("config", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeCampaign:
+        config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+
+        def suggest_next(self, batch_size: int) -> pd.DataFrame:
+            assert batch_size == 1
+            return simple_suggestions()
+
+        def suggestion_quality(self, _suggestions: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame([{"check": "ok"}])
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_staged_freshness_message": "Log file changed after suggestions were staged.",
+        }
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def number_input(cls, *_args: object, **_kwargs: object) -> int:
+            return 1
+
+        @classmethod
+        def form_submit_button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            return label == "Generate suggestions (dry run)"
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def text_input(cls, *_args: object, **_kwargs: object) -> str:
+            return str(tmp_path / "staged.csv")
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError(message)
+
+        @classmethod
+        def warning(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError(message)
+
+    streamlit_app._render_suggest(FakeStreamlit, FakeCampaign())
+
+    assert "bo_forge_staged_freshness_message" not in FakeStreamlit.session_state
+
+
+def test_valid_staged_bundle_clears_old_freshness_warning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("config", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+    bundle = make_staged_suggestion_bundle(simple_suggestions(), config_path, log_path)
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeCampaign:
+        config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+
+        def suggestion_quality(self, _suggestions: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame([{"check": "ok"}])
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+            "bo_forge_staged_suggestion_bundle": bundle,
+            "bo_forge_staged_freshness_message": "Log file changed after suggestions were staged.",
+        }
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def number_input(cls, *_args: object, **_kwargs: object) -> int:
+            return 1
+
+        @classmethod
+        def form_submit_button(cls, *_args: object, **_kwargs: object) -> bool:
+            return False
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def text_input(cls, *_args: object, **_kwargs: object) -> str:
+            return str(tmp_path / "staged.csv")
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+    monkeypatch.setattr(streamlit_app, "_current_invalidation_reason", lambda *_args: None)
+
+    streamlit_app._render_suggest(FakeStreamlit, FakeCampaign())
+
+    assert "bo_forge_staged_freshness_message" not in FakeStreamlit.session_state
+
+
+def test_reports_are_lazy_and_render_only_selected_plot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": "configs/10_multi_objective_mixed_constrained_qlogehvi.yaml",
+            "bo_forge_log_path": "examples/10_multi_objective_mixed_constrained_campaign_log.csv",
+        }
+        text_labels: list[str] = []
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def text_input(cls, label: str, *_args: object, **_kwargs: object) -> str:
+            cls.text_labels.append(label)
+            return "/tmp/plot.png"
+
+        @classmethod
+        def selectbox(cls, _label: str, options: list[str], **_kwargs: object) -> str:
+            return "Hypervolume"
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def form_submit_button(cls, *_args: object, **_kwargs: object) -> bool:
+            return False
+
+        @classmethod
+        def text_area(cls, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("Report text should not render until preview is requested.")
+
+    class FakeCampaign:
+        config = CampaignConfig.from_yaml(
+            "configs/10_multi_objective_mixed_constrained_qlogehvi.yaml"
+        )
+
+        def summary(self) -> pd.DataFrame:
+            raise AssertionError("summary should come from view data")
+
+        def plot_pareto(self, *_args: object, **_kwargs: object) -> None:
+            calls.append("pareto")
+
+        def plot_hypervolume(self, *_args: object, **_kwargs: object) -> None:
+            calls.append("hypervolume")
+
+    monkeypatch.setattr(
+        streamlit_app,
+        "campaign_report_text",
+        lambda *_args, **_kwargs: pytest.fail("report preview should be lazy"),
+    )
+    summary = pd.DataFrame(
+        [
+            {"field": "campaign_status", "value": "ready_for_bo"},
+            {"field": "observed_rows", "value": 3},
+            {"field": "pending_suggestions", "value": 0},
+            {"field": "hypervolume", "value": 1.2},
+        ]
+    )
+
+    streamlit_app._render_reports(
+        FakeStreamlit,
+        FakeCampaign(),
+        {"has_cost": False, "has_replicates": False},
+        {"summary": summary},
+    )
+
+    assert calls == []
+    assert "Hypervolume export path" in FakeStreamlit.text_labels
+    assert "Pareto export path" not in FakeStreamlit.text_labels
+
+
+def test_multi_objective_observation_keys_are_row_scoped(tmp_path: Path) -> None:
+    cfg = CampaignConfig(
+        campaign_name="mo_app",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 1.0),
+        ),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_ehvi"),
+        cost=CostConfig(expression="1.0 + x", budget=10.0),
+    )
+    rows = [
+        {
+            "row_id": row_id,
+            "iteration": 1,
+            "status": "suggested",
+            "source": "qlog_ehvi",
+            "x": x_value,
+            "yield_score": "",
+            "waste_score": "",
+            "cost_estimate": 1.0 + x_value,
+            "cost_actual": "",
+            "predicted_mean_yield_score": 0.6,
+            "predicted_std_yield_score": 0.1,
+            "predicted_mean_waste_score": 0.4,
+            "predicted_std_waste_score": 0.1,
+            "acquisition": 0.2,
+            "utility": "",
+        }
+        for row_id, x_value in [("suggested_1", 0.2), ("suggested_2", 0.8)]
+    ]
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+    log_path = tmp_path / "campaign.csv"
+    df.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+    campaign = CampaignSession(
+        config_path=Path("config.yaml"),
+        log_path=log_path,
+        config=cfg,
+        df=df,
+    )
+    first_yield_key = streamlit_app._stable_widget_key(
+        "observed_objective",
+        "suggested_1",
+        "yield_score",
+    )
+    first_waste_key = streamlit_app._stable_widget_key(
+        "observed_objective",
+        "suggested_1",
+        "waste_score",
+    )
+    first_cost_key = streamlit_app._stable_widget_key("actual_cost", "suggested_1")
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state: dict[str, object] = {
+            first_yield_key: "0.8",
+            first_waste_key: "0.2",
+            first_cost_key: "1.4",
+        }
+        errors: list[str] = []
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def selectbox(cls, _label: str, options: list[str], **_kwargs: object) -> str:
+            return options[1]
+
+        @classmethod
+        def text_input(cls, _label: str, *_args: object, **kwargs: object) -> str:
+            key = str(kwargs.get("key", ""))
+            return str(cls.session_state.get(key, ""))
+
+        @classmethod
+        def form_submit_button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            return label == "Record coupled objectives"
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("Second row should not reuse first-row values.")
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            cls.errors.append(message)
+
+    streamlit_app._render_resolve(FakeStreamlit, campaign, feature_flags(cfg))
+
+    assert log_path.read_bytes() == before
+    assert FakeStreamlit.errors == ["Observed yield_score is required."]
+
+
 def test_streamlit_app_smoke_runs_without_exceptions() -> None:
     from streamlit.testing.v1 import AppTest
 
@@ -855,8 +1683,53 @@ def test_streamlit_app_smoke_runs_without_exceptions() -> None:
     app.run(timeout=10)
 
     assert len(app.exception) == 0
-    assert [tab.label for tab in app.tabs[:2]] == ["Load Existing", "Create Campaign"]
-    assert len(app.text_area) >= 1
+    assert any(radio.label == "Campaign file action" for radio in app.radio)
+    assert any("Nothing loaded yet" in markdown.value for markdown in app.markdown)
+
+
+def test_streamlit_load_refreshes_source_bar_and_does_not_leak_metric_html() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/01_simple_2d_maximise_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/01_simple_2d_maximise_logei_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    code_text = "\n".join(code.value for code in getattr(app, "code", []))
+    assert len(app.exception) == 0
+    assert "configs/01_simple_2d_maximise_logei.yaml" in markdown_text
+    assert "examples/01_simple_2d_maximise_logei_campaign_log.csv" in markdown_text
+    assert "Valid" in markdown_text
+    assert "forge-metric" not in code_text
+
+
+def test_streamlit_loads_cost_aware_multi_objective_reports_panel() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/12_cost_aware_multi_objective_qlogehvi.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/12_cost_aware_multi_objective_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
+    app.run(timeout=10)
+
+    assert len(app.exception) == 0
+    assert any(selectbox.label == "Plot kind" for selectbox in app.selectbox)
 
 
 def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
@@ -867,8 +1740,11 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     app = AppTest.from_file("bo_forge_app/streamlit_app.py")
     app.run(timeout=10)
 
-    app.text_input[3].set_value(str(config_path))
-    app.text_input[4].set_value(str(log_path))
+    app.radio[0].set_value("Create Campaign")
+    app.run(timeout=10)
+
+    app.text_input[1].set_value(str(config_path))
+    app.text_input[2].set_value(str(log_path))
     create_button = next(button for button in app.button if button.label == "Create campaign")
     create_button.click()
     app.run(timeout=10)
@@ -876,4 +1752,64 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert len(app.exception) == 0
     assert config_path.exists()
     assert log_path.exists()
-    assert any("Campaign created and loaded" in markdown.value for markdown in app.markdown)
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    success_text = "\n".join(success.value for success in app.success)
+    assert str(config_path) in markdown_text
+    assert str(log_path) in markdown_text
+    assert "Valid" in markdown_text
+    assert "Campaign created and loaded" in success_text
+
+
+def test_streamlit_advanced_create_hides_single_objective_fields() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    app.radio[0].set_value("Create Campaign")
+    app.run(timeout=10)
+    advanced_checkbox = next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.label == "Advanced multi-objective campaign"
+    )
+    advanced_checkbox.check()
+    app.run(timeout=10)
+
+    text_labels = {input_.label for input_ in app.text_input}
+    assert "Objective name" not in text_labels
+    assert "Objective 1 name" in text_labels
+
+
+def test_streamlit_create_blocks_stale_yaml_preview(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "campaign.yaml"
+    log_path = tmp_path / "logs" / "campaign.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    app.radio[0].set_value("Create Campaign")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "New campaign name").set_value(
+        "renamed_campaign"
+    )
+    config_input = next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    )
+    log_input = next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    )
+    config_input.set_value(str(config_path))
+    log_input.set_value(str(log_path))
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    assert len(app.exception) == 0
+    assert not config_path.exists()
+    assert not log_path.exists()
+    assert any("Update YAML preview from form" in error.value for error in app.error)

@@ -1,5 +1,19 @@
 # 📝 BO Forge Changelog
 
+## v1.1.4 - Streamlit Performance And Coherent UI
+
+This release closes the v1.1.x line with Streamlit workflow completion and app performance polish while preserving v1.1.3 backend/session/CLI behavior.
+
+- Replaces eager workflow tabs with a stateful active-panel selector so inactive panels do not render expensive backend views.
+- Reorganizes the app into `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels.
+- Replaces the large campaign file area with a compact campaign source bar and form-backed load/create controls.
+- Adds Streamlit multi-objective coupled observation entry with one required value per objective and optional actual cost for cost-aware campaigns.
+- Adds advanced app campaign creation for 2-4 objective configs with optional review, replicates, and deterministic cost sections.
+- Moves raw summaries, next-action tables, full logs, and full data tables into the `Data` panel.
+- Makes report text and Matplotlib plots render only after explicit user actions.
+- Exposes backend multi-objective Pareto, Pareto-parallel, hypervolume, cost-progress, and replicate plot controls where supported.
+- Simplifies Forge Suite CSS to reduce expensive backdrop, mask, and large decorative paint effects.
+
 ## v1.1.3 - Cost-Aware Multi-Objective qLogEHVI
 
 This release adds deterministic cost-aware ranking to coupled multi-objective qLogEHVI campaigns while preserving v1.1.2 review and replicate behavior.

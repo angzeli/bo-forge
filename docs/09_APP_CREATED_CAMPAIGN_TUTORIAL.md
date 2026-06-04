@@ -24,7 +24,7 @@ bo-forge-app
 
 From a source checkout, `./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py` also works.
 
-Open the `Campaign Files` workbench panel and choose the `Create Campaign` tab.
+In the compact campaign source bar, set `Campaign file action` to `Create Campaign`.
 
 ## 🧾 Fill The Structured Fields
 
@@ -56,7 +56,7 @@ For discrete values, use comma-separated numbers. For categorical values, use co
 
 ## ✏️ Edit The YAML Preview
 
-After filling the structured fields, click `Regenerate YAML from structured fields`.
+After filling the structured fields, click `Update YAML preview from form`.
 
 Then replace the YAML preview with this full config:
 

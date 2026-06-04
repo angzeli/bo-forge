@@ -96,14 +96,14 @@ def build_campaign_yaml_text(
     initial_design_size: int,
     initial_design_method: str,
     random_seed: int,
+    objectives: list[dict[str, object]] | None = None,
+    review_enabled: bool = False,
+    replicates_enabled: bool = False,
+    cost: dict[str, object] | None = None,
 ) -> str:
     """Build editable YAML text from structured app form values."""
     raw = {
         "campaign_name": campaign_name,
-        "objective": {
-            "name": objective_name,
-            "direction": objective_direction,
-        },
         "variables": variables,
         "bo": {
             "batch_size": int(batch_size),
@@ -113,6 +113,20 @@ def build_campaign_yaml_text(
             "random_seed": int(random_seed),
         },
     }
+    if objectives:
+        raw["objectives"] = objectives
+        raw["bo"]["acquisition"] = "qlog_ehvi"
+    else:
+        raw["objective"] = {
+            "name": objective_name,
+            "direction": objective_direction,
+        }
+    if review_enabled:
+        raw["review"] = {"enabled": True}
+    if replicates_enabled:
+        raw["replicates"] = {"enabled": True}
+    if cost is not None:
+        raw["cost"] = cost
     return yaml.safe_dump(raw, sort_keys=False)
 
 
@@ -482,7 +496,12 @@ def observable_row_options(config: CampaignConfig, df: pd.DataFrame) -> dict[str
 
 def available_plot_kinds(config: CampaignConfig) -> list[str]:
     """Return plot kinds supported by the current config."""
-    kinds = ["progress", "diagnostics"]
+    if config.is_multi_objective:
+        kinds = ["pareto", "hypervolume"]
+        if len(config.objectives) >= 3:
+            kinds.append("pareto_parallel")
+    else:
+        kinds = ["progress", "diagnostics"]
     if config.cost is not None:
         kinds.append("cost_progress")
     if config.replicates.enabled:
