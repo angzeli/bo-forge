@@ -1,5 +1,19 @@
 # 📝 BO Forge Changelog
 
+## v1.2.0 - App Launcher And LAN Access
+
+This release improves local app startup and trusted-LAN access while preserving v1.1.4 backend, session, CLI, YAML/CSV, and Streamlit workflow behavior.
+
+- Keeps `bo-forge-app` as the primary packaged Streamlit workbench launcher.
+- Adds `python -m bo_forge_app` as an equivalent module launch path.
+- Adds launcher-owned `--host`, `--port`, `--browser`, and `--no-browser` options.
+- Rejects conflicting Streamlit server passthrough options so BO Forge launcher flags remain authoritative.
+- Prints local and trusted-LAN access URLs before Streamlit starts.
+- Adds explicit network safety warnings for wildcard or non-loopback hosts such as `0.0.0.0`, `::`, LAN IPs, and LAN hostnames: no built-in authentication, trusted LAN/VPN/SSH tunnel only, no public internet exposure, and host-file read/write behavior.
+- Adds optional macOS `.command` creation through `bo-forge-app --make-launcher ~/Desktop/BO-Forge.command`.
+- Keeps `--help` and launcher creation paths independent of Streamlit imports.
+- Updates app, installation, quickstart, release, and repository docs for the new launcher surface.
+
 ## v1.1.4 - Streamlit Performance And Coherent UI
 
 This release closes the v1.1.x line with Streamlit workflow completion and app performance polish while preserving v1.1.3 backend/session/CLI behavior.

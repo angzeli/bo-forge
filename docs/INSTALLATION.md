@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v1.1.4.
+This page shows the recommended `pip install` paths for BO Forge v1.2.0.
 
 Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench.
 
@@ -46,10 +46,32 @@ Check the install:
 bo-forge --version
 bo-forge doctor
 bo-forge-app
+python -m bo_forge_app
 pip check
 ```
 
-`bo-forge-app` launches the packaged Streamlit workbench.
+`bo-forge-app` launches the packaged Streamlit workbench. `python -m bo_forge_app`
+uses the same launcher path when console scripts are less visible.
+
+For trusted LAN access, use the primary wildcard bind:
+
+```bash
+bo-forge-app --host 0.0.0.0 --port 8501
+```
+
+Then open `http://<host-machine-lan-ip>:8501` from another trusted device.
+Wildcard or non-loopback hosts expose the app to the network and trigger the
+same warning. Examples include `0.0.0.0`, `::`, a LAN IP, or a LAN hostname. BO
+Forge has no built-in authentication, so use network mode only on a trusted LAN,
+VPN, or SSH tunnel. Do not expose it directly to the public internet. The app
+reads and writes files on the host machine, so keep the working directory and CSV
+log backups clear.
+
+On macOS, create an optional double-click launcher:
+
+```bash
+bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
+```
 
 ## 🛠️ Option 3: Development From A Clone
 
@@ -72,6 +94,12 @@ Run the standard development checks:
 Launch the app from a source checkout:
 
 ```bash
+./.venv/bin/bo-forge-app
+```
+
+The raw Streamlit command remains a development fallback:
+
+```bash
 ./.venv/bin/python -m streamlit run bo_forge_app/streamlit_app.py
 ```
 
@@ -87,7 +115,7 @@ Install the wheel in a fresh environment:
 
 ```bash
 python3 -m venv /tmp/bo_forge_probe
-/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.1.4-py3-none-any.whl
+/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.2.0-py3-none-any.whl
 /tmp/bo_forge_probe/bin/bo-forge doctor
 /tmp/bo_forge_probe/bin/pip check
 ```
@@ -96,7 +124,7 @@ Install the source distribution similarly:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_probe
-/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.1.4.tar.gz
+/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.2.0.tar.gz
 /tmp/bo_forge_sdist_probe/bin/bo-forge doctor
 /tmp/bo_forge_sdist_probe/bin/pip check
 ```

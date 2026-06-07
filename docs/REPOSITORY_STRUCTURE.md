@@ -64,7 +64,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
-`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
+`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command, and `__main__.py` supports `python -m bo_forge_app`. The launcher owns host, port, browser, trusted-LAN, and optional macOS `.command` startup concerns. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
 
 ## 🚀 How To Use The Repository
 
@@ -82,6 +82,7 @@ pip install bo-forge
 pip install "bo-forge[app]"
 bo-forge --version
 bo-forge-app
+python -m bo_forge_app --help
 ```
 
 Run the clean quickstart script:

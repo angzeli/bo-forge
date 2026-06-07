@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.1.4 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.2.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
 
-The v1.1.4 UI uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
+The v1.1.4 UI baseline uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
-v1.1.4 keeps backend behavior owned by `CampaignSession` while surfacing the v1.1 multi-objective, review, replicate, and deterministic cost-aware workflows in the local app.
+v1.2.0 keeps backend behavior and app workflow logic unchanged while improving launcher access, trusted-LAN startup guidance, and optional macOS click-to-start support.
 
 ## 🧰 Install
 
@@ -35,6 +35,43 @@ Start the local app:
 ```bash
 bo-forge-app
 ```
+
+Module launch is equivalent:
+
+```bash
+python -m bo_forge_app
+```
+
+Bind to a specific host or port when needed:
+
+```bash
+bo-forge-app --host 127.0.0.1 --port 8501
+bo-forge-app --no-browser
+bo-forge-app --browser
+```
+
+For trusted LAN access, use the primary wildcard bind:
+
+```bash
+bo-forge-app --host 0.0.0.0 --port 8501
+```
+
+Open `http://<host-machine-lan-ip>:8501` from another trusted device. Wildcard or
+non-loopback hosts expose the app to the network and trigger the same warning.
+Examples include `0.0.0.0`, `::`, a LAN IP, or a LAN hostname. Network mode has
+no built-in authentication, should only be used on a trusted LAN, VPN, or SSH
+tunnel, and should not be exposed directly to the public internet. The app reads
+and writes files on the host machine, so use a known working directory and keep
+CSV log backups.
+
+On macOS, create an optional double-click launcher:
+
+```bash
+bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
+```
+
+The launcher records the current working directory so relative campaign paths
+remain predictable when double-clicked.
 
 From a source checkout, the raw Streamlit command is available as a development
 fallback:
@@ -109,4 +146,4 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - Streamlit cost support surfaces deterministic cost metadata and ranking, not a
   learned cost model;
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
-  replicate configs use the backend `new_only` policy in v1.1.4.
+  replicate configs use the backend `new_only` policy in v1.2.0.

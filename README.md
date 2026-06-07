@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.1.4
+# 🧪 BO Forge v1.2.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.1.4 builds on the first stable public release with coupled multi-objective qLogEHVI campaigns, Pareto-front reporting, hypervolume progress, noisy replicate-aware GP fitting, review/replicate metadata support, and deterministic cost-aware multi-objective batch ranking while keeping the same YAML/CSV/session/CLI foundation.
+v1.2.0 builds on the v1.1 backend and Streamlit workbench baseline with a more testable app launcher, module invocation, explicit host/port/browser controls, trusted-LAN access guidance, and an optional macOS double-click launcher.
 
-v1.1.4 also closes the v1.1.x line with a faster local Streamlit workbench: active-panel rendering, less redundant raw data display, coupled multi-objective observation entry, lazy reports/plots, and Forge Suite UI performance polish.
+The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and Streamlit workbench logic remain unchanged from the v1.1.4 baseline.
 
 BO Forge deliberately supports only:
 
@@ -62,10 +62,24 @@ Launch the packaged local app:
 bo-forge-app
 ```
 
-The module entrypoint is also supported:
+The app module entrypoint is also supported:
 
 ```bash
-python -m bo_forge --version
+python -m bo_forge_app
+```
+
+For trusted LAN access, use the primary wildcard bind:
+
+```bash
+bo-forge-app --host 0.0.0.0 --port 8501
+```
+
+Wildcard or non-loopback hosts expose the app to the network and trigger the same warning. Examples include `0.0.0.0`, `::`, a LAN IP, or a LAN hostname. Use network mode only on a trusted LAN, VPN, or SSH tunnel. BO Forge has no built-in authentication and reads/writes files on the host machine.
+
+On macOS, you can create an optional double-click launcher:
+
+```bash
+bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
 ```
 
 ---
@@ -132,7 +146,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.1.4 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.2.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 
