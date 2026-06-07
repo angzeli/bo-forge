@@ -17,6 +17,7 @@ Confirm:
 
 - `LICENSE` exists.
 - `README.md` includes install commands for the core package, app extra, `bo-forge`, and `bo-forge-app`.
+- `docs/STREAMLIT_DEPLOYMENT.md` describes local-only, trusted-LAN, SSH/VPN, and authenticated reverse-proxy modes.
 - No tracked caches, working logs, latest-suggestion CSVs, notebook outputs, or runtime reports are present.
 
 ## 📦 Build
@@ -43,7 +44,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.2.0-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.2.1-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -60,11 +61,12 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.2.0-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.2.1-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
 /tmp/bo_forge_app_release_probe/bin/python -m bo_forge_app --help
+/tmp/bo_forge_app_release_probe/bin/bo-forge-app --help
 /tmp/bo_forge_app_release_probe/bin/pip check
 ```
 
@@ -76,7 +78,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.2.0.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.2.1.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -103,6 +105,9 @@ Confirm the startup output warns that the app has no built-in authentication,
 is for trusted LAN/VPN/SSH tunnel use only, and reads/writes host files. Do not
 expose the app directly to the public internet.
 
+Review [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) before release and
+confirm the trusted-LAN manual smoke matches the documented safety guidance.
+
 Optional macOS launcher smoke:
 
 ```bash
@@ -120,7 +125,7 @@ Confirm the full local loop still works:
 
 ## 🏷️ GitHub Release
 
-- Tag the release as `v1.2.0`.
+- Tag the release as `v1.2.1`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

@@ -1,5 +1,26 @@
 # 📝 BO Forge Changelog
 
+## v1.2.1 - Safe Streamlit Deployment Docs
+
+This release adds canonical deployment and safety documentation for using the
+existing Streamlit workbench beyond a single local terminal.
+
+- Adds `docs/STREAMLIT_DEPLOYMENT.md` as the canonical guide for local-only,
+  trusted-LAN, SSH/VPN, and externally authenticated reverse-proxy modes.
+- Documents that BO Forge has no built-in auth, no multi-user state
+  coordination, no database-backed campaign store, and is not hardened for
+  direct public internet exposure.
+- Clarifies that users with app access can interact with host-local files
+  selected in the app.
+- Recommends dedicated campaign working directories, copied CSV logs, CSV
+  backups, and avoiding simultaneous writes.
+- Keeps README, Quickstart, Installation, and Streamlit workflow docs concise
+  with links back to the deployment guide.
+- Updates release-readiness checks to assert the deployment guide exists,
+  contains the required safety language, and ships in the source distribution.
+- Does not change BO behavior, YAML/CSV schemas, launcher behavior,
+  authentication, storage, or Streamlit workflow logic.
+
 ## v1.2.0 - App Launcher And LAN Access
 
 This release improves local app startup and trusted-LAN access while preserving v1.1.4 backend, session, CLI, YAML/CSV, and Streamlit workflow behavior.

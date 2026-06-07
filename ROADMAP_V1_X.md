@@ -12,22 +12,24 @@ flowchart LR
     v112["v1.1.2<br/>MO review + replicates"]
     v113["v1.1.3<br/>Cost-aware MO qLogEHVI"]
     v114["v1.1.4<br/>Streamlit performance + coherent UI"]
+    v121["v1.2.1<br/>Safe Streamlit deployment docs"]
     
     v11 -.-> v111
     v11 -.-> v112
     v11 -.-> v113
     v11 -.-> v114
+    v12 -.-> v121
 
     class v10,v11,v12 majorDone
     class v13,later majorFuture
-    class v110,v111,v112,v113,v114,v120 patchDone
+    class v110,v111,v112,v113,v114,v120,v121 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.2.0`. The v1.1.x line is complete; v1.2 starts with local app launcher, module launch, and trusted-LAN access polish.
+Current baseline: `v1.2.1`. The v1.1.x line is complete; v1.2 starts with local app launcher, module launch, trusted-LAN access polish, and safe Streamlit deployment documentation.
 
 ### Patch Notes So Far
 
@@ -40,6 +42,7 @@ Current baseline: `v1.2.0`. The v1.1.x line is complete; v1.2 starts with local 
 | `v1.1.3` | Minor | Cost-aware multi-objective qLogEHVI with deterministic batch utility, budget filtering, and cost-progress diagnostics |
 | `v1.1.4` | Minor | Final v1.1.x Streamlit performance and coherent UI patch covering all v1.1 backend workflows |
 | `v1.2.0` | Minor | Testable `bo-forge-app` launcher, `python -m bo_forge_app`, host/port/browser controls, trusted-LAN warnings, and optional macOS `.command` launcher |
+| `v1.2.1` | Patch | Safe Streamlit deployment docs covering local-only, trusted-LAN, SSH/VPN, and externally authenticated reverse-proxy modes |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -69,7 +72,7 @@ Status: active
 - `python -m bo_forge_app` module launch.
 - Trusted-LAN startup guidance without adding authentication or deployment infrastructure.
 - Optional macOS double-click `.command` launcher.
-- Safe Streamlit Deployment Docs
+- Safe Streamlit deployment docs.
 - Python Backend Service Layer
 - Clearer separation between local app prototype and deployable service.
 - FastAPI backend exploration.

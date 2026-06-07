@@ -38,8 +38,41 @@ def test_readme_contains_current_install_commands() -> None:
     assert "bo-forge --version" in readme
     assert "bo-forge-app" in readme
     assert "python -m bo_forge_app" in readme
-    assert "Wildcard or non-loopback hosts" in readme
+    assert "docs/STREAMLIT_DEPLOYMENT.md" in readme
     assert "docs/INSTALLATION.md" in readme
+
+
+def test_streamlit_deployment_guide_exists_and_covers_safety_model() -> None:
+    guide = (PROJECT_ROOT / "docs" / "STREAMLIT_DEPLOYMENT.md").read_text(
+        encoding="utf-8"
+    )
+
+    required_phrases = [
+        "no built-in auth",
+        "trusted LAN",
+        "VPN",
+        "SSH tunnel",
+        "no safe unauthenticated public internet exposure",
+        "host filesystem access",
+        "Back up CSV logs",
+        "Avoid simultaneous writes",
+        "dedicated campaign working directory",
+    ]
+    for phrase in required_phrases:
+        assert phrase in guide
+
+
+def test_core_docs_link_streamlit_deployment_guide() -> None:
+    docs = [
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "docs" / "STREAMLIT_APP.md",
+        PROJECT_ROOT / "docs" / "INSTALLATION.md",
+        PROJECT_ROOT / "docs" / "QUICKSTART.md",
+        PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md",
+    ]
+
+    for path in docs:
+        assert "STREAMLIT_DEPLOYMENT.md" in path.read_text(encoding="utf-8")
 
 
 def test_release_checklist_includes_fresh_install_pip_check() -> None:
@@ -56,8 +89,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert "pip install bo-forge" in tutorial
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-1.2.0-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-1.2.0.tar.gz" in tutorial
+    assert "dist/bo_forge-1.2.1-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-1.2.1.tar.gz" in tutorial
     assert "pip check" in tutorial
 
 
@@ -198,10 +231,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-1.2.0-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-1.2.0.tar.gz"))
-    assert wheels, "No v1.2.0 wheel was built."
-    assert sdists, "No v1.2.0 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-1.2.1-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-1.2.1.tar.gz"))
+    assert wheels, "No v1.2.1 wheel was built."
+    assert sdists, "No v1.2.1 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -239,14 +272,14 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-1.2.0.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-1.2.1.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge_app/streamlit_app.py" in names
     assert "bo_forge_app/cli.py" in names
     assert "bo_forge_app/__main__.py" in names
-    assert "bo_forge-1.2.0.dist-info/entry_points.txt" in names
-    assert "bo_forge-1.2.0.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-1.2.1.dist-info/entry_points.txt" in names
+    assert "bo_forge-1.2.1.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -258,28 +291,29 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-1.2.0/README.md" in names
-    assert "bo_forge-1.2.0/ROADMAP_V0_TO_V1.md" in names
-    assert "bo_forge-1.2.0/ROADMAP_V1_X.md" in names
-    assert "bo_forge-1.2.0/docs/PUBLIC_API.md" in names
-    assert "bo_forge-1.2.0/examples/quickstart.py" in names
-    assert "bo_forge-1.2.0/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert "bo_forge-1.2.1/README.md" in names
+    assert "bo_forge-1.2.1/ROADMAP_V0_TO_V1.md" in names
+    assert "bo_forge-1.2.1/ROADMAP_V1_X.md" in names
+    assert "bo_forge-1.2.1/docs/PUBLIC_API.md" in names
+    assert "bo_forge-1.2.1/docs/STREAMLIT_DEPLOYMENT.md" in names
+    assert "bo_forge-1.2.1/examples/quickstart.py" in names
+    assert "bo_forge-1.2.1/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
     assert (
-        "bo_forge-1.2.0/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.2.1/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
         in names
     )
     assert (
-        "bo_forge-1.2.0/examples/11_four_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.2.1/examples/11_four_objective_mixed_constrained_campaign_log.csv"
         in names
     )
-    assert "bo_forge-1.2.0/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
-    assert "bo_forge-1.2.0/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.2.0/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.2.0/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
-    assert "bo_forge-1.2.0/notebooks/01_maximisation_logei_campaign.ipynb" in names
-    assert "bo_forge-1.2.0/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.2.0/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.2.0/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.2.1/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
+    assert "bo_forge-1.2.1/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.2.1/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.2.1/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
+    assert "bo_forge-1.2.1/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-1.2.1/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.2.1/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.2.1/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -321,7 +355,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 1.2.0\n"
+    assert completed.stdout == "bo-forge 1.2.1\n"
 
     source_root = str(PROJECT_ROOT.resolve())
     script = f"""
@@ -337,7 +371,7 @@ assert scripts["bo-forge-app"] == "bo_forge_app.cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "1.2.0"
+assert bo_forge.__version__ == "1.2.1"
 
 real_import = builtins.__import__
 def block_streamlit(name, *args, **kwargs):

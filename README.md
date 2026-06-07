@@ -1,8 +1,8 @@
-# 🧪 BO Forge v1.2.0
+# 🧪 BO Forge v1.2.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.2.0 builds on the v1.1 backend and Streamlit workbench baseline with a more testable app launcher, module invocation, explicit host/port/browser controls, trusted-LAN access guidance, and an optional macOS double-click launcher.
+v1.2.1 keeps the v1.2.0 app launcher surface and adds canonical safety guidance for local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy Streamlit use.
 
 The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and Streamlit workbench logic remain unchanged from the v1.1.4 baseline.
 
@@ -68,13 +68,16 @@ The app module entrypoint is also supported:
 python -m bo_forge_app
 ```
 
-For trusted LAN access, use the primary wildcard bind:
+For trusted LAN access:
 
 ```bash
 bo-forge-app --host 0.0.0.0 --port 8501
 ```
 
-Wildcard or non-loopback hosts expose the app to the network and trigger the same warning. Examples include `0.0.0.0`, `::`, a LAN IP, or a LAN hostname. Use network mode only on a trusted LAN, VPN, or SSH tunnel. BO Forge has no built-in authentication and reads/writes files on the host machine.
+BO Forge has no built-in authentication. Use network access only on a trusted
+LAN, VPN, SSH tunnel, or externally authenticated reverse proxy. See
+[docs/STREAMLIT_DEPLOYMENT.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_DEPLOYMENT.md)
+before sharing the app beyond one local machine.
 
 On macOS, you can create an optional double-click launcher:
 
@@ -129,6 +132,7 @@ bo-forge/
 - [docs/INSTALLATION.md](https://github.com/angzeli/bo-forge/blob/main/docs/INSTALLATION.md): pip install tutorial for core, app, development, wheel, and sdist installs.
 - [docs/CLI.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI.md): terminal workflow and command reference.
 - [docs/STREAMLIT_APP.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
+- [docs/STREAMLIT_DEPLOYMENT.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_DEPLOYMENT.md): safe local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy deployment guidance.
 - [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](https://github.com/angzeli/bo-forge/blob/main/docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
 - [docs/CLI_ERROR_EXAMPLES.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
 - [docs/CSV_SCHEMA.md](https://github.com/angzeli/bo-forge/blob/main/docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
@@ -146,7 +150,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.2.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.2.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

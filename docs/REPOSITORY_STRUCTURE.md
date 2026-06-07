@@ -17,6 +17,7 @@ bo-forge/
 │   ├── INSTALLATION.md
 │   ├── CLI.md
 │   ├── STREAMLIT_APP.md
+│   ├── STREAMLIT_DEPLOYMENT.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
@@ -64,7 +65,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
-`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command, and `__main__.py` supports `python -m bo_forge_app`. The launcher owns host, port, browser, trusted-LAN, and optional macOS `.command` startup concerns. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
+`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command, and `__main__.py` supports `python -m bo_forge_app`. The launcher owns host, port, browser, trusted-LAN, and optional macOS `.command` startup concerns. Deployment guidance lives in `docs/STREAMLIT_DEPLOYMENT.md`. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
 
 ## 🚀 How To Use The Repository
 
