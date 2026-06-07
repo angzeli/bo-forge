@@ -8,9 +8,10 @@ import time
 from hashlib import sha1
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bo_forge.errors import BOForgeError
+from bo_forge_app.service import CampaignAppService
 from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
     LAST_APPENDED_FINGERPRINT_KEY,
@@ -33,7 +34,6 @@ from bo_forge_app.streamlit_helpers import (
     format_dataframe_for_display,
     format_number_for_display,
     humanize_campaign_status,
-    load_campaign_session,
     make_staged_suggestion_bundle,
     observable_row_options,
     observable_rows,
@@ -50,6 +50,13 @@ from bo_forge_app.streamlit_style import (
     forge_action_label,
     forge_status_label,
 )
+
+if TYPE_CHECKING:
+    from bo_forge_app.service import CampaignViewData
+
+    ViewDataLike = CampaignViewData | dict[str, Any]
+else:
+    ViewDataLike = dict[str, Any]
 
 ACTIVE_PANEL_KEY = "bo_forge_active_panel"
 CAMPAIGN_FILE_MODE_KEY = "bo_forge_campaign_file_mode"
@@ -197,7 +204,9 @@ def _render_active_workflow_panel(
     renderers[panel]()
 
 
-def _collect_panel_view_data(campaign: Any, panel: str) -> dict[str, Any]:
+def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
+    if hasattr(campaign, "collect_view_data"):
+        return campaign.collect_view_data(panel)
     view_data: dict[str, Any] = {}
     with _TimedBlock(f"collect:{panel}"):
         if panel in {"Overview", "Data", "Reports"}:
@@ -222,7 +231,7 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> dict[str, Any]:
     return view_data
 
 
-def _view_data_value(view_data: dict[str, Any], key: str, fallback: Any) -> Any:
+def _view_data_value(view_data: ViewDataLike, key: str, fallback: Any) -> Any:
     if key in view_data:
         return view_data[key]
     return fallback()
@@ -643,7 +652,7 @@ def _create_campaign_from_inputs(
     try:
         config_path = resolve_path_input(config_output, "Config output")
         log_path = resolve_path_input(log_output, "Log output")
-        campaign = create_campaign_files(
+        session = create_campaign_files(
             config_text=edited_yaml,
             config_path=config_path,
             log_path=log_path,
@@ -654,6 +663,7 @@ def _create_campaign_from_inputs(
 
     st.session_state[CONFIG_PATH_KEY] = str(config_path)
     st.session_state[LOG_PATH_KEY] = str(log_path)
+    campaign = CampaignAppService.from_session(session)
     st.session_state[SESSION_KEY] = campaign
     _clear_staged_suggestions(st)
     _clear_report_preview(st)
@@ -688,7 +698,7 @@ def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> No
     try:
         config_path = resolve_path_input(config_value, "Config")
         log_path = resolve_path_input(log_value, "Log")
-        campaign = load_campaign_session(config_path, log_path)
+        campaign = CampaignAppService.load(config_path, log_path)
     except (BOForgeError, OSError, ValueError) as exc:
         st.error(str(exc))
         return
@@ -702,7 +712,7 @@ def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> No
     _flash_and_rerun(st, "Campaign loaded.")
 
 
-def _render_overview(st: Any, campaign: Any, view_data: dict[str, Any]) -> None:
+def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
     _render_panel_intro(
         st,
         "Overview",
@@ -801,7 +811,7 @@ def _render_data(
     st: Any,
     campaign: Any,
     flags: dict[str, bool],
-    view_data: dict[str, Any],
+    view_data: ViewDataLike,
 ) -> None:
     _render_panel_intro(
         st,
@@ -884,7 +894,7 @@ def _render_data(
 def _render_campaign_state_blocks(
     st: Any,
     campaign: Any,
-    view_data: dict[str, Any] | None = None,
+    view_data: ViewDataLike | None = None,
 ) -> None:
     view_data = view_data or {}
     summary = view_data.get("summary")
@@ -943,8 +953,13 @@ def _render_suggest(st: Any, campaign: Any) -> None:
 
     if generate_clicked:
         try:
-            suggestions = campaign.suggest_next(batch_size=int(batch_size))
-            bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
+            if hasattr(campaign, "suggest_dry_run"):
+                result = campaign.suggest_dry_run(int(batch_size))
+                suggestions = result.suggestions
+                bundle = result.bundle
+            else:
+                suggestions = campaign.suggest_next(batch_size=int(batch_size))
+                bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
         except (BOForgeError, OSError, ValueError) as exc:
             st.error(str(exc))
         else:
@@ -1005,7 +1020,10 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         export_clicked = st.form_submit_button("Export staged suggestions CSV")
     if export_clicked:
         try:
-            written_path = export_staged_suggestions_csv(suggestions, export_path)
+            if hasattr(campaign, "export_staged_suggestions"):
+                written_path = campaign.export_staged_suggestions(bundle, export_path)
+            else:
+                written_path = export_staged_suggestions_csv(suggestions, export_path)
         except OSError as exc:
             st.error(str(exc))
         else:
@@ -1039,11 +1057,20 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         )
     if append_clicked:
         try:
-            campaign.append_suggestions(suggestions)
-        except BOForgeError as exc:
+            if hasattr(campaign, "append_staged"):
+                result = campaign.append_staged(
+                    bundle,
+                    st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
+                )
+                campaign = result.service
+                appended_fingerprint = result.appended_fingerprint
+            else:
+                campaign.append_suggestions(suggestions)
+                appended_fingerprint = str(bundle["suggestions_fingerprint"])
+        except (BOForgeError, ValueError) as exc:
             st.error(str(exc))
             return
-        st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = bundle["suggestions_fingerprint"]
+        st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = appended_fingerprint
         _clear_staged_suggestions(st)
         _clear_report_preview(st)
         st.session_state[SESSION_KEY] = campaign
@@ -1055,7 +1082,7 @@ def _render_resolve(
     st: Any,
     campaign: Any,
     flags: dict[str, bool],
-    view_data: dict[str, Any] | None = None,
+    view_data: ViewDataLike | None = None,
 ) -> None:
     _render_panel_intro(
         st,
@@ -1094,7 +1121,11 @@ def _render_resolve(
                 review_clicked = st.form_submit_button("Apply review decision")
             if review_clicked:
                 try:
-                    campaign.review_suggestion(row_id, decision, note)
+                    if hasattr(campaign, "review"):
+                        result = campaign.review(row_id, decision, note)
+                        campaign = result.service
+                    else:
+                        campaign.review_suggestion(row_id, decision, note)
                 except BOForgeError as exc:
                     st.error(str(exc))
                 else:
@@ -1177,11 +1208,14 @@ def _render_resolve(
                 campaign.config.objective_names,
             )
             actual_cost = _parse_actual_cost_input(actual_cost_text)
-            campaign.mark_observed(
-                row_id=observed_row_id,
-                objective_values=objective_values,
-                actual_cost=actual_cost,
-            )
+            if hasattr(campaign, "mark_observed"):
+                result = campaign.mark_observed(
+                    row_id=observed_row_id,
+                    objective_values=objective_values,
+                    actual_cost=actual_cost,
+                )
+                if hasattr(result, "service"):
+                    campaign = result.service
         except (BOForgeError, ValueError) as exc:
             st.error(str(exc))
         else:
@@ -1195,11 +1229,13 @@ def _render_resolve(
 
     try:
         actual_cost = _parse_actual_cost_input(actual_cost_text)
-        campaign.mark_observed(
+        result = campaign.mark_observed(
             row_id=observed_row_id,
             objective_value=float(objective_value),
             actual_cost=None if actual_cost is None else float(actual_cost),
         )
+        if hasattr(result, "service"):
+            campaign = result.service
     except (BOForgeError, ValueError) as exc:
         st.error(str(exc))
     else:
@@ -1268,7 +1304,7 @@ def _render_reports(
     st: Any,
     campaign: Any,
     flags: dict[str, bool],
-    view_data: dict[str, Any] | None = None,
+    view_data: ViewDataLike | None = None,
 ) -> None:
     _render_panel_intro(
         st,
@@ -1307,7 +1343,10 @@ def _render_reports(
         export_clicked = st.form_submit_button("Export report")
     if preview_clicked:
         try:
-            st.session_state[REPORT_PREVIEW_KEY] = campaign_report_text(campaign)
+            if hasattr(campaign, "report_text"):
+                st.session_state[REPORT_PREVIEW_KEY] = campaign.report_text()
+            else:
+                st.session_state[REPORT_PREVIEW_KEY] = campaign_report_text(campaign)
         except BOForgeError as exc:
             st.error(str(exc))
     report_text = st.session_state.get(REPORT_PREVIEW_KEY)
@@ -1343,7 +1382,11 @@ def _available_plot_options(
     flags: dict[str, bool],
     log_path: Path,
 ) -> list[dict[str, Any]]:
-    plot_kinds = available_plot_kinds(campaign.config)
+    plot_kinds = (
+        campaign.available_plot_kinds()
+        if hasattr(campaign, "available_plot_kinds")
+        else available_plot_kinds(campaign.config)
+    )
     options: list[dict[str, Any]] = []
     mapping = {
         "progress": ("Progress", "plot_progress"),
@@ -1354,33 +1397,55 @@ def _available_plot_options(
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:
+            plotter = (
+                _service_plotter(campaign, kind)
+                if hasattr(campaign, "plot")
+                else getattr(campaign, plotter_name)
+            )
             options.append(
                 {
                     "label": label,
                     "key": kind,
-                    "plotter": getattr(campaign, plotter_name),
+                    "plotter": plotter,
                     "path": default_export_path(log_path, kind, "png"),
                 }
             )
     if flags["has_cost"]:
+        plotter = (
+            _service_plotter(campaign, "cost_progress")
+            if hasattr(campaign, "plot")
+            else campaign.plot_cost_progress
+        )
         options.append(
             {
                 "label": "Cost Progress",
                 "key": "cost_progress",
-                "plotter": campaign.plot_cost_progress,
+                "plotter": plotter,
                 "path": default_export_path(log_path, "cost_progress", "png"),
             }
         )
     if flags["has_replicates"]:
+        plotter = (
+            _service_plotter(campaign, "replicates")
+            if hasattr(campaign, "plot")
+            else campaign.plot_replicates
+        )
         options.append(
             {
                 "label": "Replicates",
                 "key": "replicates",
-                "plotter": campaign.plot_replicates,
+                "plotter": plotter,
                 "path": default_export_path(log_path, "replicates", "png"),
             }
         )
     return options
+
+
+def _service_plotter(campaign: Any, kind: str) -> Any:
+    def plotter(*, save_path: Path | None = None) -> object:
+        return campaign.plot(kind, save_path=save_path)
+
+    return plotter
 
 
 def _render_plot_controls(
@@ -1649,13 +1714,17 @@ def _refresh_validation_cache(
     log_path: Path,
 ) -> None:
     try:
-        campaign.validate()
+        result = campaign.validate()
     except BOForgeError as exc:
         label = "Validation issue"
         error = str(exc)
     else:
-        label = "Valid"
-        error = ""
+        if hasattr(result, "label"):
+            label = str(result.label)
+            error = str(getattr(result, "message", ""))
+        else:
+            label = "Valid"
+            error = ""
     st.session_state[VALIDATION_CACHE_KEY] = {
         "signature": _validation_cache_signature(config_path, log_path),
         "label": label,
@@ -1711,6 +1780,7 @@ def _should_clear_staged_bundle(reason: str) -> bool:
         "Log path changed after suggestions were staged.",
         "Config file changed after suggestions were staged.",
         "Log file changed after suggestions were staged.",
+        "Staged suggestions changed after they were staged.",
     }
 
 

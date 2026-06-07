@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v1.2.1.
+This page shows the recommended `pip install` paths for BO Forge v1.2.2.
 
 Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench.
 
@@ -111,7 +111,7 @@ Install the wheel in a fresh environment:
 
 ```bash
 python3 -m venv /tmp/bo_forge_probe
-/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.2.1-py3-none-any.whl
+/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.2.2-py3-none-any.whl
 /tmp/bo_forge_probe/bin/bo-forge doctor
 /tmp/bo_forge_probe/bin/pip check
 ```
@@ -120,7 +120,7 @@ Install the source distribution similarly:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_probe
-/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.2.1.tar.gz
+/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.2.2.tar.gz
 /tmp/bo_forge_sdist_probe/bin/bo-forge doctor
 /tmp/bo_forge_sdist_probe/bin/pip check
 ```

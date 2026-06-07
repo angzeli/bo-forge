@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.2.1
+# 🧪 BO Forge v1.2.2
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.2.1 keeps the v1.2.0 app launcher surface and adds canonical safety guidance for local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy Streamlit use.
+v1.2.2 keeps the v1.2 launcher and deployment guidance surface while adding an internal, non-HTTP Python service layer for Streamlit-facing campaign workflows.
 
-The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and Streamlit workbench logic remain unchanged from the v1.1.4 baseline.
+The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.1.4 baseline.
 
 BO Forge deliberately supports only:
 
@@ -23,6 +23,7 @@ BO Forge deliberately supports only:
 - a notebook-first `CampaignSession` workflow
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
+- an internal app service layer that delegates BO behavior to `CampaignSession`
 
 It intentionally does not yet cover qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
@@ -150,7 +151,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.2.1 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.2.2 environment is recorded in `requirements-lock.txt`.
 
 ---
 

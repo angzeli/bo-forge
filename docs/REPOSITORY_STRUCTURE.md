@@ -67,6 +67,8 @@ Most users should start with the `bo-forge` CLI, `CampaignSession`, or the publi
 
 `bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command, and `__main__.py` supports `python -m bo_forge_app`. The launcher owns host, port, browser, trusted-LAN, and optional macOS `.command` startup concerns. Deployment guidance lives in `docs/STREAMLIT_DEPLOYMENT.md`. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
 
+`bo_forge_app/service.py` is an internal, non-HTTP app service layer. It wraps `CampaignSession` for Streamlit-facing workflow operations such as validation, staged suggestions, append, review, mark-observed, reports, and plot routing. It is not a stable public API.
+
 ## 🚀 How To Use The Repository
 
 Create a local environment and install the package:

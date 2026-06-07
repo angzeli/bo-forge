@@ -222,6 +222,8 @@ def staged_bundle_invalidation_reason(
         return "No staged suggestions."
 
     suggestions_fingerprint = str(bundle.get("suggestions_fingerprint", ""))
+    if dataframe_fingerprint(suggestions) != suggestions_fingerprint:
+        return "Staged suggestions changed after they were staged."
     if bool(bundle.get("appended", False)) or (
         last_appended_fingerprint is not None
         and suggestions_fingerprint == last_appended_fingerprint
@@ -471,6 +473,9 @@ def append_disabled_reason(
         ),
         "Log file changed after suggestions were staged.": (
             "Append disabled: the campaign log changed after these suggestions were generated."
+        ),
+        "Staged suggestions changed after they were staged.": (
+            "Append disabled: the staged suggestion payload changed after staging."
         ),
     }
     return messages.get(reason, f"Append disabled: {reason}")

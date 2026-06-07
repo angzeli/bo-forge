@@ -471,6 +471,30 @@ def test_staged_bundle_invalidates_for_already_appended_fingerprint(tmp_path: Pa
     assert reason == "Staged suggestions were already appended."
 
 
+def test_staged_bundle_invalidates_for_mutated_payload(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+    bundle = make_staged_suggestion_bundle(simple_suggestions(), config_path, log_path)
+    suggestions = bundle["suggestions"]
+    assert isinstance(suggestions, pd.DataFrame)
+
+    suggestions.loc[0, "row_id"] = "tampered"
+
+    reason = staged_bundle_invalidation_reason(bundle, config_path, log_path)
+    assert reason == "Staged suggestions changed after they were staged."
+    assert append_disabled_reason(bundle, config_path, log_path) == (
+        "Append disabled: the staged suggestion payload changed after staging."
+    )
+
+
+def test_tampered_staged_bundle_reason_clears_app_bundle() -> None:
+    assert streamlit_app._should_clear_staged_bundle(
+        "Staged suggestions changed after they were staged."
+    )
+
+
 def test_append_disabled_reason_maps_to_user_facing_text(tmp_path: Path) -> None:
     config_path = tmp_path / "campaign.yaml"
     log_path = tmp_path / "campaign.csv"

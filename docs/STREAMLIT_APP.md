@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.2.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.2.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
-The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls the same backend/session methods used by notebooks and the CLI.
+The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
 The v1.1.4 UI baseline uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
-v1.2.1 keeps backend behavior and app workflow logic unchanged while improving launcher access, trusted-LAN startup guidance, and optional macOS click-to-start support.
+v1.2.2 keeps backend behavior and user-facing app workflow semantics unchanged while moving Streamlit-facing workflow coordination into `bo_forge_app/service.py`.
 
 ## 🧰 Install
 
@@ -142,4 +142,4 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - Streamlit cost support surfaces deterministic cost metadata and ranking, not a
   learned cost model;
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
-  replicate configs use the backend `new_only` policy in v1.2.1.
+  replicate configs use the backend `new_only` policy in v1.2.2.

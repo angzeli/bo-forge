@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v1.2.2 - Python Backend Service Layer
+
+This release adds an internal, non-HTTP Python service layer for the local
+Streamlit workbench while preserving backend BO behavior and user-facing app
+workflow semantics.
+
+- Adds `bo_forge_app/service.py` with `CampaignAppService` as the Streamlit-facing
+  workflow coordinator.
+- Keeps BO behavior delegated to `CampaignSession`; notebooks, CLI commands,
+  YAML/CSV schemas, launcher behavior, and public `bo_forge` imports are
+  unchanged.
+- Routes app workflow operations through service methods for load validation,
+  panel view data, dry-run suggestions, staged append, review, mark-observed,
+  report export, and plot dispatch.
+- Preserves the existing staged-suggestion bundle dictionary shape and
+  fingerprint semantics.
+- Keeps display-only helpers in `streamlit_helpers.py` and does not document the
+  service as a stable public API.
+
 ## v1.2.1 - Safe Streamlit Deployment Docs
 
 This release adds canonical deployment and safety documentation for using the
