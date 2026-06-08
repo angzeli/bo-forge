@@ -16,6 +16,7 @@ flowchart LR
     v120["v1.2.0<br/>App launcher + LAN access"]
     v121["v1.2.1<br/>Safe Streamlit deployment docs"]
     v122["v1.2.2<br/>Python backend service layer"]
+    v123["v1.2.3<br/>FastAPI probe"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -25,17 +26,18 @@ flowchart LR
     v12 -.-> v120
     v12 -.-> v121
     v12 -.-> v122
+    v12 -.-> v123
 
     class v10,v11,v12 majorDone
     class v13,later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.2.2`. The v1.1.x line is complete; v1.2 starts with local app launcher, module launch, trusted-LAN access polish, safe Streamlit deployment documentation, and a non-HTTP Python service layer for app workflows.
+Current baseline: `v1.2.3`. The v1.1.x line is complete; v1.2 starts with local app launcher, module launch, trusted-LAN access polish, safe Streamlit deployment documentation, a non-HTTP Python service layer for app workflows, and an experimental optional FastAPI probe.
 
 ### Patch Notes So Far
 
@@ -50,6 +52,7 @@ Current baseline: `v1.2.2`. The v1.1.x line is complete; v1.2 starts with local 
 | `v1.2.0` | Minor | Testable `bo-forge-app` launcher, `python -m bo_forge_app`, host/port/browser controls, trusted-LAN warnings, and optional macOS `.command` launcher |
 | `v1.2.1` | Patch | Safe Streamlit deployment docs covering local-only, trusted-LAN, SSH/VPN, and externally authenticated reverse-proxy modes |
 | `v1.2.2` | Patch | Internal non-HTTP Python service layer for Streamlit-facing campaign workflows |
+| `v1.2.3` | Patch | Experimental optional FastAPI probe around `CampaignAppService` for local or trusted-network API exploration |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -81,8 +84,9 @@ Status: active
 - Optional macOS double-click `.command` launcher.
 - Safe Streamlit deployment docs.
 - Python backend service layer for local app workflows.
+- Experimental optional FastAPI probe around the app service layer.
 - Clearer separation between local app prototype and deployable service.
-- FastAPI backend exploration.
+- No production backend, auth, database, or multi-user app state yet.
 
 ## 🧩 v1.3 - Structured Campaigns
 

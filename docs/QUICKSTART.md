@@ -91,7 +91,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.2.2 surfaces coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
+The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.2.3 surfaces coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -101,6 +101,19 @@ Environment checks remain CLI workflows. Empty-log creation is also available th
 ```
 
 See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings. See [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md) for a step-by-step app-created campaign tutorial.
+
+## 🧪 Experimental API Probe
+
+v1.2.3 adds an optional FastAPI probe around the internal app service layer:
+
+```bash
+pip install "bo-forge[api]"
+bo-forge-api --root . --host 127.0.0.1 --port 8765
+```
+
+The probe is experimental, root-bound, unauthenticated, and intended only for
+local or trusted-network exploration. Streamlit remains the recommended local
+UI. See [API_PROBE.md](API_PROBE.md) before using it beyond localhost.
 
 ## 🔁 Session API
 
@@ -221,7 +234,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.2.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -256,7 +269,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.2.2 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.2.3 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 

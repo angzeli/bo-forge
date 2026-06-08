@@ -117,7 +117,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.2.2 is two to four objectives.
+v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.2.3 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 

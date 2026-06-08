@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "1.2.2"
+version = "1.2.3"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -41,6 +41,7 @@ dependencies = [
 [project.scripts]
 bo-forge = "bo_forge.cli:main"
 bo-forge-app = "bo_forge_app.cli:main"
+bo-forge-api = "bo_forge_app.api_cli:main"
 
 [project.urls]
 Repository = "https://github.com/angzeli/bo-forge"
@@ -52,8 +53,14 @@ Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md"
 app = [
     "streamlit>=1.57",
 ]
+api = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
 dev = [
     "build>=1.2",
+    "fastapi>=0.115",
+    "httpx>=0.28",
     "ipykernel>=6.29",
     "ipywidgets>=8.1",
     "nbclient>=0.10",
@@ -63,6 +70,7 @@ dev = [
     "ruff>=0.8",
     "streamlit>=1.57",
     "twine>=5.0",
+    "uvicorn>=0.30",
     "wheel>=0.45",
 ]
 

@@ -1,8 +1,8 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v1.2.2.
+This page shows the recommended `pip install` paths for BO Forge v1.2.3.
 
-Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench.
+Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench. Use the API extra only when you want the experimental FastAPI probe.
 
 ## ✅ Option 1: Core Package And CLI
 
@@ -69,7 +69,33 @@ On macOS, create an optional double-click launcher:
 bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
 ```
 
-## 🛠️ Option 3: Development From A Clone
+## 🧪 Option 3: Experimental API Probe
+
+If you want the optional FastAPI probe, install the API extra:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install "bo-forge[api]"
+```
+
+Check the launcher:
+
+```bash
+bo-forge-api --help
+```
+
+Launch local-only:
+
+```bash
+bo-forge-api --root . --host 127.0.0.1 --port 8765
+```
+
+The API probe is experimental, has no built-in authentication, and is not a
+production backend. Read [API_PROBE.md](API_PROBE.md) before exposing it beyond
+localhost.
+
+## 🛠️ Option 4: Development From A Clone
 
 From the repository root:
 
@@ -111,7 +137,7 @@ Install the wheel in a fresh environment:
 
 ```bash
 python3 -m venv /tmp/bo_forge_probe
-/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.2.2-py3-none-any.whl
+/tmp/bo_forge_probe/bin/pip install dist/bo_forge-1.2.3-py3-none-any.whl
 /tmp/bo_forge_probe/bin/bo-forge doctor
 /tmp/bo_forge_probe/bin/pip check
 ```
@@ -120,7 +146,7 @@ Install the source distribution similarly:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_probe
-/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.2.2.tar.gz
+/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-1.2.3.tar.gz
 /tmp/bo_forge_sdist_probe/bin/bo-forge doctor
 /tmp/bo_forge_sdist_probe/bin/pip check
 ```

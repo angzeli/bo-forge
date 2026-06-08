@@ -1,15 +1,19 @@
 # Streamlit Deployment And Safety Guide
 
-BO Forge v1.2.2 documents local and trusted-network use of the existing
+BO Forge v1.2.3 documents local and trusted-network use of the existing
 Streamlit workbench. This guide covers deployment choices only. It does not
 change BO behavior, YAML/CSV semantics, launcher behavior, authentication,
 storage, or app workflow logic.
+
+The experimental FastAPI probe has separate guidance in
+[API_PROBE.md](API_PROBE.md). The Streamlit workbench remains the recommended
+local UI.
 
 ## Safety Model
 
 BO Forge is a local-first workbench:
 
-- BO Forge v1.2.2 has no built-in auth.
+- BO Forge v1.2.3 has no built-in auth.
 - It has no multi-user state coordination.
 - It has no database or server-side campaign store.
 - It is not hardened for direct public internet exposure.

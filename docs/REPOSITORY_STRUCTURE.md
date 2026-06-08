@@ -18,6 +18,7 @@ bo-forge/
 │   ├── CLI.md
 │   ├── STREAMLIT_APP.md
 │   ├── STREAMLIT_DEPLOYMENT.md
+│   ├── API_PROBE.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
@@ -69,6 +70,8 @@ Most users should start with the `bo-forge` CLI, `CampaignSession`, or the publi
 
 `bo_forge_app/service.py` is an internal, non-HTTP app service layer. It wraps `CampaignSession` for Streamlit-facing workflow operations such as validation, staged suggestions, append, review, mark-observed, reports, and plot routing. It is not a stable public API.
 
+`bo_forge_app/api.py` and `bo_forge_app/api_cli.py` contain an experimental optional FastAPI probe behind the `bo-forge-api` command and `[api]` extra. The probe is root-bound, local/trusted-network only, and not a production backend.
+
 ## 🚀 How To Use The Repository
 
 Create a local environment and install the package:
@@ -83,8 +86,10 @@ For installed use, the stable commands are:
 ```bash
 pip install bo-forge
 pip install "bo-forge[app]"
+pip install "bo-forge[api]"
 bo-forge --version
 bo-forge-app
+bo-forge-api --help
 python -m bo_forge_app --help
 ```
 

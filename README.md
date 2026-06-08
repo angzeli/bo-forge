@@ -1,8 +1,8 @@
-# 🧪 BO Forge v1.2.2
+# 🧪 BO Forge v1.2.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.2.2 keeps the v1.2 launcher and deployment guidance surface while adding an internal, non-HTTP Python service layer for Streamlit-facing campaign workflows.
+v1.2.3 keeps the v1.2 launcher, deployment guidance, and service-layer surface while adding an experimental optional FastAPI probe for local or trusted-network API exploration.
 
 The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.1.4 baseline.
 
@@ -24,6 +24,7 @@ BO Forge deliberately supports only:
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
 - an internal app service layer that delegates BO behavior to `CampaignSession`
+- an optional experimental FastAPI probe for local/trusted-network exploration
 
 It intentionally does not yet cover qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
@@ -41,6 +42,12 @@ Install the local Streamlit workbench:
 
 ```bash
 pip install "bo-forge[app]"
+```
+
+Install the experimental API probe:
+
+```bash
+pip install "bo-forge[api]"
 ```
 
 For local development from a clone:
@@ -85,6 +92,16 @@ On macOS, you can create an optional double-click launcher:
 ```bash
 bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
 ```
+
+Launch the experimental API probe:
+
+```bash
+bo-forge-api --root . --host 127.0.0.1 --port 8765
+```
+
+The API probe has no built-in authentication and is not a production backend.
+See [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md)
+before using it beyond localhost.
 
 ---
 
@@ -134,6 +151,7 @@ bo-forge/
 - [docs/CLI.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI.md): terminal workflow and command reference.
 - [docs/STREAMLIT_APP.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
 - [docs/STREAMLIT_DEPLOYMENT.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_DEPLOYMENT.md): safe local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy deployment guidance.
+- [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md): experimental optional FastAPI probe usage and safety model.
 - [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](https://github.com/angzeli/bo-forge/blob/main/docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
 - [docs/CLI_ERROR_EXAMPLES.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
 - [docs/CSV_SCHEMA.md](https://github.com/angzeli/bo-forge/blob/main/docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
@@ -151,7 +169,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.2.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.2.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

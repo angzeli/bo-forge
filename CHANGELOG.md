@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v1.2.3 - FastAPI Probe
+
+This release adds an experimental optional FastAPI probe around the internal
+`CampaignAppService` for local or trusted-network API exploration.
+
+- Adds `bo_forge_app/api.py` with a `create_app(root=...)` FastAPI factory,
+  root-bound path checks, JSON-safe DataFrame payloads, stateless staged-bundle
+  conversion, and structured error responses.
+- Adds `bo_forge_app/api_cli.py` and the `bo-forge-api` console command.
+- Adds the optional `api` extra with FastAPI and Uvicorn dependencies while
+  keeping core installs free of API imports.
+- Exposes health, validation, summary, dry-run suggestion, staged append,
+  review, and mark-observed endpoints.
+- Keeps mutations delegated to `CampaignAppService` and existing CSV write
+  paths, including staged-bundle fingerprint validation.
+- Adds `docs/API_PROBE.md` as the canonical experimental API guide.
+- Does not add auth, CORS broadening, a database, report/plot endpoints,
+  production deployment architecture, or new BO behavior.
+
 ## v1.2.2 - Python Backend Service Layer
 
 This release adds an internal, non-HTTP Python service layer for the local
