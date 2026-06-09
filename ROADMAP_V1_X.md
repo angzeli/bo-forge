@@ -37,7 +37,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.2.3`. The v1.1.x line is complete; v1.2 starts with local app launcher, module launch, trusted-LAN access polish, safe Streamlit deployment documentation, a non-HTTP Python service layer for app workflows, and an experimental optional FastAPI probe.
+Current baseline: `v1.2.3`. The v1.1.x line is complete; v1.2.3 closes the v1.2 app/access line with local app launcher, module launch, trusted-LAN access polish, safe Streamlit deployment documentation, a non-HTTP Python service layer for app workflows, and an experimental optional FastAPI probe.
 
 ### Patch Notes So Far
 
@@ -76,7 +76,7 @@ Status: completed
 
 ## 🏗️ v1.2 - App Launcher And Access Path
 
-Status: active
+Status: completed
 
 - Testable `bo-forge-app` launcher with explicit host, port, and browser flags.
 - `python -m bo_forge_app` module launch.
@@ -86,7 +86,7 @@ Status: active
 - Python backend service layer for local app workflows.
 - Experimental optional FastAPI probe around the app service layer.
 - Clearer separation between local app prototype and deployable service.
-- No production backend, auth, database, or multi-user app state yet.
+- Production auth, database, multi-user app state, and deeper collaboration workflows remain outside v1.2.
 
 ## 🧩 v1.3 - Structured Campaigns
 

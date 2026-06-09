@@ -141,6 +141,9 @@ Confirm the full local loop still works:
 
 ## 🏷️ GitHub Release
 
+- Final closeout: confirm `ROADMAP_V1_X.md` marks v1.2 as completed, and
+  `README.md`, `CHANGELOG.md`, install paths, and the release tag all agree on
+  `v1.2.3`.
 - Tag the release as `v1.2.3`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.

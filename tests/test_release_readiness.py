@@ -97,6 +97,18 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
         assert phrase in guide
 
 
+def test_v1_2_roadmap_line_is_closed_and_v1_3_remains_planned() -> None:
+    roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
+
+    assert "Current baseline: `v1.2.3`" in roadmap
+    assert "v1.2.3 closes the v1.2 app/access line" in roadmap
+    assert re.search(
+        r"## 🏗️ v1\.2 - App Launcher And Access Path\s+Status: completed",
+        roadmap,
+    )
+    assert re.search(r"## 🧩 v1\.3 - Structured Campaigns\s+Status: planned", roadmap)
+
+
 def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
     repository_structure = (PROJECT_ROOT / "docs" / "REPOSITORY_STRUCTURE.md").read_text(
         encoding="utf-8"

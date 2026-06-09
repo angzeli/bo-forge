@@ -16,6 +16,8 @@ This release adds an experimental optional FastAPI probe around the internal
 - Keeps mutations delegated to `CampaignAppService` and existing CSV write
   paths, including staged-bundle fingerprint validation.
 - Adds `docs/API_PROBE.md` as the canonical experimental API guide.
+- Completes the v1.2 app/access track before the planned v1.3 structured
+  campaign line.
 - Does not add auth, CORS broadening, a database, report/plot endpoints,
   production deployment architecture, or new BO behavior.
 
