@@ -9,6 +9,7 @@ from bo_forge.config import (
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
+    StageConfig,
     VariableConfig,
 )
 from bo_forge.errors import LogValidationError
@@ -25,6 +26,36 @@ def config() -> CampaignConfig:
             VariableConfig("temperature", "continuous", 300.0, 800.0),
         ),
         bo=BOConfig(batch_size=2, initial_design_size=3),
+    )
+
+
+def structured_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="structured_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 900.0),
+            VariableConfig("solvent", "categorical", values=("MeCN", "Water")),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=2),
+        stages=(
+            StageConfig("screen", ("x", "solvent")),
+            StageConfig("refine", ("x", "temperature")),
+        ),
+    )
+
+
+def structured_constrained_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="structured_constrained_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=structured_config().variables,
+        bo=BOConfig(batch_size=1, initial_design_size=2),
+        constraints=(
+            ConstraintConfig("temperature_limit", "temperature <= 700"),
+        ),
+        stages=structured_config().stages,
     )
 
 
@@ -51,6 +82,43 @@ def valid_df() -> pd.DataFrame:
                 "source": "sobol",
                 "x": 0.5,
                 "temperature": 650.0,
+                "activity": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def structured_df() -> pd.DataFrame:
+    cfg = structured_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "screen_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.2,
+                "temperature": "",
+                "solvent": "MeCN",
+                "activity": 1.3,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "refine_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "sobol",
+                "stage": "refine",
+                "x": 0.5,
+                "temperature": 650.0,
+                "solvent": "",
                 "activity": "",
                 "predicted_mean": "",
                 "predicted_std": "",
@@ -232,6 +300,88 @@ def test_validate_campaign_data_accepts_valid_log() -> None:
     validate_campaign_data(config(), valid_df())
 
 
+def test_canonical_columns_for_non_structured_log_remain_unchanged() -> None:
+    assert canonical_columns(config()) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "x",
+        "temperature",
+        "activity",
+        "predicted_mean",
+        "predicted_std",
+        "acquisition",
+    ]
+
+
+def test_validate_campaign_data_accepts_structured_log() -> None:
+    validate_campaign_data(structured_config(), structured_df())
+
+
+def test_structured_canonical_columns_include_stage_after_source() -> None:
+    assert canonical_columns(structured_config()) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "stage",
+        "x",
+        "temperature",
+        "solvent",
+        "activity",
+        "predicted_mean",
+        "predicted_std",
+        "acquisition",
+    ]
+
+
+def test_structured_log_missing_stage_column_fails() -> None:
+    df = structured_df().drop(columns=["stage"])
+
+    with pytest.raises(LogValidationError, match="missing required columns: \\['stage'\\]"):
+        validate_campaign_data(structured_config(), df)
+
+
+def test_structured_log_unknown_stage_fails() -> None:
+    df = structured_df()
+    df.loc[0, "stage"] = "unknown"
+
+    with pytest.raises(LogValidationError, match="unknown stage 'unknown'"):
+        validate_campaign_data(structured_config(), df)
+
+
+def test_structured_log_active_variable_missing_or_invalid_fails() -> None:
+    df = structured_df().astype(object)
+    df.loc[0, "x"] = ""
+
+    with pytest.raises(LogValidationError, match="active variable 'x'"):
+        validate_campaign_data(structured_config(), df)
+
+
+def test_structured_log_inactive_variable_must_be_blank() -> None:
+    df = structured_df()
+    df.loc[0, "temperature"] = 500.0
+
+    with pytest.raises(LogValidationError, match="inactive variable 'temperature'"):
+        validate_campaign_data(structured_config(), df)
+
+
+def test_structured_constraints_apply_only_when_referenced_variables_are_active() -> None:
+    df = structured_df()
+    df.loc[0, "x"] = 0.9
+
+    validate_campaign_data(structured_constrained_config(), df)
+
+
+def test_structured_constraints_fail_when_active_stage_violates() -> None:
+    df = structured_df()
+    df.loc[1, "temperature"] = 800.0
+
+    with pytest.raises(LogValidationError, match="violates constraint 'temperature_limit'"):
+        validate_campaign_data(structured_constrained_config(), df)
+
+
 def test_validate_campaign_data_accepts_valid_mixed_log() -> None:
     validate_campaign_data(mixed_config(), mixed_df())
 
@@ -318,6 +468,17 @@ def test_validate_campaign_data_accepts_replicate_example_log() -> None:
 
     validate_campaign_data(config_replicate, df)
     assert config_replicate.replicates.enabled
+
+
+def test_validate_campaign_data_accepts_structured_example_log() -> None:
+    config_structured = CampaignConfig.from_yaml("configs/13_structured_campaign_core.yaml")
+    df = load_campaign_log(
+        "examples/13_structured_campaign_core_campaign_log.csv",
+        config_structured,
+    )
+
+    validate_campaign_data(config_structured, df)
+    assert config_structured.stage_names == ["screen", "refine"]
 
 
 def test_canonical_columns_for_schema_combinations() -> None:

@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from bo_forge.config import CampaignConfig
+from bo_forge.config import (
+    CampaignConfig,
+    active_variables_for_stage,
+    configured_stage_names,
+    is_structured_campaign,
+)
 from bo_forge.costs import evaluate_cost
 from bo_forge.errors import ConfigError, LogValidationError
 
@@ -178,6 +183,150 @@ replicates:
     assert config.replicates.min_repeats_at_best == 2
     assert config.replicates.max_repeats_per_group == 4
     assert config.replicates.noise_floor == pytest.approx(1.0e-6)
+
+
+def test_config_from_yaml_parses_structured_stages(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: structured_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: precursor_ratio
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: annealing_temperature
+    type: continuous
+    lower: 300
+    upper: 900
+  - name: electrolyte
+    type: categorical
+    values: [KOH, NaOH]
+stages:
+  - name: screen
+    variables: [precursor_ratio, electrolyte]
+  - name: refine
+    variables: [precursor_ratio, annealing_temperature]
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert is_structured_campaign(config)
+    assert configured_stage_names(config) == ["screen", "refine"]
+    assert active_variables_for_stage(config, "screen") == [
+        "precursor_ratio",
+        "electrolyte",
+    ]
+    assert config.active_variable_names_for_stage("refine") == [
+        "precursor_ratio",
+        "annealing_temperature",
+    ]
+
+
+def test_structured_stages_reject_empty_stage_list(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: structured_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+stages: []
+""",
+    )
+
+    with pytest.raises(ConfigError, match="stages.*non-empty list"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_structured_stages_reject_duplicate_stage_names(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: structured_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+stages:
+  - name: screen
+    variables: [x]
+  - name: screen
+    variables: [x]
+""",
+    )
+
+    with pytest.raises(ConfigError, match="Duplicate stage name 'screen'"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_structured_stages_reject_unknown_variable_reference(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: structured_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+stages:
+  - name: screen
+    variables: [x, missing_variable]
+""",
+    )
+
+    with pytest.raises(ConfigError, match="references unknown variable 'missing_variable'"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_structured_stages_reject_cost_until_stage_aware_cost_support(
+    tmp_path: Path,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: structured_cost
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: temperature
+    type: continuous
+    lower: 300
+    upper: 900
+cost:
+  expression: "1.0 + temperature / 1000"
+stages:
+  - name: screen
+    variables: [x]
+  - name: refine
+    variables: [x, temperature]
+""",
+    )
+
+    with pytest.raises(ConfigError, match="Structured campaigns with cost"):
+        CampaignConfig.from_yaml(path)
 
 
 def test_replicates_defaults_preserve_noisy_repeat_policy(tmp_path: Path) -> None:
@@ -545,6 +694,22 @@ def test_example_replicate_config_parses() -> None:
     assert config.replicates.enabled
     assert config.variable_names == ["precursor_ratio", "annealing_temperature"]
     assert config.bo.initial_design_size == 4
+
+
+def test_example_structured_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/13_structured_campaign_core.yaml")
+
+    assert config.campaign_name == "structured_campaign_core"
+    assert config.is_structured_campaign
+    assert config.stage_names == ["screen", "refine"]
+    assert config.active_variable_names_for_stage("screen") == [
+        "precursor_ratio",
+        "electrolyte",
+    ]
+    assert config.active_variable_names_for_stage("refine") == [
+        "precursor_ratio",
+        "annealing_temperature",
+    ]
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:

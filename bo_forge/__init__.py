@@ -1,6 +1,6 @@
-"""BO Forge v1.2.3."""
+"""BO Forge v1.3.0."""
 
-__version__ = "1.2.3"
+__version__ = "1.3.0"
 
 from bo_forge.config import (
     BOConfig,
@@ -10,7 +10,11 @@ from bo_forge.config import (
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
+    StageConfig,
     VariableConfig,
+    active_variables_for_stage,
+    configured_stage_names,
+    is_structured_campaign,
 )
 from bo_forge.costs import evaluate_cost
 from bo_forge.errors import (
@@ -49,16 +53,20 @@ __all__ = [
     "ObjectiveConfig",
     "ReplicateConfig",
     "ReviewConfig",
+    "StageConfig",
     "SuggestionError",
     "VariableConfig",
     "__version__",
+    "active_variables_for_stage",
     "append_suggestions",
     "aggregate_observed_replicates",
     "best_replicate_group",
+    "configured_stage_names",
     "evaluate_cost",
     "get_observed_data",
     "hypervolume",
     "hypervolume_progress",
+    "is_structured_campaign",
     "load_campaign_log",
     "mark_observed",
     "pareto_front",

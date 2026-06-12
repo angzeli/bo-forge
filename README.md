@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.2.3
+# 🧪 BO Forge v1.3.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.2.3 keeps the v1.2 launcher, deployment guidance, and service-layer surface while adding an experimental optional FastAPI probe for local or trusted-network API exploration.
+v1.3.0 adds the backend foundation for structured campaign logs with named stages and stage-specific active variables.
 
-The backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.1.4 baseline.
+Existing backend BO behavior, non-structured YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.2.3 baseline.
 
 BO Forge deliberately supports only:
 
@@ -18,6 +18,7 @@ BO Forge deliberately supports only:
 - optional feasibility constraints
 - optional cost-aware ranking and human review
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
+- optional structured/staged campaign logs with stage-aware validation
 - resume from existing logs
 - basic diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
@@ -26,7 +27,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover stage-aware modelling, automatic stage transitions, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -169,7 +170,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.2.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.3.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

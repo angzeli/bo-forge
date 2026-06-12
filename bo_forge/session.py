@@ -122,6 +122,7 @@ class CampaignSession:
             ("best_row_id", best_row_id),
             ("best_objective_value", best_objective_value),
         ]
+        self._extend_structured_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -205,6 +206,7 @@ class CampaignSession:
             ("initial_design_remaining", initial_design_remaining),
             ("next_iteration", next_iteration(self.df)),
         ]
+        self._extend_structured_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -239,6 +241,24 @@ class CampaignSession:
             (str(row["field"]), row["value"]) for _, row in pareto_summary.iterrows()
         )
         return pd.DataFrame(rows, columns=["field", "value"])
+
+    def _extend_structured_summary_rows(self, rows: list[tuple[str, object]]) -> None:
+        if not self.config.is_structured_campaign:
+            return
+        rows.extend(
+            [
+                ("structured_campaign", True),
+                ("stage_count", len(self.config.stages)),
+                ("stages", ", ".join(self.config.stage_names)),
+                (
+                    "stage_active_variables",
+                    "; ".join(
+                        f"{stage.name}: {', '.join(stage.variables)}"
+                        for stage in self.config.stages
+                    ),
+                ),
+            ]
+        )
 
     def _review_status_counts(self) -> dict[str, int]:
         suggested = self.df["status"] == "suggested"
@@ -499,6 +519,7 @@ class CampaignSession:
             objective_value=objective_value,
             objective_values=objective_values,
             actual_cost=actual_cost,
+            config=self.config,
         )
         return self.reload()
 
@@ -509,7 +530,7 @@ class CampaignSession:
         note: str = "",
     ) -> pd.DataFrame:
         """Review one pending suggestion, reload, and return the refreshed log."""
-        _review_suggestion(self.log_path, row_id, decision, note)
+        _review_suggestion(self.log_path, row_id, decision, note, config=self.config)
         return self.reload()
 
     def plot_progress(self, **kwargs: Any) -> Any:

@@ -550,7 +550,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.2.3\n"
+    assert captured.out == "bo-forge 1.3.0\n"
     assert captured.err == ""
 
 
@@ -559,7 +559,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.2.3\n"
+    assert completed.stdout == "bo-forge 1.3.0\n"
     assert completed.stderr == ""
 
 
@@ -866,6 +866,26 @@ def test_suggest_with_pending_suggestions_returns_hint_without_mutating_csv(
         in captured.err
     )
     assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_structured_suggest_fails_clearly_without_mutating_csv(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    log_path.write_bytes(
+        Path("examples/13_structured_campaign_core_campaign_log.csv").read_bytes()
+    )
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Structured campaign suggestion generation is not implemented" in captured.err
+    assert "Hint: Add structured rows manually" in captured.err
+    assert log_path.read_bytes() == before
 
 
 def test_mark_observed_missing_row_returns_hint(

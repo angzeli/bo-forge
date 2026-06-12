@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+from dataclasses import replace
 
 import pandas as pd
 
 from bo_forge.config import CampaignConfig, VariableConfig
-from bo_forge.constraints import constraint_violations_for_row
+from bo_forge.constraints import constraint_variable_names, constraint_violations_for_row
 from bo_forge.errors import LogValidationError
 
 BASE_COLUMNS = ["row_id", "iteration", "status", "source"]
+STAGE_COLUMNS = ["stage"]
 REVIEW_COLUMNS = ["review_status", "review_note"]
 REPLICATE_COLUMNS = ["replicate_group", "replicate_index"]
 COST_COLUMNS = ["cost_estimate", "cost_actual"]
@@ -28,6 +30,7 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
     if config.is_multi_objective:
         return [
             *BASE_COLUMNS,
+            *(STAGE_COLUMNS if config.is_structured_campaign else []),
             *(REVIEW_COLUMNS if config.review.enabled else []),
             *(REPLICATE_COLUMNS if config.replicates.enabled else []),
             *config.variable_names,
@@ -39,6 +42,7 @@ def canonical_columns(config: CampaignConfig) -> list[str]:
         ]
     return [
         *BASE_COLUMNS,
+        *(STAGE_COLUMNS if config.is_structured_campaign else []),
         *(REVIEW_COLUMNS if config.review.enabled else []),
         *(REPLICATE_COLUMNS if config.replicates.enabled else []),
         *config.variable_names,
@@ -59,6 +63,7 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_iteration(df)
     _validate_status(df)
     _validate_source(config, df)
+    _validate_stage(config, df)
     _validate_review(config, df)
     _validate_variables(config, df)
     _validate_replicates(config, df)
@@ -102,10 +107,7 @@ def design_tuples(config: CampaignConfig, df: pd.DataFrame) -> set[tuple[object,
     if df.empty:
         return set()
     return {
-        design_key_for_values(
-            config,
-            [row[variable.name] for variable in config.variables],
-        )
+        _design_key_for_row(config, row)
         for _, row in df.iterrows()
     }
 
@@ -219,7 +221,29 @@ def _validate_review(config: CampaignConfig, df: pd.DataFrame) -> None:
         raise LogValidationError(f"Row '{row_id}' has review_note containing a newline.")
 
 
+def _validate_stage(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if not config.is_structured_campaign:
+        return
+    valid_stages = set(config.stage_names)
+    for index, value in df["stage"].items():
+        if not isinstance(value, str) or not value.strip() or value.strip() != value:
+            row_id = str(df.at[index, "row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has invalid stage: value={value!r}. "
+                "Expected one configured stage name."
+            )
+        if value not in valid_stages:
+            row_id = str(df.at[index, "row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' has unknown stage '{value}'. "
+                f"Expected one of {config.stage_names}."
+            )
+
+
 def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if config.is_structured_campaign:
+        _validate_structured_variables(config, df)
+        return
     for variable in config.variables:
         if variable.type == "categorical":
             _validate_categorical_variable(variable, df)
@@ -241,6 +265,55 @@ def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
             _validate_integer_variable(variable, df, numeric)
         elif variable.type == "discrete":
             _validate_discrete_variable(variable, df, numeric)
+        else:
+            raise LogValidationError(
+                f"Variable '{variable.name}' has unsupported type '{variable.type}'."
+            )
+
+
+def _validate_structured_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
+    active_by_stage = {
+        stage.name: set(stage.variables)
+        for stage in config.stages
+    }
+    for variable in config.variables:
+        variable_name = variable.name
+        active = df["stage"].map(
+            lambda stage, variable_name=variable_name: variable_name in active_by_stage[str(stage)]
+        )
+        inactive_filled = (~active) & ~_blank_mask(df[variable.name])
+        if inactive_filled.any():
+            row_id = str(df.loc[inactive_filled, "row_id"].iloc[0])
+            stage = str(df.loc[inactive_filled, "stage"].iloc[0])
+            value = df.loc[inactive_filled, variable.name].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has value for inactive variable '{variable.name}' "
+                f"in stage '{stage}': value={value!r}. Inactive structured-campaign "
+                "variables must be blank."
+            )
+        active_df = df.loc[active]
+        if active_df.empty:
+            continue
+        if variable.type == "categorical":
+            _validate_categorical_variable(variable, active_df)
+            continue
+
+        numeric = pd.to_numeric(active_df[variable.name], errors="coerce")
+        invalid_numeric = numeric.isna() | ~numeric.map(math.isfinite)
+        if invalid_numeric.any():
+            row_id = str(active_df.loc[invalid_numeric, "row_id"].iloc[0])
+            value = active_df.loc[invalid_numeric, variable.name].iloc[0]
+            raise LogValidationError(
+                f"Row '{row_id}' has non-numeric value for active variable "
+                f"'{variable.name}': value={value!r}."
+            )
+
+        if variable.type == "continuous":
+            _validate_numeric_bounds(variable, active_df, numeric)
+        elif variable.type == "integer":
+            _validate_integer_variable(variable, active_df, numeric)
+        elif variable.type == "discrete":
+            _validate_discrete_variable(variable, active_df, numeric)
         else:
             raise LogValidationError(
                 f"Variable '{variable.name}' has unsupported type '{variable.type}'."
@@ -372,10 +445,7 @@ def _validate_replicates(config: CampaignConfig, df: pd.DataFrame) -> None:
 def _validate_no_duplicate_design_rows(config: CampaignConfig, df: pd.DataFrame) -> None:
     seen: dict[tuple[object, ...], str] = {}
     for _, row in df.iterrows():
-        key = design_key_for_values(
-            config,
-            [row[variable.name] for variable in config.variables],
-        )
+        key = _design_key_for_row(config, row)
         row_id = str(row["row_id"])
         previous = seen.get(key)
         if previous is not None:
@@ -392,10 +462,7 @@ def _validate_replicate_design_consistency(config: CampaignConfig, df: pd.DataFr
     key_to_group: dict[tuple[object, ...], str] = {}
     for _, row in df.iterrows():
         group = str(row["replicate_group"])
-        key = design_key_for_values(
-            config,
-            [row[variable.name] for variable in config.variables],
-        )
+        key = _design_key_for_row(config, row)
         row_id = str(row["row_id"])
         existing_key = group_to_key.get(group)
         if existing_key is not None and existing_key != key:
@@ -413,6 +480,30 @@ def _validate_replicate_design_consistency(config: CampaignConfig, df: pd.DataFr
                 f"replicate_group='{group}'."
             )
         key_to_group[key] = group
+
+
+def _design_key_for_row(config: CampaignConfig, row: pd.Series) -> tuple[object, ...]:
+    if not config.is_structured_campaign:
+        return design_key_for_values(
+            config,
+            [row[variable.name] for variable in config.variables],
+        )
+
+    stage_name = str(row["stage"])
+    active_variable_names = set(config.active_variable_names_for_stage(stage_name))
+    active_variables = [
+        variable
+        for variable in config.variables
+        if variable.name in active_variable_names
+    ]
+    active_values = [row[variable.name] for variable in active_variables]
+    return (
+        stage_name,
+        *(
+            _normalise_variable_value(variable, value)
+            for variable, value in zip(active_variables, active_values, strict=True)
+        ),
+    )
 
 
 def _validate_objective(config: CampaignConfig, df: pd.DataFrame) -> None:
@@ -512,8 +603,49 @@ def _multi_objective_result_columns(config: CampaignConfig) -> list[str]:
 
 
 def _validate_constraints(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if config.is_structured_campaign:
+        _validate_structured_constraints(config, df)
+        return
     for _, row in df.iterrows():
         violations = constraint_violations_for_row(config, row)
+        if violations:
+            constraint = violations[0]
+            row_id = str(row["row_id"])
+            raise LogValidationError(
+                f"Row '{row_id}' violates constraint '{constraint.name}': "
+                f"{constraint.expression}."
+            )
+
+
+def _validate_structured_constraints(config: CampaignConfig, df: pd.DataFrame) -> None:
+    references = {
+        constraint.name: constraint_variable_names(constraint.expression)
+        for constraint in config.constraints
+    }
+    active_by_stage = {
+        stage.name: set(stage.variables)
+        for stage in config.stages
+    }
+    for _, row in df.iterrows():
+        active_variables = active_by_stage[str(row["stage"])]
+        applicable_constraints = tuple(
+            constraint
+            for constraint in config.constraints
+            if references[constraint.name].issubset(active_variables)
+        )
+        if not applicable_constraints:
+            continue
+        stage_variables = tuple(
+            variable
+            for variable in config.variables
+            if variable.name in active_variables
+        )
+        stage_config = replace(
+            config,
+            variables=stage_variables,
+            constraints=applicable_constraints,
+        )
+        violations = constraint_violations_for_row(stage_config, row)
         if violations:
             constraint = violations[0]
             row_id = str(row["row_id"])

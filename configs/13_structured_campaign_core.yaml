@@ -1,0 +1,28 @@
+campaign_name: structured_campaign_core
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: precursor_ratio
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+  - name: annealing_temperature
+    type: integer
+    lower: 300
+    upper: 900
+  - name: electrolyte
+    type: categorical
+    values: [KOH, NaOH]
+constraints:
+  - name: refine_temperature_limit
+    expression: annealing_temperature <= 750
+stages:
+  - name: screen
+    variables: [precursor_ratio, electrolyte]
+  - name: refine
+    variables: [precursor_ratio, annealing_temperature]
+bo:
+  batch_size: 1
+  initial_design_size: 2
+  acquisition: log_ei

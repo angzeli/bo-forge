@@ -512,6 +512,11 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
     if isinstance(exc, SuggestionError):
+        if "Structured campaign suggestion generation is not implemented" in str(exc):
+            return (
+                "Hint: Add structured rows manually, then validate the log before "
+                "marking observations."
+            )
         return (
             "Hint: Resolve pending suggestions or review the campaign state before "
             "requesting new suggestions."

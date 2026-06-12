@@ -10,6 +10,7 @@ from bo_forge.config import (
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
+    StageConfig,
     VariableConfig,
 )
 from bo_forge.errors import LogValidationError, LogWriteError
@@ -46,6 +47,23 @@ def replicate_config() -> CampaignConfig:
         variables=cfg.variables,
         bo=cfg.bo,
         replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def structured_config(*, review: bool = False) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="structured_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 900.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        review=ReviewConfig(enabled=review),
+        stages=(
+            StageConfig("screen", ("x",)),
+            StageConfig("refine", ("x", "temperature")),
+        ),
     )
 
 
@@ -92,6 +110,27 @@ def cost_review_suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
         ],
         columns=canonical_columns(cfg),
     )
+
+
+def structured_suggestion(*, review: bool = False) -> pd.DataFrame:
+    cfg = structured_config(review=review)
+    row = {
+        "row_id": "structured_1",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "manual",
+        "stage": "screen",
+        "x": 0.4,
+        "temperature": "",
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    if review:
+        row["review_status"] = "pending"
+        row["review_note"] = ""
+    return pd.DataFrame([row], columns=canonical_columns(cfg))
 
 
 def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None:
@@ -336,6 +375,55 @@ def test_append_suggestions_requires_config_for_replicate_logs_without_mutation(
         append_suggestions(log_path, suggestions)
 
     assert log_path.read_bytes() == before
+
+
+def test_mark_observed_requires_config_for_structured_logs_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    structured_suggestion().to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="Structured campaign mark_observed requires"):
+        mark_observed(log_path, "structured_1", 1.7)
+
+    assert log_path.read_bytes() == before
+
+
+def test_mark_observed_with_config_supports_structured_logs(tmp_path: Path) -> None:
+    cfg = structured_config()
+    log_path = tmp_path / "campaign.csv"
+    structured_suggestion().to_csv(log_path, index=False)
+
+    mark_observed(log_path, "structured_1", 1.7, config=cfg)
+
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "status"] == "observed"
+    assert float(df.loc[0, "activity"]) == pytest.approx(1.7)
+
+
+def test_review_suggestion_requires_config_for_structured_logs_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    structured_suggestion(review=True).to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="Structured campaign review_suggestion requires"):
+        review_suggestion(log_path, "structured_1", "accept")
+
+    assert log_path.read_bytes() == before
+
+
+def test_review_suggestion_with_config_supports_structured_logs(tmp_path: Path) -> None:
+    cfg = structured_config(review=True)
+    log_path = tmp_path / "campaign.csv"
+    structured_suggestion(review=True).to_csv(log_path, index=False)
+
+    review_suggestion(log_path, "structured_1", "accept", config=cfg)
+
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "review_status"] == "accepted"
 
 
 def test_mark_observed_rejects_missing_row_id(tmp_path: Path) -> None:

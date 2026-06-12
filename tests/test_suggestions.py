@@ -11,6 +11,7 @@ from bo_forge.config import (
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
+    StageConfig,
     VariableConfig,
 )
 from bo_forge.errors import SuggestionError
@@ -40,6 +41,20 @@ def config(batch_size: int = 2, initial_design_size: int = 3) -> CampaignConfig:
             raw_samples=16,
             num_restarts=2,
             mc_samples=16,
+        ),
+    )
+
+
+def structured_config() -> CampaignConfig:
+    cfg = config(batch_size=1, initial_design_size=1)
+    return CampaignConfig(
+        campaign_name="structured_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        stages=(
+            StageConfig("screen", ("x",)),
+            StageConfig("refine", ("x", "temperature")),
         ),
     )
 
@@ -302,6 +317,14 @@ def test_suggest_next_returns_sobol_initial_suggestions() -> None:
     assert suggestions["x"].astype(float).between(0.0, 1.0).all()
     assert suggestions["temperature"].astype(float).between(300.0, 800.0).all()
     assert suggestions["activity"].astype(str).eq("").all()
+
+
+def test_suggest_next_rejects_structured_campaigns_until_stage_aware_modeling() -> None:
+    cfg = structured_config()
+    df = empty_campaign_log(cfg)
+
+    with pytest.raises(SuggestionError, match="Structured campaign suggestion generation"):
+        suggest_next(cfg, df)
 
 
 def test_replicate_suggestions_set_group_to_row_id_and_start_at_zero() -> None:

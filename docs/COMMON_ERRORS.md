@@ -14,6 +14,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
 - `invalid replicate_group` or `invalid replicate_index`: check explicit replicate metadata.
+- `unknown stage` or `inactive variable`: check structured-campaign `stages:` and blank inactive variable cells.
 
 ## ⚙️ Config Errors
 
@@ -117,7 +118,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-v1.1 supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.2.3 is two to four objectives.
+BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.0 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -126,6 +127,26 @@ Fix: define at least two objective mappings, each with `name`, `direction`, and 
 Multi-objective reference points must be numeric and finite.
 
 Fix: set a user-facing value that is meaningfully worse than the region of interest for that objective.
+
+### `Duplicate stage name`
+
+Structured campaign stage names must be unique.
+
+Fix: give every item in `stages:` a distinct non-empty `name`.
+
+### `Stage '...' references unknown variable`
+
+A structured stage lists a variable that is not present in the top-level
+`variables:` list.
+
+Fix: use exact configured variable names in every stage's `variables:` list.
+
+### `Structured campaigns with cost are not supported`
+
+v1.3.0 validates structured logs, but cost-aware structured campaigns are
+deferred because inactive variables are intentionally blank.
+
+Fix: remove either `stages:` or `cost:` from the config.
 
 ## 🧾 CSV Schema Errors
 
@@ -144,6 +165,22 @@ Fix: reorder the CSV header to:
 ```text
 row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predicted_std,acquisition
 ```
+
+For structured campaigns, `stage` belongs immediately after `source`.
+
+### `Row '...' has unknown stage`
+
+The CSV row has a `stage` value that does not match the configured `stages:`.
+
+Fix: use one of the configured stage names.
+
+### `inactive variable`
+
+A structured-campaign row has a filled value for a variable that is not active
+in that row's stage.
+
+Fix: leave inactive variable cells blank. BO Forge intentionally rejects
+ignored inactive values so hand-edited CSV logs remain unambiguous.
 
 ### `Duplicate row_id`
 

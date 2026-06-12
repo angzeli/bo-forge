@@ -17,6 +17,7 @@ from bo_forge.validation import (
     REPLICATE_COLUMNS,
     RESULT_COLUMNS,
     REVIEW_COLUMNS,
+    STAGE_COLUMNS,
     UTILITY_COLUMNS,
     VALID_MULTI_OBJECTIVE_SOURCES,
     VALID_REVIEW_STATUSES,
@@ -69,6 +70,11 @@ def append_suggestions(
     _validate_structural_log(combined)
     if config is not None:
         validate_campaign_data(config, combined)
+    elif _has_stage_column(combined.columns):
+        raise LogWriteError(
+            "Structured campaign append requires config-aware validation; use "
+            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+        )
     elif _has_replicate_columns(combined.columns):
         raise LogWriteError(
             "Replicate append requires config-aware validation; use "
@@ -83,6 +89,7 @@ def mark_observed(
     objective_value: float | None = None,
     objective_values: dict[str, float] | None = None,
     actual_cost: float | None = None,
+    config: CampaignConfig | None = None,
 ) -> None:
     """Mark a suggested row as observed by filling the objective value in place."""
     path = Path(log_path)
@@ -118,6 +125,13 @@ def mark_observed(
 
     df = _read_csv(path)
     _validate_structural_log(df)
+    if config is not None:
+        validate_campaign_data(config, df)
+    elif _has_stage_column(df.columns):
+        raise LogWriteError(
+            "Structured campaign mark_observed requires config-aware validation; use "
+            "mark_observed(..., config=config) or CampaignSession.mark_observed()."
+        )
 
     matches = df["row_id"].astype(str) == row_id
     if not matches.any():
@@ -158,6 +172,8 @@ def mark_observed(
     if actual_cost_text is not None:
         df.at[index, "cost_actual"] = actual_cost_text
     _validate_structural_log(df)
+    if config is not None:
+        validate_campaign_data(config, df)
     _atomic_write_and_validate(path, df)
 
 
@@ -245,6 +261,7 @@ def review_suggestion(
     row_id: str,
     decision: str,
     note: str = "",
+    config: CampaignConfig | None = None,
 ) -> None:
     """Record a human review decision for one suggested row."""
     path = Path(log_path)
@@ -271,6 +288,13 @@ def review_suggestion(
 
     df = _read_csv(path)
     _validate_structural_log(df)
+    if config is not None:
+        validate_campaign_data(config, df)
+    elif _has_stage_column(df.columns):
+        raise LogWriteError(
+            "Structured campaign review_suggestion requires config-aware validation; use "
+            "review_suggestion(..., config=config) or CampaignSession.review_suggestion()."
+        )
     if not _has_review_columns(df.columns):
         raise LogWriteError("Cannot review suggestions because review is not enabled.")
 
@@ -290,6 +314,8 @@ def review_suggestion(
     df.at[index, "review_status"] = decision_map[decision]
     df.at[index, "review_note"] = cleaned_note
     _validate_structural_log(df)
+    if config is not None:
+        validate_campaign_data(config, df)
     _atomic_write_and_validate(path, df)
 
 
@@ -391,14 +417,15 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
         raise LogValidationError(f"Row '{row_id}' has invalid source '{value}'.")
 
     variable_columns, objective_columns = _variable_and_objective_columns(df.columns)
-    for column in variable_columns:
-        invalid = df[column].map(_is_blank)
-        if invalid.any():
-            row_id = str(df.loc[invalid, "row_id"].iloc[0])
-            value = df.loc[invalid, column].iloc[0]
-            raise LogValidationError(
-                f"Row '{row_id}' has blank value for variable '{column}': value={value!r}."
-            )
+    if not _has_stage_column(df.columns):
+        for column in variable_columns:
+            invalid = df[column].map(_is_blank)
+            if invalid.any():
+                row_id = str(df.loc[invalid, "row_id"].iloc[0])
+                value = df.loc[invalid, column].iloc[0]
+                raise LogValidationError(
+                    f"Row '{row_id}' has blank value for variable '{column}': value={value!r}."
+                )
 
     observed = df["status"] == "observed"
     suggested = df["status"] == "suggested"
@@ -568,6 +595,8 @@ def _variable_and_objective_columns(
         return variable_columns, objective_columns
 
     start = len(BASE_COLUMNS)
+    if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+        start += len(STAGE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         start += len(REVIEW_COLUMNS)
     if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
@@ -624,6 +653,8 @@ def _multi_objective_parts_from_columns(
         return None
 
     start = len(BASE_COLUMNS)
+    if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+        start += len(STAGE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         start += len(REVIEW_COLUMNS)
     if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
@@ -674,15 +705,25 @@ def _is_blank(value: object) -> bool:
 def _has_review_columns(columns: pd.Index | list[str]) -> bool:
     column_list = list(columns)
     start = len(BASE_COLUMNS)
+    if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+        start += len(STAGE_COLUMNS)
     return column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS
 
 
 def _has_replicate_columns(columns: pd.Index | list[str]) -> bool:
     column_list = list(columns)
     start = len(BASE_COLUMNS)
+    if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+        start += len(STAGE_COLUMNS)
     if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         start += len(REVIEW_COLUMNS)
     return column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS
+
+
+def _has_stage_column(columns: pd.Index | list[str]) -> bool:
+    column_list = list(columns)
+    start = len(BASE_COLUMNS)
+    return column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS
 
 
 def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
@@ -691,6 +732,8 @@ def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
     if multi_objective_parts is not None:
         variable_columns, objective_columns, _ = multi_objective_parts
         start = len(BASE_COLUMNS)
+        if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+            start += len(STAGE_COLUMNS)
         if column_list[start : start + len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
             start += len(REVIEW_COLUMNS)
         if column_list[start : start + len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:
@@ -699,7 +742,10 @@ def _has_cost_columns(columns: pd.Index | list[str]) -> bool:
         return column_list[cost_start : cost_start + len(COST_COLUMNS)] == COST_COLUMNS
     has_utility = column_list[-len(UTILITY_COLUMNS) :] == UTILITY_COLUMNS
     result_end = len(column_list) - (len(UTILITY_COLUMNS) if has_utility else 0)
-    middle = column_list[len(BASE_COLUMNS) : result_end - len(RESULT_COLUMNS)]
+    start = len(BASE_COLUMNS)
+    if column_list[start : start + len(STAGE_COLUMNS)] == STAGE_COLUMNS:
+        start += len(STAGE_COLUMNS)
+    middle = column_list[start : result_end - len(RESULT_COLUMNS)]
     if middle[: len(REVIEW_COLUMNS)] == REVIEW_COLUMNS:
         middle = middle[len(REVIEW_COLUMNS) :]
     if middle[: len(REPLICATE_COLUMNS)] == REPLICATE_COLUMNS:

@@ -91,7 +91,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.2.3 surfaces coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
+The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.0 keeps coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -114,6 +114,27 @@ bo-forge-api --root . --host 127.0.0.1 --port 8765
 The probe is experimental, root-bound, unauthenticated, and intended only for
 local or trusted-network exploration. Streamlit remains the recommended local
 UI. See [API_PROBE.md](API_PROBE.md) before using it beyond localhost.
+
+## 🧩 Structured Campaign Configs
+
+v1.3.0 adds backend validation for structured campaign logs with named stages.
+Each stage lists the variables active in that stage:
+
+```yaml
+stages:
+  - name: screen
+    variables: [precursor_ratio, solvent]
+  - name: refine
+    variables: [precursor_ratio, annealing_temperature]
+```
+
+Structured CSV logs include `stage` immediately after `source`. For each row,
+variables active in that row's stage must be filled and valid; inactive variable
+cells must be blank. Constraints are evaluated only when every referenced
+variable is active for that row's stage. This is a validation foundation for
+manual staged rows only: stage-aware suggestion generation, automatic stage
+transitions, cost-aware structured campaigns, and Streamlit structured workflow
+support remain deferred.
 
 ## 🔁 Session API
 
@@ -216,7 +237,7 @@ append_suggestions(log_path, suggestions, config=config)
 mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.95)
 ```
 
-Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config=config)` for production workflows. Passing the config lets BO Forge prevalidate the combined CSV log before writing. The backward-compatible `append_suggestions(log_path, suggestions)` form remains available for non-replicate logs, but replicate logs require config-aware append validation.
+Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config=config)` for production workflows. Passing the config lets BO Forge prevalidate the combined CSV log before writing. The backward-compatible `append_suggestions(log_path, suggestions)` form remains available for non-replicate logs, but replicate and structured logs require config-aware append validation. For structured logs, use `CampaignSession.mark_observed()` or pass `config=config` to low-level `mark_observed()`.
 
 ## ⚙️ Example Configs
 
@@ -231,10 +252,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml`: adds coupled two-objective qLogEHVI with mixed variables and constraints.
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml`: generalizes qLogEHVI to a four-objective mixed constrained campaign.
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml`: adds deterministic cost-aware batch ranking to a three-objective qLogEHVI campaign.
+- `configs/13_structured_campaign_core.yaml`: demonstrates structured stage validation for manually staged CSV rows.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-v1.1 supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -269,7 +291,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.2.3 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.0 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 

@@ -43,6 +43,16 @@ def validate_constraint_expression(
     validator.visit(tree)
 
 
+def constraint_variable_names(expression: str) -> set[str]:
+    """Return variable names referenced by a validated constraint expression."""
+    tree = ast.parse(expression, mode="eval")
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+    }
+
+
 def constraint_violations_for_row(
     config: CampaignConfig,
     row: Mapping[str, object],

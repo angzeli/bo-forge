@@ -16,6 +16,7 @@ RESERVED_COLUMNS = {
     "iteration",
     "status",
     "source",
+    "stage",
     "review_status",
     "review_note",
     "replicate_group",
@@ -77,6 +78,12 @@ class ReplicateConfig:
 
 
 @dataclass(frozen=True)
+class StageConfig:
+    name: str
+    variables: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class BOConfig:
     batch_size: int = 1
     initial_design_size: int = 8
@@ -100,6 +107,7 @@ class CampaignConfig:
     cost: CostConfig | None = None
     review: ReviewConfig = field(default_factory=ReviewConfig)
     replicates: ReplicateConfig = field(default_factory=ReplicateConfig)
+    stages: tuple[StageConfig, ...] = ()
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CampaignConfig:
@@ -132,6 +140,23 @@ class CampaignConfig:
         return bool(self.objectives)
 
     @property
+    def is_structured_campaign(self) -> bool:
+        """Return True when this campaign defines staged variable activity."""
+        return bool(self.stages)
+
+    @property
+    def stage_names(self) -> list[str]:
+        """Return configured stage names in YAML order."""
+        return [stage.name for stage in self.stages]
+
+    def active_variable_names_for_stage(self, stage_name: str) -> list[str]:
+        """Return active variable names for a configured stage."""
+        for stage in self.stages:
+            if stage.name == stage_name:
+                return list(stage.variables)
+        raise ConfigError(f"Unknown campaign stage '{stage_name}'.")
+
+    @property
     def direction_sign(self) -> float:
         """Return the multiplier that converts objective values to maximization."""
         if self.objective is None:
@@ -150,6 +175,12 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     variables = _parse_variables(raw.get("variables"), set(objective_names))
     constraints = _parse_constraints(raw.get("constraints", []), variables)
     cost = _parse_cost(raw.get("cost"), variables)
+    stages = _parse_stages(raw.get("stages"), variables)
+    if stages and cost is not None:
+        raise ConfigError(
+            "Structured campaigns with cost are not supported in v1.3.0; "
+            "remove either 'stages' or 'cost'."
+        )
     review = _parse_review(raw.get("review"))
     replicates = _parse_replicates(
         raw.get("replicates"),
@@ -167,7 +198,23 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         cost=cost,
         review=review,
         replicates=replicates,
+        stages=tuple(stages),
     )
+
+
+def is_structured_campaign(config: CampaignConfig) -> bool:
+    """Return True when a campaign config defines structured stages."""
+    return config.is_structured_campaign
+
+
+def configured_stage_names(config: CampaignConfig) -> list[str]:
+    """Return structured campaign stage names in configured order."""
+    return config.stage_names
+
+
+def active_variables_for_stage(config: CampaignConfig, stage_name: str) -> list[str]:
+    """Return active variable names for one structured campaign stage."""
+    return config.active_variable_names_for_stage(stage_name)
 
 
 def _parse_objective_section(raw: dict[str, Any]) -> tuple[ObjectiveConfig, list[ObjectiveConfig]]:
@@ -427,6 +474,58 @@ def _parse_cost(raw: Any, variables: list[VariableConfig]) -> CostConfig | None:
         candidate_pool_size=candidate_pool_size,
         top_k=top_k,
     )
+
+
+def _parse_stages(raw: Any, variables: list[VariableConfig]) -> list[StageConfig]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not raw:
+        raise ConfigError("Config key 'stages' must be a non-empty list when provided.")
+
+    configured_variables = {variable.name for variable in variables}
+    stages: list[StageConfig] = []
+    seen_names: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ConfigError(f"Stage at index {index} must be a mapping.")
+        unsupported = sorted(set(item) - {"name", "variables"})
+        if unsupported:
+            raise ConfigError(f"Stage at index {index} has unsupported keys: {unsupported}.")
+        name = _required_str(item, "name", f"stages[{index}]")
+        if name in seen_names:
+            raise ConfigError(f"Duplicate stage name '{name}'.")
+        variables_raw = item.get("variables")
+        if not isinstance(variables_raw, list) or not variables_raw:
+            raise ConfigError(
+                f"Stage '{name}' must define non-empty list key 'variables'."
+            )
+        active_variables: list[str] = []
+        seen_variables: set[str] = set()
+        for variable_index, variable_name in enumerate(variables_raw):
+            if not isinstance(variable_name, str) or not variable_name.strip():
+                raise ConfigError(
+                    f"Stage '{name}' variable at index {variable_index} must be "
+                    "a non-empty string."
+                )
+            cleaned = variable_name.strip()
+            if cleaned != variable_name:
+                raise ConfigError(
+                    f"Stage '{name}' variable at index {variable_index} has "
+                    f"surrounding whitespace: value={variable_name!r}."
+                )
+            if cleaned in seen_variables:
+                raise ConfigError(
+                    f"Stage '{name}' lists duplicate variable '{cleaned}'."
+                )
+            if cleaned not in configured_variables:
+                raise ConfigError(
+                    f"Stage '{name}' references unknown variable '{cleaned}'."
+                )
+            active_variables.append(cleaned)
+            seen_variables.add(cleaned)
+        stages.append(StageConfig(name=name, variables=tuple(active_variables)))
+        seen_names.add(name)
+    return stages
 
 
 def _parse_review(raw: Any) -> ReviewConfig:

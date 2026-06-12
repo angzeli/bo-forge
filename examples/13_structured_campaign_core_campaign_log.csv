@@ -1,0 +1,4 @@
+row_id,iteration,status,source,stage,precursor_ratio,annealing_temperature,electrolyte,activity,predicted_mean,predicted_std,acquisition
+screen_seed_0,0,observed,manual,screen,0.2,,KOH,1.1,,,
+screen_next,1,suggested,manual,screen,0.5,,NaOH,,,,
+refine_seed_0,2,observed,manual,refine,0.35,650,,1.4,,,

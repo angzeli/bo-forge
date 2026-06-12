@@ -13,6 +13,7 @@ from bo_forge.config import (
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
+    StageConfig,
     VariableConfig,
 )
 from bo_forge.errors import LogValidationError
@@ -135,6 +136,35 @@ def config(direction: str = "maximize", initial_design_size: int = 2) -> Campaig
     )
 
 
+def structured_config() -> CampaignConfig:
+    cfg = config(initial_design_size=1)
+    return CampaignConfig(
+        campaign_name="structured_session_test",
+        objective=cfg.objective,
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 900.0),
+        ),
+        bo=cfg.bo,
+        stages=(
+            StageConfig("screen", ("x",)),
+            StageConfig("refine", ("x", "temperature")),
+        ),
+    )
+
+
+def structured_review_config() -> CampaignConfig:
+    cfg = structured_config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        review=ReviewConfig(enabled=True),
+        stages=cfg.stages,
+    )
+
+
 def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="mixed_session_test",
@@ -202,6 +232,47 @@ def observed_log(cfg: CampaignConfig, values: list[float]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def structured_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "screen_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.2,
+                "temperature": "",
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def structured_pending_log(cfg: CampaignConfig) -> pd.DataFrame:
+    row = {
+        "row_id": "screen_1",
+        "iteration": 1,
+        "status": "suggested",
+        "source": "manual",
+        "stage": "screen",
+        "x": 0.4,
+        "temperature": "",
+        "score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    if cfg.review.enabled:
+        row["review_status"] = "pending"
+        row["review_note"] = ""
+    return pd.DataFrame([row], columns=canonical_columns(cfg))
 
 
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
@@ -362,6 +433,58 @@ def test_from_files_loads_config_and_log(tmp_path: Path) -> None:
     assert campaign.log_path == log_path
     assert campaign.config.campaign_name == "session_test"
     assert len(campaign.df) == 1
+
+
+def test_structured_campaign_summary_includes_stage_metadata(tmp_path: Path) -> None:
+    cfg = structured_config()
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=tmp_path / "structured.csv",
+        config=cfg,
+        df=structured_observed_log(cfg),
+    )
+
+    summary = campaign.summary()
+
+    assert summary_value(summary, "structured_campaign") is True
+    assert summary_value(summary, "stage_count") == 2
+    assert summary_value(summary, "stages") == "screen, refine"
+    assert summary_value(summary, "stage_active_variables") == (
+        "screen: x; refine: x, temperature"
+    )
+
+
+def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path) -> None:
+    cfg = structured_config()
+    log_path = write_log(tmp_path / "structured.csv", cfg, structured_pending_log(cfg))
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    observed = campaign.mark_observed("screen_1", objective_value=1.7)
+
+    assert observed.loc[0, "status"] == "observed"
+    assert float(observed.loc[0, "score"]) == pytest.approx(1.7)
+
+    review_cfg = structured_review_config()
+    review_log_path = write_log(
+        tmp_path / "structured_review.csv",
+        review_cfg,
+        structured_pending_log(review_cfg),
+    )
+    review_campaign = CampaignSession(
+        config_path=tmp_path / "structured_review.yaml",
+        log_path=review_log_path,
+        config=review_cfg,
+        df=pd.read_csv(review_log_path, keep_default_na=False),
+    )
+
+    reviewed = review_campaign.review_suggestion("screen_1", "accept")
+
+    assert reviewed.loc[0, "review_status"] == "accepted"
 
 
 def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> None:

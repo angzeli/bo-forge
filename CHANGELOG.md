@@ -1,5 +1,30 @@
 # 📝 BO Forge Changelog
 
+## v1.3.0 - Structured Campaign Core
+
+This release adds the backend foundation for structured campaign logs with
+named stages and stage-specific active variables.
+
+- Adds optional `stages:` config support with unique stage names and validated
+  variable references.
+- Adds a canonical `stage` CSV column for structured campaign logs.
+- Validates that every structured row uses a configured stage.
+- Requires variables active for a row's stage to be filled and valid.
+- Requires inactive variable cells to stay blank so public CSV logs remain
+  unambiguous and editable.
+- Evaluates constraints for a structured row only when every referenced
+  variable is active in that row's stage.
+- Rejects `stages:` + `cost:` configs in v1.3.0 because stage-aware cost
+  evaluation remains deferred.
+- Adds structured-campaign helper exports for stage detection and active
+  variable lookup.
+- Adds minimal session-summary fields for structured campaign stage metadata.
+- Adds a minimal structured config and seed log example.
+- Keeps stage-aware suggestion generation, automatic stage transitions,
+  cost-aware structured campaigns, multi-fidelity campaigns, contextual BO,
+  Streamlit structured workflows, database storage, and async execution out of
+  scope.
+
 ## v1.2.3 - FastAPI Probe
 
 This release adds an experimental optional FastAPI probe around the internal

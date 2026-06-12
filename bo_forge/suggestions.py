@@ -65,6 +65,11 @@ def suggest_next(
 ) -> pd.DataFrame:
     """Suggest the next experiment or batch for a campaign."""
     validate_campaign_data(config, df)
+    if config.is_structured_campaign:
+        raise SuggestionError(
+            "Structured campaign suggestion generation is not implemented in v1.3.0; "
+            "create staged rows explicitly in the CSV log for now."
+        )
     if has_pending_suggestions(df, config):
         raise SuggestionError(
             "Cannot generate new suggestions while unresolved status='suggested' rows exist."

@@ -8,22 +8,24 @@ BO Forge campaign logs are plain CSV files. The schema is deliberately strict so
 row_id,iteration,status,source,<variable columns...>,<objective column>,predicted_mean,predicted_std,acquisition
 ```
 
-When `review.enabled: true`, add `review_status,review_note` immediately after `source`.
+When `stages:` is configured, add `stage` immediately after `source`.
 
-When `replicates.enabled: true`, add `replicate_group,replicate_index` immediately after `source`, or immediately after the review columns when review is also enabled.
+When `review.enabled: true`, add `review_status,review_note` immediately after `source`, or immediately after `stage` when structured stages are configured.
+
+When `replicates.enabled: true`, add `replicate_group,replicate_index` immediately after `source`, after `stage`, or after the review columns when review is also enabled.
 
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after the objective column and add `utility` immediately after `acquisition`.
 
 The full cost + review + replicates schema is:
 
 ```text
-row_id,iteration,status,source,review_status,review_note,replicate_group,replicate_index,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
+row_id,iteration,status,source,[stage],review_status,review_note,replicate_group,replicate_index,<variable columns...>,<objective column>,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
 ```
 
 For v1.1 multi-objective campaigns, the schema scales with the configured objective order:
 
 ```text
-row_id,iteration,status,source,[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,[cost_estimate,cost_actual],predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition,[utility]
+row_id,iteration,status,source,[stage],[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,[cost_estimate,cost_actual],predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition,[utility]
 ```
 
 Multi-objective campaigns in v1.1 assume coupled objective evaluation: every observed row contains all configured objective values. Suggested rows keep every objective column blank until the experiment is complete.
@@ -42,6 +44,7 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
 | `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qlog_ehvi`, or `cost_qlog_ehvi` for cost-aware multi-objective campaigns. |
+| `stage` | If `stages:` configured | One configured stage name. Structured logs place this column immediately after `source`. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
 | `replicate_group` | If replicates enabled | Nonblank replicate-group identifier. Rows in a group share one design. |
@@ -67,7 +70,7 @@ Suggested rows:
 
 - `status` must be `suggested`.
 - The objective cell must be blank.
-- Variable values must be filled and valid for the configured variable type.
+- Variable values must be filled and valid for the configured variable type, except inactive structured-campaign variables, which must be blank.
 - `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_ehvi`, or `cost_qlog_ehvi`.
 - For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
 - For single-objective cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
@@ -83,6 +86,40 @@ Observed rows:
 - For cost-aware campaigns, `cost_actual` may be filled when the experiment is marked observed.
 
 If `review` is not enabled, review columns are unsupported extras. If `cost` is not configured, cost and utility columns are unsupported extras. If `replicates` is not enabled, replicate columns are unsupported extras.
+
+## 🧩 Structured Campaign Logs
+
+v1.3.0 adds a minimal structured-campaign foundation through an optional
+top-level `stages:` list:
+
+```yaml
+stages:
+  - name: screen
+    variables: [precursor_ratio, solvent]
+  - name: refine
+    variables: [precursor_ratio, annealing_temperature]
+```
+
+Rules:
+
+- stage names must be unique non-empty strings;
+- every stage variable must refer to a configured variable name;
+- structured CSV logs must include `stage` immediately after `source`;
+- every row's `stage` value must match one configured stage name;
+- variables active for the row's stage must be filled and valid;
+- inactive variables must be blank.
+- constraints are evaluated for a row only when every variable referenced by the
+  constraint is active in that row's stage;
+- `stages:` cannot be combined with `cost:` in v1.3.0.
+
+The blank-only inactive-variable rule is intentional. It keeps public CSV values
+editable and prevents ignored inactive values from being confused with active
+design settings.
+
+v1.3.0 validates manually staged logs and exposes stage metadata in session
+summaries, but it does not yet implement stage-aware suggestion generation,
+automatic stage transitions, multi-fidelity semantics, contextual BO, cost-aware
+structured campaigns, or Streamlit structured workflow support.
 
 ## 🔁 Suggested To Observed Transition
 
@@ -103,7 +140,11 @@ mark_observed(
 - fills the objective value;
 - changes `status` from `suggested` to `observed`;
 - preserves `row_id`, `iteration`, `source`, and variable values;
-- validates before and after writing.
+- validates the CSV structure before and after writing.
+
+For structured campaigns, prefer `CampaignSession.mark_observed()` or pass
+`config=config` to the low-level helper so BO Forge can validate the configured
+stage and active-variable rules before writing.
 
 For cost-aware campaigns, `mark_observed(..., actual_cost=...)` records a finite non-negative realised cost in `cost_actual`. For review-enabled campaigns, only `review_status=accepted` rows can be marked observed.
 
@@ -161,7 +202,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -171,7 +212,7 @@ v1.1 supports `m >= 2` objectives with coupled evaluation. The primary tested ra
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.2.3. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
+Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.3.0. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -198,7 +239,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.2.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.3.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 

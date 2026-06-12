@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.2.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.3.0.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -20,16 +20,20 @@ These names are supported imports from `bo_forge`:
 - `ObjectiveConfig`
 - `ReplicateConfig`
 - `ReviewConfig`
+- `StageConfig`
 - `SuggestionError`
 - `VariableConfig`
 - `__version__`
+- `active_variables_for_stage`
 - `append_suggestions`
 - `aggregate_observed_replicates`
 - `best_replicate_group`
+- `configured_stage_names`
 - `evaluate_cost`
 - `get_observed_data`
 - `hypervolume`
 - `hypervolume_progress`
+- `is_structured_campaign`
 - `load_campaign_log`
 - `mark_observed`
 - `pareto_front`
@@ -44,7 +48,12 @@ These names are supported imports from `bo_forge`:
 
 Replicate-enabled model fitting keeps raw CSV rows as the source of truth, but trains on one group-mean row per `replicate_group`. When empirical replicate variance is available, BO Forge passes group-mean observation variance to BoTorch as `train_Yvar`; otherwise it keeps learned-noise GP behavior.
 
-For append safety, prefer `CampaignSession.append_suggestions()` or `append_suggestions(log_path, suggestions, config=config)`. The config-aware path validates the combined CSV log before writing. Calling `append_suggestions(log_path, suggestions)` without a config remains supported for non-replicate logs, but replicate logs require config-aware append validation.
+For append safety, prefer `CampaignSession.append_suggestions()` or `append_suggestions(log_path, suggestions, config=config)`. The config-aware path validates the combined CSV log before writing. Calling `append_suggestions(log_path, suggestions)` without a config remains supported for non-replicate, non-structured logs, but replicate and structured logs require config-aware append validation. Structured logs also require config-aware `mark_observed()` and `review_suggestion()` transitions; use the `CampaignSession` methods or pass `config=config` to the low-level helpers.
+
+Structured campaigns expose stage metadata through `StageConfig`,
+`is_structured_campaign`, `configured_stage_names`, and
+`active_variables_for_stage`. v1.3.0 validates structured logs but does not yet
+provide stage-aware suggestion generation or cost-aware structured campaigns.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 
