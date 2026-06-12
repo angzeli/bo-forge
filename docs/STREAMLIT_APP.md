@@ -1,12 +1,12 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.3.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.3.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
 The v1.1.4 UI baseline uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
-v1.3.0 keeps backend behavior and user-facing app workflow semantics unchanged from the v1.2 service-layer baseline.
+v1.3.1 keeps backend behavior and user-facing app workflow semantics unchanged from the v1.2 service-layer baseline.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -146,7 +146,7 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - Streamlit cost support surfaces deterministic cost metadata and ranking, not a
   learned cost model;
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
-  replicate configs use the backend `new_only` policy in v1.3.0.
+  replicate configs use the backend `new_only` policy in v1.3.1.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.

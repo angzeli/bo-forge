@@ -18,7 +18,7 @@ from bo_forge.acquisition import (
     optimize_qlog_ehvi,
 )
 from bo_forge.config import CampaignConfig
-from bo_forge.constraints import constraint_violations_for_values
+from bo_forge.constraints import constraint_variable_names, constraint_violations_for_values
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model
@@ -52,6 +52,16 @@ _GENERATION_FAILURE_HINT = (
     "The feasible design space may be exhausted, constraints may be too restrictive, "
     "or bo.min_normalized_distance may be too large."
 )
+SUGGESTION_QUALITY_COLUMNS = [
+    "row_id",
+    "is_feasible",
+    "violated_constraints",
+    "is_exact_duplicate",
+    "duplicate_allowed_by_replicates",
+    "nearest_existing_distance",
+    "nearest_batch_distance",
+    "passes_distance_threshold",
+]
 
 
 class _CandidateGenerationExhausted(SuggestionError):
@@ -62,14 +72,19 @@ def suggest_next(
     config: CampaignConfig,
     df: pd.DataFrame,
     batch_size: int | None = None,
+    stage: str | None = None,
 ) -> pd.DataFrame:
     """Suggest the next experiment or batch for a campaign."""
     validate_campaign_data(config, df)
     if config.is_structured_campaign:
-        raise SuggestionError(
-            "Structured campaign suggestion generation is not implemented in v1.3.0; "
-            "create staged rows explicitly in the CSV log for now."
+        return _suggest_structured_stage(
+            config=config,
+            df=df,
+            batch_size=batch_size,
+            stage=stage,
         )
+    if stage is not None:
+        raise SuggestionError("--stage is only valid for structured campaign configs.")
     if has_pending_suggestions(df, config):
         raise SuggestionError(
             "Cannot generate new suggestions while unresolved status='suggested' rows exist."
@@ -139,6 +154,112 @@ def suggest_next(
         observed_df=observed_df,
         batch_size=requested_batch_size,
     )
+
+
+def _suggest_structured_stage(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    batch_size: int | None,
+    stage: str | None,
+) -> pd.DataFrame:
+    stage_name = _resolve_structured_stage(config, stage)
+    if config.cost is not None:
+        raise SuggestionError(
+            "Structured campaign suggestions with cost are not supported in v1.3.1."
+        )
+    if has_pending_suggestions(df, config):
+        raise SuggestionError(
+            "Cannot generate new suggestions while unresolved status='suggested' rows exist."
+        )
+
+    stage_config = _stage_local_config(config, stage_name)
+    stage_df = _stage_local_dataframe(config, df, stage_name, stage_config)
+    local_suggestions = suggest_next(stage_config, stage_df, batch_size=batch_size)
+    suggestions = _expand_stage_suggestions(
+        config=config,
+        stage_name=stage_name,
+        local_suggestions=local_suggestions,
+        iteration=next_iteration(df),
+    )
+    combined = pd.concat([df, suggestions], ignore_index=True)
+    validate_campaign_data(config, combined)
+    return suggestions
+
+
+def _resolve_structured_stage(config: CampaignConfig, stage: str | None) -> str:
+    if stage is None:
+        if len(config.stages) == 1:
+            stage = config.stages[0].name
+        else:
+            raise SuggestionError(
+                "Structured campaign suggestions require an explicit stage. "
+                f"Pass stage=... or CLI --stage with one of {config.stage_names}."
+            )
+    if not isinstance(stage, str) or not stage.strip() or stage.strip() != stage:
+        raise SuggestionError(f"Invalid structured campaign stage: value={stage!r}.")
+    if stage not in config.stage_names:
+        raise SuggestionError(
+            f"Unknown structured campaign stage '{stage}'. Expected one of {config.stage_names}."
+        )
+    active_variables = config.active_variable_names_for_stage(stage)
+    if not active_variables:
+        raise SuggestionError(f"Structured campaign stage '{stage}' has no active variables.")
+    return stage
+
+
+def _stage_local_config(config: CampaignConfig, stage_name: str) -> CampaignConfig:
+    active_names = set(config.active_variable_names_for_stage(stage_name))
+    active_variables = tuple(
+        variable
+        for variable in config.variables
+        if variable.name in active_names
+    )
+    applicable_constraints = tuple(
+        constraint
+        for constraint in config.constraints
+        if constraint_variable_names(constraint.expression).issubset(active_names)
+    )
+    return replace(
+        config,
+        variables=active_variables,
+        constraints=applicable_constraints,
+        stages=(),
+    )
+
+
+def _stage_local_dataframe(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    stage_name: str,
+    stage_config: CampaignConfig,
+) -> pd.DataFrame:
+    stage_rows = df.loc[df["stage"] == stage_name]
+    columns = canonical_columns(stage_config)
+    local = pd.DataFrame(columns=columns)
+    for column in columns:
+        if column in stage_rows.columns:
+            local[column] = stage_rows[column].to_numpy()
+    return local.loc[:, columns].copy()
+
+
+def _expand_stage_suggestions(
+    *,
+    config: CampaignConfig,
+    stage_name: str,
+    local_suggestions: pd.DataFrame,
+    iteration: int,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for _, local_row in local_suggestions.iterrows():
+        row = _empty_row(config)
+        for column in local_suggestions.columns:
+            if column in row:
+                row[column] = local_row[column]
+        row["stage"] = stage_name
+        row["iteration"] = iteration
+        rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(config))
 
 
 def _suggest_initial_design(
@@ -1075,6 +1196,8 @@ def suggestion_quality_summary(
 ) -> pd.DataFrame:
     """Return read-only quality diagnostics for suggested rows."""
     validate_campaign_data(config, df)
+    if config.is_structured_campaign:
+        return _structured_suggestion_quality_summary(config, df, suggestions)
     required_columns = {"row_id", *config.variable_names}
     missing = sorted(required_columns - set(suggestions.columns))
     if missing:
@@ -1161,17 +1284,34 @@ def suggestion_quality_summary(
 
     return pd.DataFrame(
         rows,
-        columns=[
-            "row_id",
-            "is_feasible",
-            "violated_constraints",
-            "is_exact_duplicate",
-            "duplicate_allowed_by_replicates",
-            "nearest_existing_distance",
-            "nearest_batch_distance",
-            "passes_distance_threshold",
-        ],
+        columns=SUGGESTION_QUALITY_COLUMNS,
     )
+
+
+def _structured_suggestion_quality_summary(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    suggestions: pd.DataFrame,
+) -> pd.DataFrame:
+    validate_campaign_data(config, suggestions)
+    rows: list[pd.DataFrame] = []
+    for stage_name in config.stage_names:
+        stage_suggestions = suggestions.loc[suggestions["stage"] == stage_name]
+        if stage_suggestions.empty:
+            continue
+        stage_config = _stage_local_config(config, stage_name)
+        stage_df = _stage_local_dataframe(config, df, stage_name, stage_config)
+        local_suggestions = _stage_local_dataframe(
+            config,
+            stage_suggestions,
+            stage_name,
+            stage_config,
+        )
+        quality = suggestion_quality_summary(stage_config, stage_df, local_suggestions)
+        rows.append(quality)
+    if not rows:
+        return pd.DataFrame(columns=SUGGESTION_QUALITY_COLUMNS)
+    return pd.concat(rows, ignore_index=True)
 
 
 def _candidate_values_from_df(

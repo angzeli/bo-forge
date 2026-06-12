@@ -14,7 +14,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
 - `invalid replicate_group` or `invalid replicate_index`: check explicit replicate metadata.
-- `unknown stage` or `inactive variable`: check structured-campaign `stages:` and blank inactive variable cells.
+- `require an explicit stage`, `unknown stage`, or `inactive variable`: check structured-campaign `stages:`, pass `--stage` for structured suggestions, and keep inactive variable cells blank.
 
 ## ⚙️ Config Errors
 
@@ -118,7 +118,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.0 is two to four objectives.
+BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.1 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -143,10 +143,24 @@ Fix: use exact configured variable names in every stage's `variables:` list.
 
 ### `Structured campaigns with cost are not supported`
 
-v1.3.0 validates structured logs, but cost-aware structured campaigns are
+v1.3.1 validates structured logs, but cost-aware structured campaigns are
 deferred because inactive variables are intentionally blank.
 
 Fix: remove either `stages:` or `cost:` from the config.
+
+### `Structured campaign suggestions require an explicit stage`
+
+Structured campaigns with more than one configured stage need an explicit stage
+selection for suggestion generation.
+
+Fix: call `campaign.suggest_next(stage="screen")` or pass
+`bo-forge suggest --stage screen` using one configured stage name.
+
+### `Unknown structured campaign stage`
+
+The requested suggestion stage is not present in the config's `stages:` list.
+
+Fix: check the configured stage names and pass one exact stage name.
 
 ## 🧾 CSV Schema Errors
 

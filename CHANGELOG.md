@@ -1,5 +1,27 @@
 # 📝 BO Forge Changelog
 
+## v1.3.1 - Stage-aware Suggestions And CLI
+
+This release adds explicit stage-aware suggestion generation on top of the
+v1.3.0 structured campaign core.
+
+- Adds `stage=` support to `CampaignSession.suggest_next()` and the backend
+  `suggest_next()` helper for structured campaigns.
+- Adds `bo-forge suggest --stage STAGE_NAME` for dry-run and `--append`
+  structured suggestions.
+- Populates the canonical `stage` column on generated structured rows.
+- Generates only active variables for the selected stage and leaves inactive
+  variables blank.
+- Requires an explicit stage when a structured campaign has multiple stages,
+  while allowing safe inference for a single-stage structured campaign.
+- Keeps duplicate checks stage-aware by evaluating candidate quality in the
+  selected stage's active-variable space.
+- Evaluates only constraints whose referenced variables are active for the
+  selected stage.
+- Keeps automatic stage transitions, stage reports, notebooks, Streamlit
+  structured workflow, multi-fidelity campaigns, contextual BO, database
+  storage, and async execution out of scope.
+
 ## v1.3.0 - Structured Campaign Core
 
 This release adds the backend foundation for structured campaign logs with

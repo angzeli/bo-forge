@@ -110,16 +110,19 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v1.3.0.
+- `stages:` cannot be combined with `cost:` in v1.3.1.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
 design settings.
 
-v1.3.0 validates manually staged logs and exposes stage metadata in session
-summaries, but it does not yet implement stage-aware suggestion generation,
-automatic stage transitions, multi-fidelity semantics, contextual BO, cost-aware
-structured campaigns, or Streamlit structured workflow support.
+v1.3.1 adds explicit stage-aware suggestions through
+`CampaignSession.suggest_next(stage="...")` and `bo-forge suggest --stage ...`.
+Generated structured suggestions populate the selected `stage`, fill only that
+stage's active variables, and leave inactive variables blank. Automatic stage
+transitions, stage reports, multi-fidelity semantics, contextual BO,
+cost-aware structured campaigns, and Streamlit structured workflow support
+remain deferred.
 
 ## 🔁 Suggested To Observed Transition
 
@@ -194,7 +197,7 @@ Blank `utility` is expected for initial Sobol/random suggestions, because no mod
 
 ## ✅ Constraint Rules
 
-If a config defines `constraints`, every CSV row must satisfy every constraint regardless of `status` or `source`.
+If a non-structured config defines `constraints`, every CSV row must satisfy every constraint regardless of `status` or `source`. In structured campaigns, a constraint is evaluated for a row only when every variable referenced by that constraint is active in the row's stage.
 
 This means manual historical rows, Sobol/random initial suggestions, and LogEI/qLogEI model suggestions all follow the same feasibility rules. A row that violates a constraint fails CSV validation with the row ID, constraint name, and expression.
 
@@ -202,7 +205,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.3.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -212,7 +215,7 @@ BO Forge supports `m >= 2` objectives with coupled evaluation. The primary teste
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.3.0. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
+Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.3.1. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -239,7 +242,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.3.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.3.1, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 

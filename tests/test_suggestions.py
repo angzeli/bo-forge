@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import pytest
 import torch
@@ -319,12 +321,179 @@ def test_suggest_next_returns_sobol_initial_suggestions() -> None:
     assert suggestions["activity"].astype(str).eq("").all()
 
 
-def test_suggest_next_rejects_structured_campaigns_until_stage_aware_modeling() -> None:
+def test_structured_suggest_requires_stage_when_ambiguous() -> None:
     cfg = structured_config()
     df = empty_campaign_log(cfg)
 
-    with pytest.raises(SuggestionError, match="Structured campaign suggestion generation"):
+    with pytest.raises(SuggestionError, match="require an explicit stage"):
         suggest_next(cfg, df)
+
+
+def test_structured_suggest_rejects_unknown_stage() -> None:
+    cfg = structured_config()
+    df = empty_campaign_log(cfg)
+
+    with pytest.raises(SuggestionError, match="Unknown structured campaign stage 'unknown'"):
+        suggest_next(cfg, df, stage="unknown")
+
+
+def test_structured_suggest_rejects_stage_with_no_active_variables() -> None:
+    cfg = CampaignConfig(
+        campaign_name="bad_structured",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        stages=(StageConfig("empty", ()),),
+    )
+    df = empty_campaign_log(cfg)
+
+    with pytest.raises(SuggestionError, match="has no active variables"):
+        suggest_next(cfg, df, stage="empty")
+
+
+def test_structured_suggest_populates_stage_and_only_active_variables() -> None:
+    cfg = structured_config()
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df, stage="screen")
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "x"] != ""
+    assert suggestions.loc[0, "temperature"] == ""
+    assert suggestions.loc[0, "activity"] == ""
+
+
+def test_structured_model_based_suggest_uses_selected_stage() -> None:
+    cfg = structured_config()
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "screen_obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.2,
+                "temperature": "",
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "screen_obs_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.8,
+                "temperature": "",
+                "activity": 1.3,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    suggestions = suggest_next(cfg, df, stage="screen")
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "x"] != ""
+    assert suggestions.loc[0, "temperature"] == ""
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean"]))
+    assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
+    assert math.isfinite(float(suggestions.loc[0, "acquisition"]))
+
+
+def test_structured_single_stage_can_infer_stage() -> None:
+    base = structured_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        stages=(StageConfig("screen", ("x",)),),
+    )
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "temperature"] == ""
+
+
+def test_structured_suggest_ignores_constraints_with_inactive_variables() -> None:
+    base = structured_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        constraints=(ConstraintConfig("temperature_low", "temperature <= 300"),),
+        stages=base.stages,
+    )
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df, stage="screen")
+
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "temperature"] == ""
+
+
+def test_structured_suggest_applies_constraints_with_active_variables() -> None:
+    cfg = CampaignConfig(
+        campaign_name="structured_active_constraint",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("solvent", "categorical", values=("A",)),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, random_seed=3),
+        constraints=(ConstraintConfig("only_a", "solvent == 'A'"),),
+        stages=(StageConfig("screen", ("solvent",)),),
+    )
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df, stage="screen")
+
+    assert suggestions.loc[0, "solvent"] == "A"
+
+
+def test_structured_duplicate_checks_are_stage_aware() -> None:
+    cfg = CampaignConfig(
+        campaign_name="structured_duplicate",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("solvent", "categorical", values=("A",)),),
+        bo=BOConfig(batch_size=1, initial_design_size=1, random_seed=3),
+        stages=(
+            StageConfig("screen", ("solvent",)),
+            StageConfig("refine", ("solvent",)),
+        ),
+    )
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "refine_obs",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "refine",
+                "solvent": "A",
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    suggestions = suggest_next(cfg, df, stage="screen")
+
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "solvent"] == "A"
 
 
 def test_replicate_suggestions_set_group_to_row_id_and_start_at_zero() -> None:

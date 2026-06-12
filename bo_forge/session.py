@@ -339,6 +339,12 @@ class CampaignSession:
     def next_action(self) -> pd.DataFrame:
         """Return the recommended next notebook action without mutating state."""
         campaign_status = self.campaign_status()
+        structured_stage_arg = ""
+        if self.config.is_structured_campaign:
+            if len(self.config.stage_names) == 1:
+                structured_stage_arg = f"stage={self.config.stage_names[0]!r}"
+            else:
+                structured_stage_arg = "stage='STAGE_NAME'"
         if campaign_status == "has_pending_suggestions":
             if self.config.review.enabled and not self.review_queue().empty:
                 action = "review_pending_suggestions"
@@ -392,17 +398,30 @@ class CampaignSession:
         elif campaign_status == "ready_for_initial_design":
             action = "suggest_initial_design"
             reason = "Observed rows are below initial_design_size; request Sobol suggestions."
-            suggested_call = (
-                "suggestions = campaign.suggest_next(); "
-                "campaign.append_suggestions(suggestions)"
-            )
+            if structured_stage_arg:
+                suggested_call = (
+                    f"suggestions = campaign.suggest_next({structured_stage_arg}); "
+                    "campaign.append_suggestions(suggestions)"
+                )
+            else:
+                suggested_call = (
+                    "suggestions = campaign.suggest_next(); "
+                    "campaign.append_suggestions(suggestions)"
+                )
         else:
             action = "suggest_bo"
             reason = "Initial design is complete and no pending suggestions remain."
-            suggested_call = (
-                "suggestions = campaign.suggest_next(batch_size=...); "
-                "campaign.append_suggestions(suggestions)"
-            )
+            if structured_stage_arg:
+                suggested_call = (
+                    "suggestions = campaign.suggest_next("
+                    f"batch_size=..., {structured_stage_arg}); "
+                    "campaign.append_suggestions(suggestions)"
+                )
+            else:
+                suggested_call = (
+                    "suggestions = campaign.suggest_next(batch_size=...); "
+                    "campaign.append_suggestions(suggestions)"
+                )
 
         return pd.DataFrame(
             [
@@ -488,9 +507,18 @@ class CampaignSession:
         """Return the best replicate group by mean objective."""
         return _best_replicate_group(self.config, self.df)
 
-    def suggest_next(self, batch_size: int | None = None) -> pd.DataFrame:
+    def suggest_next(
+        self,
+        batch_size: int | None = None,
+        stage: str | None = None,
+    ) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
-        return _suggest_next(self.config, self.df.copy(deep=True), batch_size=batch_size)
+        return _suggest_next(
+            self.config,
+            self.df.copy(deep=True),
+            batch_size=batch_size,
+            stage=stage,
+        )
 
     def suggestion_quality(self, suggestions: pd.DataFrame) -> pd.DataFrame:
         """Return read-only quality diagnostics for suggested rows."""

@@ -91,7 +91,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.0 keeps coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
+The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.1 keeps coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -117,7 +117,7 @@ UI. See [API_PROBE.md](API_PROBE.md) before using it beyond localhost.
 
 ## 🧩 Structured Campaign Configs
 
-v1.3.0 adds backend validation for structured campaign logs with named stages.
+v1.3.0 added backend validation for structured campaign logs with named stages.
 Each stage lists the variables active in that stage:
 
 ```yaml
@@ -131,8 +131,28 @@ stages:
 Structured CSV logs include `stage` immediately after `source`. For each row,
 variables active in that row's stage must be filled and valid; inactive variable
 cells must be blank. Constraints are evaluated only when every referenced
-variable is active for that row's stage. This is a validation foundation for
-manual staged rows only: stage-aware suggestion generation, automatic stage
+variable is active for that row's stage.
+
+v1.3.1 adds explicit stage-aware suggestions through the session API and CLI:
+
+```python
+suggestions = campaign.suggest_next(batch_size=1, stage="screen")
+```
+
+```bash
+bo-forge init-log \
+  --config configs/13_structured_campaign_core.yaml \
+  --log examples/13_structured_campaign_core_working_log.csv
+
+bo-forge suggest \
+  --config configs/13_structured_campaign_core.yaml \
+  --log examples/13_structured_campaign_core_working_log.csv \
+  --stage screen
+```
+
+Generated structured suggestions populate `stage`, fill only the selected
+stage's active variables, and leave inactive variables blank. If a structured
+campaign has multiple stages, pass the stage explicitly. Automatic stage
 transitions, cost-aware structured campaigns, and Streamlit structured workflow
 support remain deferred.
 
@@ -195,7 +215,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.best_replicate_group()` | Return the best single-objective replicate group by mean objective. Multi-objective replicate campaigns should use `campaign.replicate_summary()` and `campaign.pareto_front()`. |
 | `campaign.pareto_front()` | Return nondominated observed rows for a multi-objective campaign. |
 | `campaign.pareto_summary()` | Return Pareto-count, reference-point, direction, and hypervolume fields. |
-| `campaign.suggest_next(batch_size=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. |
+| `campaign.suggest_next(batch_size=None, stage=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. Structured campaigns with multiple stages require `stage`. |
 | `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
 | `campaign.mark_observed(row_id, objective_value, actual_cost=None)` | Mark one pending suggestion observed, optionally record actual cost, and refresh `campaign.df`. |
@@ -252,11 +272,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml`: adds coupled two-objective qLogEHVI with mixed variables and constraints.
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml`: generalizes qLogEHVI to a four-objective mixed constrained campaign.
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml`: adds deterministic cost-aware batch ranking to a three-objective qLogEHVI campaign.
-- `configs/13_structured_campaign_core.yaml`: demonstrates structured stage validation for manually staged CSV rows.
+- `configs/13_structured_campaign_core.yaml`: demonstrates structured stage validation and explicit stage-aware suggestions.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -291,7 +311,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.0 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.1 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 

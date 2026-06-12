@@ -113,6 +113,10 @@ def build_parser() -> argparse.ArgumentParser:
     suggest_parser = subparsers.add_parser("suggest", help="Generate campaign suggestions.")
     _add_config_log_arguments(suggest_parser)
     suggest_parser.add_argument("--batch-size", type=int, help="Override configured batch size.")
+    suggest_parser.add_argument(
+        "--stage",
+        help="Structured campaign stage name for stage-aware suggestions.",
+    )
     suggest_parser.add_argument("--output", type=Path, help="Optional suggestions CSV output path.")
     suggest_parser.add_argument(
         "--append",
@@ -323,7 +327,7 @@ def _cmd_report(args: argparse.Namespace) -> int:
 
 def _cmd_suggest(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    suggestions = campaign.suggest_next(batch_size=args.batch_size)
+    suggestions = campaign.suggest_next(batch_size=args.batch_size, stage=args.stage)
 
     print(f"Generated {len(suggestions)} suggestion(s).")
     if args.output is None:
@@ -512,10 +516,16 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
     if isinstance(exc, SuggestionError):
-        if "Structured campaign suggestion generation is not implemented" in str(exc):
+        if (
+            "Structured campaign suggestions require an explicit stage" in str(exc)
+            or "Invalid structured campaign stage" in str(exc)
+            or "Unknown structured campaign stage" in str(exc)
+            or "has no active variables" in str(exc)
+            or "--stage is only valid" in str(exc)
+        ):
             return (
-                "Hint: Add structured rows manually, then validate the log before "
-                "marking observations."
+                "Hint: Use --stage with one configured structured stage name, "
+                "or omit --stage for non-structured campaigns."
             )
         return (
             "Hint: Resolve pending suggestions or review the campaign state before "

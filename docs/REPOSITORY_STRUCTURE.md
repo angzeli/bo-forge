@@ -144,7 +144,7 @@ The repository also includes:
 - `configs/10_multi_objective_mixed_constrained_qlogehvi.yaml` as a coupled two-objective mixed constrained example,
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml` as a four-objective mixed constrained example,
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml` as a three-objective cost-aware qLogEHVI example,
-- and `configs/13_structured_campaign_core.yaml` as a structured stage-validation example for manually staged rows.
+- and `configs/13_structured_campaign_core.yaml` as a structured stage-validation and explicit stage-aware suggestion example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

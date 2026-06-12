@@ -18,6 +18,7 @@ flowchart LR
     v122["v1.2.2<br/>Python backend service layer"]
     v123["v1.2.3<br/>FastAPI probe"]
     v130["v1.3.0<br/>Structured campaign core"]
+    v131["v1.3.1<br/>Stage-aware suggestions + CLI"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -29,11 +30,12 @@ flowchart LR
     v12 -.-> v122
     v12 -.-> v123
     v13 -.-> v130
+    v13 -.-> v131
 
     class v10,v11,v12 majorDone
     class v13 majorActive
     class later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -41,7 +43,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.3.0`. The v1.2.x line is complete; v1.3 starts with a structured campaign core that validates named stages and stage-specific active variables while keeping stage-aware modelling and automatic transitions deferred.
+Current baseline: `v1.3.1`. The v1.2.x line is complete; v1.3 now has a structured campaign core plus explicit stage-aware backend/session/CLI suggestions while keeping automatic stage transitions and richer structured reports deferred.
 
 ### Patch Notes So Far
 
@@ -58,6 +60,7 @@ Current baseline: `v1.3.0`. The v1.2.x line is complete; v1.3 starts with a stru
 | `v1.2.2` | Patch | Internal non-HTTP Python service layer for Streamlit-facing campaign workflows |
 | `v1.2.3` | Patch | Experimental optional FastAPI probe around `CampaignAppService` for local or trusted-network API exploration |
 | `v1.3.0` | Minor | Structured campaign core with stage config, canonical `stage` CSV column, and stage-aware log validation |
+| `v1.3.1` | Minor | Explicit stage-aware backend/session/CLI suggestions for structured campaigns |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -102,7 +105,9 @@ Status: active
 - Canonical `stage` CSV column for structured campaign logs.
 - Stage-aware row validation with inactive variables required blank.
 - Minimal session-summary reporting for configured stages.
-- Stage-aware modelling, automatic stage transitions, cost-aware structured campaigns, Streamlit structured workflows, and multi-fidelity semantics remain deferred.
+- Explicit stage-aware backend/session/CLI suggestions for a selected stage.
+- Generated structured suggestions populate `stage`, fill only active variables, and keep inactive variables blank.
+- Automatic stage transitions, stage reports, cost-aware structured campaigns, Streamlit structured workflows, and multi-fidelity semantics remain deferred.
 
 ## 🔮 Later
 

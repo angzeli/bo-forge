@@ -487,6 +487,44 @@ def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path
     assert reviewed.loc[0, "review_status"] == "accepted"
 
 
+def test_structured_session_suggest_next_accepts_stage_without_mutating(
+    tmp_path: Path,
+) -> None:
+    cfg = structured_config()
+    log_path = write_log(tmp_path / "structured.csv", cfg, empty_campaign_log(cfg))
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+    before = log_path.read_bytes()
+
+    suggestions = campaign.suggest_next(stage="screen")
+
+    assert log_path.read_bytes() == before
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "stage"] == "screen"
+    assert suggestions.loc[0, "x"] != ""
+    assert suggestions.loc[0, "temperature"] == ""
+    assert list(suggestions.columns) == canonical_columns(cfg)
+
+
+def test_structured_next_action_mentions_explicit_stage(tmp_path: Path) -> None:
+    cfg = structured_config()
+    log_path = write_log(tmp_path / "structured.csv", cfg, empty_campaign_log(cfg))
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    action = campaign.next_action()
+
+    assert "campaign.suggest_next(stage='STAGE_NAME')" in action.loc[0, "suggested_call"]
+
+
 def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> None:
     config_path = write_mixed_config(tmp_path / "mixed.yaml")
     cfg = mixed_config()

@@ -86,6 +86,25 @@ bo-forge suggest \
 
 The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
+For structured campaigns, pass one configured stage name explicitly. Generated
+rows populate the `stage` column, fill only variables active in that stage, and
+leave inactive variables blank:
+
+```bash
+bo-forge init-log \
+  --config configs/13_structured_campaign_core.yaml \
+  --log examples/13_structured_campaign_core_working_log.csv
+
+bo-forge suggest \
+  --config configs/13_structured_campaign_core.yaml \
+  --log examples/13_structured_campaign_core_working_log.csv \
+  --stage screen
+```
+
+Use `--append` only when you want to append the generated stage-aware rows to
+the canonical CSV log. Structured campaigns with multiple stages fail clearly
+when `--stage` is omitted.
+
 Cost-aware and review-enabled campaigns use the same rhythm with extra review and cost commands. Inspect the current budget state:
 
 ```bash

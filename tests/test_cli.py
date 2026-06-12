@@ -550,7 +550,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.3.0\n"
+    assert captured.out == "bo-forge 1.3.1\n"
     assert captured.err == ""
 
 
@@ -559,7 +559,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.3.0\n"
+    assert completed.stdout == "bo-forge 1.3.1\n"
     assert completed.stderr == ""
 
 
@@ -868,23 +868,148 @@ def test_suggest_with_pending_suggestions_returns_hint_without_mutating_csv(
     assert log_path.read_text(encoding="utf-8") == before_csv
 
 
-def test_structured_suggest_fails_clearly_without_mutating_csv(
+def test_structured_suggest_requires_stage_without_mutating_csv(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     config_path = Path("configs/13_structured_campaign_core.yaml")
     log_path = tmp_path / "structured.csv"
-    log_path.write_bytes(
-        Path("examples/13_structured_campaign_core_campaign_log.csv").read_bytes()
-    )
+    cfg = CampaignConfig.from_yaml(config_path)
+    write_log(log_path, cfg)
     before = log_path.read_bytes()
 
     assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 1
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "Structured campaign suggestion generation is not implemented" in captured.err
-    assert "Hint: Add structured rows manually" in captured.err
+    assert "Structured campaign suggestions require an explicit stage" in captured.err
+    assert "Hint: Use --stage with one configured structured stage name" in captured.err
+    assert log_path.read_bytes() == before
+
+
+def test_structured_suggest_dry_run_accepts_stage_without_mutating_csv(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    cfg = CampaignConfig.from_yaml(config_path)
+    write_log(log_path, cfg)
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--stage", "screen"]) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    assert "screen" in captured.out
+    assert log_path.read_bytes() == before
+
+
+def test_structured_documented_init_log_then_suggest_flow_succeeds(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured_working.csv"
+
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+    assert run(["suggest", *base_args(config_path, log_path), "--stage", "screen"]) == 0
+
+    captured = capsys.readouterr()
+    assert "Created empty campaign log" in captured.out
+    assert "Generated 1 suggestion(s)." in captured.out
+    assert "screen" in captured.out
+
+
+def test_structured_suggest_append_writes_stage_aware_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    cfg = CampaignConfig.from_yaml(config_path)
+    write_log(log_path, cfg)
+
+    assert (
+        run(
+            [
+                "suggest",
+                *base_args(config_path, log_path),
+                "--stage",
+                "screen",
+                "--append",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "Appended suggestions to campaign log" in captured.out
+    df = load_campaign_log(log_path, cfg)
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["stage"] == "screen"
+    assert pd.notna(row["precursor_ratio"])
+    assert pd.notna(row["electrolyte"])
+    assert row["annealing_temperature"] == ""
+
+
+def test_structured_suggest_unknown_stage_fails_without_mutating_csv(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    cfg = CampaignConfig.from_yaml(config_path)
+    write_log(log_path, cfg)
+    before = log_path.read_bytes()
+
+    assert (
+        run(
+            [
+                "suggest",
+                *base_args(config_path, log_path),
+                "--stage",
+                "missing",
+                "--append",
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Unknown structured campaign stage 'missing'" in captured.err
+    assert log_path.read_bytes() == before
+
+
+def test_structured_suggest_invalid_stage_format_returns_stage_hint_without_mutating(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    cfg = CampaignConfig.from_yaml(config_path)
+    write_log(log_path, cfg)
+    before = log_path.read_bytes()
+
+    assert (
+        run(
+            [
+                "suggest",
+                *base_args(config_path, log_path),
+                "--stage",
+                " screen",
+                "--append",
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Invalid structured campaign stage" in captured.err
+    assert "Hint: Use --stage with one configured structured stage name" in captured.err
     assert log_path.read_bytes() == before
 
 
