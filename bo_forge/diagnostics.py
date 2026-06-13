@@ -28,6 +28,7 @@ from bo_forge.plot_style import (
     style_colorbar,
 )
 from bo_forge.replicates import replicate_summary
+from bo_forge.structured import stage_summary
 from bo_forge.transforms import dataframe_to_variable_coverage, has_mixed_variables
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
@@ -307,6 +308,102 @@ def plot_replicates(
         fig_folder=fig_folder,
         save_path=save_path,
         show=show,
+    )
+
+
+def plot_stage_diagnostics(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot structured-campaign stage counts and active-variable coverage."""
+    validate_campaign_data(config, df)
+    if not config.is_structured_campaign:
+        raise ValueError("plot_stage_diagnostics() requires a structured campaign config.")
+
+    summary = stage_summary(config, df)
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(15, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+        gridspec_kw={"width_ratios": [1.1, 1.25]},
+    )
+    counts_ax, variables_ax = axes
+    x = list(range(len(summary)))
+    stage_labels = summary["stage"].astype(str).tolist()
+    observed = pd.to_numeric(summary["observed_rows"])
+    suggested = pd.to_numeric(summary["suggested_rows"])
+    pending = pd.to_numeric(summary["pending_rows"])
+
+    counts_ax.bar(x, observed, color="#2563eb", label="observed")
+    counts_ax.bar(x, suggested, bottom=observed, color="#94a3b8", label="suggested")
+    for position, value in zip(x, pending, strict=True):
+        if value > 0:
+            counts_ax.text(
+                position,
+                observed.iloc[position] + suggested.iloc[position] + 0.05,
+                f"pending {int(value)}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                color="#92400e",
+            )
+    counts_ax.set_xticks(x)
+    counts_ax.set_xticklabels(stage_labels, rotation=0)
+    counts_ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    set_title(counts_ax, "Rows by stage")
+    set_axis_labels(counts_ax, "Stage", "Rows")
+    add_legend(counts_ax)
+
+    matrix = [
+        [
+            1.0 if variable.name in set(stage.variables) else 0.0
+            for variable in config.variables
+        ]
+        for stage in config.stages
+    ]
+    image = variables_ax.imshow(
+        matrix,
+        aspect="auto",
+        cmap="Blues",
+        vmin=0.0,
+        vmax=1.0,
+    )
+    variables_ax.set_xticks(range(len(config.variables)))
+    variables_ax.set_xticklabels(
+        [variable.name.replace("_", "\n") for variable in config.variables],
+        rotation=0,
+        ha="center",
+    )
+    variables_ax.set_yticks(range(len(config.stages)))
+    variables_ax.set_yticklabels(stage_labels)
+    set_title(variables_ax, "Active variable map")
+    set_axis_labels(variables_ax, "Variable", "Stage")
+    colorbar = fig.colorbar(image, ax=variables_ax, ticks=[0.0, 1.0])
+    colorbar.ax.set_yticklabels(["inactive", "active"])
+    style_colorbar(colorbar, "Stage variable state")
+
+    fig.suptitle(
+        f"{config.campaign_name}: stage diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
     )
 
 

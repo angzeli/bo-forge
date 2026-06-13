@@ -10,6 +10,7 @@ from bo_forge.config import (
     CampaignConfig,
     ObjectiveConfig,
     ReplicateConfig,
+    StageConfig,
     VariableConfig,
 )
 from bo_forge.diagnostics import (
@@ -18,6 +19,7 @@ from bo_forge.diagnostics import (
     plot_diagnostics,
     plot_progress,
     plot_replicates,
+    plot_stage_diagnostics,
 )
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
@@ -196,6 +198,55 @@ def replicate_log() -> pd.DataFrame:
     )
 
 
+def structured_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name="structured_diagnostics",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        stages=(
+            StageConfig("screen", ("x",)),
+            StageConfig("refine", ("x", "temperature")),
+        ),
+    )
+
+
+def structured_log() -> pd.DataFrame:
+    cfg = structured_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "screen_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.3,
+                "temperature": "",
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "refine_0",
+                "iteration": 1,
+                "status": "suggested",
+                "source": "manual",
+                "stage": "refine",
+                "x": 0.5,
+                "temperature": 650.0,
+                "activity": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_plot_progress_uses_report_ready_style_and_can_save(tmp_path: Path) -> None:
     output_path = tmp_path / "progress.png"
 
@@ -341,6 +392,23 @@ def test_plot_replicates_writes_nested_output_without_mutating_df(tmp_path: Path
     assert ax.get_title() == "replicate_diagnostics: replicate summary"
     assert ax.get_xlabel() == "Replicate group index"
     assert [label.get_text() for label in ax.get_xticklabels()] == ["1", "2"]
+
+
+def test_plot_stage_diagnostics_writes_stage_figure(tmp_path: Path) -> None:
+    cfg = structured_config()
+    df = structured_log()
+    before = df.copy(deep=True)
+    save_path = tmp_path / "reports" / "stage_diagnostics.png"
+
+    fig, axes = plot_stage_diagnostics(cfg, df, save_path=save_path)
+
+    assert save_path.exists()
+    assert hasattr(fig, "savefig")
+    assert len(axes) == 2
+    assert axes[0].get_title() == "Rows by stage"
+    assert axes[1].get_title() == "Active variable map"
+    assert axes[1].images[0].get_array().tolist() == [[1.0, 0.0], [1.0, 1.0]]
+    pd.testing.assert_frame_equal(df, before)
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

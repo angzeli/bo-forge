@@ -91,6 +91,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(replicate_summary_parser)
     replicate_summary_parser.set_defaults(handler=_cmd_replicate_summary)
 
+    stage_summary_parser = subparsers.add_parser(
+        "stage-summary",
+        help="Print structured-campaign stage summary fields.",
+    )
+    _add_config_log_arguments(stage_summary_parser)
+    stage_summary_parser.set_defaults(handler=_cmd_stage_summary)
+
     pareto_front_parser = subparsers.add_parser(
         "pareto-front",
         help="Print nondominated observed rows for a multi-objective campaign.",
@@ -177,6 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
             "pareto",
             "pareto-parallel",
             "hypervolume",
+            "stage-diagnostics",
         ],
         required=True,
         help="Plot type to export.",
@@ -291,6 +299,14 @@ def _cmd_cost_summary(args: argparse.Namespace) -> int:
 def _cmd_replicate_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     _print_table(campaign.replicate_summary())
+    return 0
+
+
+def _cmd_stage_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if not campaign.config.is_structured_campaign:
+        raise ConfigError("stage-summary requires a structured campaign config.")
+    _print_table(campaign.stage_summary())
     return 0
 
 
@@ -418,6 +434,10 @@ def _cmd_plot(args: argparse.Namespace) -> int:
             if not campaign.config.is_multi_objective:
                 raise ConfigError("plot --kind hypervolume requires a multi-objective config.")
             campaign.plot_hypervolume(save_path=args.output)
+        elif args.kind == "stage-diagnostics":
+            if not campaign.config.is_structured_campaign:
+                raise ConfigError("plot --kind stage-diagnostics requires a structured config.")
+            campaign.plot_stage_diagnostics(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

@@ -550,7 +550,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.3.1\n"
+    assert captured.out == "bo-forge 1.3.2\n"
     assert captured.err == ""
 
 
@@ -559,7 +559,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.3.1\n"
+    assert completed.stdout == "bo-forge 1.3.2\n"
     assert completed.stderr == ""
 
 
@@ -1011,6 +1011,41 @@ def test_structured_suggest_invalid_stage_format_returns_stage_hint_without_muta
     assert "Invalid structured campaign stage" in captured.err
     assert "Hint: Use --stage with one configured structured stage name" in captured.err
     assert log_path.read_bytes() == before
+
+
+def test_stage_summary_cli_prints_structured_stage_table(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    log_path.write_bytes(
+        Path("examples/13_structured_campaign_core_campaign_log.csv").read_bytes()
+    )
+
+    assert run(["stage-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "stage" in captured.out
+    assert "screen" in captured.out
+    assert "refine" in captured.out
+    assert "active_variables" in captured.out
+    assert "No observed rows for stage." not in captured.err
+
+
+def test_stage_summary_cli_rejects_non_structured_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg))
+
+    assert run(["stage-summary", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "stage-summary requires a structured campaign config" in captured.err
 
 
 def test_mark_observed_missing_row_returns_hint(
@@ -1543,6 +1578,38 @@ def test_plot_replicates_writes_nested_output_path(
 
     captured = capsys.readouterr()
     assert captured.out == f"Wrote replicates plot: {output_path}\n"
+    assert output_path.exists()
+    assert log_path.read_text(encoding="utf-8") == before_csv
+
+
+def test_plot_stage_diagnostics_writes_nested_output_path(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    log_path.write_bytes(
+        Path("examples/13_structured_campaign_core_campaign_log.csv").read_bytes()
+    )
+    output_path = tmp_path / "figures" / "stage-diagnostics.png"
+    before_csv = log_path.read_text(encoding="utf-8")
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "stage-diagnostics",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.out == f"Wrote stage-diagnostics plot: {output_path}\n"
     assert output_path.exists()
     assert log_path.read_text(encoding="utf-8") == before_csv
 

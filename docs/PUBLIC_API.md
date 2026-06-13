@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.3.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.3.2.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -40,6 +40,7 @@ These names are supported imports from `bo_forge`:
 - `pareto_summary`
 - `review_suggestion`
 - `replicate_summary`
+- `stage_summary`
 - `suggest_next`
 - `suggestion_quality_summary`
 - `validate_campaign_data`
@@ -54,8 +55,12 @@ Structured campaigns expose stage metadata through `StageConfig`,
 `is_structured_campaign`, `configured_stage_names`, and
 `active_variables_for_stage`. v1.3.1 supports explicit stage-aware suggestions
 with `suggest_next(config, df, stage="...")` or
-`CampaignSession.suggest_next(stage="...")`. Cost-aware structured campaigns
-remain deferred.
+`CampaignSession.suggest_next(stage="...")`. v1.3.2 adds read-only
+`stage_summary(config, df)`, `CampaignSession.stage_summary()`, and
+`CampaignSession.plot_stage_diagnostics()`. For replicate-enabled structured
+campaigns, stage best values use replicate group means; the `best_row_id`
+field contains the best `replicate_group`. Cost-aware structured campaigns and
+automatic stage transitions remain deferred.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

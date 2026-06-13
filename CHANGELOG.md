@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v1.3.2 - Stage Reports And Diagnostics
+
+This release adds read-only structured-campaign inspection on top of the
+v1.3.1 stage-aware suggestion path.
+
+- Adds `stage_summary(config, df)` and `CampaignSession.stage_summary()` for
+  deterministic stage counts, active/inactive variable lists, warnings, and
+  transition-readiness guidance.
+- Adds structured stage sections to campaign reports without changing
+  non-structured report output.
+- Adds `CampaignSession.plot_stage_diagnostics()` and
+  `bo-forge plot --kind stage-diagnostics` for stage row counts and
+  active-variable maps.
+- Adds read-only `bo-forge stage-summary` CLI inspection.
+- Reports best single-objective rows by stage and Pareto counts for
+  multi-objective structured stages where meaningful.
+- Keeps automatic stage transitions, new modelling features, notebooks,
+  Streamlit structured workflow, multi-fidelity campaigns, contextual BO,
+  database storage, and async execution out of scope.
+
 ## v1.3.1 - Stage-aware Suggestions And CLI
 
 This release adds explicit stage-aware suggestion generation on top of the

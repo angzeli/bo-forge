@@ -118,7 +118,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.1 is two to four objectives.
+BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.2 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -143,8 +143,9 @@ Fix: use exact configured variable names in every stage's `variables:` list.
 
 ### `Structured campaigns with cost are not supported`
 
-v1.3.1 validates structured logs, but cost-aware structured campaigns are
-deferred because inactive variables are intentionally blank.
+v1.3.2 validates structured logs, suggestions, reports, and diagnostics, but
+cost-aware structured campaigns are deferred because inactive variables are
+intentionally blank.
 
 Fix: remove either `stages:` or `cost:` from the config.
 
@@ -161,6 +162,14 @@ Fix: call `campaign.suggest_next(stage="screen")` or pass
 The requested suggestion stage is not present in the config's `stages:` list.
 
 Fix: check the configured stage names and pass one exact stage name.
+
+### `stage-summary requires a structured campaign config`
+
+`bo-forge stage-summary` is only defined when the YAML config has a `stages:`
+section.
+
+Fix: use `summary` for non-structured campaigns, or add a valid `stages:`
+section before using structured stage diagnostics.
 
 ## 🧾 CSV Schema Errors
 

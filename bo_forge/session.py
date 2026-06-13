@@ -41,6 +41,7 @@ from bo_forge.replicates import (
 from bo_forge.replicates import (
     replicate_summary as _replicate_summary,
 )
+from bo_forge.structured import stage_summary as _stage_summary
 from bo_forge.suggestions import (
     suggest_next as _suggest_next,
 )
@@ -451,8 +452,10 @@ class CampaignSession:
                 tables["replicate_summary"] = self.replicate_summary()
             if self.config.cost is not None:
                 tables["cost_summary"] = self.cost_summary()
+            if self.config.is_structured_campaign:
+                tables["stage_summary"] = self.stage_summary()
             return tables
-        return {
+        tables = {
             "summary": self.summary(),
             "next_action": self.next_action(),
             "best_observation": self.best_observation(),
@@ -462,6 +465,9 @@ class CampaignSession:
             "review_queue": self.review_queue(),
             "cost_summary": self.cost_summary(),
         }
+        if self.config.is_structured_campaign:
+            tables["stage_summary"] = self.stage_summary()
+        return tables
 
     def export_report(self, path: str | Path) -> Path:
         """Write a deterministic plain-text campaign report and return its path."""
@@ -498,6 +504,10 @@ class CampaignSession:
     def pareto_summary(self) -> pd.DataFrame:
         """Return Pareto-front and hypervolume summary fields."""
         return _pareto_summary(self.config, self.df)
+
+    def stage_summary(self) -> pd.DataFrame:
+        """Return structured-campaign stage summary rows."""
+        return _stage_summary(self.config, self.df)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -603,6 +613,12 @@ class CampaignSession:
 
         return _plot_hypervolume(self.config, self.df, **kwargs)
 
+    def plot_stage_diagnostics(self, **kwargs: Any) -> Any:
+        """Plot structured-campaign stage diagnostics."""
+        from bo_forge.diagnostics import plot_stage_diagnostics as _plot_stage_diagnostics
+
+        return _plot_stage_diagnostics(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -633,6 +649,11 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             sections.append(
                 "Cost Summary\n------------\n\n"
                 + _format_report_table(tables["cost_summary"], "No cost model configured.")
+            )
+        if "stage_summary" in tables:
+            sections.append(
+                "Stage Summary\n-------------\n\n"
+                + _format_report_table(tables["stage_summary"], "No structured stages configured.")
             )
         sections.append(
             "Pending Suggestions\n-------------------\n\n"
@@ -667,6 +688,17 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             + _format_report_table(tables["review_queue"], "No suggestions awaiting review."),
             "Cost Summary\n------------\n\n"
             + _format_report_table(tables["cost_summary"], "No cost model configured."),
+            *(
+                [
+                    "Stage Summary\n-------------\n\n"
+                    + _format_report_table(
+                        tables["stage_summary"],
+                        "No structured stages configured.",
+                    )
+                ]
+                if "stage_summary" in tables
+                else []
+            ),
         ]
     )
 

@@ -165,6 +165,46 @@ def structured_review_config() -> CampaignConfig:
     )
 
 
+def structured_replicate_config() -> CampaignConfig:
+    cfg = structured_config()
+    return CampaignConfig(
+        campaign_name="structured_replicate_session_test",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        replicates=ReplicateConfig(enabled=True),
+        stages=cfg.stages,
+    )
+
+
+def structured_multi_objective_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="structured_multi_session_test",
+        objective=ObjectiveConfig("yield_score", "maximize", 0.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 0.0),
+            ObjectiveConfig("waste_score", "minimize", 10.0),
+        ),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 900.0),
+        ),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=1,
+            acquisition="qlog_ehvi",
+            random_seed=5,
+            raw_samples=8,
+            num_restarts=2,
+            mc_samples=8,
+        ),
+        stages=(
+            StageConfig("screen", ("x",)),
+            StageConfig("refine", ("x", "temperature")),
+        ),
+    )
+
+
 def mixed_config(initial_design_size: int = 3) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="mixed_session_test",
@@ -273,6 +313,146 @@ def structured_pending_log(cfg: CampaignConfig) -> pd.DataFrame:
         row["review_status"] = "pending"
         row["review_note"] = ""
     return pd.DataFrame([row], columns=canonical_columns(cfg))
+
+
+def structured_stage_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "screen_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.2,
+                "temperature": "",
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "screen_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.7,
+                "temperature": "",
+                "score": 1.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "refine_pending",
+                "iteration": 2,
+                "status": "suggested",
+                "source": "manual",
+                "stage": "refine",
+                "x": 0.6,
+                "temperature": 650.0,
+                "score": "",
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def structured_replicate_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "group_0_rep_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "replicate_group": "group_0",
+                "replicate_index": 0,
+                "x": 0.2,
+                "temperature": "",
+                "score": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "group_0_rep_1",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "replicate_group": "group_0",
+                "replicate_index": 1,
+                "x": 0.2,
+                "temperature": "",
+                "score": 3.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "group_1_rep_0",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "replicate_group": "group_1",
+                "replicate_index": 0,
+                "x": 0.8,
+                "temperature": "",
+                "score": 2.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def structured_multi_objective_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "screen_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.2,
+                "temperature": "",
+                "yield_score": 1.0,
+                "waste_score": 5.0,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "screen_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "stage": "screen",
+                "x": 0.8,
+                "temperature": "",
+                "yield_score": 0.5,
+                "waste_score": 1.0,
+                "predicted_mean_yield_score": "",
+                "predicted_std_yield_score": "",
+                "predicted_mean_waste_score": "",
+                "predicted_std_waste_score": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
 
 
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
@@ -452,6 +632,152 @@ def test_structured_campaign_summary_includes_stage_metadata(tmp_path: Path) -> 
     assert summary_value(summary, "stage_active_variables") == (
         "screen: x; refine: x, temperature"
     )
+
+
+def test_stage_summary_returns_deterministic_stage_rows(tmp_path: Path) -> None:
+    cfg = structured_config()
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=tmp_path / "structured.csv",
+        config=cfg,
+        df=structured_stage_log(cfg),
+    )
+
+    summary = campaign.stage_summary()
+
+    assert list(summary.columns) == [
+        "stage",
+        "active_variables",
+        "inactive_variables",
+        "total_rows",
+        "observed_rows",
+        "suggested_rows",
+        "pending_rows",
+        "best_row_id",
+        "best_objective_value",
+        "pareto_count",
+        "warning",
+        "transition_readiness",
+    ]
+    assert summary["stage"].tolist() == ["screen", "refine"]
+    screen = summary.loc[summary["stage"] == "screen"].iloc[0]
+    assert screen["active_variables"] == "x"
+    assert screen["inactive_variables"] == "temperature"
+    assert int(screen["observed_rows"]) == 2
+    assert int(screen["pending_rows"]) == 0
+    assert screen["best_row_id"] == "screen_1"
+    assert float(screen["best_objective_value"]) == pytest.approx(1.5)
+    assert screen["warning"] == ""
+    assert screen["transition_readiness"] == "ready_for_suggestions"
+    refine = summary.loc[summary["stage"] == "refine"].iloc[0]
+    assert refine["active_variables"] == "x, temperature"
+    assert refine["inactive_variables"] == ""
+    assert int(refine["observed_rows"]) == 0
+    assert int(refine["suggested_rows"]) == 1
+    assert int(refine["pending_rows"]) == 1
+    assert refine["warning"] == "No observed rows for stage."
+    assert refine["transition_readiness"] == "resolve_pending"
+
+
+def test_stage_summary_preserves_config_order_for_inactive_variables(
+    tmp_path: Path,
+) -> None:
+    cfg = CampaignConfig(
+        campaign_name="structured_order_session_test",
+        objective=ObjectiveConfig("score", "maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("zeta", "continuous", 0.0, 1.0),
+            VariableConfig("alpha", "continuous", 0.0, 1.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        stages=(StageConfig("screen", ("zeta",)),),
+    )
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured_order.yaml",
+        log_path=tmp_path / "structured_order.csv",
+        config=cfg,
+        df=empty_campaign_log(cfg),
+    )
+
+    summary = campaign.stage_summary()
+
+    assert summary.loc[0, "inactive_variables"] == "x, alpha"
+
+
+def test_stage_summary_uses_replicate_group_mean_for_best_stage_row(
+    tmp_path: Path,
+) -> None:
+    cfg = structured_replicate_config()
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured_replicates.yaml",
+        log_path=tmp_path / "structured_replicates.csv",
+        config=cfg,
+        df=structured_replicate_log(cfg),
+    )
+
+    summary = campaign.stage_summary()
+
+    screen = summary.loc[summary["stage"] == "screen"].iloc[0]
+    assert screen["best_row_id"] == "group_1"
+    assert float(screen["best_objective_value"]) == pytest.approx(2.5)
+
+
+def test_stage_summary_reports_multi_objective_pareto_count(tmp_path: Path) -> None:
+    cfg = structured_multi_objective_config()
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured_multi.yaml",
+        log_path=tmp_path / "structured_multi.csv",
+        config=cfg,
+        df=structured_multi_objective_log(cfg),
+    )
+
+    summary = campaign.stage_summary()
+
+    screen = summary.loc[summary["stage"] == "screen"].iloc[0]
+    assert pd.isna(screen["best_row_id"])
+    assert pd.isna(screen["best_objective_value"])
+    assert int(screen["pareto_count"]) == 2
+    refine = summary.loc[summary["stage"] == "refine"].iloc[0]
+    assert int(refine["pareto_count"]) == 0
+    assert refine["warning"] == "No observed rows for stage."
+
+
+def test_structured_report_includes_stage_summary(tmp_path: Path) -> None:
+    cfg = structured_config()
+    log_path = write_log(tmp_path / "structured.csv", cfg, structured_stage_log(cfg))
+    campaign = CampaignSession(
+        config_path=tmp_path / "structured.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    report = campaign.report()
+    report_path = campaign.export_report(tmp_path / "reports" / "structured.txt")
+    text = report_path.read_text(encoding="utf-8")
+
+    assert "stage_summary" in report
+    assert "Stage Summary\n-------------" in text
+    assert "active_variables" in text
+    assert "No observed rows for stage." in text
+
+
+def test_non_structured_report_has_no_stage_summary(tmp_path: Path) -> None:
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0]))
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert "stage_summary" not in report
+    assert "Stage Summary" not in text
 
 
 def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path) -> None:

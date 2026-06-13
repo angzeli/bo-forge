@@ -1,6 +1,6 @@
-"""BO Forge v1.3.1."""
+"""BO Forge v1.3.2."""
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 from bo_forge.config import (
     BOConfig,
@@ -37,6 +37,7 @@ from bo_forge.replicates import (
     replicate_summary,
 )
 from bo_forge.session import CampaignSession
+from bo_forge.structured import stage_summary
 from bo_forge.suggestions import suggest_next, suggestion_quality_summary
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
@@ -75,5 +76,6 @@ __all__ = [
     "replicate_summary",
     "suggest_next",
     "suggestion_quality_summary",
+    "stage_summary",
     "validate_campaign_data",
 ]

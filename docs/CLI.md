@@ -105,6 +105,14 @@ Use `--append` only when you want to append the generated stage-aware rows to
 the canonical CSV log. Structured campaigns with multiple stages fail clearly
 when `--stage` is omitted.
 
+Inspect stage status without mutating the log:
+
+```bash
+bo-forge stage-summary \
+  --config configs/13_structured_campaign_core.yaml \
+  --log examples/13_structured_campaign_core_campaign_log.csv
+```
+
 Cost-aware and review-enabled campaigns use the same rhythm with extra review and cost commands. Inspect the current budget state:
 
 ```bash
@@ -274,6 +282,7 @@ bo-forge plot \
 | `bo-forge next-action --config PATH --log PATH` | Print the recommended next campaign action. |
 | `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and either best-observed-objective or multi-objective hypervolume/Pareto fields. |
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
+| `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
@@ -281,7 +290,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, or hypervolume figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, or structured stage-diagnostics figure. |
 
 ## 🧯 CLI Error Output
 
