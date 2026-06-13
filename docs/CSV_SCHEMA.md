@@ -16,7 +16,7 @@ When `replicates.enabled: true`, add `replicate_group,replicate_index` immediate
 
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`. In
-v1.3.2, `stages:` cannot be combined with `cost:`.
+v1.3.3, `stages:` cannot be combined with `cost:`.
 
 The non-structured cost + review + replicates schema is:
 
@@ -30,7 +30,7 @@ For v1.1 multi-objective campaigns, the schema scales with the configured object
 row_id,iteration,status,source,[stage],[review_status,review_note],[replicate_group,replicate_index],<variable columns...>,<objective_1>,...,<objective_m>,[cost_estimate,cost_actual],predicted_mean_<objective_1>,predicted_std_<objective_1>,...,predicted_mean_<objective_m>,predicted_std_<objective_m>,acquisition,[utility]
 ```
 
-For v1.3.2 structured campaigns, the bracketed `[stage]` marker is not
+For v1.3.3 structured campaigns, the bracketed `[stage]` marker is not
 compatible with `[cost_estimate,cost_actual]` or `[utility]`; cost-aware
 structured campaigns remain deferred.
 
@@ -116,7 +116,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v1.3.2.
+- `stages:` cannot be combined with `cost:` in v1.3.3.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -218,7 +218,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.3.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.3.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -228,7 +228,7 @@ BO Forge supports `m >= 2` objectives with coupled evaluation. The primary teste
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.3.2. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
+Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.3.3. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -255,7 +255,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.3.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.3.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 

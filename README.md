@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.3.2
+# 🧪 BO Forge v1.3.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.3.2 adds read-only stage reports and diagnostics for structured campaign logs with named stages and stage-specific active variables.
+v1.3.3 adds a structured campaign tutorial example and notebook for staged screening/refinement workflows.
 
-Existing backend BO behavior, non-structured YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.2.3 baseline.
+Existing backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.3.2 structured-campaign baseline.
 
 BO Forge deliberately supports only:
 
@@ -170,7 +170,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.3.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.3.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

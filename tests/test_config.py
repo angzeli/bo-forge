@@ -712,6 +712,28 @@ def test_example_structured_config_parses() -> None:
     ]
 
 
+def test_structured_tutorial_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/14_structured_campaign_tutorial.yaml")
+
+    assert config.campaign_name == "structured_photocatalyst_tutorial"
+    assert config.is_structured_campaign
+    assert config.stage_names == ["screening", "refinement"]
+    assert config.active_variable_names_for_stage("screening") == [
+        "catalyst_loading",
+        "base",
+    ]
+    assert config.active_variable_names_for_stage("refinement") == [
+        "catalyst_loading",
+        "base",
+        "temperature",
+        "residence_time",
+    ]
+    assert [constraint.name for constraint in config.constraints] == [
+        "refinement_temperature_limit",
+        "refinement_loading_time_limit",
+    ]
+
+
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",

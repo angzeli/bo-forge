@@ -118,7 +118,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.2 is two to four objectives.
+BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.3 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -143,7 +143,8 @@ Fix: use exact configured variable names in every stage's `variables:` list.
 
 ### `Structured campaigns with cost are not supported`
 
-v1.3.2 validates structured logs, suggestions, reports, and diagnostics, but
+v1.3.3 validates structured logs, suggestions, reports, diagnostics, and the
+structured tutorial workflow, but
 cost-aware structured campaigns are deferred because inactive variables are
 intentionally blank.
 

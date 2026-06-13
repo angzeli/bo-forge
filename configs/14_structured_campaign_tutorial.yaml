@@ -1,0 +1,39 @@
+campaign_name: structured_photocatalyst_tutorial
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.05
+    upper: 0.50
+  - name: base
+    type: categorical
+    values: [K2CO3, NaOAc]
+  - name: temperature
+    type: integer
+    lower: 40
+    upper: 100
+  - name: residence_time
+    type: discrete
+    values: [15, 30, 60]
+constraints:
+  - name: refinement_temperature_limit
+    expression: temperature <= 90
+  - name: refinement_loading_time_limit
+    expression: catalyst_loading * residence_time <= 18
+stages:
+  - name: screening
+    variables: [catalyst_loading, base]
+  - name: refinement
+    variables: [catalyst_loading, base, temperature, residence_time]
+bo:
+  batch_size: 1
+  initial_design_size: 3
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 13
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+  min_normalized_distance: 0.02

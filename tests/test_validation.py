@@ -481,6 +481,19 @@ def test_validate_campaign_data_accepts_structured_example_log() -> None:
     assert config_structured.stage_names == ["screen", "refine"]
 
 
+def test_validate_campaign_data_accepts_structured_tutorial_log() -> None:
+    config_structured = CampaignConfig.from_yaml(
+        "configs/14_structured_campaign_tutorial.yaml"
+    )
+    df = load_campaign_log(
+        "examples/14_structured_campaign_tutorial_campaign_log.csv",
+        config_structured,
+    )
+
+    validate_campaign_data(config_structured, df)
+    assert config_structured.stage_names == ["screening", "refinement"]
+
+
 def test_canonical_columns_for_schema_combinations() -> None:
     base = config()
     cost = cost_review_config()

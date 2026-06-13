@@ -91,7 +91,7 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.2 keeps coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
+The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.3 keeps coupled multi-objective objective entry, cost-aware actual-cost entry, and backend plot controls while keeping BO logic in `CampaignSession`.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 
@@ -175,6 +175,12 @@ bo-forge plot \
 
 Automatic stage transitions, cost-aware structured campaigns, and Streamlit
 structured workflow support remain deferred.
+
+The structured tutorial files are:
+
+- `configs/14_structured_campaign_tutorial.yaml`;
+- `examples/14_structured_campaign_tutorial_campaign_log.csv`;
+- `notebooks/14_structured_campaign_tutorial.ipynb`.
 
 ## 🔁 Session API
 
@@ -295,10 +301,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml`: generalizes qLogEHVI to a four-objective mixed constrained campaign.
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml`: adds deterministic cost-aware batch ranking to a three-objective qLogEHVI campaign.
 - `configs/13_structured_campaign_core.yaml`: demonstrates structured stage validation and explicit stage-aware suggestions.
+- `configs/14_structured_campaign_tutorial.yaml`: demonstrates a staged screening/refinement workflow with mixed variables, stage-aware constraints, and a notebook walkthrough.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -333,7 +340,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.2 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.3 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 

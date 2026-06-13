@@ -1,5 +1,23 @@
 # 📝 BO Forge Changelog
 
+## v1.3.3 - Structured Campaign Example And Notebook
+
+This release adds a lightweight structured-campaign tutorial on top of the
+v1.3.2 stage reports and diagnostics.
+
+- Adds `configs/14_structured_campaign_tutorial.yaml` with screening and
+  refinement stages, mixed variables, and stage-aware constraints.
+- Adds `examples/14_structured_campaign_tutorial_campaign_log.csv` as a small
+  validated seed log.
+- Adds `notebooks/14_structured_campaign_tutorial.ipynb` as an output-free
+  teaching notebook covering load, validate, `stage_summary()`, stage-aware
+  dry-run suggestions, explicit append, simulated observations, reports, stage
+  diagnostics, and a compact CLI demo.
+- Documents the tutorial in the quickstart and repository structure docs.
+- Keeps backend modelling, automatic stage transitions, Streamlit structured
+  workflow, multi-fidelity campaigns, contextual BO, and broad structured
+  workflow changes out of scope.
+
 ## v1.3.2 - Stage Reports And Diagnostics
 
 This release adds read-only structured-campaign inspection on top of the

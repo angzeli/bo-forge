@@ -1,0 +1,5 @@
+row_id,iteration,status,source,stage,catalyst_loading,base,temperature,residence_time,activity,predicted_mean,predicted_std,acquisition
+screen_seed_0,0,observed,manual,screening,0.12,K2CO3,,,1.05,,,
+screen_seed_1,1,observed,manual,screening,0.32,NaOAc,,,1.22,,,
+refine_seed_0,2,observed,manual,refinement,0.28,K2CO3,75,30,1.55,,,
+refine_seed_1,3,observed,manual,refinement,0.38,NaOAc,85,30,1.68,,,
