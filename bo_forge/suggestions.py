@@ -166,7 +166,7 @@ def _suggest_structured_stage(
     stage_name = _resolve_structured_stage(config, stage)
     if config.cost is not None:
         raise SuggestionError(
-            "Structured campaign suggestions with cost are not supported in v1.3.2."
+            "Structured campaign suggestions with cost are not supported in v1.3.4."
         )
     if has_pending_suggestions(df, config):
         raise SuggestionError(

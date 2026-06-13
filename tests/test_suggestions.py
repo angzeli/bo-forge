@@ -351,6 +351,25 @@ def test_structured_suggest_rejects_stage_with_no_active_variables() -> None:
         suggest_next(cfg, df, stage="empty")
 
 
+def test_structured_suggest_with_cost_fails_with_current_version_message() -> None:
+    base = structured_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        cost=CostConfig(expression="1.0"),
+        stages=base.stages,
+    )
+    df = empty_campaign_log(cfg)
+
+    with pytest.raises(
+        SuggestionError,
+        match="Structured campaign suggestions with cost are not supported in v1.3.4",
+    ):
+        suggest_next(cfg, df, stage="screen")
+
+
 def test_structured_suggest_populates_stage_and_only_active_variables() -> None:
     cfg = structured_config()
     df = empty_campaign_log(cfg)

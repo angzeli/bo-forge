@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v1.3.4 - Streamlit Structured Campaign Workflow
+
+This release wraps the existing structured-campaign backend/session workflow in
+the local Streamlit workbench.
+
+- Detects structured campaigns in Streamlit and displays configured stages with
+  active/inactive variables.
+- Adds a `Suggest` panel stage selector for stage-aware dry-run suggestions.
+- Records the selected stage in the staged suggestion bundle.
+- Blocks append if the staged suggestions, selected stage, config, or log changed
+  after staging.
+- Shows stage summaries in `Overview` and `Data`.
+- Exposes the backend stage-diagnostics plot in `Reports`.
+- Keeps suggestion generation non-mutating and append/review/observation actions
+  explicit.
+- Keeps backend BO behavior, YAML/CSV schemas, CLI behavior, notebooks,
+  automatic stage transitions, Streamlit campaign creation semantics,
+  multi-fidelity campaigns, contextual BO, database storage, cloud deployment,
+  and authentication out of scope.
+
 ## v1.3.3 - Structured Campaign Example And Notebook
 
 This release adds a lightweight structured-campaign tutorial on top of the

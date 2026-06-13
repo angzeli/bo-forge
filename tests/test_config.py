@@ -325,7 +325,10 @@ stages:
 """,
     )
 
-    with pytest.raises(ConfigError, match="Structured campaigns with cost"):
+    with pytest.raises(
+        ConfigError,
+        match="Structured campaigns with cost are not supported in v1.3.4",
+    ):
         CampaignConfig.from_yaml(path)
 
 

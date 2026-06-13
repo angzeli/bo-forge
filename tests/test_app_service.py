@@ -85,6 +85,12 @@ print("ok")
             "Overview",
             ["summary", "next_action", "observed", "pending", "pareto_summary", "cost_summary"],
         ),
+        (
+            "13_structured_campaign_core.yaml",
+            "13_structured_campaign_core_campaign_log.csv",
+            "Data",
+            ["summary", "next_action", "observed", "pending", "stage_summary"],
+        ),
     ],
 )
 def test_app_service_loads_validates_and_collects_view_data(
@@ -134,6 +140,71 @@ def test_app_service_dry_run_is_non_mutating_and_uses_existing_bundle_shape(
     assert result.bundle["appended"] is False
     assert log_path.read_bytes() == before_bytes
     pd.testing.assert_frame_equal(service.df, before_df)
+
+
+def test_app_service_structured_dry_run_records_stage_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = copy_example_log(tmp_path, "13_structured_campaign_core_campaign_log.csv")
+    pd.read_csv(log_path, keep_default_na=False).query("status == 'observed'").to_csv(
+        log_path,
+        index=False,
+    )
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "13_structured_campaign_core.yaml",
+        log_path,
+    )
+    before_bytes = log_path.read_bytes()
+
+    result = service.suggest_dry_run(batch_size=1, stage="screen")
+
+    assert result.bundle["stage"] == "screen"
+    assert result.suggestions.loc[0, "stage"] == "screen"
+    assert result.suggestions.loc[0, "annealing_temperature"] == ""
+    assert not result.quality.empty
+    assert log_path.read_bytes() == before_bytes
+
+
+def test_app_service_structured_append_rejects_changed_stage_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = copy_example_log(tmp_path, "13_structured_campaign_core_campaign_log.csv")
+    pd.read_csv(log_path, keep_default_na=False).query("status == 'observed'").to_csv(
+        log_path,
+        index=False,
+    )
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "13_structured_campaign_core.yaml",
+        log_path,
+    )
+    result = service.suggest_dry_run(batch_size=1, stage="screen")
+    before = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Stage selection changed after suggestions were staged"):
+        service.append_staged(result.bundle, stage="refine")
+
+    assert log_path.read_bytes() == before
+
+
+def test_app_service_structured_append_requires_matching_stage_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = copy_example_log(tmp_path, "13_structured_campaign_core_campaign_log.csv")
+    pd.read_csv(log_path, keep_default_na=False).query("status == 'observed'").to_csv(
+        log_path,
+        index=False,
+    )
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "13_structured_campaign_core.yaml",
+        log_path,
+    )
+    result = service.suggest_dry_run(batch_size=1, stage="screen")
+    before = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Stage selection changed after suggestions were staged"):
+        service.append_staged(result.bundle)
+
+    assert log_path.read_bytes() == before
 
 
 def test_app_service_append_staged_refreshes_session(tmp_path: Path) -> None:
@@ -357,6 +428,22 @@ def test_app_service_report_export_and_plot_routing(tmp_path: Path) -> None:
         plt.close(result.figure)
 
 
+def test_app_service_structured_stage_diagnostics_plot_routing(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "13_structured_campaign_core_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "13_structured_campaign_core.yaml",
+        log_path,
+    )
+
+    assert "stage_diagnostics" in service.available_plot_kinds()
+    plot_path = tmp_path / "plots" / "stage_diagnostics.png"
+    result = service.plot("stage_diagnostics", save_path=plot_path)
+
+    assert plot_path.exists()
+    assert result.written_path == plot_path
+    plt.close(result.figure)
+
+
 def test_app_service_read_helper_allowlist_exposes_only_non_mutating_helpers(
     tmp_path: Path,
 ) -> None:
@@ -369,6 +456,15 @@ def test_app_service_read_helper_allowlist_exposes_only_non_mutating_helpers(
     assert callable(service.summary)
     assert callable(service.next_action)
     assert callable(service.suggestion_quality)
+    structured_log_path = copy_example_log(
+        tmp_path,
+        "13_structured_campaign_core_campaign_log.csv",
+    )
+    structured_service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "13_structured_campaign_core.yaml",
+        structured_log_path,
+    )
+    assert callable(structured_service.stage_summary)
     assert service.mark_observed.__func__ is CampaignAppService.mark_observed
     for mutator in ["append_suggestions", "review_suggestion", "reload"]:
         with pytest.raises(AttributeError, match=mutator):

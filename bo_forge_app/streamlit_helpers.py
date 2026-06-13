@@ -191,12 +191,14 @@ def make_staged_suggestion_bundle(
     suggestions: pd.DataFrame,
     config_path: str | Path,
     log_path: str | Path,
+    *,
+    stage: str | None = None,
 ) -> dict[str, object]:
     """Create a staged suggestion bundle tied to the current config/log files."""
     resolved_config_path = Path(config_path).expanduser().resolve()
     resolved_log_path = Path(log_path).expanduser().resolve()
     staged_suggestions = suggestions.copy(deep=True).reset_index(drop=True)
-    return {
+    bundle: dict[str, object] = {
         "suggestions": staged_suggestions,
         "suggestions_fingerprint": dataframe_fingerprint(staged_suggestions),
         "config_path": str(resolved_config_path),
@@ -205,6 +207,9 @@ def make_staged_suggestion_bundle(
         "log_fingerprint": file_fingerprint(resolved_log_path),
         "appended": False,
     }
+    if stage is not None:
+        bundle["stage"] = stage
+    return bundle
 
 
 def staged_bundle_invalidation_reason(
@@ -212,6 +217,7 @@ def staged_bundle_invalidation_reason(
     config_path: str | Path,
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
+    stage: str | None = None,
 ) -> str | None:
     """Return a reason staged suggestions cannot be appended, or None."""
     if bundle is None:
@@ -236,6 +242,8 @@ def staged_bundle_invalidation_reason(
         return "Config path changed after suggestions were staged."
     if str(resolved_log_path) != bundle.get("log_path"):
         return "Log path changed after suggestions were staged."
+    if "stage" in bundle and stage != bundle.get("stage"):
+        return "Stage selection changed after suggestions were staged."
     if file_fingerprint(resolved_config_path) != bundle.get("config_fingerprint"):
         return "Config file changed after suggestions were staged."
     if file_fingerprint(resolved_log_path) != bundle.get("log_fingerprint"):
@@ -248,6 +256,7 @@ def staged_bundle_is_appendable(
     config_path: str | Path,
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
+    stage: str | None = None,
 ) -> bool:
     """Return True when staged suggestions are still valid for append."""
     return (
@@ -256,6 +265,7 @@ def staged_bundle_is_appendable(
             config_path=config_path,
             log_path=log_path,
             last_appended_fingerprint=last_appended_fingerprint,
+            stage=stage,
         )
         is None
     )
@@ -269,6 +279,35 @@ def feature_flags(config: CampaignConfig) -> dict[str, bool]:
         "has_review": config.review.enabled,
         "has_replicates": config.replicates.enabled,
     }
+
+
+def structured_stage_options(config: CampaignConfig) -> list[str]:
+    """Return configured stage names for app selectors."""
+    return config.stage_names if config.is_structured_campaign else []
+
+
+def active_variables_display(config: CampaignConfig, stage_name: str) -> str:
+    """Return a compact active-variable label for one configured stage."""
+    return ", ".join(config.active_variable_names_for_stage(stage_name))
+
+
+def structured_stage_config_table(config: CampaignConfig) -> pd.DataFrame:
+    """Return configured stages and active/inactive variables for app display."""
+    rows: list[dict[str, str]] = []
+    for stage_name in structured_stage_options(config):
+        active = config.active_variable_names_for_stage(stage_name)
+        inactive = [name for name in config.variable_names if name not in set(active)]
+        rows.append(
+            {
+                "stage": stage_name,
+                "active_variables": ", ".join(active),
+                "inactive_variables": ", ".join(inactive),
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=["stage", "active_variables", "inactive_variables"],
+    )
 
 
 def format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
@@ -447,6 +486,7 @@ def append_disabled_reason(
     config_path: str | Path,
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
+    stage: str | None = None,
 ) -> str | None:
     """Return a concise append-disabled reason, or None when append is allowed."""
     reason = staged_bundle_invalidation_reason(
@@ -454,6 +494,7 @@ def append_disabled_reason(
         config_path=config_path,
         log_path=log_path,
         last_appended_fingerprint=last_appended_fingerprint,
+        stage=stage,
     )
     if reason is None:
         return None
@@ -476,6 +517,9 @@ def append_disabled_reason(
         ),
         "Staged suggestions changed after they were staged.": (
             "Append disabled: the staged suggestion payload changed after staging."
+        ),
+        "Stage selection changed after suggestions were staged.": (
+            "Append disabled: the selected stage changed after these suggestions were generated."
         ),
     }
     return messages.get(reason, f"Append disabled: {reason}")
@@ -507,6 +551,8 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
             kinds.append("pareto_parallel")
     else:
         kinds = ["progress", "diagnostics"]
+    if config.is_structured_campaign:
+        kinds.append("stage_diagnostics")
     if config.cost is not None:
         kinds.append("cost_progress")
     if config.replicates.enabled:

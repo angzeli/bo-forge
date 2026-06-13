@@ -19,6 +19,7 @@ from bo_forge_app.streamlit_helpers import (
     NEW_CAMPAIGN_YAML_KEY,
     SESSION_KEY,
     STAGED_SUGGESTION_BUNDLE_KEY,
+    active_variables_display,
     append_disabled_reason,
     available_plot_kinds,
     build_campaign_yaml_text,
@@ -44,6 +45,8 @@ from bo_forge_app.streamlit_helpers import (
     staged_bundle_invalidation_reason,
     staged_suggestions_from_bundle,
     status_tone,
+    structured_stage_config_table,
+    structured_stage_options,
 )
 from bo_forge_app.streamlit_style import (
     apply_forge_suite_style,
@@ -64,6 +67,7 @@ FLASH_MESSAGE_KEY = "bo_forge_flash_message"
 NEW_CAMPAIGN_FORM_YAML_KEY = "bo_forge_new_campaign_form_yaml"
 REPORT_PREVIEW_KEY = "bo_forge_report_preview_text"
 STAGED_FRESHNESS_MESSAGE_KEY = "bo_forge_staged_freshness_message"
+SUGGEST_STAGE_KEY = "bo_forge_suggest_stage"
 VALIDATION_CACHE_KEY = "bo_forge_validation_cache"
 WORKFLOW_PANELS = ["Overview", "Suggest", "Resolve", "Reports", "Data"]
 
@@ -228,6 +232,8 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
             view_data["cost_summary"] = campaign.cost_summary()
         if panel in {"Overview", "Data"} and campaign.config.replicates.enabled:
             view_data["replicate_summary"] = campaign.replicate_summary()
+        if panel in {"Overview", "Data", "Reports"} and campaign.config.is_structured_campaign:
+            view_data["stage_summary"] = campaign.stage_summary()
     return view_data
 
 
@@ -795,6 +801,14 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             raw_df=replicate_summary,
             expanded_raw=False,
         )
+    if campaign.config.is_structured_campaign:
+        _render_table_section(
+            st,
+            "Stage Summary",
+            _view_data_value(view_data, "stage_summary", campaign.stage_summary),
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
 
     observed = view_data.get("observed")
     pending = view_data.get("pending")
@@ -887,6 +901,14 @@ def _render_data(
             empty_kind="replicate_summary",
             expanded_raw=False,
         )
+    if campaign.config.is_structured_campaign:
+        _render_table_section(
+            st,
+            "Stage Summary",
+            _view_data_value(view_data, "stage_summary", campaign.stage_summary),
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
     with st.expander("Show full raw campaign log", expanded=False):
         st.dataframe(format_dataframe_for_display(campaign.df), width="stretch")
 
@@ -938,6 +960,30 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         ["1. Generate dry-run suggestions", "2. Inspect quality", "3. Append explicitly"],
     )
     config_path, log_path = _current_paths(st)
+    stage_options = structured_stage_options(campaign.config)
+    if stage_options:
+        _render_table_section(
+            st,
+            "Configured Stages",
+            structured_stage_config_table(campaign.config),
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
+    selected_stage = None
+    if stage_options:
+        selected_stage = str(
+            st.selectbox(
+                "Suggestion stage",
+                stage_options,
+                key=SUGGEST_STAGE_KEY,
+                help="Structured campaigns require an explicit stage for suggestions.",
+            )
+        )
+        _render_artifact_note(
+            st,
+            "Active variables",
+            active_variables_display(campaign.config, selected_stage),
+        )
     with st.form("suggest_dry_run_form"):
         batch_size = st.number_input(
             "Batch size",
@@ -954,12 +1000,23 @@ def _render_suggest(st: Any, campaign: Any) -> None:
     if generate_clicked:
         try:
             if hasattr(campaign, "suggest_dry_run"):
-                result = campaign.suggest_dry_run(int(batch_size))
+                result = campaign.suggest_dry_run(int(batch_size), stage=selected_stage)
                 suggestions = result.suggestions
                 bundle = result.bundle
             else:
-                suggestions = campaign.suggest_next(batch_size=int(batch_size))
-                bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
+                if selected_stage is None:
+                    suggestions = campaign.suggest_next(batch_size=int(batch_size))
+                else:
+                    suggestions = campaign.suggest_next(
+                        batch_size=int(batch_size),
+                        stage=selected_stage,
+                    )
+                bundle = make_staged_suggestion_bundle(
+                    suggestions,
+                    config_path,
+                    log_path,
+                    stage=selected_stage,
+                )
         except (BOForgeError, OSError, ValueError) as exc:
             st.error(str(exc))
         else:
@@ -973,7 +1030,10 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         _render_empty_state(st, *empty_state_message("staged_suggestions"))
         return
 
-    raw_reason = _current_invalidation_reason(st, bundle)
+    if selected_stage is None:
+        raw_reason = _current_invalidation_reason(st, bundle)
+    else:
+        raw_reason = _current_invalidation_reason(st, bundle, stage=selected_stage)
     if raw_reason is None:
         st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
     disabled_reason = append_disabled_reason(
@@ -981,6 +1041,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         config_path,
         log_path,
         st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
+        stage=selected_stage,
     )
     if raw_reason and raw_reason != "No staged suggestions.":
         st.session_state[STAGED_FRESHNESS_MESSAGE_KEY] = raw_reason
@@ -1061,6 +1122,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
                 result = campaign.append_staged(
                     bundle,
                     st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
+                    stage=selected_stage,
                 )
                 campaign = result.service
                 appended_fingerprint = result.appended_fingerprint
@@ -1394,6 +1456,7 @@ def _available_plot_options(
         "pareto": ("Pareto", "plot_pareto"),
         "pareto_parallel": ("Pareto Parallel", "plot_pareto_parallel"),
         "hypervolume": ("Hypervolume", "plot_hypervolume"),
+        "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:
@@ -1632,7 +1695,21 @@ def _render_table_section(
 
 def _render_selected_row_preview(st: Any, campaign: Any, row: Any) -> None:
     metrics = []
-    for variable in campaign.config.variables[:6]:
+    variables = campaign.config.variables
+    if campaign.config.is_structured_campaign:
+        stage_name = str(row.get("stage", ""))
+        metrics.append(("Stage", stage_name))
+        try:
+            active_names = set(campaign.config.active_variable_names_for_stage(stage_name))
+        except BOForgeError:
+            active_names = set()
+        else:
+            variables = tuple(
+                variable
+                for variable in campaign.config.variables
+                if variable.name in active_names
+            )
+    for variable in variables[:6]:
         metrics.append((variable.name, row.get(variable.name, "")))
     _render_metric_grid(st, metrics)
 
@@ -1761,7 +1838,12 @@ def _flash_and_rerun(st: Any, message: str) -> None:
         st.success(message)
 
 
-def _current_invalidation_reason(st: Any, bundle: dict[str, object] | None) -> str | None:
+def _current_invalidation_reason(
+    st: Any,
+    bundle: dict[str, object] | None,
+    *,
+    stage: str | None = None,
+) -> str | None:
     config_path, log_path = _current_paths(st)
     try:
         return staged_bundle_invalidation_reason(
@@ -1769,6 +1851,7 @@ def _current_invalidation_reason(st: Any, bundle: dict[str, object] | None) -> s
             config_path=config_path,
             log_path=log_path,
             last_appended_fingerprint=st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
+            stage=stage,
         )
     except OSError as exc:
         return str(exc)
@@ -1778,6 +1861,7 @@ def _should_clear_staged_bundle(reason: str) -> bool:
     return reason in {
         "Config path changed after suggestions were staged.",
         "Log path changed after suggestions were staged.",
+        "Stage selection changed after suggestions were staged.",
         "Config file changed after suggestions were staged.",
         "Log file changed after suggestions were staged.",
         "Staged suggestions changed after they were staged.",

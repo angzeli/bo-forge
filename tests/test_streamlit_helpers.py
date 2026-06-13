@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -10,6 +11,7 @@ from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
 from bo_forge_app.streamlit_helpers import (
+    active_variables_display,
     append_disabled_reason,
     available_plot_kinds,
     build_campaign_yaml_text,
@@ -42,6 +44,8 @@ from bo_forge_app.streamlit_helpers import (
     staged_bundle_is_appendable,
     staged_suggestions_from_bundle,
     status_tone,
+    structured_stage_config_table,
+    structured_stage_options,
 )
 from bo_forge_app.streamlit_style import FORGE_SUITE_CSS, forge_action_label, forge_status_label
 
@@ -387,6 +391,59 @@ def test_make_staged_suggestion_bundle_records_context(tmp_path: Path) -> None:
     assert bundle["config_path"] == str(config_path.resolve())
     assert bundle["log_path"] == str(log_path.resolve())
     assert bundle["appended"] is False
+
+
+def test_stage_aware_staged_bundle_records_and_validates_stage(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+
+    bundle = make_staged_suggestion_bundle(
+        simple_suggestions(),
+        config_path,
+        log_path,
+        stage="screen",
+    )
+
+    assert bundle["stage"] == "screen"
+    assert staged_bundle_invalidation_reason(
+        bundle,
+        config_path,
+        log_path,
+        stage="screen",
+    ) is None
+    assert staged_bundle_invalidation_reason(
+        bundle,
+        config_path,
+        log_path,
+    ) == "Stage selection changed after suggestions were staged."
+    assert append_disabled_reason(
+        bundle,
+        config_path,
+        log_path,
+    ) == "Append disabled: the selected stage changed after these suggestions were generated."
+    assert staged_bundle_invalidation_reason(
+        bundle,
+        config_path,
+        log_path,
+        stage="refine",
+    ) == "Stage selection changed after suggestions were staged."
+    assert append_disabled_reason(
+        bundle,
+        config_path,
+        log_path,
+        stage="refine",
+    ) == "Append disabled: the selected stage changed after these suggestions were generated."
+    assert not staged_bundle_is_appendable(
+        bundle,
+        config_path,
+        log_path,
+        stage="refine",
+    )
+    assert streamlit_app._should_clear_staged_bundle(
+        "Stage selection changed after suggestions were staged."
+    )
 
 
 def test_staged_bundle_is_appendable_for_matching_context(tmp_path: Path) -> None:
@@ -760,6 +817,35 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "pareto_parallel",
         "cost_progress",
     ]
+
+
+def test_structured_stage_display_helpers_show_configured_activity() -> None:
+    config = CampaignConfig.from_yaml("configs/13_structured_campaign_core.yaml")
+
+    table = structured_stage_config_table(config)
+
+    assert structured_stage_options(config) == ["screen", "refine"]
+    assert active_variables_display(config, "screen") == "precursor_ratio, electrolyte"
+    assert table["stage"].tolist() == ["screen", "refine"]
+    assert table.loc[table["stage"] == "screen", "active_variables"].iloc[0] == (
+        "precursor_ratio, electrolyte"
+    )
+    assert table.loc[table["stage"] == "screen", "inactive_variables"].iloc[0] == (
+        "annealing_temperature"
+    )
+    assert available_plot_kinds(config) == [
+        "progress",
+        "diagnostics",
+        "stage_diagnostics",
+    ]
+
+
+def test_non_structured_stage_display_helpers_are_empty() -> None:
+    config = CampaignConfig.from_yaml("configs/01_simple_2d_maximise_logei.yaml")
+
+    assert structured_stage_options(config) == []
+    assert structured_stage_config_table(config).empty
+    assert available_plot_kinds(config) == ["progress", "diagnostics"]
 
 
 def test_default_export_path_uses_reports_directory() -> None:
@@ -1422,6 +1508,165 @@ def test_successful_dry_run_clears_stale_staged_freshness(tmp_path: Path) -> Non
     assert "bo_forge_staged_freshness_message" not in FakeStreamlit.session_state
 
 
+def test_structured_suggest_panel_stages_selected_stage(tmp_path: Path) -> None:
+    config_path = Path("configs/13_structured_campaign_core.yaml")
+    log_path = tmp_path / "structured.csv"
+    shutil.copyfile("examples/13_structured_campaign_core_campaign_log.csv", log_path)
+    structured_config = CampaignConfig.from_yaml(config_path)
+    calls: list[tuple[int, str | None]] = []
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class _FormContext:
+        def __enter__(self) -> "_FormContext":
+            FakeStreamlit.form_depth += 1
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            FakeStreamlit.form_depth -= 1
+
+    class FakeCampaign:
+        config = structured_config
+
+        def suggest_dry_run(self, batch_size: int, stage: str | None = None) -> object:
+            calls.append((batch_size, stage))
+            suggestions = pd.DataFrame(
+                [
+                    {
+                        "row_id": "suggested_screen",
+                        "iteration": 2,
+                        "status": "suggested",
+                        "source": "sobol",
+                        "stage": str(stage),
+                        "precursor_ratio": 0.25,
+                        "electrolyte": "KPF6",
+                        "annealing_temperature": "",
+                        "activity": "",
+                        "predicted_mean": "",
+                        "predicted_std": "",
+                        "acquisition": "",
+                    }
+                ]
+            )
+            bundle = make_staged_suggestion_bundle(
+                suggestions,
+                config_path,
+                log_path,
+                stage=stage,
+            )
+            return SimpleNamespace(
+                suggestions=suggestions,
+                bundle=bundle,
+                quality=pd.DataFrame([{"check": "ok"}]),
+            )
+
+        def suggestion_quality(self, _suggestions: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame([{"check": "ok"}])
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": str(config_path),
+            "bo_forge_log_path": str(log_path),
+        }
+        selectbox_labels: list[str] = []
+        selectbox_called_inside_form = False
+        form_depth = 0
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def number_input(cls, *_args: object, **_kwargs: object) -> int:
+            return 1
+
+        @classmethod
+        def selectbox(cls, label: str, options: list[str], **_kwargs: object) -> str:
+            cls.selectbox_labels.append(label)
+            cls.selectbox_called_inside_form = cls.form_depth > 0
+            assert options == ["screen", "refine"]
+            return "screen"
+
+        @classmethod
+        def form_submit_button(cls, label: str, *_args: object, **_kwargs: object) -> bool:
+            return label == "Generate suggestions (dry run)"
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _FormContext:
+            return _FormContext()
+
+        @classmethod
+        def text_input(cls, *_args: object, **_kwargs: object) -> str:
+            return str(tmp_path / "staged.csv")
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def subheader(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def dataframe(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def expander(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def success(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def error(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError(message)
+
+        @classmethod
+        def warning(cls, message: str, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError(message)
+
+    streamlit_app._render_suggest(FakeStreamlit, FakeCampaign())
+
+    bundle = FakeStreamlit.session_state["bo_forge_staged_suggestion_bundle"]
+    assert calls == [(1, "screen")]
+    assert FakeStreamlit.selectbox_labels == ["Suggestion stage"]
+    assert not FakeStreamlit.selectbox_called_inside_form
+    assert bundle["stage"] == "screen"
+    staged = staged_suggestions_from_bundle(bundle)
+    assert staged.loc[0, "stage"] == "screen"
+    assert log_path.read_bytes() == Path(
+        "examples/13_structured_campaign_core_campaign_log.csv"
+    ).read_bytes()
+
+
+def test_structured_selected_row_preview_handles_invalid_stage() -> None:
+    config = CampaignConfig.from_yaml("configs/13_structured_campaign_core.yaml")
+    campaign = SimpleNamespace(config=config)
+
+    class FakeStreamlit:
+        markdown_calls: list[str] = []
+
+        @classmethod
+        def markdown(cls, content: str, *_args: object, **_kwargs: object) -> None:
+            cls.markdown_calls.append(content)
+
+    streamlit_app._render_selected_row_preview(
+        FakeStreamlit,
+        campaign,
+        pd.Series({"stage": "unknown_stage", "precursor_ratio": 0.25}),
+    )
+
+    rendered = "\n".join(FakeStreamlit.markdown_calls)
+    assert "unknown_stage" in rendered
+
+
 def test_valid_staged_bundle_clears_old_freshness_warning(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1754,6 +1999,59 @@ def test_streamlit_loads_cost_aware_multi_objective_reports_panel() -> None:
 
     assert len(app.exception) == 0
     assert any(selectbox.label == "Plot kind" for selectbox in app.selectbox)
+
+
+def test_streamlit_structured_stage_change_clears_staged_bundle(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    log_path = tmp_path / "structured.csv"
+    pd.read_csv(
+        "examples/13_structured_campaign_core_campaign_log.csv",
+        keep_default_na=False,
+    ).query("status == 'observed'").to_csv(log_path, index=False)
+    before_bytes = log_path.read_bytes()
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/13_structured_campaign_core.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+
+    stage_select = next(
+        selectbox for selectbox in app.selectbox if selectbox.label == "Suggestion stage"
+    )
+    assert stage_select.value == "screen"
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+
+    bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+    assert bundle["stage"] == "screen"
+    stage_select = next(
+        selectbox for selectbox in app.selectbox if selectbox.label == "Suggestion stage"
+    )
+    stage_select.set_value("refine")
+    app.run(timeout=10)
+
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in app.session_state
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Cleared stale staged suggestions." in markdown_text
+    assert log_path.read_bytes() == before_bytes
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
+    app.run(timeout=10)
+    plot_select = next(selectbox for selectbox in app.selectbox if selectbox.label == "Plot kind")
+    assert "Stage Diagnostics" in list(plot_select.options)
+    assert len(app.exception) == 0
 
 
 def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:

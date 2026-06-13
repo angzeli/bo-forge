@@ -178,7 +178,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     stages = _parse_stages(raw.get("stages"), variables)
     if stages and cost is not None:
         raise ConfigError(
-            "Structured campaigns with cost are not supported in v1.3.2; "
+            "Structured campaigns with cost are not supported in v1.3.4; "
             "remove either 'stages' or 'cost'."
         )
     review = _parse_review(raw.get("review"))

@@ -36,6 +36,7 @@ _SESSION_READ_HELPERS = {
     "pareto_front",
     "campaign_status",
     "suggestion_quality",
+    "stage_summary",
 }
 
 
@@ -62,6 +63,7 @@ class CampaignViewData:
     pareto_front: pd.DataFrame | None = None
     cost_summary: pd.DataFrame | None = None
     replicate_summary: pd.DataFrame | None = None
+    stage_summary: pd.DataFrame | None = None
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like compatibility for existing app render helpers."""
@@ -180,15 +182,22 @@ class CampaignAppService:
             data.cost_summary = self.session.cost_summary()
         if panel in {"Overview", "Data"} and self.config.replicates.enabled:
             data.replicate_summary = self.session.replicate_summary()
+        if panel in {"Overview", "Data", "Reports"} and self.config.is_structured_campaign:
+            data.stage_summary = self.session.stage_summary()
         return data
 
-    def suggest_dry_run(self, batch_size: int) -> StagedSuggestionResult:
+    def suggest_dry_run(
+        self,
+        batch_size: int,
+        stage: str | None = None,
+    ) -> StagedSuggestionResult:
         """Generate non-mutating suggestions and return staged app state."""
-        suggestions = self.session.suggest_next(batch_size=batch_size)
+        suggestions = self.session.suggest_next(batch_size=batch_size, stage=stage)
         bundle = make_staged_suggestion_bundle(
             suggestions,
             self.config_path,
             self.log_path,
+            stage=stage,
         )
         quality = self.session.suggestion_quality(suggestions)
         return StagedSuggestionResult(suggestions, bundle, quality)
@@ -197,6 +206,7 @@ class CampaignAppService:
         self,
         bundle: dict[str, object],
         last_appended_fingerprint: str | None = None,
+        stage: str | None = None,
     ) -> AppendResult:
         """Append a valid staged bundle, reload, and return refreshed service state."""
         reason = staged_bundle_invalidation_reason(
@@ -204,6 +214,7 @@ class CampaignAppService:
             config_path=self.config_path,
             log_path=self.log_path,
             last_appended_fingerprint=last_appended_fingerprint,
+            stage=stage,
         )
         if reason is not None:
             raise ValueError(reason)
@@ -259,6 +270,7 @@ class CampaignAppService:
             "hypervolume": self.session.plot_hypervolume,
             "cost_progress": self.session.plot_cost_progress,
             "replicates": self.session.plot_replicates,
+            "stage_diagnostics": self.session.plot_stage_diagnostics,
         }
         if kind not in plotters:
             raise ValueError(f"Unsupported plot kind: {kind}")

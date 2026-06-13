@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.3.3
+# 🧪 BO Forge v1.3.4
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.3.3 adds a structured campaign tutorial example and notebook for staged screening/refinement workflows.
+v1.3.4 wraps structured/staged campaign workflows in the local Streamlit app while keeping the backend campaign engine in `bo_forge`.
 
-Existing backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, and user-facing Streamlit workbench semantics remain unchanged from the v1.3.2 structured-campaign baseline.
+Existing backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, examples, and notebooks remain unchanged from the v1.3.3 structured tutorial baseline.
 
 BO Forge deliberately supports only:
 
@@ -27,7 +27,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover automatic stage transitions, Streamlit structured workflow, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover automatic stage transitions, Streamlit structured campaign creation, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -170,7 +170,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.3.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.3.4 environment is recorded in `requirements-lock.txt`.
 
 ---
 

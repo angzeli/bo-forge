@@ -1,16 +1,38 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.3.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.3.4 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
 The v1.1.4 UI baseline uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
-v1.3.3 keeps user-facing app workflow semantics unchanged from the v1.2 service-layer baseline. Structured campaign behavior remains backend/session/CLI-owned; the app does not add a structured workflow in this patch.
+v1.3.4 adds Streamlit support for existing structured campaign semantics. The
+app detects configured stages, shows active/inactive variables, lets users pick
+the stage for dry-run suggestions, and stores that stage in the staged
+suggestion bundle before explicit append.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
 Streamlit workbench.
+
+## 🧩 Structured Campaigns
+
+Structured campaigns remain backend-owned through `CampaignSession`; Streamlit
+does not implement automatic stage transitions or a second campaign engine.
+
+When a loaded config defines `stages:`, the app:
+
+- shows configured stages and active/inactive variables in the `Suggest` panel;
+- requires a stage selection before stage-aware dry-run suggestions;
+- stages suggestions with the selected stage recorded in the app bundle;
+- blocks append if the config, log, staged suggestions, or selected stage changed
+  after staging;
+- shows stage summary tables in `Overview` and `Data`;
+- exposes the backend stage-diagnostics plot in `Reports`.
+
+Mutations remain explicit. Generating suggestions does not write to the CSV log;
+append, review, and observation actions still run through the backend service
+layer and `CampaignSession`.
 
 ## 🧰 Install
 
@@ -146,7 +168,9 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - Streamlit cost support surfaces deterministic cost metadata and ranking, not a
   learned cost model;
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
-  replicate configs use the backend `new_only` policy in v1.3.3.
+  replicate configs use the backend `new_only` policy in v1.3.4;
+- no automatic structured-stage transitions or Streamlit-owned structured
+  campaign engine.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.
