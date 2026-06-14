@@ -462,6 +462,10 @@ def empty_state_message(kind: str) -> tuple[str, str]:
             "No replicate summary available.",
             "Replicate summaries appear only when replicates are enabled.",
         ),
+        "fidelity_summary": (
+            "No fidelity summary available.",
+            "Fidelity summaries appear only when a fidelity section is configured.",
+        ),
         "report_preview": (
             "No report preview available.",
             "Load a valid campaign before exporting a report.",
@@ -553,6 +557,8 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
         kinds = ["progress", "diagnostics"]
     if config.is_structured_campaign:
         kinds.append("stage_diagnostics")
+    if config.fidelity is not None:
+        kinds.append("fidelity_diagnostics")
     if config.cost is not None:
         kinds.append("cost_progress")
     if config.replicates.enabled:

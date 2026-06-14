@@ -1,5 +1,19 @@
 # 📝 BO Forge Changelog
 
+## v1.4.1 - Multi-Fidelity Reporting and Diagnostics
+
+This patch adds read-only reporting and diagnostics for the v1.4.0
+single-objective qMFKG workflow.
+
+- Adds `fidelity_summary(config, df)` and `CampaignSession.fidelity_summary()`.
+- Adds `bo-forge fidelity-summary`.
+- Adds `plot_fidelity_diagnostics()` and
+  `bo-forge plot --kind fidelity-diagnostics`.
+- Includes fidelity summaries in campaign reports and Streamlit/app-service
+  view data for loaded fidelity campaigns.
+- Keeps qMFKG modelling, YAML/CSV schemas, acquisition scope, and unsupported
+  multi-fidelity combinations unchanged from v1.4.0.
+
 ## v1.4.0 - Single-Objective Multi-Fidelity qMFKG
 
 This release adds BO Forge's first conservative multi-fidelity Bayesian

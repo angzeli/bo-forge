@@ -95,7 +95,7 @@ print("ok")
             "15_multi_fidelity_qmfkg.yaml",
             "15_multi_fidelity_qmfkg_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending"],
+            ["summary", "next_action", "observed", "pending", "fidelity_summary"],
         ),
     ],
 )
@@ -444,6 +444,23 @@ def test_app_service_structured_stage_diagnostics_plot_routing(tmp_path: Path) -
     assert "stage_diagnostics" in service.available_plot_kinds()
     plot_path = tmp_path / "plots" / "stage_diagnostics.png"
     result = service.plot("stage_diagnostics", save_path=plot_path)
+
+    assert plot_path.exists()
+    assert result.written_path == plot_path
+    plt.close(result.figure)
+
+
+def test_app_service_fidelity_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "15_multi_fidelity_qmfkg_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "15_multi_fidelity_qmfkg.yaml",
+        log_path,
+    )
+
+    assert callable(service.fidelity_summary)
+    assert "fidelity_diagnostics" in service.available_plot_kinds()
+    plot_path = tmp_path / "plots" / "fidelity_diagnostics.png"
+    result = service.plot("fidelity_diagnostics", save_path=plot_path)
 
     assert plot_path.exists()
     assert result.written_path == plot_path

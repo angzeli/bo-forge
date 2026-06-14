@@ -780,6 +780,39 @@ def test_non_structured_report_has_no_stage_summary(tmp_path: Path) -> None:
     assert "Stage Summary" not in text
 
 
+def test_fidelity_summary_and_report_include_fidelity_section() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/15_multi_fidelity_qmfkg.yaml",
+        "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+
+    summary = campaign.fidelity_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert summary_value(summary, "fidelity_variable") == "fidelity"
+    assert summary_value(summary, "target_fidelity") == pytest.approx(1.0)
+    assert summary_value(summary, "observed_rows") == 4
+    assert summary_value(summary, "target_fidelity_observed_rows") == 1
+    assert summary_value(summary, "best_observed_row_id") == "mf_seed_3"
+    assert "fidelity_summary" in report
+    assert "Fidelity Summary\n----------------" in text
+
+
+def test_fidelity_summary_rejects_non_fidelity_session(tmp_path: Path) -> None:
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0]))
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    with pytest.raises(ValueError, match="requires a config with a fidelity section"):
+        campaign.fidelity_summary()
+
+
 def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path) -> None:
     cfg = structured_config()
     log_path = write_log(tmp_path / "structured.csv", cfg, structured_pending_log(cfg))

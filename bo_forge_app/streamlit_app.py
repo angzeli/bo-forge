@@ -234,6 +234,8 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
             view_data["replicate_summary"] = campaign.replicate_summary()
         if panel in {"Overview", "Data", "Reports"} and campaign.config.is_structured_campaign:
             view_data["stage_summary"] = campaign.stage_summary()
+        if panel in {"Overview", "Data", "Reports"} and campaign.config.fidelity is not None:
+            view_data["fidelity_summary"] = campaign.fidelity_summary()
     return view_data
 
 
@@ -801,6 +803,14 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             raw_df=replicate_summary,
             expanded_raw=False,
         )
+    if campaign.config.fidelity is not None:
+        _render_table_section(
+            st,
+            "Fidelity Summary",
+            _view_data_value(view_data, "fidelity_summary", campaign.fidelity_summary),
+            empty_kind="fidelity_summary",
+            expanded_raw=False,
+        )
     if campaign.config.is_structured_campaign:
         _render_table_section(
             st,
@@ -899,6 +909,14 @@ def _render_data(
             "Replicate Summary",
             replicate_summary,
             empty_kind="replicate_summary",
+            expanded_raw=False,
+        )
+    if campaign.config.fidelity is not None:
+        _render_table_section(
+            st,
+            "Fidelity Summary",
+            _view_data_value(view_data, "fidelity_summary", campaign.fidelity_summary),
+            empty_kind="fidelity_summary",
             expanded_raw=False,
         )
     if campaign.config.is_structured_campaign:
@@ -1457,6 +1475,7 @@ def _available_plot_options(
         "pareto_parallel": ("Pareto Parallel", "plot_pareto_parallel"),
         "hypervolume": ("Hypervolume", "plot_hypervolume"),
         "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
+        "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:

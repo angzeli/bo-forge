@@ -37,6 +37,7 @@ _SESSION_READ_HELPERS = {
     "campaign_status",
     "suggestion_quality",
     "stage_summary",
+    "fidelity_summary",
 }
 
 
@@ -64,6 +65,7 @@ class CampaignViewData:
     cost_summary: pd.DataFrame | None = None
     replicate_summary: pd.DataFrame | None = None
     stage_summary: pd.DataFrame | None = None
+    fidelity_summary: pd.DataFrame | None = None
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like compatibility for existing app render helpers."""
@@ -184,6 +186,8 @@ class CampaignAppService:
             data.replicate_summary = self.session.replicate_summary()
         if panel in {"Overview", "Data", "Reports"} and self.config.is_structured_campaign:
             data.stage_summary = self.session.stage_summary()
+        if panel in {"Overview", "Data", "Reports"} and self.config.fidelity is not None:
+            data.fidelity_summary = self.session.fidelity_summary()
         return data
 
     def suggest_dry_run(
@@ -271,6 +275,7 @@ class CampaignAppService:
             "cost_progress": self.session.plot_cost_progress,
             "replicates": self.session.plot_replicates,
             "stage_diagnostics": self.session.plot_stage_diagnostics,
+            "fidelity_diagnostics": self.session.plot_fidelity_diagnostics,
         }
         if kind not in plotters:
             raise ValueError(f"Unsupported plot kind: {kind}")

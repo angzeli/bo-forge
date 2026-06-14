@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     StageConfig,
@@ -17,6 +18,7 @@ from bo_forge.diagnostics import (
     _directional_best_so_far,
     _normalised_variable_coverage,
     plot_diagnostics,
+    plot_fidelity_diagnostics,
     plot_progress,
     plot_replicates,
     plot_stage_diagnostics,
@@ -147,6 +149,52 @@ def replicate_config() -> CampaignConfig:
         variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
         bo=cfg.bo,
         replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def fidelity_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="fidelity_diagnostics",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("fidelity", "continuous", 0.2, 1.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=2, acquisition="qmf_kg"),
+        fidelity=FidelityConfig(variable="fidelity", target=1.0),
+    )
+
+
+def fidelity_log() -> pd.DataFrame:
+    cfg = fidelity_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "mf_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.2,
+                "fidelity": 0.4,
+                "activity": 0.8,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mf_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.7,
+                "fidelity": 1.0,
+                "activity": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
     )
 
 
@@ -409,6 +457,37 @@ def test_plot_stage_diagnostics_writes_stage_figure(tmp_path: Path) -> None:
     assert axes[1].get_title() == "Active variable map"
     assert axes[1].images[0].get_array().tolist() == [[1.0, 0.0], [1.0, 1.0]]
     pd.testing.assert_frame_equal(df, before)
+
+
+def test_plot_fidelity_diagnostics_writes_figure_and_labels(tmp_path: Path) -> None:
+    cfg = fidelity_config()
+    save_path = tmp_path / "reports" / "fidelity.png"
+
+    fig, axes = plot_fidelity_diagnostics(cfg, fidelity_log(), save_path=save_path)
+
+    assert save_path.exists()
+    assert axes[0].get_xlabel() == "fidelity"
+    assert axes[0].get_ylabel() == "activity"
+    assert axes[1].get_xlabel() == "fidelity"
+    assert axes[1].get_ylabel() == "Observed rows"
+    assert "target fidelity = 1" in axes[0].get_legend_handles_labels()[1]
+    plt.close(fig)
+
+
+def test_plot_fidelity_diagnostics_handles_empty_observed_log() -> None:
+    cfg = fidelity_config()
+
+    fig, axes = plot_fidelity_diagnostics(cfg, pd.DataFrame(columns=canonical_columns(cfg)))
+
+    assert "No observed fidelity data yet." in axes[0].texts[0].get_text()
+    assert axes[0].get_xlabel() == "fidelity"
+    assert axes[1].get_ylabel() == "Observed rows"
+    plt.close(fig)
+
+
+def test_plot_fidelity_diagnostics_rejects_non_fidelity_config() -> None:
+    with pytest.raises(ValueError, match="requires a config with fidelity"):
+        plot_fidelity_diagnostics(config(), observed_log())
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

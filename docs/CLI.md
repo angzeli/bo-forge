@@ -99,6 +99,16 @@ bo-forge suggest \
   --config configs/15_multi_fidelity_qmfkg.yaml \
   --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
   --batch-size 1
+
+bo-forge fidelity-summary \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+
+bo-forge plot \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --kind fidelity-diagnostics \
+  --output reports/15_multi_fidelity_diagnostics.png
 ```
 
 The generated model-based row uses `source=qmf_kg`. Use a copied working log
@@ -301,6 +311,7 @@ bo-forge plot \
 | `bo-forge cost-summary --config PATH --log PATH` | Print cost, reserved-cost, budget, and either best-observed-objective or multi-objective hypervolume/Pareto fields. |
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
 | `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
+| `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
@@ -308,7 +319,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, or structured stage-diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, or fidelity-diagnostics figure. |
 
 ## 🧯 CLI Error Output
 

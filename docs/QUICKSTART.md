@@ -185,7 +185,8 @@ The structured tutorial files are:
 ## 🧪 Multi-Fidelity qMFKG
 
 v1.4.0 adds a conservative single-objective multi-fidelity workflow with one
-continuous fidelity variable:
+continuous fidelity variable. v1.4.1 adds read-only summaries and diagnostics
+for that workflow:
 
 ```yaml
 fidelity:
@@ -217,9 +218,29 @@ bo-forge suggest \
   --config configs/15_multi_fidelity_qmfkg.yaml \
   --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
   --batch-size 1
+
+bo-forge fidelity-summary \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+
+bo-forge plot \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --kind fidelity-diagnostics \
+  --output reports/15_multi_fidelity_diagnostics.png
 ```
 
-In v1.4.0, multi-fidelity is single-objective only and cannot be combined with
+From Python:
+
+```python
+campaign = CampaignSession.from_files(
+    "configs/15_multi_fidelity_qmfkg.yaml",
+    "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
+)
+campaign.fidelity_summary()
+```
+
+In v1.4.x, multi-fidelity is single-objective only and cannot be combined with
 `objectives:`, `stages:`, `cost:`, `replicates.enabled: true`, categorical,
 integer, or discrete variables, or model-based `batch_size > 1`.
 

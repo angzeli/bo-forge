@@ -32,6 +32,7 @@ from bo_forge.multi_objective import (
 from bo_forge.multi_objective import (
     pareto_summary as _pareto_summary,
 )
+from bo_forge.multifidelity import fidelity_summary as _fidelity_summary
 from bo_forge.replicates import (
     best_replicate_group as _best_replicate_group,
 )
@@ -483,6 +484,8 @@ class CampaignSession:
         }
         if self.config.is_structured_campaign:
             tables["stage_summary"] = self.stage_summary()
+        if self.config.fidelity is not None:
+            tables["fidelity_summary"] = self.fidelity_summary()
         return tables
 
     def export_report(self, path: str | Path) -> Path:
@@ -524,6 +527,10 @@ class CampaignSession:
     def stage_summary(self) -> pd.DataFrame:
         """Return structured-campaign stage summary rows."""
         return _stage_summary(self.config, self.df)
+
+    def fidelity_summary(self) -> pd.DataFrame:
+        """Return multi-fidelity campaign summary fields."""
+        return _fidelity_summary(self.config, self.df)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -635,6 +642,14 @@ class CampaignSession:
 
         return _plot_stage_diagnostics(self.config, self.df, **kwargs)
 
+    def plot_fidelity_diagnostics(self, **kwargs: Any) -> Any:
+        """Plot observed multi-fidelity diagnostics."""
+        from bo_forge.diagnostics import (
+            plot_fidelity_diagnostics as _plot_fidelity_diagnostics,
+        )
+
+        return _plot_fidelity_diagnostics(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -704,6 +719,17 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             + _format_report_table(tables["review_queue"], "No suggestions awaiting review."),
             "Cost Summary\n------------\n\n"
             + _format_report_table(tables["cost_summary"], "No cost model configured."),
+            *(
+                [
+                    "Fidelity Summary\n----------------\n\n"
+                    + _format_report_table(
+                        tables["fidelity_summary"],
+                        "No fidelity section configured.",
+                    )
+                ]
+                if "fidelity_summary" in tables
+                else []
+            ),
             *(
                 [
                     "Stage Summary\n-------------\n\n"

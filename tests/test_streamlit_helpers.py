@@ -801,6 +801,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "configs/11_four_objective_mixed_constrained_qlogehvi.yaml"
     )
     multi_cost = CampaignConfig.from_yaml("configs/12_cost_aware_multi_objective_qlogehvi.yaml")
+    fidelity = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
 
     assert available_plot_kinds(plain) == ["progress", "diagnostics"]
     assert available_plot_kinds(cost) == ["progress", "diagnostics", "cost_progress"]
@@ -816,6 +817,11 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "hypervolume",
         "pareto_parallel",
         "cost_progress",
+    ]
+    assert available_plot_kinds(fidelity) == [
+        "progress",
+        "diagnostics",
+        "fidelity_diagnostics",
     ]
 
 

@@ -1,6 +1,6 @@
-"""BO Forge v1.4.0."""
+"""BO Forge v1.4.1."""
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 from bo_forge.config import (
     BOConfig,
@@ -32,6 +32,7 @@ from bo_forge.multi_objective import (
     pareto_front,
     pareto_summary,
 )
+from bo_forge.multifidelity import fidelity_summary
 from bo_forge.replicates import (
     aggregate_observed_replicates,
     best_replicate_group,
@@ -66,6 +67,7 @@ __all__ = [
     "best_replicate_group",
     "configured_stage_names",
     "evaluate_cost",
+    "fidelity_summary",
     "get_observed_data",
     "hypervolume",
     "hypervolume_progress",

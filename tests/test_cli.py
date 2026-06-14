@@ -215,7 +215,13 @@ bo:
     return path
 
 
-def write_fidelity_config(path: Path, *, initial_design_size: int = 3) -> Path:
+def write_fidelity_config(
+    path: Path,
+    *,
+    initial_design_size: int = 3,
+    review: bool = False,
+) -> Path:
+    review_block = "review:\n  enabled: true\n" if review else ""
     path.write_text(
         f"""
 campaign_name: fidelity_cli_test
@@ -235,6 +241,7 @@ fidelity:
   variable: fidelity
   target: 1.0
   num_fantasies: 8
+{review_block}\
 bo:
   batch_size: 1
   initial_design_size: {initial_design_size}
@@ -265,7 +272,11 @@ def config(initial_design_size: int = 2) -> CampaignConfig:
     )
 
 
-def fidelity_config(initial_design_size: int = 3) -> CampaignConfig:
+def fidelity_config(
+    initial_design_size: int = 3,
+    *,
+    review: bool = False,
+) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="fidelity_cli_test",
         objective=ObjectiveConfig(name="activity", direction="maximize"),
@@ -283,6 +294,7 @@ def fidelity_config(initial_design_size: int = 3) -> CampaignConfig:
             mc_samples=8,
         ),
         fidelity=FidelityConfig(variable="fidelity", target=1.0, num_fantasies=8),
+        review=ReviewConfig(enabled=review),
     )
 
 
@@ -662,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.4.0\n"
+    assert captured.out == "bo-forge 1.4.1\n"
     assert captured.err == ""
 
 
@@ -671,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.4.0\n"
+    assert completed.stdout == "bo-forge 1.4.1\n"
     assert completed.stderr == ""
 
 
@@ -1454,6 +1466,158 @@ def test_multi_fidelity_cli_suggest_append_writes_qmfkg_row(
     assert float(row["fidelity"]) <= 1.0
     assert row["activity"] == ""
     assert list(df.columns) == canonical_columns(cfg)
+
+
+def test_multi_fidelity_cli_fidelity_summary_outputs_table(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+
+    assert run(["fidelity-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "fidelity_variable" in captured.out
+    assert "target_fidelity_observed_rows" in captured.out
+    assert "best_target_fidelity_row_id" in captured.out
+    assert "mf_obs_3" in captured.out
+
+
+def test_multi_fidelity_cli_fidelity_summary_counts_review_blocking_qmfkg(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml", review=True)
+    cfg = fidelity_config(review=True)
+    rows = [
+        {
+            "row_id": "target_0",
+            "iteration": 0,
+            "status": "observed",
+            "source": "manual",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": 0.5,
+            "fidelity": 1.0,
+            "activity": 1.2,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        },
+        {
+            "row_id": "pending_qmfkg",
+            "iteration": 1,
+            "status": "suggested",
+            "source": "qmf_kg",
+            "review_status": "pending",
+            "review_note": "",
+            "x": 0.2,
+            "fidelity": 0.8,
+            "activity": "",
+            "predicted_mean": 1.1,
+            "predicted_std": 0.1,
+            "acquisition": 0.2,
+        },
+        {
+            "row_id": "accepted_qmfkg",
+            "iteration": 2,
+            "status": "suggested",
+            "source": "qmf_kg",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": 0.3,
+            "fidelity": 0.8,
+            "activity": "",
+            "predicted_mean": 1.2,
+            "predicted_std": 0.1,
+            "acquisition": 0.3,
+        },
+        {
+            "row_id": "rejected_qmfkg",
+            "iteration": 3,
+            "status": "suggested",
+            "source": "qmf_kg",
+            "review_status": "rejected",
+            "review_note": "",
+            "x": 0.4,
+            "fidelity": 0.8,
+            "activity": "",
+            "predicted_mean": 1.3,
+            "predicted_std": 0.1,
+            "acquisition": 0.4,
+        },
+        {
+            "row_id": "deferred_qmfkg",
+            "iteration": 4,
+            "status": "suggested",
+            "source": "qmf_kg",
+            "review_status": "deferred",
+            "review_note": "",
+            "x": 0.6,
+            "fidelity": 0.8,
+            "activity": "",
+            "predicted_mean": 1.4,
+            "predicted_std": 0.1,
+            "acquisition": 0.5,
+        },
+    ]
+    log_path = write_log(
+        tmp_path / "fidelity.csv",
+        cfg,
+        pd.DataFrame(rows, columns=canonical_columns(cfg)),
+    )
+
+    assert run(["fidelity-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "pending_qmfkg_suggestions" in captured.out
+    pending_line = next(
+        line for line in captured.out.splitlines() if "pending_qmfkg_suggestions" in line
+    )
+    assert pending_line.split()[-1] == "2"
+
+
+def test_multi_fidelity_cli_fidelity_summary_rejects_non_fidelity_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config(), observed_log(config()))
+
+    assert run(["fidelity-summary", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "fidelity-summary requires a multi-fidelity config" in captured.err
+
+
+def test_multi_fidelity_cli_plot_fidelity_diagnostics_writes_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+    output_path = tmp_path / "reports" / "fidelity.png"
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "fidelity-diagnostics",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert f"Wrote fidelity-diagnostics plot: {output_path}" in captured.out
+    assert output_path.exists()
 
 
 def test_multi_fidelity_cli_batch_size_failure_has_specific_hint_without_mutation(

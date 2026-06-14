@@ -311,6 +311,116 @@ def plot_replicates(
     )
 
 
+def plot_fidelity_diagnostics(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot observed objective values against fidelity and fidelity coverage."""
+    validate_campaign_data(config, df)
+    if config.fidelity is None:
+        raise ValueError("plot_fidelity_diagnostics() requires a config with fidelity.")
+
+    observed = get_observed_data(config, df)
+    fidelity_name = config.fidelity.variable
+    objective = config.objective.name
+    target = float(config.fidelity.target)
+
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(14, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    scatter_ax, count_ax = axes
+
+    if observed.empty:
+        scatter_ax.text(
+            0.5,
+            0.5,
+            "No observed fidelity data yet.",
+            ha="center",
+            va="center",
+            transform=scatter_ax.transAxes,
+        )
+        scatter_ax.axvline(
+            target,
+            color="#d97706",
+            linestyle="--",
+            linewidth=2,
+            label=f"target fidelity = {target:g}",
+        )
+        count_ax.text(
+            0.5,
+            0.5,
+            "No observations yet.",
+            ha="center",
+            va="center",
+            transform=count_ax.transAxes,
+        )
+    else:
+        fidelity_values = pd.to_numeric(observed[fidelity_name])
+        objective_values = pd.to_numeric(observed[objective])
+        scatter_ax.scatter(
+            fidelity_values,
+            objective_values,
+            color="#2563eb",
+            alpha=0.8,
+            label="observed",
+        )
+        scatter_ax.axvline(
+            target,
+            color="#d97706",
+            linestyle="--",
+            linewidth=2,
+            label=f"target fidelity = {target:g}",
+        )
+        bin_count = min(10, max(1, int(fidelity_values.nunique())))
+        count_ax.hist(
+            fidelity_values,
+            bins=bin_count,
+            color="#64748b",
+            edgecolor="black",
+            alpha=0.85,
+        )
+        count_ax.axvline(
+            target,
+            color="#d97706",
+            linestyle="--",
+            linewidth=2,
+            label=f"target fidelity = {target:g}",
+        )
+
+    set_title(scatter_ax, "Objective vs fidelity")
+    set_axis_labels(scatter_ax, fidelity_name, objective)
+    add_legend(scatter_ax)
+    set_title(count_ax, "Observed fidelity distribution")
+    set_axis_labels(count_ax, fidelity_name, "Observed rows")
+    count_ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    add_legend(count_ax)
+    fig.suptitle(
+        f"{config.campaign_name}: fidelity diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
 def plot_stage_diagnostics(
     config: CampaignConfig,
     df: pd.DataFrame,

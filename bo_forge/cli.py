@@ -98,6 +98,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(stage_summary_parser)
     stage_summary_parser.set_defaults(handler=_cmd_stage_summary)
 
+    fidelity_summary_parser = subparsers.add_parser(
+        "fidelity-summary",
+        help="Print multi-fidelity campaign summary fields.",
+    )
+    _add_config_log_arguments(fidelity_summary_parser)
+    fidelity_summary_parser.set_defaults(handler=_cmd_fidelity_summary)
+
     pareto_front_parser = subparsers.add_parser(
         "pareto-front",
         help="Print nondominated observed rows for a multi-objective campaign.",
@@ -185,6 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
             "pareto-parallel",
             "hypervolume",
             "stage-diagnostics",
+            "fidelity-diagnostics",
         ],
         required=True,
         help="Plot type to export.",
@@ -307,6 +315,14 @@ def _cmd_stage_summary(args: argparse.Namespace) -> int:
     if not campaign.config.is_structured_campaign:
         raise ConfigError("stage-summary requires a structured campaign config.")
     _print_table(campaign.stage_summary())
+    return 0
+
+
+def _cmd_fidelity_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if campaign.config.fidelity is None:
+        raise ConfigError("fidelity-summary requires a multi-fidelity config.")
+    _print_table(campaign.fidelity_summary())
     return 0
 
 
@@ -438,6 +454,12 @@ def _cmd_plot(args: argparse.Namespace) -> int:
             if not campaign.config.is_structured_campaign:
                 raise ConfigError("plot --kind stage-diagnostics requires a structured config.")
             campaign.plot_stage_diagnostics(save_path=args.output)
+        elif args.kind == "fidelity-diagnostics":
+            if campaign.config.fidelity is None:
+                raise ConfigError(
+                    "plot --kind fidelity-diagnostics requires a multi-fidelity config."
+                )
+            campaign.plot_fidelity_diagnostics(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

@@ -1,8 +1,10 @@
-# 🧪 BO Forge v1.4.0
+# 🧪 BO Forge v1.4.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.4.0 adds BO Forge's first conservative multi-fidelity workflow: single-objective continuous-fidelity qMFKG through BoTorch's current multi-fidelity stack.
+v1.4.1 keeps the conservative v1.4.0 single-objective continuous-fidelity qMFKG
+modelling scope and adds read-only fidelity summaries plus fidelity diagnostics
+for those campaigns.
 
 Existing single-objective, multi-objective, structured, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.3.4 structured Streamlit baseline.
 
@@ -12,14 +14,14 @@ BO Forge deliberately supports only:
 - single-objective campaigns, plus coupled multi-objective campaigns with `m >= 2` objectives
 - maximize or minimize direction
 - Sobol or random initial suggestions
-- BoTorch `SingleTaskGP`
+- BoTorch `SingleTaskGP` and `SingleTaskMultiFidelityGP`
 - LogEI/qLogEI for standard single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
 - optional cost-aware ranking and human review
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
 - optional structured/staged campaign logs with stage-aware validation, explicit stage-aware suggestions, and read-only stage diagnostics
-- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable
+- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable and read-only fidelity diagnostics
 - resume from existing logs
 - basic diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
@@ -130,7 +132,9 @@ The Streamlit app is intentionally a thin wrapper.
 Future interfaces should keep wrapping this backend package rather than moving BO logic into notebooks, CLI commands, or app code.
 
 The bundled multi-fidelity example is `configs/15_multi_fidelity_qmfkg.yaml`
-with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`.
+with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`. Inspect it
+with `campaign.fidelity_summary()`, `bo-forge fidelity-summary`, or
+`bo-forge plot --kind fidelity-diagnostics`.
 
 ---
 
@@ -174,7 +178,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.4.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.4.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

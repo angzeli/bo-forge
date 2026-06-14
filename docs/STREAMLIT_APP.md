@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.4.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.4.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -10,6 +10,10 @@ v1.3.4 adds Streamlit support for existing structured campaign semantics. The
 app detects configured stages, shows active/inactive variables, lets users pick
 the stage for dry-run suggestions, and stores that stage in the staged
 suggestion bundle before explicit append.
+
+v1.4.1 surfaces read-only fidelity summaries and fidelity diagnostics for
+loaded single-objective qMFKG configs. It does not add Streamlit multi-fidelity
+campaign creation.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -135,11 +139,11 @@ Exporting staged suggestions writes a separate CSV file only. It does not modify
 
 The app keeps file selection in the source bar, followed by five practical campaign panels. Only the active panel renders on each Streamlit rerun:
 
-- `Overview`: validation, campaign status, next action, compact metrics, best-observation or Pareto summary, and compact cost/replicate summaries.
+- `Overview`: validation, campaign status, next action, compact metrics, best-observation or Pareto summary, and compact cost/replicate/fidelity summaries.
 - `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
 - `Resolve`: review queue, observable suggestions, single-objective mark-observed, coupled multi-objective objective entry, and actual-cost input when configured.
 - `Reports`: report preview/export and supported plot controls. Report text and figures are generated only after explicit actions.
-- `Data`: raw summary and next-action tables, observed rows, pending rows, Pareto tables, cost/replicate summaries, and the full raw log.
+- `Data`: raw summary and next-action tables, observed rows, pending rows, Pareto tables, cost/replicate/fidelity summaries, and the full raw log.
 
 ## ⚠️ Write Actions
 
@@ -171,8 +175,9 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
   replicate configs use the backend `new_only` policy in v1.4.0;
 - no automatic structured-stage transitions or Streamlit-owned structured
   campaign engine.
-- no Streamlit multi-fidelity campaign creation; v1.4.0 fidelity configs load
-  through the existing backend/session workflow.
+- no Streamlit multi-fidelity campaign creation; v1.4.1 fidelity configs load
+  through the existing backend/session workflow and expose read-only summaries
+  and diagnostics.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.
