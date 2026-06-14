@@ -1,12 +1,13 @@
-"""BO Forge v1.3.4."""
+"""BO Forge v1.4.0."""
 
-__version__ = "1.3.4"
+__version__ = "1.4.0"
 
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
     CostConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -49,6 +50,7 @@ __all__ = [
     "ConfigError",
     "ConstraintConfig",
     "CostConfig",
+    "FidelityConfig",
     "LogValidationError",
     "LogWriteError",
     "ObjectiveConfig",

@@ -182,6 +182,47 @@ The structured tutorial files are:
 - `examples/14_structured_campaign_tutorial_campaign_log.csv`;
 - `notebooks/14_structured_campaign_tutorial.ipynb`.
 
+## 🧪 Multi-Fidelity qMFKG
+
+v1.4.0 adds a conservative single-objective multi-fidelity workflow with one
+continuous fidelity variable:
+
+```yaml
+fidelity:
+  variable: fidelity
+  target: 1.0
+  fixed_cost: 0.01
+  fidelity_cost_weight: 1.0
+  num_fantasies: 64
+
+bo:
+  acquisition: qmf_kg
+```
+
+The fidelity variable remains a normal CSV variable column. Lower-fidelity rows
+are real objective measurements at that fidelity; the target fidelity is the
+value BO Forge ultimately optimizes for. qMFKG trades target-fidelity
+information gain against the configured affine fidelity cost evaluated on the
+normalized model-space fidelity coordinate. This fidelity cost is not the same
+as BO Forge's existing `cost:` budget/ranking feature.
+
+Try the bundled seed log:
+
+```bash
+bo-forge validate \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --batch-size 1
+```
+
+In v1.4.0, multi-fidelity is single-objective only and cannot be combined with
+`objectives:`, `stages:`, `cost:`, `replicates.enabled: true`, categorical,
+integer, or discrete variables, or model-based `batch_size > 1`.
+
 ## 🔁 Session API
 
 Notebook campaign workflows should usually start with `CampaignSession`:
@@ -305,7 +346,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.3.4 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -340,7 +381,7 @@ campaign.plot_hypervolume(save_path="reports/hypervolume.png")
 
 For a 3+ objective campaign, `campaign.plot_pareto()` renders all objective-pair projections using one shared full-space Pareto set, and `campaign.plot_pareto_parallel()` shows normalized Pareto-front trade-off profiles.
 
-The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.3.4 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
+The reference point is written in user-facing units and should be meaningfully worse than the region of interest. `hypervolume()` reports current hypervolume for the observed state, using group means when replicates are enabled. `hypervolume_progress()` and `plot_hypervolume()` show cumulative best-so-far progress, so progress plots do not decrease when a later replicate worsens an existing group mean. Hypervolume is reported as `0.0` when no observed point dominates the reference point. v1.4.0 supports review, replicate, and deterministic cost metadata for coupled multi-objective campaigns; decoupled objective evaluation remains deferred.
 
 ## 🧪 Mixed-Variable Campaigns
 

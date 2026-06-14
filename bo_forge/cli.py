@@ -536,6 +536,8 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
     if isinstance(exc, SuggestionError):
+        if "qMFKG model-based suggestions support batch_size=1" in str(exc):
+            return "Hint: Use --batch-size 1 for model-based qMFKG suggestions."
         if (
             "Structured campaign suggestions require an explicit stage" in str(exc)
             or "Invalid structured campaign stage" in str(exc)

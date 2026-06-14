@@ -8,11 +8,13 @@ import pandas as pd
 import torch
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
+from botorch.models.gp_regression_fidelity import SingleTaskMultiFidelityGP
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from bo_forge.config import CampaignConfig
 from bo_forge.multi_objective import objectives_to_model_space
+from bo_forge.multifidelity import fidelity_feature_index
 from bo_forge.replicates import modeling_observed_data_with_variance
 from bo_forge.transforms import dataframe_to_unit_cube, objective_to_model_space
 
@@ -65,6 +67,27 @@ def fit_gp_model(config: CampaignConfig, observed_df: pd.DataFrame) -> SingleTas
         training.train_x,
         training.train_y,
         input_transform=Normalize(d=training.train_x.shape[-1]),
+        outcome_transform=Standardize(m=training.train_y.shape[-1]),
+        **kwargs,
+    )
+    mll = ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_mll(mll)
+    return model
+
+
+def fit_multi_fidelity_gp_model(
+    config: CampaignConfig,
+    observed_df: pd.DataFrame,
+) -> SingleTaskMultiFidelityGP:
+    """Fit BoTorch's single-task multi-fidelity GP to observed campaign data."""
+    training = dataframe_to_training_tensors(config, observed_df)
+    kwargs = {}
+    if training.train_yvar is not None:
+        kwargs["train_Yvar"] = training.train_yvar
+    model = SingleTaskMultiFidelityGP(
+        training.train_x,
+        training.train_y,
+        data_fidelities=[fidelity_feature_index(config)],
         outcome_transform=Standardize(m=training.train_y.shape[-1]),
         **kwargs,
     )

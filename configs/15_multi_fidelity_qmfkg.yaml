@@ -1,0 +1,29 @@
+campaign_name: multi_fidelity_photocatalyst_qmfkg
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.05
+    upper: 0.50
+  - name: fidelity
+    type: continuous
+    lower: 0.20
+    upper: 1.00
+fidelity:
+  variable: fidelity
+  target: 1.0
+  fixed_cost: 0.01
+  fidelity_cost_weight: 1.0
+  num_fantasies: 8
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: qmf_kg
+  initial_design_method: sobol
+  random_seed: 15
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 16
+  min_normalized_distance: 0.02

@@ -1,0 +1,5 @@
+row_id,iteration,status,source,catalyst_loading,fidelity,activity,predicted_mean,predicted_std,acquisition
+mf_seed_0,0,observed,manual,0.10,0.25,0.72,,,
+mf_seed_1,1,observed,manual,0.22,0.50,1.08,,,
+mf_seed_2,2,observed,manual,0.34,0.75,1.36,,,
+mf_seed_3,3,observed,manual,0.44,1.00,1.42,,,

@@ -20,7 +20,15 @@ COST_COLUMNS = ["cost_estimate", "cost_actual"]
 RESULT_COLUMNS = ["predicted_mean", "predicted_std", "acquisition"]
 UTILITY_COLUMNS = ["utility"]
 VALID_STATUSES = {"suggested", "observed"}
-VALID_SOURCES = {"manual", "random", "sobol", "log_ei", "qlog_ei", "cost_log_ei"}
+VALID_SOURCES = {
+    "manual",
+    "random",
+    "sobol",
+    "log_ei",
+    "qlog_ei",
+    "cost_log_ei",
+    "qmf_kg",
+}
 VALID_MULTI_OBJECTIVE_SOURCES = {"manual", "random", "sobol", "qlog_ehvi", "cost_qlog_ehvi"}
 VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
@@ -183,7 +191,12 @@ def _validate_status(df: pd.DataFrame) -> None:
 
 
 def _validate_source(config: CampaignConfig, df: pd.DataFrame) -> None:
-    valid_sources = VALID_MULTI_OBJECTIVE_SOURCES if config.is_multi_objective else VALID_SOURCES
+    if config.is_multi_objective:
+        valid_sources = VALID_MULTI_OBJECTIVE_SOURCES
+    elif config.fidelity is not None:
+        valid_sources = {"manual", "random", "sobol", "qmf_kg"}
+    else:
+        valid_sources = VALID_SOURCES - {"qmf_kg"}
     invalid = ~df["source"].isin(valid_sources)
     if invalid.any():
         row_id = str(df.loc[invalid, "row_id"].iloc[0])

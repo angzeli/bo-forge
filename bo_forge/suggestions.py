@@ -15,13 +15,15 @@ from torch.quasirandom import SobolEngine
 from bo_forge.acquisition import (
     build_qlog_ehvi_acquisition,
     optimize_log_ei,
+    optimize_posterior_mean_at_target_fidelity,
     optimize_qlog_ehvi,
+    optimize_qmf_kg,
 )
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_variable_names, constraint_violations_for_values
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
-from bo_forge.models import dataframe_to_tensors, fit_gp_model
+from bo_forge.models import dataframe_to_tensors, fit_gp_model, fit_multi_fidelity_gp_model
 from bo_forge.multi_objective import (
     objectives_from_model_space,
     reference_point_to_model_space,
@@ -104,6 +106,14 @@ def suggest_next(
             count=min(requested_batch_size, remaining_initial),
         )
 
+    if config.fidelity is not None:
+        return _suggest_multi_fidelity_model_based(
+            config=config,
+            df=df,
+            observed_df=observed_df,
+            batch_size=requested_batch_size,
+        )
+
     if config.is_multi_objective:
         if config.cost is not None:
             return _suggest_cost_aware_multi_objective_model_based(
@@ -166,7 +176,7 @@ def _suggest_structured_stage(
     stage_name = _resolve_structured_stage(config, stage)
     if config.cost is not None:
         raise SuggestionError(
-            "Structured campaign suggestions with cost are not supported in v1.3.4."
+            "Structured campaign suggestions with cost are not supported in v1.4.0."
         )
     if has_pending_suggestions(df, config):
         raise SuggestionError(
@@ -289,6 +299,84 @@ def _suggest_initial_design(
         _populate_cost_fields(config, row, candidate)
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _suggest_multi_fidelity_model_based(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    if batch_size != 1:
+        raise SuggestionError(
+            "qMFKG model-based suggestions support batch_size=1 in v1.4.0: "
+            f"requested={batch_size}."
+        )
+    try:
+        torch.manual_seed(config.bo.random_seed)
+        model = fit_multi_fidelity_gp_model(config, observed_df)
+        fixed_features_list = categorical_feature_assignments(config)
+        model_dim = encoded_dimension(config)
+        current_value = optimize_posterior_mean_at_target_fidelity(
+            config=config,
+            model=model,
+            model_dim=model_dim,
+            fixed_features_list=fixed_features_list,
+        )
+        user_candidates: list[tuple[object, ...]] | None = None
+        acquisition_value: torch.Tensor | None = None
+        rejection_message = "no candidate was decoded"
+
+        for attempt in range(MAX_DECODE_RETRIES):
+            torch.manual_seed(config.bo.random_seed + attempt)
+            x_unit_raw, acquisition_value, _ = optimize_qmf_kg(
+                config=config,
+                model=model,
+                current_value=current_value,
+                model_dim=model_dim,
+                fixed_features_list=fixed_features_list,
+            )
+            decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
+            rejection_message = _candidate_batch_rejection_message(
+                config,
+                df,
+                decoded_candidates,
+            )
+            if rejection_message is None:
+                user_candidates = decoded_candidates
+                break
+
+        if user_candidates is None or acquisition_value is None:
+            raise _CandidateGenerationExhausted(
+                "Could not generate a feasible, non-duplicate qMFKG suggestion after "
+                f"{MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+                f"Last rejection: {rejection_message}"
+            )
+
+        x_unit_repaired = values_to_unit_cube(config, user_candidates)
+        with torch.no_grad():
+            posterior = model.posterior(x_unit_repaired)
+            mean_model = posterior.mean.squeeze(-1)
+            std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
+            mean_user = objective_from_model_space(config, mean_model)
+    except SuggestionError:
+        raise
+    except (BotorchError, RuntimeError, ValueError) as exc:
+        raise SuggestionError(f"Could not generate qMFKG suggestion: {exc}") from exc
+
+    row = _empty_row(config)
+    row["row_id"] = uuid.uuid4().hex
+    row["iteration"] = next_iteration(df)
+    row["status"] = "suggested"
+    row["source"] = "qmf_kg"
+    _populate_replicate_fields(config, row)
+    _populate_review_fields(config, row)
+    for name, value in zip(config.variable_names, user_candidates[0], strict=True):
+        row[name] = value
+    row["predicted_mean"] = float(mean_user.reshape(-1)[0])
+    row["predicted_std"] = float(std.reshape(-1)[0])
+    row["acquisition"] = float(acquisition_value.reshape(-1)[0])
+    return pd.DataFrame([row], columns=canonical_columns(config))
 
 
 def _suggest_multi_objective_model_based(

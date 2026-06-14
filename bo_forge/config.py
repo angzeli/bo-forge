@@ -63,6 +63,15 @@ class CostConfig:
 
 
 @dataclass(frozen=True)
+class FidelityConfig:
+    variable: str
+    target: float
+    fixed_cost: float = 0.01
+    fidelity_cost_weight: float = 1.0
+    num_fantasies: int = 64
+
+
+@dataclass(frozen=True)
 class ReviewConfig:
     enabled: bool = False
 
@@ -105,6 +114,7 @@ class CampaignConfig:
     objectives: tuple[ObjectiveConfig, ...] = ()
     constraints: tuple[ConstraintConfig, ...] = ()
     cost: CostConfig | None = None
+    fidelity: FidelityConfig | None = None
     review: ReviewConfig = field(default_factory=ReviewConfig)
     replicates: ReplicateConfig = field(default_factory=ReplicateConfig)
     stages: tuple[StageConfig, ...] = ()
@@ -175,10 +185,11 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     variables = _parse_variables(raw.get("variables"), set(objective_names))
     constraints = _parse_constraints(raw.get("constraints", []), variables)
     cost = _parse_cost(raw.get("cost"), variables)
+    fidelity = _parse_fidelity(raw.get("fidelity"), variables)
     stages = _parse_stages(raw.get("stages"), variables)
     if stages and cost is not None:
         raise ConfigError(
-            "Structured campaigns with cost are not supported in v1.3.4; "
+            "Structured campaigns with cost are not supported in v1.4.0; "
             "remove either 'stages' or 'cost'."
         )
     review = _parse_review(raw.get("review"))
@@ -186,7 +197,19 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         raw.get("replicates"),
         multi_objective=bool(objectives),
     )
-    bo = _parse_bo(raw.get("bo", {}), multi_objective=bool(objectives))
+    _validate_fidelity_combinations(
+        fidelity=fidelity,
+        variables=variables,
+        multi_objective=bool(objectives),
+        stages=stages,
+        cost=cost,
+        replicates=replicates,
+    )
+    bo = _parse_bo(
+        raw.get("bo", {}),
+        multi_objective=bool(objectives),
+        has_fidelity=fidelity is not None,
+    )
 
     return CampaignConfig(
         campaign_name=campaign_name,
@@ -196,6 +219,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         objectives=tuple(objectives),
         constraints=tuple(constraints),
         cost=cost,
+        fidelity=fidelity,
         review=review,
         replicates=replicates,
         stages=tuple(stages),
@@ -362,13 +386,30 @@ def _parse_variables(raw: Any, objective_names: set[str]) -> list[VariableConfig
     return variables
 
 
-def _parse_bo(raw: Any, *, multi_objective: bool = False) -> BOConfig:
+def _parse_bo(
+    raw: Any,
+    *,
+    multi_objective: bool = False,
+    has_fidelity: bool = False,
+) -> BOConfig:
     if not isinstance(raw, dict):
         raise ConfigError("Config key 'bo' must be a mapping when provided.")
 
-    default_acquisition = "qlog_ehvi" if multi_objective else "log_ei"
+    if has_fidelity:
+        default_acquisition = "qmf_kg"
+    elif multi_objective:
+        default_acquisition = "qlog_ehvi"
+    else:
+        default_acquisition = "log_ei"
     acquisition = str(raw.get("acquisition", default_acquisition))
-    supported = {"qlog_ehvi"} if multi_objective else {"log_ei"}
+    if acquisition == "qmf_kg" and not has_fidelity:
+        raise ConfigError("bo.acquisition='qmf_kg' requires a 'fidelity' config section.")
+    if has_fidelity:
+        supported = {"qmf_kg"}
+    elif multi_objective:
+        supported = {"qlog_ehvi"}
+    else:
+        supported = {"log_ei"}
     if acquisition not in supported:
         raise ConfigError(
             f"Unsupported acquisition '{acquisition}'. "
@@ -474,6 +515,77 @@ def _parse_cost(raw: Any, variables: list[VariableConfig]) -> CostConfig | None:
         candidate_pool_size=candidate_pool_size,
         top_k=top_k,
     )
+
+
+def _parse_fidelity(
+    raw: Any,
+    variables: list[VariableConfig],
+) -> FidelityConfig | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'fidelity' must be a mapping when provided.")
+    unsupported = sorted(
+        set(raw)
+        - {"variable", "target", "fixed_cost", "fidelity_cost_weight", "num_fantasies"}
+    )
+    if unsupported:
+        raise ConfigError(f"Config key 'fidelity' has unsupported keys: {unsupported}.")
+    variable_name = _required_str(raw, "variable", "fidelity")
+    variable_by_name = {variable.name: variable for variable in variables}
+    if variable_name not in variable_by_name:
+        raise ConfigError(
+            f"fidelity.variable references unknown variable '{variable_name}'."
+        )
+    variable = variable_by_name[variable_name]
+    if variable.type != "continuous":
+        raise ConfigError(
+            f"fidelity.variable '{variable_name}' must be a continuous variable."
+        )
+    target = _required_float(raw, "target", "fidelity")
+    assert variable.lower is not None and variable.upper is not None
+    if target < variable.lower or target > variable.upper:
+        raise ConfigError(
+            f"fidelity.target must be within variable '{variable_name}' bounds: "
+            f"target={target:g}, lower={variable.lower:g}, upper={variable.upper:g}."
+        )
+    return FidelityConfig(
+        variable=variable_name,
+        target=target,
+        fixed_cost=_positive_float(raw.get("fixed_cost", 0.01), "fidelity.fixed_cost"),
+        fidelity_cost_weight=_positive_float(
+            raw.get("fidelity_cost_weight", 1.0),
+            "fidelity.fidelity_cost_weight",
+        ),
+        num_fantasies=_positive_int(raw.get("num_fantasies", 64), "fidelity.num_fantasies"),
+    )
+
+
+def _validate_fidelity_combinations(
+    *,
+    fidelity: FidelityConfig | None,
+    variables: list[VariableConfig],
+    multi_objective: bool,
+    stages: list[StageConfig],
+    cost: CostConfig | None,
+    replicates: ReplicateConfig,
+) -> None:
+    if fidelity is None:
+        return
+    if multi_objective:
+        raise ConfigError("fidelity is only supported for single-objective campaigns in v1.4.0.")
+    if stages:
+        raise ConfigError("fidelity cannot be combined with structured campaign stages in v1.4.0.")
+    if cost is not None:
+        raise ConfigError("fidelity cannot be combined with cost-aware campaigns in v1.4.0.")
+    if replicates.enabled:
+        raise ConfigError("fidelity cannot be combined with replicate campaigns in v1.4.0.")
+    unsupported = [variable.name for variable in variables if variable.type != "continuous"]
+    if unsupported:
+        raise ConfigError(
+            "fidelity campaigns only support continuous variables in v1.4.0: "
+            f"non_continuous={unsupported}."
+        )
 
 
 def _parse_stages(raw: Any, variables: list[VariableConfig]) -> list[StageConfig]:

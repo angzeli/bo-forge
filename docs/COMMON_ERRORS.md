@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
-- `Row ... has invalid source`: use only `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qlog_ehvi`, or `cost_qlog_ehvi` for cost-aware multi-objective campaigns.
+- `Row ... has invalid source`: use only the sources supported by the config, such as `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qmf_kg`, `qlog_ehvi`, or `cost_qlog_ehvi`.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -118,7 +118,7 @@ Fix: keep exactly one objective section.
 
 ### `objectives must contain at least two objectives`
 
-BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.3.4 is two to four objectives.
+BO Forge supports coupled multi-objective campaigns with at least two objectives. The primary tested range in v1.4.0 is two to four objectives.
 
 Fix: define at least two objective mappings, each with `name`, `direction`, and `reference_point`.
 
@@ -143,7 +143,7 @@ Fix: use exact configured variable names in every stage's `variables:` list.
 
 ### `Structured campaigns with cost are not supported`
 
-v1.3.4 validates structured logs, suggestions, reports, diagnostics, and the
+v1.4.0 validates structured logs, suggestions, reports, diagnostics, and the
 structured tutorial workflow, but
 cost-aware structured campaigns are deferred because inactive variables are
 intentionally blank.
@@ -171,6 +171,45 @@ section.
 
 Fix: use `summary` for non-structured campaigns, or add a valid `stages:`
 section before using structured stage diagnostics.
+
+### `bo.acquisition='qmf_kg' requires a 'fidelity' config section`
+
+qMFKG is only available for explicit multi-fidelity configs.
+
+Fix: add a valid `fidelity:` section or use `bo.acquisition: log_ei` for a
+standard single-objective campaign.
+
+### `fidelity.variable ... must be a continuous variable`
+
+The fidelity variable must be one configured continuous variable.
+
+Fix: define the fidelity column as a bounded continuous variable:
+
+```yaml
+variables:
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+
+fidelity:
+  variable: fidelity
+  target: 1.0
+```
+
+### `fidelity cannot be combined with ...`
+
+v1.4.0 multi-fidelity support is deliberately conservative.
+
+Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `cost:`, or
+`replicates.enabled: true`. Multi-objective, structured, cost-aware, and
+replicate-aware multi-fidelity workflows are deferred.
+
+### `qMFKG model-based suggestions support batch_size=1`
+
+Once the initial design is complete, v1.4.0 qMFKG suggestions are one-at-a-time.
+
+Fix: request `batch_size=1` for multi-fidelity model-based suggestions.
 
 ## 🧾 CSV Schema Errors
 

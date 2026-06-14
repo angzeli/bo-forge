@@ -327,7 +327,7 @@ stages:
 
     with pytest.raises(
         ConfigError,
-        match="Structured campaigns with cost are not supported in v1.3.4",
+        match="Structured campaigns with cost are not supported in v1.4.0",
     ):
         CampaignConfig.from_yaml(path)
 
@@ -466,6 +466,237 @@ replicates:
     )
 
     with pytest.raises(ConfigError, match="single-objective campaigns"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_config_from_yaml_parses_fidelity_config(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: fidelity_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.05
+    upper: 0.5
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+  fixed_cost: 0.02
+  fidelity_cost_weight: 2.5
+  num_fantasies: 8
+bo:
+  initial_design_size: 4
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.fidelity is not None
+    assert config.fidelity.variable == "fidelity"
+    assert config.fidelity.target == 1.0
+    assert config.fidelity.fixed_cost == 0.02
+    assert config.fidelity.fidelity_cost_weight == 2.5
+    assert config.fidelity.num_fantasies == 8
+    assert config.bo.acquisition == "qmf_kg"
+
+
+def test_qmf_kg_requires_fidelity_config(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_qmfkg
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match="qmf_kg.*requires"):
+        CampaignConfig.from_yaml(path)
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (
+            """
+objectives:
+  - name: activity
+    direction: maximize
+    reference_point: 0
+  - name: stability
+    direction: maximize
+    reference_point: 0
+""",
+            "single-objective",
+        ),
+        (
+            """
+cost:
+  expression: "1.0 + x"
+""",
+            "cost-aware",
+        ),
+        (
+            """
+replicates:
+  enabled: true
+""",
+            "replicate",
+        ),
+        (
+            """
+stages:
+  - name: screen
+    variables: [x, fidelity]
+""",
+            "structured campaign stages",
+        ),
+    ],
+)
+def test_fidelity_rejects_unsupported_combinations(
+    tmp_path: Path,
+    extra: str,
+    message: str,
+) -> None:
+    objective = (
+        ""
+        if "objectives:" in extra
+        else """
+objective:
+  name: activity
+  direction: maximize
+"""
+    )
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: bad_fidelity
+{objective}
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+{extra}
+fidelity:
+  variable: fidelity
+  target: 1.0
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
+def test_fidelity_requires_configured_continuous_variable(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_fidelity_variable
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: integer
+    lower: 1
+    upper: 3
+fidelity:
+  variable: fidelity
+  target: 1
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match="must be a continuous variable"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_fidelity_rejects_non_continuous_design_variables(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_fidelity_mixed
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: solvent
+    type: categorical
+    values: [Water, MeCN]
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match="only support continuous variables"):
+        CampaignConfig.from_yaml(path)
+
+
+def test_fidelity_target_must_be_within_bounds(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_fidelity_target
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.2
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match="fidelity.target must be within"):
         CampaignConfig.from_yaml(path)
 
 
@@ -735,6 +966,17 @@ def test_structured_tutorial_config_parses() -> None:
         "refinement_temperature_limit",
         "refinement_loading_time_limit",
     ]
+
+
+def test_example_multi_fidelity_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
+
+    assert config.campaign_name == "multi_fidelity_photocatalyst_qmfkg"
+    assert config.fidelity is not None
+    assert config.fidelity.variable == "fidelity"
+    assert config.fidelity.target == 1.0
+    assert config.bo.acquisition == "qmf_kg"
+    assert config.variable_names == ["catalyst_loading", "fidelity"]
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:

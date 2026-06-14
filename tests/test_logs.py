@@ -7,6 +7,7 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     CostConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -47,6 +48,19 @@ def replicate_config() -> CampaignConfig:
         variables=cfg.variables,
         bo=cfg.bo,
         replicates=ReplicateConfig(enabled=True),
+    )
+
+
+def fidelity_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="fidelity_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("fidelity", "continuous", 0.2, 1.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qmf_kg"),
+        fidelity=FidelityConfig(variable="fidelity", target=1.0),
     )
 
 
@@ -131,6 +145,27 @@ def structured_suggestion(*, review: bool = False) -> pd.DataFrame:
         row["review_status"] = "pending"
         row["review_note"] = ""
     return pd.DataFrame([row], columns=canonical_columns(cfg))
+
+
+def qmfkg_suggestion(row_id: str = "qmfkg_1") -> pd.DataFrame:
+    cfg = fidelity_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": row_id,
+                "iteration": 1,
+                "status": "suggested",
+                "source": "qmf_kg",
+                "x": 0.4,
+                "fidelity": 0.8,
+                "activity": "",
+                "predicted_mean": 1.2,
+                "predicted_std": 0.1,
+                "acquisition": 0.01,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
 
 
 def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None:
@@ -373,6 +408,42 @@ def test_append_suggestions_requires_config_for_replicate_logs_without_mutation(
 
     with pytest.raises(LogWriteError, match="Replicate append requires config-aware validation"):
         append_suggestions(log_path, suggestions)
+
+    assert log_path.read_bytes() == before
+
+
+def test_append_suggestions_requires_config_for_qmfkg_logs_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    qmfkg_suggestion("existing").to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="qMFKG append requires config-aware validation"):
+        append_suggestions(log_path, qmfkg_suggestion())
+
+    assert log_path.read_bytes() == before
+
+
+def test_append_suggestions_with_config_accepts_qmfkg_logs(tmp_path: Path) -> None:
+    cfg = fidelity_config()
+    log_path = tmp_path / "campaign.csv"
+
+    append_suggestions(log_path, qmfkg_suggestion(), config=cfg)
+
+    df = load_campaign_log(log_path, cfg)
+    assert df.loc[0, "source"] == "qmf_kg"
+
+
+def test_mark_observed_requires_config_for_qmfkg_logs_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    qmfkg_suggestion().to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="qMFKG mark_observed requires"):
+        mark_observed(log_path, "qmfkg_1", 1.7)
 
     assert log_path.read_bytes() == before
 

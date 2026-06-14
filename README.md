@@ -1,10 +1,10 @@
-# 🧪 BO Forge v1.3.4
+# 🧪 BO Forge v1.4.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.3.4 wraps structured/staged campaign workflows in the local Streamlit app while keeping the backend campaign engine in `bo_forge`.
+v1.4.0 adds BO Forge's first conservative multi-fidelity workflow: single-objective continuous-fidelity qMFKG through BoTorch's current multi-fidelity stack.
 
-Existing backend BO behavior, YAML/CSV semantics, `CampaignSession` APIs, CLI campaign workflow, examples, and notebooks remain unchanged from the v1.3.3 structured tutorial baseline.
+Existing single-objective, multi-objective, structured, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.3.4 structured Streamlit baseline.
 
 BO Forge deliberately supports only:
 
@@ -13,12 +13,13 @@ BO Forge deliberately supports only:
 - maximize or minimize direction
 - Sobol or random initial suggestions
 - BoTorch `SingleTaskGP`
-- LogEI/qLogEI for single-objective campaigns and qLogEHVI for coupled multi-objective campaigns
+- LogEI/qLogEI for standard single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
 - optional cost-aware ranking and human review
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
 - optional structured/staged campaign logs with stage-aware validation, explicit stage-aware suggestions, and read-only stage diagnostics
+- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable
 - resume from existing logs
 - basic diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
@@ -27,7 +28,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover automatic stage transitions, Streamlit structured campaign creation, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, Streamlit structured campaign creation, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -114,8 +115,8 @@ flowchart LR
     B --> C["Validate campaign data"]
     C --> D{"Enough observations?"}
     D -- "No" --> E["Sobol/random suggestion"]
-    D -- "Yes" --> F["Fit SingleTaskGP"]
-    F --> G["Score LogEI / qLogEI"]
+    D -- "Yes" --> F["Fit BoTorch GP"]
+    F --> G["Score acquisition"]
     G --> H["Suggest candidate(s)"]
     E --> H
     H --> I["Append status=suggested"]
@@ -127,6 +128,9 @@ flowchart LR
 The Streamlit app is intentionally a thin wrapper.
 
 Future interfaces should keep wrapping this backend package rather than moving BO logic into notebooks, CLI commands, or app code.
+
+The bundled multi-fidelity example is `configs/15_multi_fidelity_qmfkg.yaml`
+with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`.
 
 ---
 
@@ -170,7 +174,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.3.4 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.4.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

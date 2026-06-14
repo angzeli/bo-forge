@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.3.4.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.4.0.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -15,6 +15,7 @@ These names are supported imports from `bo_forge`:
 - `ConfigError`
 - `ConstraintConfig`
 - `CostConfig`
+- `FidelityConfig`
 - `LogValidationError`
 - `LogWriteError`
 - `ObjectiveConfig`
@@ -61,6 +62,12 @@ with `suggest_next(config, df, stage="...")` or
 campaigns, stage best values use replicate group means; the `best_row_id`
 field contains the best `replicate_group`. Cost-aware structured campaigns and
 automatic stage transitions remain deferred.
+
+Multi-fidelity campaigns expose `FidelityConfig` through the top-level package
+for config construction and inspection. v1.4.0 multi-fidelity support is
+single-objective, continuous-variable qMFKG only; BoTorch-facing helper
+functions in `bo_forge.multifidelity` are implementation details rather than
+stable public API.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

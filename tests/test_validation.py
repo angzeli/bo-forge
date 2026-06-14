@@ -6,6 +6,7 @@ from bo_forge.config import (
     CampaignConfig,
     ConstraintConfig,
     CostConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -181,6 +182,19 @@ def replicate_config() -> CampaignConfig:
     )
 
 
+def fidelity_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="fidelity_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("fidelity", "continuous", 0.2, 1.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=3, acquisition="qmf_kg"),
+        fidelity=FidelityConfig(variable="fidelity", target=1.0),
+    )
+
+
 def mixed_df() -> pd.DataFrame:
     cfg = mixed_config()
     return pd.DataFrame(
@@ -313,6 +327,53 @@ def test_canonical_columns_for_non_structured_log_remain_unchanged() -> None:
         "predicted_std",
         "acquisition",
     ]
+
+
+def test_multi_fidelity_canonical_columns_have_no_new_columns() -> None:
+    assert canonical_columns(fidelity_config()) == [
+        "row_id",
+        "iteration",
+        "status",
+        "source",
+        "x",
+        "fidelity",
+        "activity",
+        "predicted_mean",
+        "predicted_std",
+        "acquisition",
+    ]
+
+
+def test_validate_campaign_data_accepts_qmfkg_source() -> None:
+    cfg = fidelity_config()
+    df = pd.DataFrame(
+        [
+            {
+                "row_id": "mf_0",
+                "iteration": 0,
+                "status": "suggested",
+                "source": "qmf_kg",
+                "x": 0.4,
+                "fidelity": 0.8,
+                "activity": "",
+                "predicted_mean": 1.2,
+                "predicted_std": 0.1,
+                "acquisition": 0.02,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+    validate_campaign_data(cfg, df)
+
+
+def test_validate_campaign_data_rejects_qmfkg_source_without_fidelity() -> None:
+    cfg = config()
+    df = valid_df()
+    df.loc[0, "source"] = "qmf_kg"
+
+    with pytest.raises(LogValidationError, match="invalid source 'qmf_kg'"):
+        validate_campaign_data(cfg, df)
 
 
 def test_validate_campaign_data_accepts_structured_log() -> None:

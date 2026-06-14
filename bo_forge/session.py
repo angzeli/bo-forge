@@ -124,6 +124,7 @@ class CampaignSession:
             ("best_objective_value", best_objective_value),
         ]
         self._extend_structured_summary_rows(rows)
+        self._extend_fidelity_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -208,6 +209,7 @@ class CampaignSession:
             ("next_iteration", next_iteration(self.df)),
         ]
         self._extend_structured_summary_rows(rows)
+        self._extend_fidelity_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -258,6 +260,20 @@ class CampaignSession:
                         for stage in self.config.stages
                     ),
                 ),
+            ]
+        )
+
+    def _extend_fidelity_summary_rows(self, rows: list[tuple[str, object]]) -> None:
+        if self.config.fidelity is None:
+            return
+        rows.extend(
+            [
+                ("multi_fidelity_campaign", True),
+                ("fidelity_variable", self.config.fidelity.variable),
+                ("target_fidelity", self.config.fidelity.target),
+                ("fidelity_fixed_cost", self.config.fidelity.fixed_cost),
+                ("fidelity_cost_weight", self.config.fidelity.fidelity_cost_weight),
+                ("qmfkg_num_fantasies", self.config.fidelity.num_fantasies),
             ]
         )
 

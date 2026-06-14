@@ -1,5 +1,28 @@
 # 📝 BO Forge Changelog
 
+## v1.4.0 - Single-Objective Multi-Fidelity qMFKG
+
+This release adds BO Forge's first conservative multi-fidelity Bayesian
+optimisation workflow.
+
+- Adds a top-level `fidelity:` config section for one continuous fidelity
+  variable, a target fidelity, affine fidelity cost settings, and qMFKG fantasy
+  count.
+- Adds `bo.acquisition: qmf_kg` for single-objective multi-fidelity campaigns.
+- Fits BoTorch `SingleTaskMultiFidelityGP` models and optimizes
+  `qMultiFidelityKnowledgeGradient` through BoTorch's one-shot KG workflow.
+- Uses BoTorch's `AffineFidelityCostModel`,
+  `InverseCostWeightedUtility`, `project_to_target_fidelity`,
+  target-fidelity `PosteriorMean` current values, and
+  `gen_one_shot_kg_initial_conditions`.
+- Keeps the CSV schema unchanged: the fidelity variable remains an ordinary
+  user-facing variable column and model-based suggestions use `source=qmf_kg`.
+- Adds `configs/15_multi_fidelity_qmfkg.yaml` and
+  `examples/15_multi_fidelity_qmfkg_campaign_log.csv`.
+- Keeps multi-objective, structured, cost-aware, replicate-aware, batch,
+  discrete/categorical, and Streamlit-created multi-fidelity workflows out of
+  scope for v1.4.0.
+
 ## v1.3.4 - Streamlit Structured Campaign Workflow
 
 This release wraps the existing structured-campaign backend/session workflow in

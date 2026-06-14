@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.3.4 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.4.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -164,13 +164,15 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - no authentication or multi-user state;
 - no database storage;
 - no production FastAPI backend or React frontend;
-- no new BO models, acquisitions, or CSV schemas beyond the backend package;
+- no Streamlit-owned BO models, acquisitions, or CSV schemas beyond the backend package;
 - Streamlit cost support surfaces deterministic cost metadata and ranking, not a
   learned cost model;
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
-  replicate configs use the backend `new_only` policy in v1.3.4;
+  replicate configs use the backend `new_only` policy in v1.4.0;
 - no automatic structured-stage transitions or Streamlit-owned structured
   campaign engine.
+- no Streamlit multi-fidelity campaign creation; v1.4.0 fidelity configs load
+  through the existing backend/session workflow.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.

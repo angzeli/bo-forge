@@ -79,7 +79,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "1.3.4"
+    assert payload["version"] == "1.4.0"
     assert payload["experimental"] is True
 
 
@@ -119,6 +119,26 @@ def test_api_summary_is_json_safe_and_read_only(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["summary"]["columns"] == ["field", "value"]
     assert "records" in payload["observed"]
+    assert log_path.read_bytes() == before
+
+
+def test_api_validation_and_summary_accept_multi_fidelity_example(tmp_path: Path) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "15_multi_fidelity_qmfkg.yaml",
+        "15_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+    api_client = client(tmp_path)
+
+    validation = api_client.post("/campaign/validation", json=ref)
+    summary = api_client.post("/campaign/summary", json=ref)
+
+    assert validation.status_code == 200
+    assert validation.json()["validation"]["ok"] is True
+    assert summary.status_code == 200
+    assert summary.json()["summary"]["columns"] == ["field", "value"]
     assert log_path.read_bytes() == before
 
 

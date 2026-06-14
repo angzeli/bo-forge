@@ -6,7 +6,7 @@ This roadmap starts after the first stable public release. It is directional, no
 
 ```mermaid
 flowchart LR
-    v10["v1.0<br/>Stable public release"] --> v11["v1.1<br/>Coupled multi-objective qLogEHVI"] --> v12["v1.2<br/>App Launcher + LAN Access"] --> v13["v1.3<br/>Structured campaigns"] --> later["Later<br/>Multi-fidelity + contextual BO"]
+    v10["v1.0<br/>Stable public release"] --> v11["v1.1<br/>Coupled multi-objective qLogEHVI"] --> v12["v1.2<br/>App Launcher + LAN Access"] --> v13["v1.3<br/>Structured campaigns"] --> v14["v1.4<br/>Single-objective multi-fidelity qMFKG"] --> later["Later<br/>Contextual BO + deeper workflow lines"]
 
     v110["v1.1.0<br/>Two-objective qLogEHVI"]
     v111["v1.1.1<br/>3+ objective generalisation"]
@@ -22,6 +22,7 @@ flowchart LR
     v132["v1.3.2<br/>Stage reports + diagnostics"]
     v133["v1.3.3<br/>Structured tutorial example"]
     v134["v1.3.4<br/>Streamlit structured workflow"]
+    v140["v1.4.0<br/>Single-objective qMFKG"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -37,11 +38,12 @@ flowchart LR
     v13 -.-> v132
     v13 -.-> v133
     v13 -.-> v134
+    v14 -.-> v140
 
-    class v10,v11,v12 majorDone
-    class v13 majorActive
+    class v10,v11,v12,v13 majorDone
+    class v14 majorActive
     class later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -49,7 +51,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.3.4`. The v1.2.x line is complete; v1.3 now has a structured campaign core, explicit stage-aware backend/session/CLI suggestions, read-only stage reports and diagnostics, a structured tutorial example with a seed log and notebook, and a Streamlit wrapper for stage-aware dry-run suggestions and diagnostics while keeping automatic stage transitions and deeper structured workflows deferred.
+Current baseline: `v1.4.0`. The v1.3.x line is complete; v1.4 begins with a conservative single-objective continuous-fidelity qMFKG workflow using BoTorch's current multi-fidelity KG stack while keeping multi-objective, structured, cost-aware, replicate-aware, and batch multi-fidelity workflows deferred.
 
 ### Patch Notes So Far
 
@@ -70,6 +72,7 @@ Current baseline: `v1.3.4`. The v1.2.x line is complete; v1.3 now has a structur
 | `v1.3.2` | Minor | Read-only stage summaries, report sections, CLI inspection, and stage diagnostics for structured campaigns |
 | `v1.3.3` | Patch | Structured campaign tutorial config, seed log, and notebook for staged screening/refinement workflows |
 | `v1.3.4` | Patch | Streamlit structured campaign workflow wrapper with stage selector, stage summaries, and stage diagnostics |
+| `v1.4.0` | Minor | Single-objective continuous-fidelity qMFKG with unchanged CSV schema |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -107,7 +110,7 @@ Status: completed
 
 ## 🧩 v1.3 - Structured Campaigns
 
-Status: active
+Status: completed
 
 - Optional `stages:` config block with named stages.
 - Variables that appear only in specific campaign stages.
@@ -121,11 +124,27 @@ Status: active
 - Streamlit stage display, stage-aware dry-run suggestions, stage summaries, and stage diagnostics.
 - Automatic stage transitions, cost-aware structured campaigns, Streamlit structured campaign creation, and multi-fidelity semantics remain deferred.
 
+## 🧪 v1.4 - Single-Objective Multi-Fidelity qMFKG
+
+Status: active
+
+- Optional `fidelity:` config section for one continuous fidelity variable.
+- `bo.acquisition: qmf_kg` for single-objective multi-fidelity campaigns.
+- BoTorch `SingleTaskMultiFidelityGP` fitting.
+- BoTorch `qMultiFidelityKnowledgeGradient` with one-shot KG initial
+  conditions, affine fidelity cost, inverse-cost utility, target-fidelity
+  projection, and target-fidelity posterior-mean current value.
+- No new CSV columns; the fidelity variable remains a normal user-facing
+  variable column.
+- Initial Sobol/random suggestions remain unchanged; model-based suggestions
+  use `source=qmf_kg`.
+- Multi-objective, structured, cost-aware, replicate-aware, batch, and
+  discrete/categorical multi-fidelity workflows remain deferred.
+
 ## 🔮 Later
 
 Status: directional
 
-- Multi-fidelity BO.
 - Contextual BO.
 - More specialised surrogate models or kernels.
 - Deeper app collaboration workflows.

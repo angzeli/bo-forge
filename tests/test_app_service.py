@@ -91,6 +91,12 @@ print("ok")
             "Data",
             ["summary", "next_action", "observed", "pending", "stage_summary"],
         ),
+        (
+            "15_multi_fidelity_qmfkg.yaml",
+            "15_multi_fidelity_qmfkg_campaign_log.csv",
+            "Overview",
+            ["summary", "next_action", "observed", "pending"],
+        ),
     ],
 )
 def test_app_service_loads_validates_and_collects_view_data(

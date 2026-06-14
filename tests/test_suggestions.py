@@ -10,6 +10,7 @@ from bo_forge.config import (
     CampaignConfig,
     ConstraintConfig,
     CostConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -217,6 +218,58 @@ def replicate_config(
     )
 
 
+def multi_fidelity_config(initial_design_size: int = 3) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="multi_fidelity_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("fidelity", "continuous", 0.2, 1.0),
+        ),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            acquisition="qmf_kg",
+            random_seed=5,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            num_fantasies=8,
+        ),
+    )
+
+
+def multi_fidelity_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (x_value, fidelity, activity) in enumerate(
+        [
+            (0.10, 0.25, 0.7),
+            (0.30, 0.50, 1.1),
+            (0.60, 0.75, 1.4),
+            (0.85, 1.00, 1.3),
+        ]
+    ):
+        rows.append(
+            {
+                "row_id": f"mf_obs_{index}",
+                "iteration": index,
+                "status": "observed",
+                "source": "manual",
+                "x": x_value,
+                "fidelity": fidelity,
+                "activity": activity,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     rows = []
     for index, (x_value, repeats, dose, solvent, score) in enumerate(
@@ -321,6 +374,19 @@ def test_suggest_next_returns_sobol_initial_suggestions() -> None:
     assert suggestions["activity"].astype(str).eq("").all()
 
 
+def test_multi_fidelity_initial_design_includes_fidelity_values() -> None:
+    cfg = multi_fidelity_config(initial_design_size=3)
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert len(suggestions) == 2
+    assert set(suggestions["source"]) == {"sobol"}
+    assert suggestions["x"].astype(float).between(0.0, 1.0).all()
+    assert suggestions["fidelity"].astype(float).between(0.2, 1.0).all()
+    assert list(suggestions.columns) == canonical_columns(cfg)
+
+
 def test_structured_suggest_requires_stage_when_ambiguous() -> None:
     cfg = structured_config()
     df = empty_campaign_log(cfg)
@@ -365,7 +431,7 @@ def test_structured_suggest_with_cost_fails_with_current_version_message() -> No
 
     with pytest.raises(
         SuggestionError,
-        match="Structured campaign suggestions with cost are not supported in v1.3.4",
+        match="Structured campaign suggestions with cost are not supported in v1.4.0",
     ):
         suggest_next(cfg, df, stage="screen")
 
@@ -1109,6 +1175,62 @@ def test_suggest_next_returns_model_based_single_suggestion() -> None:
     assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
     assert float(suggestions.loc[0, "x"]) >= 0.0
     assert float(suggestions.loc[0, "x"]) <= 1.0
+
+
+def test_multi_fidelity_qmfkg_returns_one_valid_non_mutating_suggestion() -> None:
+    cfg = multi_fidelity_config(initial_design_size=3)
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "qmf_kg"
+    assert suggestions["x"].astype(float).between(0.0, 1.0).all()
+    assert suggestions["fidelity"].astype(float).between(0.2, 1.0).all()
+    assert suggestions.loc[0, "activity"] == ""
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean"]))
+    assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
+    assert math.isfinite(float(suggestions.loc[0, "acquisition"]))
+    assert list(suggestions.columns) == canonical_columns(cfg)
+
+
+def test_multi_fidelity_qmfkg_rejects_model_based_batch_size_above_one() -> None:
+    cfg = multi_fidelity_config(initial_design_size=3)
+    df = multi_fidelity_observed_log(cfg)
+
+    with pytest.raises(SuggestionError, match="batch_size=1"):
+        suggest_next(cfg, df, batch_size=2)
+
+
+def test_multi_fidelity_qmfkg_wraps_optimizer_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = multi_fidelity_config(initial_design_size=3)
+    df = multi_fidelity_observed_log(cfg)
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+
+    def fail_qmfkg(*_args: object, **_kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        raise RuntimeError("optimizer exploded")
+
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", fail_qmfkg)
+
+    with pytest.raises(
+        SuggestionError,
+        match="Could not generate qMFKG suggestion: optimizer exploded",
+    ):
+        suggest_next(cfg, df, batch_size=1)
 
 
 def test_suggest_next_returns_model_based_batch_suggestions() -> None:

@@ -53,14 +53,15 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
 - `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
+- `multifidelity.py`: BoTorch multi-fidelity helper translations for qMFKG campaigns.
 - `replicates.py`: explicit replicate aggregation, replicate-derived observation variance, summaries, and best group selection.
 - `structured.py`: read-only structured-campaign stage summaries and transition-readiness guidance.
 - `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
 - `validation.py`: schema, bounds, status, source, and objective-state validation.
 - `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.
 - `models.py`: conversion from campaign logs to tensors and GP fitting.
-- `acquisition.py`: LogEI, qLogEI, and qLogEHVI acquisition optimisation.
-- `suggestions.py`: Sobol, LogEI/qLogEI, and qLogEHVI candidate generation.
+- `acquisition.py`: LogEI, qLogEI, qLogEHVI, and qMFKG acquisition optimisation.
+- `suggestions.py`: Sobol, LogEI/qLogEI, qLogEHVI, and qMFKG candidate generation.
 - `diagnostics.py`: user-facing diagnostic plots.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
@@ -146,7 +147,8 @@ The repository also includes:
 - `configs/11_four_objective_mixed_constrained_qlogehvi.yaml` as a four-objective mixed constrained example,
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml` as a three-objective cost-aware qLogEHVI example,
 - `configs/13_structured_campaign_core.yaml` as a structured stage-validation and explicit stage-aware suggestion example,
-- and `configs/14_structured_campaign_tutorial.yaml` as a staged screening/refinement tutorial paired with `notebooks/14_structured_campaign_tutorial.ipynb`.
+- `configs/14_structured_campaign_tutorial.yaml` as a staged screening/refinement tutorial paired with `notebooks/14_structured_campaign_tutorial.ipynb`,
+- and `configs/15_multi_fidelity_qmfkg.yaml` as a single-objective continuous-fidelity qMFKG example.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

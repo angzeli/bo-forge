@@ -1,6 +1,6 @@
 # Streamlit Deployment And Safety Guide
 
-BO Forge v1.3.4 documents local and trusted-network use of the existing
+BO Forge v1.4.0 documents local and trusted-network use of the existing
 Streamlit workbench. This guide covers deployment choices only. It does not
 change BO behavior, YAML/CSV semantics, launcher behavior, authentication,
 storage, or app workflow logic.
@@ -13,7 +13,7 @@ local UI.
 
 BO Forge is a local-first workbench:
 
-- BO Forge v1.3.4 has no built-in auth.
+- BO Forge v1.4.0 has no built-in auth.
 - It has no multi-user state coordination.
 - It has no database or server-side campaign store.
 - It is not hardened for direct public internet exposure.

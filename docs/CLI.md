@@ -86,6 +86,24 @@ bo-forge suggest \
 
 The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
+For single-objective multi-fidelity configs, the fidelity variable is a normal
+CSV variable column. Once the initial design is complete, qMFKG model-based
+suggestions are one-at-a-time:
+
+```bash
+bo-forge validate \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/15_multi_fidelity_qmfkg.yaml \
+  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --batch-size 1
+```
+
+The generated model-based row uses `source=qmf_kg`. Use a copied working log
+before `--append`, as with the other examples.
+
 For structured campaigns, pass one configured stage name explicitly. Generated
 rows populate the `stage` column, fill only variables active in that stage, and
 leave inactive variables blank:

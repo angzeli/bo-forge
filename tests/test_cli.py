@@ -12,6 +12,7 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     CostConfig,
+    FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -214,6 +215,40 @@ bo:
     return path
 
 
+def write_fidelity_config(path: Path, *, initial_design_size: int = 3) -> Path:
+    path.write_text(
+        f"""
+campaign_name: fidelity_cli_test
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+  num_fantasies: 8
+bo:
+  batch_size: 1
+  initial_design_size: {initial_design_size}
+  acquisition: qmf_kg
+  random_seed: 7
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 8
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def config(initial_design_size: int = 2) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="cli_test",
@@ -227,6 +262,27 @@ def config(initial_design_size: int = 2) -> CampaignConfig:
             num_restarts=2,
             mc_samples=16,
         ),
+    )
+
+
+def fidelity_config(initial_design_size: int = 3) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="fidelity_cli_test",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("fidelity", "continuous", 0.2, 1.0),
+        ),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            acquisition="qmf_kg",
+            random_seed=7,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+        fidelity=FidelityConfig(variable="fidelity", target=1.0, num_fantasies=8),
     )
 
 
@@ -331,6 +387,62 @@ def observed_log(cfg: CampaignConfig) -> pd.DataFrame:
                 "source": "manual",
                 "x": 0.8,
                 "score": 1.5,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
+def fidelity_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "mf_obs_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.1,
+                "fidelity": 0.25,
+                "activity": 0.7,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mf_obs_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.3,
+                "fidelity": 0.5,
+                "activity": 1.1,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mf_obs_2",
+                "iteration": 2,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.6,
+                "fidelity": 0.75,
+                "activity": 1.4,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+            {
+                "row_id": "mf_obs_3",
+                "iteration": 3,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.85,
+                "fidelity": 1.0,
+                "activity": 1.3,
                 "predicted_mean": "",
                 "predicted_std": "",
                 "acquisition": "",
@@ -550,7 +662,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.3.4\n"
+    assert captured.out == "bo-forge 1.4.0\n"
     assert captured.err == ""
 
 
@@ -559,7 +671,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.3.4\n"
+    assert completed.stdout == "bo-forge 1.4.0\n"
     assert completed.stderr == ""
 
 
@@ -1317,6 +1429,49 @@ def test_suggest_append_changes_csv_but_does_not_mark_observed(
     assert len(df) == 1
     assert df.loc[0, "status"] == "suggested"
     assert pd.isna(df.loc[0, "score"])
+
+
+def test_multi_fidelity_cli_suggest_append_writes_qmfkg_row(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    assert f"Appended suggestions to campaign log: {log_path}" in captured.out
+    df = load_campaign_log(log_path, cfg)
+    row = df.iloc[-1]
+    assert row["status"] == "suggested"
+    assert row["source"] == "qmf_kg"
+    assert float(row["x"]) >= 0.0
+    assert float(row["x"]) <= 1.0
+    assert float(row["fidelity"]) >= 0.2
+    assert float(row["fidelity"]) <= 1.0
+    assert row["activity"] == ""
+    assert list(df.columns) == canonical_columns(cfg)
+
+
+def test_multi_fidelity_cli_batch_size_failure_has_specific_hint_without_mutation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "2", "--append"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "qMFKG model-based suggestions support batch_size=1" in captured.err
+    assert "Hint: Use --batch-size 1 for model-based qMFKG suggestions." in captured.err
+    assert log_path.read_bytes() == before
 
 
 def test_suggest_output_and_append_writes_output_and_log(
