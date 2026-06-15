@@ -24,6 +24,7 @@ flowchart LR
     v134["v1.3.4<br/>Streamlit structured workflow"]
     v140["v1.4.0<br/>Single-objective qMFKG"]
     v141["v1.4.1<br/>Fidelity reporting + diagnostics"]
+    v142["v1.4.2<br/>Multi-fidelity tutorial"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -41,11 +42,12 @@ flowchart LR
     v13 -.-> v134
     v14 -.-> v140
     v14 -.-> v141
+    v14 -.-> v142
 
     class v10,v11,v12,v13 majorDone
     class v14 majorActive
     class later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141,v142 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -53,7 +55,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.4.1`. The v1.3.x line is complete; v1.4 begins with a conservative single-objective continuous-fidelity qMFKG workflow using BoTorch's current multi-fidelity KG stack and now includes read-only fidelity summaries and diagnostics while keeping multi-objective, structured, cost-aware, replicate-aware, and batch multi-fidelity workflows deferred.
+Current baseline: `v1.4.2`. The v1.3.x line is complete; v1.4 begins with a conservative single-objective continuous-fidelity qMFKG workflow using BoTorch's current multi-fidelity KG stack, includes read-only fidelity summaries and diagnostics, and now has a lightweight notebook tutorial while keeping multi-objective, structured, cost-aware, replicate-aware, and batch multi-fidelity workflows deferred.
 
 ### Patch Notes So Far
 
@@ -76,6 +78,7 @@ Current baseline: `v1.4.1`. The v1.3.x line is complete; v1.4 begins with a cons
 | `v1.3.4` | Patch | Streamlit structured campaign workflow wrapper with stage selector, stage summaries, and stage diagnostics |
 | `v1.4.0` | Minor | Single-objective continuous-fidelity qMFKG with unchanged CSV schema |
 | `v1.4.1` | Patch | Read-only fidelity summaries, CLI inspection, reports, Streamlit routing, and fidelity diagnostics |
+| `v1.4.2` | Patch | Multi-fidelity qMFKG tutorial notebook and release-readiness documentation |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -143,6 +146,8 @@ Status: active
   use `source=qmf_kg`.
 - Read-only `fidelity_summary`, `bo-forge fidelity-summary`, campaign report
   sections, Streamlit routing, and fidelity diagnostics are available.
+- `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb` demonstrates the
+  sequential qMFKG workflow using the existing example config and seed log.
 - Multi-objective, structured, cost-aware, replicate-aware, batch, and
   discrete/categorical multi-fidelity workflows remain deferred.
 

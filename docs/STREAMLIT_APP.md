@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.4.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.4.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -175,7 +175,7 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
   replicate configs use the backend `new_only` policy in v1.4.0;
 - no automatic structured-stage transitions or Streamlit-owned structured
   campaign engine.
-- no Streamlit multi-fidelity campaign creation; v1.4.1 fidelity configs load
+- no Streamlit multi-fidelity campaign creation; v1.4.2 fidelity configs load
   through the existing backend/session workflow and expose read-only summaries
   and diagnostics.
 

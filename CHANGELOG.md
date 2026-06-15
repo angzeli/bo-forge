@@ -1,5 +1,20 @@
 # 📝 BO Forge Changelog
 
+## v1.4.2 - Multi-Fidelity Tutorial Workflow
+
+This patch adds a lightweight tutorial notebook for the existing v1.4
+single-objective qMFKG workflow.
+
+- Adds `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
+- Demonstrates copying the seed log to an ignored working log, validating,
+  inspecting `summary()`, `fidelity_summary()`, and `next_action()`, and running
+  a sequential qMFKG loop to 15 observed rows.
+- Shows explicit append, deterministic local observation simulation,
+  `mark_observed()`, report export, and progress, diagnostics, and fidelity
+  diagnostics plots.
+- Keeps BO modelling, YAML/CSV schemas, Streamlit workflow semantics, CLI
+  commands, and public APIs unchanged from v1.4.1.
+
 ## v1.4.1 - Multi-Fidelity Reporting and Diagnostics
 
 This patch adds read-only reporting and diagnostics for the v1.4.0

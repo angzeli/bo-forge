@@ -185,8 +185,8 @@ The structured tutorial files are:
 ## 🧪 Multi-Fidelity qMFKG
 
 v1.4.0 adds a conservative single-objective multi-fidelity workflow with one
-continuous fidelity variable. v1.4.1 adds read-only summaries and diagnostics
-for that workflow:
+continuous fidelity variable. v1.4.1 adds read-only summaries and diagnostics,
+and v1.4.2 adds a notebook walkthrough for that workflow:
 
 ```yaml
 fidelity:
@@ -239,6 +239,10 @@ campaign = CampaignSession.from_files(
 )
 campaign.fidelity_summary()
 ```
+
+The tutorial notebook is:
+
+- `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
 
 In v1.4.x, multi-fidelity is single-objective only and cannot be combined with
 `objectives:`, `stages:`, `cost:`, `replicates.enabled: true`, categorical,

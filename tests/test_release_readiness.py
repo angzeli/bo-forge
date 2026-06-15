@@ -53,6 +53,7 @@ def test_multi_fidelity_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/15_multi_fidelity_qmfkg.yaml",
         "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
+        "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb",
     ]
 
     for relative_path in release_assets:
@@ -82,7 +83,7 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/INSTALLATION.md" in readme
 
 
-def test_v1_4_1_docs_describe_correct_release_scope() -> None:
+def test_v1_4_2_docs_describe_correct_release_scope() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
@@ -160,7 +161,7 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
 def test_v1_4_roadmap_line_is_active_after_v1_3_closeout() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v1.4.1`" in roadmap
+    assert "Current baseline: `v1.4.2`" in roadmap
     assert "Explicit stage-aware backend/session/CLI suggestions" in roadmap
     assert "Read-only stage summaries, structured report sections" in roadmap
     assert "Structured campaign tutorial config, seed log, and notebook" in roadmap
@@ -171,6 +172,7 @@ def test_v1_4_roadmap_line_is_active_after_v1_3_closeout() -> None:
     ) in roadmap
     assert "`v1.4.0` | Minor | Single-objective continuous-fidelity qMFKG" in roadmap
     assert "`v1.4.1` | Patch | Read-only fidelity summaries" in roadmap
+    assert "`v1.4.2` | Patch | Multi-fidelity qMFKG tutorial notebook" in roadmap
     assert "BoTorch `SingleTaskMultiFidelityGP` fitting" in roadmap
     assert re.search(
         r"## 🏗️ v1\.2 - App Launcher And Access Path\s+Status: completed",
@@ -216,7 +218,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v1.4.1" in requirements_lock
+    assert "BO Forge v1.4.2" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -227,8 +229,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install "bo-forge[api]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-1.4.1-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-1.4.1.tar.gz" in tutorial
+    assert "dist/bo_forge-1.4.2-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-1.4.2.tar.gz" in tutorial
     assert "pip check" in tutorial
 
 
@@ -263,7 +265,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "In v1.4.1, `stages:` cannot be combined with `cost:`." in normalized_csv_schema
+    assert "In v1.4.2, `stages:` cannot be combined with `cost:`." in normalized_csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
 
@@ -294,6 +296,8 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     assert "fidelity-summary" in cli_docs
     assert "fidelity-diagnostics" in cli_docs
     assert "campaign.fidelity_summary()" in quickstart
+    assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in quickstart
+    assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in readme
     assert "source=qmf_kg" in csv_schema
     assert "no new CSV columns" in csv_schema
     assert "fidelity cost is separate from BO Forge's `cost:`" in csv_schema
@@ -412,10 +416,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-1.4.1-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-1.4.1.tar.gz"))
-    assert wheels, "No v1.4.1 wheel was built."
-    assert sdists, "No v1.4.1 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-1.4.2-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-1.4.2.tar.gz"))
+    assert wheels, "No v1.4.2 wheel was built."
+    assert sdists, "No v1.4.2 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -458,7 +462,7 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-1.4.1.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-1.4.2.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge/multifidelity.py" in names
@@ -469,8 +473,8 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge_app/api.py" in names
     assert "bo_forge_app/api_cli.py" in names
     assert "bo_forge_app/__main__.py" in names
-    assert "bo_forge-1.4.1.dist-info/entry_points.txt" in names
-    assert "bo_forge-1.4.1.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-1.4.2.dist-info/entry_points.txt" in names
+    assert "bo_forge-1.4.2.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -486,37 +490,38 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-1.4.1/README.md" in names
-    assert "bo_forge-1.4.1/ROADMAP_V0_TO_V1.md" in names
-    assert "bo_forge-1.4.1/ROADMAP_V1_X.md" in names
-    assert "bo_forge-1.4.1/docs/PUBLIC_API.md" in names
-    assert "bo_forge-1.4.1/docs/STREAMLIT_DEPLOYMENT.md" in names
-    assert "bo_forge-1.4.1/docs/API_PROBE.md" in names
-    assert "bo_forge-1.4.1/examples/quickstart.py" in names
-    assert "bo_forge-1.4.1/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert "bo_forge-1.4.2/README.md" in names
+    assert "bo_forge-1.4.2/ROADMAP_V0_TO_V1.md" in names
+    assert "bo_forge-1.4.2/ROADMAP_V1_X.md" in names
+    assert "bo_forge-1.4.2/docs/PUBLIC_API.md" in names
+    assert "bo_forge-1.4.2/docs/STREAMLIT_DEPLOYMENT.md" in names
+    assert "bo_forge-1.4.2/docs/API_PROBE.md" in names
+    assert "bo_forge-1.4.2/examples/quickstart.py" in names
+    assert "bo_forge-1.4.2/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
     assert (
-        "bo_forge-1.4.1/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.4.2/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
         in names
     )
     assert (
-        "bo_forge-1.4.1/examples/11_four_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-1.4.2/examples/11_four_objective_mixed_constrained_campaign_log.csv"
         in names
     )
-    assert "bo_forge-1.4.1/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
-    assert "bo_forge-1.4.1/examples/13_structured_campaign_core_campaign_log.csv" in names
-    assert "bo_forge-1.4.1/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
-    assert "bo_forge-1.4.1/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
-    assert "bo_forge-1.4.1/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.4.1/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-1.4.1/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
-    assert "bo_forge-1.4.1/configs/13_structured_campaign_core.yaml" in names
-    assert "bo_forge-1.4.1/configs/14_structured_campaign_tutorial.yaml" in names
-    assert "bo_forge-1.4.1/configs/15_multi_fidelity_qmfkg.yaml" in names
-    assert "bo_forge-1.4.1/notebooks/01_maximisation_logei_campaign.ipynb" in names
-    assert "bo_forge-1.4.1/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.4.1/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.4.1/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-1.4.1/notebooks/14_structured_campaign_tutorial.ipynb" in names
+    assert "bo_forge-1.4.2/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
+    assert "bo_forge-1.4.2/examples/13_structured_campaign_core_campaign_log.csv" in names
+    assert "bo_forge-1.4.2/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
+    assert "bo_forge-1.4.2/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
+    assert "bo_forge-1.4.2/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.4.2/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-1.4.2/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
+    assert "bo_forge-1.4.2/configs/13_structured_campaign_core.yaml" in names
+    assert "bo_forge-1.4.2/configs/14_structured_campaign_tutorial.yaml" in names
+    assert "bo_forge-1.4.2/configs/15_multi_fidelity_qmfkg.yaml" in names
+    assert "bo_forge-1.4.2/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-1.4.2/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.4.2/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.4.2/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-1.4.2/notebooks/14_structured_campaign_tutorial.ipynb" in names
+    assert "bo_forge-1.4.2/notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -558,7 +563,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 1.4.1\n"
+    assert completed.stdout == "bo-forge 1.4.2\n"
     subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
         cwd=probe_dir,
@@ -583,7 +588,7 @@ assert scripts["bo-forge-api"] == "bo_forge_app.api_cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "1.4.1"
+assert bo_forge.__version__ == "1.4.2"
 
 real_import = builtins.__import__
 def block_optional_app_deps(name, *args, **kwargs):

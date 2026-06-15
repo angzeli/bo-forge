@@ -26,4 +26,4 @@ bo:
   raw_samples: 8
   num_restarts: 1
   mc_samples: 16
-  min_normalized_distance: 0.02
+  min_normalized_distance: 0.0

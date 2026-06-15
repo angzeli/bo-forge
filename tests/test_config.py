@@ -976,6 +976,7 @@ def test_example_multi_fidelity_config_parses() -> None:
     assert config.fidelity.variable == "fidelity"
     assert config.fidelity.target == 1.0
     assert config.bo.acquisition == "qmf_kg"
+    assert config.bo.min_normalized_distance == 0.0
     assert config.variable_names == ["catalyst_loading", "fidelity"]
 
 
