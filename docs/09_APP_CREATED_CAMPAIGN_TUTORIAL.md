@@ -35,6 +35,7 @@ Use these values in the structured form:
 | New campaign name | `09_app_created_practical_catalyst` |
 | New YAML config output path | `configs/09_app_created_practical_catalyst.yaml` |
 | New CSV log output path | `examples/09_app_created_practical_catalyst_campaign_log.csv` |
+| Campaign kind | `Single-objective` |
 | Objective name | `yield_score` |
 | Objective direction | `maximize` |
 | Batch size | `2` |
@@ -121,14 +122,14 @@ This config must pass BO Forge validation before any files are written.
 
 ## 🧪 Create And Validate
 
-Click `Create and load campaign`.
+Click `Create campaign`.
 
 Expected result:
 
 - the YAML config file is created;
 - the empty canonical CSV log is created;
 - the campaign is loaded immediately;
-- the `Campaign` panel shows `Campaign log is valid.`;
+- the source bar and `Overview` panel show the campaign as valid;
 - the log contains headers only and no observed rows yet.
 
 The canonical CSV columns will include review, replicate, cost, and utility fields because those sections are enabled in the YAML.
@@ -155,6 +156,8 @@ Because review is enabled, only accepted suggestions should be marked observed. 
 This `09` campaign is useful as a compact practical app demo:
 
 - the app can create a campaign from scratch;
+- `Campaign kind` selects single-objective, multi-objective, or
+  multi-fidelity qMFKG creation paths;
 - structured fields handle the basic config;
 - advanced YAML adds constraints, cost, review, and replicates;
 - BO Forge still writes a strict canonical CSV log;

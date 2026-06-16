@@ -100,6 +100,8 @@ def build_campaign_yaml_text(
     review_enabled: bool = False,
     replicates_enabled: bool = False,
     cost: dict[str, object] | None = None,
+    fidelity: dict[str, object] | None = None,
+    bo_overrides: dict[str, object] | None = None,
 ) -> str:
     """Build editable YAML text from structured app form values."""
     raw = {
@@ -114,6 +116,8 @@ def build_campaign_yaml_text(
         },
     }
     if objectives:
+        if fidelity is not None:
+            raise ValueError("Multi-fidelity app-created campaigns are single-objective only.")
         raw["objectives"] = objectives
         raw["bo"]["acquisition"] = "qlog_ehvi"
     else:
@@ -121,6 +125,11 @@ def build_campaign_yaml_text(
             "name": objective_name,
             "direction": objective_direction,
         }
+    if fidelity is not None:
+        raw["fidelity"] = fidelity
+        raw["bo"]["acquisition"] = "qmf_kg"
+    if bo_overrides:
+        raw["bo"].update(bo_overrides)
     if review_enabled:
         raw["review"] = {"enabled": True}
     if replicates_enabled:

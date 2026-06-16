@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.4.2.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.4.3.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -66,7 +66,7 @@ automatic stage transitions remain deferred.
 
 Multi-fidelity campaigns expose `FidelityConfig` and `fidelity_summary` through
 the top-level package for config construction and read-only inspection.
-v1.4.2 multi-fidelity support remains single-objective, continuous-variable
+v1.4.3 multi-fidelity support remains single-objective, continuous-variable
 qMFKG only; BoTorch-facing helper functions in `bo_forge.multifidelity` are
 implementation details rather than stable public API.
 

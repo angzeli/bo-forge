@@ -16,7 +16,7 @@ When `replicates.enabled: true`, add `replicate_group,replicate_index` immediate
 
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`. In
-v1.4.2, `stages:` cannot be combined with `cost:`.
+v1.4.3, `stages:` cannot be combined with `cost:`.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -121,7 +121,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v1.4.2.
+- `stages:` cannot be combined with `cost:` in v1.4.3.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active

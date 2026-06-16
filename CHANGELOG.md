@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v1.4.3 - Streamlit Multi-Fidelity Workflow
+
+This patch completes the Streamlit-facing v1.4 multi-fidelity workflow without
+changing backend BO behavior, YAML/CSV semantics, public APIs, or CLI commands.
+
+- Replaces the app creation checkbox model with a clearer `Campaign kind`
+  selector for single-objective, multi-objective, and multi-fidelity qMFKG
+  campaigns.
+- Adds Streamlit-created single-objective continuous-fidelity qMFKG configs with
+  a top-level `fidelity:` block, `bo.acquisition: qmf_kg`, forced
+  `bo.batch_size: 1`, and responsive tutorial-style qMFKG defaults.
+- Defaults the fidelity variable to a variable named `fidelity` when present,
+  otherwise the last continuous variable, and defaults target fidelity to that
+  variable's upper bound.
+- Keeps review optional for app-created multi-fidelity campaigns while leaving
+  cost, replicates, structured stages, multi-objective fields, and
+  discrete/categorical fidelity workflows out of scope.
+- Adds a qMFKG note and batch-size cap in the `Suggest` panel for loaded
+  fidelity configs.
+
 ## v1.4.2 - Multi-Fidelity Tutorial Workflow
 
 This patch adds a lightweight tutorial notebook for the existing v1.4

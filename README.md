@@ -1,9 +1,10 @@
-# 🧪 BO Forge v1.4.2
+# 🧪 BO Forge v1.4.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.4.2 keeps the conservative v1.4 single-objective continuous-fidelity qMFKG
-modelling scope and adds a clean tutorial notebook for that workflow.
+v1.4.3 keeps the conservative v1.4 single-objective continuous-fidelity qMFKG
+modelling scope and completes the Streamlit-facing creation and suggestion
+workflow for that mode.
 
 Existing single-objective, multi-objective, structured, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.3.4 structured Streamlit baseline.
 
@@ -29,7 +30,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, Streamlit structured campaign creation, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -178,7 +179,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.4.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.4.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

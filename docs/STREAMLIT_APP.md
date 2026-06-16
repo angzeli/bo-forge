@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.4.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.4.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -11,9 +11,10 @@ app detects configured stages, shows active/inactive variables, lets users pick
 the stage for dry-run suggestions, and stores that stage in the staged
 suggestion bundle before explicit append.
 
-v1.4.1 surfaces read-only fidelity summaries and fidelity diagnostics for
-loaded single-objective qMFKG configs. It does not add Streamlit multi-fidelity
-campaign creation.
+v1.4.3 completes the Streamlit-facing single-objective multi-fidelity qMFKG
+workflow. The app can create conservative continuous-fidelity qMFKG configs,
+load existing fidelity configs, show fidelity summaries, and route fidelity
+diagnostic plots through the existing backend/session workflow.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -37,6 +38,27 @@ When a loaded config defines `stages:`, the app:
 Mutations remain explicit. Generating suggestions does not write to the CSV log;
 append, review, and observation actions still run through the backend service
 layer and `CampaignSession`.
+
+## 🧪 Multi-Fidelity qMFKG Campaigns
+
+Multi-fidelity campaigns remain backend-owned through `CampaignSession`; the
+app only builds validated YAML, stages suggestions, and calls the existing
+session methods.
+
+When `Create Campaign` uses `Campaign kind = Multi-fidelity qMFKG`, the app:
+
+- keeps the campaign single-objective;
+- restricts generated variables to continuous variables;
+- lets one continuous variable act as the fidelity variable;
+- defaults a variable named `fidelity` as the fidelity variable when present,
+  otherwise the last variable;
+- defaults target fidelity to the selected variable's upper bound;
+- writes a top-level `fidelity:` block;
+- sets `bo.acquisition: qmf_kg` and `bo.batch_size: 1`;
+- uses responsive qMFKG defaults matching the tutorial example;
+- allows optional `review.enabled: true`;
+- leaves cost, replicates, structured stages, multi-objective fields,
+  discrete/categorical fidelity variables, and batch qMFKG out of scope.
 
 ## 🧰 Install
 
@@ -113,7 +135,7 @@ Then use the compact campaign source bar to enter:
 
 Use a working log rather than editing seed example logs directly.
 
-You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. The default builder creates a single-objective campaign; advanced mode supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. Choose `Campaign kind` for single-objective, multi-objective, or multi-fidelity qMFKG creation. Multi-objective creation supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. Multi-fidelity creation is single-objective continuous-fidelity qMFKG only. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
 
 For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
 
@@ -174,10 +196,9 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
 - multi-objective replicate active-repeat selection remains deferred; multi-objective
   replicate configs use the backend `new_only` policy in v1.4.0;
 - no automatic structured-stage transitions or Streamlit-owned structured
-  campaign engine.
-- no Streamlit multi-fidelity campaign creation; v1.4.2 fidelity configs load
-  through the existing backend/session workflow and expose read-only summaries
-  and diagnostics.
+  campaign engine;
+- no multi-objective, structured, cost-aware, replicate-aware,
+  discrete/categorical, or batch multi-fidelity workflows.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.

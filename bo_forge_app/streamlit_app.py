@@ -65,6 +65,7 @@ ACTIVE_PANEL_KEY = "bo_forge_active_panel"
 CAMPAIGN_FILE_MODE_KEY = "bo_forge_campaign_file_mode"
 FLASH_MESSAGE_KEY = "bo_forge_flash_message"
 NEW_CAMPAIGN_FORM_YAML_KEY = "bo_forge_new_campaign_form_yaml"
+NEW_CAMPAIGN_KIND_KEY = "bo_forge_new_campaign_kind"
 REPORT_PREVIEW_KEY = "bo_forge_report_preview_text"
 STAGED_FRESHNESS_MESSAGE_KEY = "bo_forge_staged_freshness_message"
 SUGGEST_STAGE_KEY = "bo_forge_suggest_stage"
@@ -324,18 +325,31 @@ def _render_create_new_campaign(st: Any) -> None:
             key="new_campaign_log_output_path",
         )
 
-    advanced_multi_objective = st.checkbox(
-        "Advanced multi-objective campaign",
-        value=False,
-        key="new_campaign_advanced_multi_objective",
-        help="Generate an objectives: config with 2-4 coupled objectives.",
+    campaign_kind = st.radio(
+        "Campaign kind",
+        ["Single-objective", "Multi-objective", "Multi-fidelity qMFKG"],
+        horizontal=True,
+        key=NEW_CAMPAIGN_KIND_KEY,
+        help=(
+            "Multi-fidelity qMFKG creates a single-objective config with one "
+            "continuous fidelity variable."
+        ),
     )
+    is_multi_objective = campaign_kind == "Multi-objective"
+    is_multi_fidelity = campaign_kind == "Multi-fidelity qMFKG"
+    if is_multi_fidelity:
+        _render_callout(
+            st,
+            "Multi-fidelity qMFKG",
+            "App-created multi-fidelity campaigns are single-objective, continuous-variable "
+            "qMFKG campaigns. Advanced qMFKG defaults stay editable in the YAML preview.",
+        )
 
     _render_section_label(st, "Objective")
     objective_name = "activity"
     objective_direction = "maximize"
     objectives: list[dict[str, object]] | None = None
-    if advanced_multi_objective:
+    if is_multi_objective:
         objective_count = st.number_input(
             "Objective count",
             min_value=2,
@@ -362,13 +376,33 @@ def _render_create_new_campaign(st: Any) -> None:
     _render_section_label(st, "BO settings")
     bo_col_1, bo_col_2, bo_col_3, bo_col_4 = st.columns(4)
     with bo_col_1:
-        batch_size = st.number_input("Batch size", min_value=1, value=1, key="new_bo_batch_size")
+        if is_multi_fidelity:
+            batch_size = st.number_input(
+                "Batch size",
+                min_value=1,
+                max_value=1,
+                value=1,
+                key="new_bo_batch_size_multi_fidelity",
+                disabled=True,
+                help="qMFKG model-based suggestions are sequential in v1.4.",
+            )
+        else:
+            batch_size = st.number_input(
+                "Batch size",
+                min_value=1,
+                value=1,
+                key="new_bo_batch_size",
+            )
     with bo_col_2:
         initial_design_size = st.number_input(
             "Initial design size",
             min_value=1,
-            value=8,
-            key="new_bo_initial_design_size",
+            value=4 if is_multi_fidelity else 8,
+            key=(
+                "new_bo_initial_design_size_multi_fidelity"
+                if is_multi_fidelity
+                else "new_bo_initial_design_size"
+            ),
         )
     with bo_col_3:
         initial_design_method = st.selectbox(
@@ -390,11 +424,39 @@ def _render_create_new_campaign(st: Any) -> None:
 
     generated_yaml = ""
     try:
-        variables = _collect_new_campaign_variables(st, int(variable_count))
+        variables = _collect_new_campaign_variables(
+            st,
+            int(variable_count),
+            continuous_only=is_multi_fidelity,
+        )
         review_enabled = False
         replicates_enabled = False
         cost_settings = None
-        if advanced_multi_objective:
+        fidelity_settings = None
+        bo_overrides = None
+        if is_multi_fidelity:
+            _render_section_label(st, "Fidelity")
+            fidelity_settings = _collect_new_campaign_fidelity_settings(st, variables)
+            bo_overrides = {
+                "acquisition": "qmf_kg",
+                "batch_size": 1,
+                "raw_samples": 8,
+                "num_restarts": 1,
+                "mc_samples": 16,
+                "min_normalized_distance": 0.0,
+            }
+            _render_artifact_note(
+                st,
+                "qMFKG defaults",
+                "Generated YAML uses num_fantasies=8, raw_samples=8, num_restarts=1, "
+                "mc_samples=16, and min_normalized_distance=0.0.",
+            )
+            review_enabled = st.checkbox(
+                "Enable review",
+                value=False,
+                key="new_campaign_review_enabled_multi_fidelity",
+            )
+        elif is_multi_objective:
             _render_section_label(st, "Advanced sections")
             review_enabled = st.checkbox(
                 "Enable review",
@@ -451,6 +513,8 @@ def _render_create_new_campaign(st: Any) -> None:
             review_enabled=review_enabled,
             replicates_enabled=replicates_enabled,
             cost=cost_settings,
+            fidelity=fidelity_settings,
+            bo_overrides=bo_overrides,
         )
     except ValueError as exc:
         st.error(f"Could not build YAML preview: {exc}")
@@ -586,8 +650,14 @@ def _collect_new_campaign_objectives(st: Any, objective_count: int) -> list[dict
     return objectives
 
 
-def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[str, object]]:
+def _collect_new_campaign_variables(
+    st: Any,
+    variable_count: int,
+    *,
+    continuous_only: bool = False,
+) -> list[dict[str, object]]:
     variables: list[dict[str, object]] = []
+    key_prefix = "new_fidelity_variable" if continuous_only else "new_variable"
     for index in range(variable_count):
         with st.expander(f"Variable {index + 1}", expanded=index < 2):
             st.markdown(
@@ -598,16 +668,24 @@ def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[s
             with name_col:
                 name = st.text_input(
                     "Variable name",
-                    value=f"x{index + 1}",
+                    value=(
+                        "fidelity"
+                        if continuous_only and index == variable_count - 1
+                        else f"x{index + 1}"
+                    ),
                     placeholder="temperature",
-                    key=f"new_variable_{index}_name",
+                    key=f"{key_prefix}_{index}_name",
                 )
             with type_col:
-                variable_type = st.selectbox(
-                    "Variable type",
-                    ["continuous", "integer", "discrete", "categorical"],
-                    key=f"new_variable_{index}_type",
-                )
+                if continuous_only:
+                    variable_type = "continuous"
+                    st.markdown("**Variable type**  \ncontinuous")
+                else:
+                    variable_type = st.selectbox(
+                        "Variable type",
+                        ["continuous", "integer", "discrete", "categorical"],
+                        key=f"{key_prefix}_{index}_type",
+                    )
             _render_variable_type_badge(st, str(variable_type))
             variable: dict[str, object] = {"name": name, "type": variable_type}
             if variable_type in {"continuous", "integer"}:
@@ -616,13 +694,13 @@ def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[s
                     lower = st.number_input(
                         "Lower",
                         value=0.0,
-                        key=f"new_variable_{index}_lower",
+                        key=f"{key_prefix}_{index}_lower",
                     )
                 with upper_col:
                     upper = st.number_input(
                         "Upper",
                         value=1.0,
-                        key=f"new_variable_{index}_upper",
+                        key=f"{key_prefix}_{index}_upper",
                     )
                 variable["lower"] = int(lower) if variable_type == "integer" else float(lower)
                 variable["upper"] = int(upper) if variable_type == "integer" else float(upper)
@@ -631,7 +709,7 @@ def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[s
                     "Discrete values",
                     value="0.0, 0.5, 1.0",
                     placeholder="0.1, 0.2, 0.5",
-                    key=f"new_variable_{index}_discrete_values",
+                    key=f"{key_prefix}_{index}_discrete_values",
                     help="Discrete values must be comma-separated numbers.",
                 )
                 variable["values"] = parse_discrete_values_text(values_text, name)
@@ -640,7 +718,7 @@ def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[s
                     "Categorical labels",
                     value="A, B, C",
                     placeholder="MeCN, DMF, Water",
-                    key=f"new_variable_{index}_categorical_values",
+                    key=f"{key_prefix}_{index}_categorical_values",
                     help=(
                         "Categorical labels are case-sensitive. Empty or duplicate "
                         "labels are rejected."
@@ -649,6 +727,51 @@ def _collect_new_campaign_variables(st: Any, variable_count: int) -> list[dict[s
                 variable["values"] = parse_categorical_values_text(values_text, name)
             variables.append(variable)
     return variables
+
+
+def _collect_new_campaign_fidelity_settings(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> dict[str, object]:
+    continuous_variables = [
+        variable
+        for variable in variables
+        if variable.get("type") == "continuous"
+        and "lower" in variable
+        and "upper" in variable
+    ]
+    if not continuous_variables:
+        raise ValueError("Multi-fidelity qMFKG campaigns require a continuous variable.")
+
+    variable_names = [str(variable["name"]) for variable in continuous_variables]
+    default_index = next(
+        (index for index, name in enumerate(variable_names) if name == "fidelity"),
+        len(variable_names) - 1,
+    )
+    fidelity_variable = st.selectbox(
+        "Fidelity variable",
+        variable_names,
+        index=default_index,
+        key="new_campaign_fidelity_variable",
+    )
+    selected_variable = continuous_variables[variable_names.index(str(fidelity_variable))]
+    lower = float(selected_variable["lower"])
+    upper = float(selected_variable["upper"])
+    target = st.number_input(
+        "Target fidelity",
+        min_value=lower,
+        max_value=upper,
+        value=upper,
+        key=f"new_campaign_fidelity_target_{fidelity_variable}",
+        help="Defaults to the selected fidelity variable's upper bound.",
+    )
+    return {
+        "variable": str(fidelity_variable),
+        "target": float(target),
+        "fixed_cost": 0.01,
+        "fidelity_cost_weight": 1.0,
+        "num_fantasies": 8,
+    }
 
 
 def _create_campaign_from_inputs(
@@ -1002,13 +1125,22 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             "Active variables",
             active_variables_display(campaign.config, selected_stage),
         )
+    is_multi_fidelity = campaign.config.fidelity is not None
+    if is_multi_fidelity:
+        _render_artifact_note(
+            st,
+            "qMFKG suggestions",
+            "Multi-fidelity qMFKG suggestions are sequential in v1.4, so the "
+            "dry-run batch size is capped at 1.",
+        )
     with st.form("suggest_dry_run_form"):
         batch_size = st.number_input(
             "Batch size",
             min_value=1,
-            max_value=32,
-            value=max(1, int(campaign.config.bo.batch_size)),
+            max_value=1 if is_multi_fidelity else 32,
+            value=1 if is_multi_fidelity else max(1, int(campaign.config.bo.batch_size)),
             step=1,
+            disabled=is_multi_fidelity,
         )
         generate_clicked = st.form_submit_button(
             "Generate suggestions (dry run)",

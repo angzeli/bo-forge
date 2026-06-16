@@ -7,6 +7,7 @@ import pytest
 from matplotlib import pyplot as plt
 
 from bo_forge.config import BOConfig, CampaignConfig, CostConfig, ObjectiveConfig, VariableConfig
+from bo_forge.io import empty_campaign_log
 from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
 from bo_forge_app import streamlit_app, streamlit_helpers, streamlit_style
@@ -190,6 +191,53 @@ def test_build_campaign_yaml_text_supports_advanced_multi_objective_sections() -
     assert config.review.enabled
     assert config.replicates.enabled
     assert config.cost is not None
+
+
+def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_fidelity_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "fidelity", "type": "continuous", "lower": 0.2, "upper": 1.0},
+        ],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        review_enabled=True,
+        fidelity={
+            "variable": "fidelity",
+            "target": 1.0,
+            "fixed_cost": 0.01,
+            "fidelity_cost_weight": 1.0,
+            "num_fantasies": 8,
+        },
+        bo_overrides={
+            "acquisition": "qmf_kg",
+            "batch_size": 1,
+            "raw_samples": 8,
+            "num_restarts": 1,
+            "mc_samples": 16,
+            "min_normalized_distance": 0.0,
+        },
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.fidelity is not None
+    assert config.fidelity.variable == "fidelity"
+    assert config.fidelity.target == pytest.approx(1.0)
+    assert config.bo.acquisition == "qmf_kg"
+    assert config.bo.batch_size == 1
+    assert config.bo.raw_samples == 8
+    assert config.bo.num_restarts == 1
+    assert config.bo.mc_samples == 16
+    assert config.bo.min_normalized_distance == pytest.approx(0.0)
+    assert config.review.enabled
+    assert list(empty_log.columns) == canonical_columns(config)
 
 
 def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
@@ -2088,24 +2136,157 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert "Campaign created and loaded" in success_text
 
 
+def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "fidelity.yaml"
+    log_path = tmp_path / "logs" / "fidelity.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Multi-fidelity qMFKG"
+    )
+    app.run(timeout=10)
+    next(checkbox for checkbox in app.checkbox if checkbox.label == "Enable review").check()
+    app.run(timeout=10)
+
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.fidelity is not None
+    assert config.fidelity.variable == "fidelity"
+    assert config.fidelity.target == pytest.approx(1.0)
+    assert config.bo.acquisition == "qmf_kg"
+    assert config.bo.batch_size == 1
+    assert config.review.enabled
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+
+    assert any(subheader.value == "Fidelity Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    suggest_markdown = "\n".join(markdown.value for markdown in app.markdown)
+    batch_inputs = [
+        number_input
+        for number_input in app.number_input
+        if number_input.label == "Batch size"
+    ]
+    assert "qMFKG suggestions" in suggest_markdown
+    assert batch_inputs[-1].value == 1
+    assert batch_inputs[-1].min == 1
+    assert batch_inputs[-1].max == 1
+    assert batch_inputs[-1].proto.disabled
+
+
+def test_streamlit_multi_fidelity_target_defaults_to_selected_variable_upper(
+    tmp_path: Path,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "fidelity_alt.yaml"
+    log_path = tmp_path / "logs" / "fidelity_alt.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Multi-fidelity qMFKG"
+    )
+    app.run(timeout=10)
+
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.key == "new_fidelity_variable_0_name"
+    ).set_value("temperature")
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.key == "new_fidelity_variable_1_name"
+    ).set_value("loading")
+    next(
+        input_
+        for input_ in app.number_input
+        if input_.key == "new_fidelity_variable_0_upper"
+    ).set_value(2.5)
+    app.run(timeout=10)
+    next(
+        selectbox
+        for selectbox in app.selectbox
+        if selectbox.label == "Fidelity variable"
+    ).set_value("temperature")
+    app.run(timeout=10)
+
+    target_input = next(
+        input_ for input_ in app.number_input if input_.label == "Target fidelity"
+    )
+    assert target_input.value == pytest.approx(2.5)
+    assert target_input.max == pytest.approx(2.5)
+
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.fidelity is not None
+    assert config.fidelity.variable == "temperature"
+    assert config.fidelity.target == pytest.approx(2.5)
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+
+
 def test_streamlit_advanced_create_hides_single_objective_fields() -> None:
     from streamlit.testing.v1 import AppTest
 
     app = AppTest.from_file("bo_forge_app/streamlit_app.py")
     app.run(timeout=10)
-    app.radio[0].set_value("Create Campaign")
-    app.run(timeout=10)
-    advanced_checkbox = next(
-        checkbox
-        for checkbox in app.checkbox
-        if checkbox.label == "Advanced multi-objective campaign"
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
     )
-    advanced_checkbox.check()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Multi-objective"
+    )
     app.run(timeout=10)
 
     text_labels = {input_.label for input_ in app.text_input}
+    checkbox_labels = {checkbox.label for checkbox in app.checkbox}
     assert "Objective name" not in text_labels
     assert "Objective 1 name" in text_labels
+    assert "Advanced multi-objective campaign" not in checkbox_labels
 
 
 def test_streamlit_create_blocks_stale_yaml_preview(tmp_path: Path) -> None:
