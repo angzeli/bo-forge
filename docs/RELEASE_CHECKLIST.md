@@ -13,6 +13,8 @@ Use this checklist before publishing a GitHub release or PyPI package.
 ./.venv/bin/python -m bo_forge suggest --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m bo_forge fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
 ./.venv/bin/python -m bo_forge plot --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv --kind fidelity-diagnostics --output /tmp/bo_forge_fidelity_diagnostics.png
+./.venv/bin/python -m bo_forge validate --config configs/16_contextual_logei.yaml --log examples/16_contextual_logei_campaign_log.csv
+./.venv/bin/python -m bo_forge suggest --config configs/16_contextual_logei.yaml --log examples/16_contextual_logei_campaign_log.csv --context feedstock_acidity=0.25 --batch-size 1
 ./.venv/bin/python -m streamlit --version
 git diff --check
 ```
@@ -49,7 +51,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.4.3-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-1.5.0-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -66,7 +68,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.4.3-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-1.5.0-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -83,7 +85,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-1.4.3-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-1.5.0-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -96,7 +98,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.4.3.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-1.5.0.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -139,6 +141,9 @@ Confirm the full local loop still works:
 - create or load a campaign;
 - create a `Campaign kind = Multi-fidelity qMFKG` campaign and confirm the
   generated YAML contains `fidelity:` and `bo.acquisition: qmf_kg`;
+- load `configs/16_contextual_logei.yaml`, generate a dry-run contextual
+  suggestion with `feedstock_acidity`, and confirm append is blocked if the
+  context value changes after staging;
 - generate staged suggestions;
 - append;
 - mark observed;
@@ -147,10 +152,10 @@ Confirm the full local loop still works:
 
 ## 🏷️ GitHub Release
 
-- Final closeout: confirm `ROADMAP_V1_X.md` marks v1.4 as active, and
+- Final closeout: confirm `ROADMAP_V1_X.md` marks v1.5 as active, and
   `README.md`, `CHANGELOG.md`, install paths, and the release tag all agree on
-  `v1.4.3`.
-- Tag the release as `v1.4.3`.
+  `v1.5.0`.
+- Tag the release as `v1.5.0`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

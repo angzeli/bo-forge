@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 from math import isfinite
@@ -196,12 +197,24 @@ def dataframe_fingerprint(df: pd.DataFrame) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def context_values_fingerprint(context_values: dict[str, object]) -> str:
+    """Return a stable fingerprint for staged contextual metadata."""
+    payload = json.dumps(
+        context_values,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def make_staged_suggestion_bundle(
     suggestions: pd.DataFrame,
     config_path: str | Path,
     log_path: str | Path,
     *,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Create a staged suggestion bundle tied to the current config/log files."""
     resolved_config_path = Path(config_path).expanduser().resolve()
@@ -218,6 +231,12 @@ def make_staged_suggestion_bundle(
     }
     if stage is not None:
         bundle["stage"] = stage
+    if context_values is not None:
+        staged_context_values = dict(context_values)
+        bundle["context_values"] = staged_context_values
+        bundle["context_values_fingerprint"] = context_values_fingerprint(
+            staged_context_values
+        )
     return bundle
 
 
@@ -227,6 +246,7 @@ def staged_bundle_invalidation_reason(
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> str | None:
     """Return a reason staged suggestions cannot be appended, or None."""
     if bundle is None:
@@ -253,6 +273,21 @@ def staged_bundle_invalidation_reason(
         return "Log path changed after suggestions were staged."
     if "stage" in bundle and stage != bundle.get("stage"):
         return "Stage selection changed after suggestions were staged."
+    if "context_values" in bundle:
+        bundled_context_values = bundle.get("context_values")
+        if not isinstance(bundled_context_values, dict):
+            return "Context values changed after suggestions were staged."
+        if (
+            context_values_fingerprint(bundled_context_values)
+            != bundle.get("context_values_fingerprint")
+        ):
+            return "Context values changed after suggestions were staged."
+    if (
+        "context_values" in bundle
+        and context_values is not None
+        and dict(context_values) != bundle.get("context_values")
+    ):
+        return "Context values changed after suggestions were staged."
     if file_fingerprint(resolved_config_path) != bundle.get("config_fingerprint"):
         return "Config file changed after suggestions were staged."
     if file_fingerprint(resolved_log_path) != bundle.get("log_fingerprint"):
@@ -266,6 +301,7 @@ def staged_bundle_is_appendable(
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> bool:
     """Return True when staged suggestions are still valid for append."""
     return (
@@ -275,6 +311,7 @@ def staged_bundle_is_appendable(
             log_path=log_path,
             last_appended_fingerprint=last_appended_fingerprint,
             stage=stage,
+            context_values=context_values,
         )
         is None
     )
@@ -500,6 +537,7 @@ def append_disabled_reason(
     log_path: str | Path,
     last_appended_fingerprint: str | None = None,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> str | None:
     """Return a concise append-disabled reason, or None when append is allowed."""
     reason = staged_bundle_invalidation_reason(
@@ -508,6 +546,7 @@ def append_disabled_reason(
         log_path=log_path,
         last_appended_fingerprint=last_appended_fingerprint,
         stage=stage,
+        context_values=context_values,
     )
     if reason is None:
         return None
@@ -533,6 +572,9 @@ def append_disabled_reason(
         ),
         "Stage selection changed after suggestions were staged.": (
             "Append disabled: the selected stage changed after these suggestions were generated."
+        ),
+        "Context values changed after suggestions were staged.": (
+            "Append disabled: context values changed after these suggestions were generated."
         ),
     }
     return messages.get(reason, f"Append disabled: {reason}")

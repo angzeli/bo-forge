@@ -1,0 +1,5 @@
+row_id,iteration,status,source,catalyst_loading,reaction_temperature,solvent,feedstock_acidity,yield_score,predicted_mean,predicted_std,acquisition
+ctx_seed_0,0,observed,manual,0.20,70,MeCN,0.30,0.62,,,
+ctx_seed_1,0,observed,manual,0.55,90,EtOH,0.30,0.81,,,
+ctx_seed_2,0,observed,manual,0.35,100,Water,0.70,0.58,,,
+ctx_seed_3,0,observed,manual,0.75,110,MeCN,0.70,0.76,,,

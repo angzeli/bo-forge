@@ -131,6 +131,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--stage",
         help="Structured campaign stage name for stage-aware suggestions.",
     )
+    suggest_parser.add_argument(
+        "--context",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Context variable value for contextual campaigns; repeat as needed.",
+    )
     suggest_parser.add_argument("--output", type=Path, help="Optional suggestions CSV output path.")
     suggest_parser.add_argument(
         "--append",
@@ -359,7 +366,12 @@ def _cmd_report(args: argparse.Namespace) -> int:
 
 def _cmd_suggest(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    suggestions = campaign.suggest_next(batch_size=args.batch_size, stage=args.stage)
+    context_values = _parse_context_values(args.context)
+    suggestions = campaign.suggest_next(
+        batch_size=args.batch_size,
+        stage=args.stage,
+        context_values=context_values,
+    )
 
     print(f"Generated {len(suggestions)} suggestion(s).")
     if args.output is None:
@@ -372,6 +384,27 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
         campaign.append_suggestions(suggestions)
         print(f"Appended suggestions to campaign log: {args.log}")
     return 0
+
+
+def _parse_context_values(items: Sequence[str]) -> dict[str, str] | None:
+    if not items:
+        return None
+    parsed: dict[str, str] = {}
+    for item in items:
+        if "=" not in item:
+            raise SuggestionError(
+                f"Malformed --context value '{item}'. Expected NAME=VALUE."
+            )
+        name, raw_value = item.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise SuggestionError(
+                f"Malformed --context value '{item}'. Context variable name is blank."
+            )
+        if name in parsed:
+            raise SuggestionError(f"Duplicate --context value for variable '{name}'.")
+        parsed[name] = raw_value
+    return parsed
 
 
 def _cmd_review(args: argparse.Namespace) -> int:
@@ -558,6 +591,11 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
     if isinstance(exc, SuggestionError):
+        if "Context" in str(exc) or "context" in str(exc):
+            return (
+                "Hint: Use --context NAME=VALUE for each configured context "
+                "variable, or add context.default_values in the YAML config."
+            )
         if "qMFKG model-based suggestions support batch_size=1" in str(exc):
             return "Hint: Use --batch-size 1 for model-based qMFKG suggestions."
         if (

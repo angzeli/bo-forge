@@ -46,6 +46,7 @@ class DryRunRequest(CampaignRef):
     """Request for non-mutating suggestion generation."""
 
     batch_size: int | None = Field(default=None, ge=1)
+    context_values: dict[str, object] | None = None
 
 
 class StagedBundlePayload(BaseModel):
@@ -58,6 +59,8 @@ class StagedBundlePayload(BaseModel):
     log_path: str
     log_fingerprint: str
     appended: bool = False
+    context_values: dict[str, object] | None = None
+    context_values_fingerprint: str | None = None
 
 
 class AppendRequest(CampaignRef):
@@ -172,7 +175,10 @@ def create_app(root: str | Path) -> FastAPI:
     def dry_run(request: DryRunRequest) -> dict[str, object]:
         service = _load_service(resolved_root, request)
         batch_size = request.batch_size or service.config.bo.batch_size
-        result = service.suggest_dry_run(batch_size=batch_size)
+        result = service.suggest_dry_run(
+            batch_size=batch_size,
+            context_values=request.context_values,
+        )
         return {
             "suggestions": _table_payload(result.suggestions),
             "quality": _table_payload(result.quality),
@@ -308,11 +314,13 @@ def _staged_bundle_payload(bundle: dict[str, object], root: Path) -> dict[str, o
         "log_path": _relative_to_root(root, bundle.get("log_path", "")),
         "log_fingerprint": str(bundle.get("log_fingerprint", "")),
         "appended": bool(bundle.get("appended", False)),
+        "context_values": bundle.get("context_values"),
+        "context_values_fingerprint": bundle.get("context_values_fingerprint"),
     }
 
 
 def _rehydrate_staged_bundle(payload: StagedBundlePayload, root: Path) -> dict[str, object]:
-    return {
+    bundle: dict[str, object] = {
         "suggestions": _table_to_dataframe(payload.suggestions),
         "suggestions_fingerprint": payload.suggestions_fingerprint,
         "config_path": str(_resolve_under_root(root, payload.config_path, "staged.config_path")),
@@ -321,6 +329,10 @@ def _rehydrate_staged_bundle(payload: StagedBundlePayload, root: Path) -> dict[s
         "log_fingerprint": payload.log_fingerprint,
         "appended": payload.appended,
     }
+    if payload.context_values is not None:
+        bundle["context_values"] = payload.context_values
+        bundle["context_values_fingerprint"] = payload.context_values_fingerprint
+    return bundle
 
 
 def _validation_payload(result: ValidationResult) -> dict[str, object]:

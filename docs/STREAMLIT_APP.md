@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.4.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.5.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -15,6 +15,11 @@ v1.4.3 completes the Streamlit-facing single-objective multi-fidelity qMFKG
 workflow. The app can create conservative continuous-fidelity qMFKG configs,
 load existing fidelity configs, show fidelity summaries, and route fidelity
 diagnostic plots through the existing backend/session workflow.
+
+v1.5.0 adds loaded-campaign support for contextual BO. When a config defines
+`context:`, the `Suggest` panel renders one input per context variable, passes
+those values to `CampaignSession.suggest_next(context_values=...)`, and records
+the values in the staged suggestion bundle before explicit append.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -59,6 +64,28 @@ When `Create Campaign` uses `Campaign kind = Multi-fidelity qMFKG`, the app:
 - allows optional `review.enabled: true`;
 - leaves cost, replicates, structured stages, multi-objective fields,
   discrete/categorical fidelity variables, and batch qMFKG out of scope.
+
+## 🌐 Contextual Campaigns
+
+Contextual campaigns remain backend-owned through `CampaignSession`; the app
+does not implement a separate contextual optimizer or contextual campaign
+creation flow.
+
+When a loaded config defines `context:`, the app:
+
+- shows context inputs in the `Suggest` panel;
+- uses YAML `context.default_values` as initial widget values when present;
+- passes those values to backend dry-run suggestions;
+- stages suggestions with the selected context values recorded in the app
+  bundle;
+- blocks append if the config, log, staged suggestions, selected stage, or
+  context values changed after staging.
+
+v1.5.0 app support is limited to loaded single-objective contextual
+LogEI/qLogEI campaigns. Contextual campaign creation, contextual
+multi-objective BO, contextual structured campaigns, contextual
+multi-fidelity, contextual cost-aware, and contextual replicate-aware workflows
+remain deferred.
 
 ## 🧰 Install
 
@@ -199,6 +226,8 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
   campaign engine;
 - no multi-objective, structured, cost-aware, replicate-aware,
   discrete/categorical, or batch multi-fidelity workflows.
+- no Streamlit contextual campaign creation or contextual combinations beyond
+  loaded single-objective LogEI/qLogEI configs.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.

@@ -16,11 +16,15 @@ When `replicates.enabled: true`, add `replicate_group,replicate_index` immediate
 
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`. In
-v1.4.3, `stages:` cannot be combined with `cost:`.
+v1.5.0, `stages:` cannot be combined with `cost:`.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
 fidelity value measured for that row.
+
+When `context:` is configured, no new CSV columns are added. Context variables
+stay in the normal variable columns, store observed user-facing values, and are
+fixed to supplied/default values during suggestion generation.
 
 The non-structured cost + review + replicates schema is:
 
@@ -121,7 +125,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v1.4.3.
+- `stages:` cannot be combined with `cost:` in v1.5.0.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -138,8 +142,8 @@ v1.3.2 adds read-only structured inspection through `stage_summary()`,
 Structured campaign reports include configured stage state, active/inactive
 variables, row counts, pending rows, best single-objective rows or
 multi-objective Pareto counts where meaningful, and warnings for stages without
-observations. Automatic stage transitions, multi-fidelity semantics,
-contextual BO, cost-aware structured campaigns, and Streamlit structured
+observations. Automatic stage transitions, combinations with multi-fidelity or
+contextual workflows, cost-aware structured campaigns, and Streamlit structured
 campaign creation remain deferred.
 
 ## 🧪 Multi-Fidelity Rules
@@ -175,6 +179,35 @@ Rules:
 
 Unsupported v1.4.0 combinations are intentional: `fidelity:` cannot be combined
 with `objectives:`, `stages:`, `cost:`, or `replicates.enabled: true`.
+
+## 🌐 Contextual BO Rules
+
+v1.5.0 adds a conservative single-objective contextual LogEI/qLogEI workflow:
+
+```yaml
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.5
+```
+
+Rules:
+
+- context variables must be declared under `variables:`;
+- at least one non-context decision variable must remain;
+- context variables may be continuous, integer, discrete, or categorical;
+- context variables are stored as normal CSV variable columns;
+- suggestions require every context variable value, supplied through
+  `context.default_values`, `context_values={...}`, app inputs, API payloads, or
+  CLI `--context NAME=VALUE`;
+- generated suggestions fill context variable columns with the fixed values;
+- duplicate checks use the full variable row, so the same decision setting at a
+  different context is a distinct design;
+- constraints are evaluated against the full candidate, including fixed context
+  values.
+
+Unsupported v1.5.0 combinations are intentional: `context:` cannot be combined
+with `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates:`.
 
 ## 🔁 Suggested To Observed Transition
 

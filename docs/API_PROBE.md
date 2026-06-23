@@ -104,6 +104,19 @@ curl -X POST http://127.0.0.1:8765/campaign/suggestions/dry-run \
   -d '{"config_path":"configs/01_simple_2d_maximise_logei.yaml","log_path":"examples/01_simple_2d_maximise_logei_campaign_log.csv","batch_size":1}'
 ```
 
+Contextual campaigns pass context values in the same dry-run request:
+
+```json
+{
+  "config_path": "configs/16_contextual_logei.yaml",
+  "log_path": "examples/16_contextual_logei_campaign_log.csv",
+  "batch_size": 1,
+  "context_values": {
+    "feedstock_acidity": 0.25
+  }
+}
+```
+
 The dry-run response includes a stateless staged bundle:
 
 ```json
@@ -129,7 +142,9 @@ existing `CampaignAppService.append_staged()` path:
 
 Clients should not edit the staged bundle. Append rechecks the staged bundle's
 embedded `config_fingerprint` and `log_fingerprint`; append does not use a
-separate `expected_log_fingerprint` in v1.2.3.
+separate `expected_log_fingerprint` in v1.2.3. Contextual dry-runs also record
+the supplied `context_values` in the staged bundle so trusted clients can retain
+the context used to generate the suggestions.
 
 Staged bundles are fingerprint and integrity checked. They are not
 authenticated, signed, or server-issued. A trusted client can craft a

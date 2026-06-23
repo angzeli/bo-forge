@@ -15,6 +15,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `violates constraint`: check the row values against the YAML `constraints` block.
 - `invalid replicate_group` or `invalid replicate_index`: check explicit replicate metadata.
 - `require an explicit stage`, `unknown stage`, or `inactive variable`: check structured-campaign `stages:`, pass `--stage` for structured suggestions, and keep inactive variable cells blank.
+- `Contextual suggestions require values`: pass every configured context value through `context.default_values`, `context_values={...}`, the app context inputs, API `context_values`, or CLI `--context NAME=VALUE`.
 
 ## ⚙️ Config Errors
 
@@ -87,6 +88,55 @@ Fix: remove leading/trailing spaces from the YAML or CSV value.
 The constraint expression uses a name that is not one of the configured variables.
 
 Fix: use exact variable names from the YAML `variables` list.
+
+### `context.variables references unknown variable`
+
+A contextual campaign lists a context variable that is not present in the
+top-level `variables:` list.
+
+Fix: declare the context variable under `variables:` first, then reference it
+from `context.variables`.
+
+### `Contextual campaigns require at least one decision variable`
+
+Every configured variable was listed as context, so there is nothing left for BO
+Forge to optimize.
+
+Fix: leave at least one configured variable out of `context.variables`.
+
+### `Contextual suggestions require values for all context variables`
+
+At suggestion time, BO Forge needs fixed values for every configured context
+variable.
+
+Fix: provide defaults in YAML or pass context values explicitly:
+
+```yaml
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.5
+```
+
+```python
+campaign.suggest_next(context_values={"feedstock_acidity": 0.25})
+```
+
+```bash
+bo-forge suggest \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv \
+  --context feedstock_acidity=0.25
+```
+
+### `context cannot be combined with ...`
+
+v1.5.0 contextual BO support is deliberately conservative.
+
+Fix: do not combine `context:` with `objectives:`, `stages:`, `fidelity:`,
+`cost:`, or `replicates.enabled: true`. Contextual multi-objective,
+structured, multi-fidelity, cost-aware, and replicate-aware workflows remain
+deferred.
 
 ### `Constraint '...' uses unsupported syntax`
 

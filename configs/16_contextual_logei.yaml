@@ -1,0 +1,37 @@
+campaign_name: contextual_feedstock_logei
+objective:
+  name: yield_score
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+  - name: reaction_temperature
+    type: integer
+    lower: 60
+    upper: 120
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH, Water]
+  - name: feedstock_acidity
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.5
+constraints:
+  - name: acidity_loading_window
+    expression: catalyst_loading + feedstock_acidity <= 1.6
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 16
+  raw_samples: 32
+  num_restarts: 2
+  mc_samples: 32
+  min_normalized_distance: 0.0

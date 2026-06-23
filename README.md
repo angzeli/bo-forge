@@ -1,12 +1,12 @@
-# 🧪 BO Forge v1.4.3
+# 🧪 BO Forge v1.5.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.4.3 keeps the conservative v1.4 single-objective continuous-fidelity qMFKG
-modelling scope and completes the Streamlit-facing creation and suggestion
-workflow for that mode.
+v1.5.0 adds the conservative contextual BO core: single-objective
+LogEI/qLogEI campaigns where context variables are normal CSV variables but are
+fixed at suggestion time instead of optimized.
 
-Existing single-objective, multi-objective, structured, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.3.4 structured Streamlit baseline.
+Existing single-objective, multi-objective, structured, multi-fidelity, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.4.3 multi-fidelity Streamlit baseline.
 
 BO Forge deliberately supports only:
 
@@ -22,6 +22,7 @@ BO Forge deliberately supports only:
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
 - optional structured/staged campaign logs with stage-aware validation, explicit stage-aware suggestions, and read-only stage diagnostics
 - optional single-objective multi-fidelity qMFKG with one continuous fidelity variable and read-only fidelity diagnostics
+- optional single-objective contextual LogEI/qLogEI with context variables fixed at suggestion time
 - resume from existing logs
 - basic diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
@@ -30,7 +31,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover contextual multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -137,6 +138,11 @@ with `campaign.fidelity_summary()`, `bo-forge fidelity-summary`, or
 `bo-forge plot --kind fidelity-diagnostics`; the notebook walkthrough is
 `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
 
+The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
+log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
+suggestions with `CampaignSession.suggest_next(context_values={...})` or
+`bo-forge suggest --context feedstock_acidity=0.25`.
+
 ---
 
 ## 🗂️ Repository Structure
@@ -179,7 +185,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.4.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.5.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

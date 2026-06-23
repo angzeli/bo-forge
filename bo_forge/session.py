@@ -126,6 +126,7 @@ class CampaignSession:
         ]
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
+        self._extend_context_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -211,6 +212,7 @@ class CampaignSession:
         ]
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
+        self._extend_context_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -275,6 +277,17 @@ class CampaignSession:
                 ("fidelity_fixed_cost", self.config.fidelity.fixed_cost),
                 ("fidelity_cost_weight", self.config.fidelity.fidelity_cost_weight),
                 ("qmfkg_num_fantasies", self.config.fidelity.num_fantasies),
+            ]
+        )
+
+    def _extend_context_summary_rows(self, rows: list[tuple[str, object]]) -> None:
+        if self.config.context is None:
+            return
+        rows.extend(
+            [
+                ("contextual_campaign", True),
+                ("context_variables", ", ".join(self.config.context_variable_names)),
+                ("decision_variables", ", ".join(self.config.decision_variable_names)),
             ]
         )
 
@@ -363,6 +376,18 @@ class CampaignSession:
                 structured_stage_arg = f"stage={self.config.stage_names[0]!r}"
             else:
                 structured_stage_arg = "stage='STAGE_NAME'"
+        context_arg = "context_values={...}" if self.config.context is not None else ""
+
+        def suggest_call_args(*, include_batch_size: bool = False) -> str:
+            args = []
+            if include_batch_size:
+                args.append("batch_size=...")
+            if structured_stage_arg:
+                args.append(structured_stage_arg)
+            if context_arg:
+                args.append(context_arg)
+            return ", ".join(args)
+
         if campaign_status == "has_pending_suggestions":
             if self.config.review.enabled and not self.review_queue().empty:
                 action = "review_pending_suggestions"
@@ -416,9 +441,10 @@ class CampaignSession:
         elif campaign_status == "ready_for_initial_design":
             action = "suggest_initial_design"
             reason = "Observed rows are below initial_design_size; request Sobol suggestions."
-            if structured_stage_arg:
+            args = suggest_call_args()
+            if args:
                 suggested_call = (
-                    f"suggestions = campaign.suggest_next({structured_stage_arg}); "
+                    f"suggestions = campaign.suggest_next({args}); "
                     "campaign.append_suggestions(suggestions)"
                 )
             else:
@@ -429,10 +455,10 @@ class CampaignSession:
         else:
             action = "suggest_bo"
             reason = "Initial design is complete and no pending suggestions remain."
-            if structured_stage_arg:
+            args = suggest_call_args(include_batch_size=True)
+            if args:
                 suggested_call = (
-                    "suggestions = campaign.suggest_next("
-                    f"batch_size=..., {structured_stage_arg}); "
+                    f"suggestions = campaign.suggest_next({args}); "
                     "campaign.append_suggestions(suggestions)"
                 )
             else:
@@ -544,6 +570,7 @@ class CampaignSession:
         self,
         batch_size: int | None = None,
         stage: str | None = None,
+        context_values: dict[str, object] | None = None,
     ) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
         return _suggest_next(
@@ -551,6 +578,7 @@ class CampaignSession:
             self.df.copy(deep=True),
             batch_size=batch_size,
             stage=stage,
+            context_values=context_values,
         )
 
     def suggestion_quality(self, suggestions: pd.DataFrame) -> pd.DataFrame:

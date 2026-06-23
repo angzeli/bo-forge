@@ -1,5 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v1.5.0 - Contextual BO Core
+
+This release adds BO Forge's conservative contextual BO foundation for
+single-objective LogEI/qLogEI campaigns.
+
+- Adds a top-level `context:` config section with context variable names and
+  optional `default_values`.
+- Keeps context variables as ordinary user-facing CSV variable columns; no new
+  CSV columns are introduced.
+- Fixes context variables at suggestion time while optimizing over the remaining
+  decision variables.
+- Adds `CampaignSession.suggest_next(..., context_values={...})` and
+  `bo-forge suggest --context NAME=VALUE`.
+- Adds contextual fixed-feature handling for continuous, integer, discrete, and
+  categorical context variables.
+- Adds minimal Streamlit loaded-campaign support for entering context values in
+  the `Suggest` panel.
+- Adds API/service dry-run support for contextual suggestions and staged-bundle
+  context metadata.
+- Adds `configs/16_contextual_logei.yaml` and
+  `examples/16_contextual_logei_campaign_log.csv`.
+- Keeps contextual multi-objective, structured, multi-fidelity, cost-aware, and
+  replicate-aware workflows out of scope for v1.5.0.
+
 ## v1.4.3 - Streamlit Multi-Fidelity Workflow
 
 This patch completes the Streamlit-facing v1.4 multi-fidelity workflow without

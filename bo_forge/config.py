@@ -72,6 +72,12 @@ class FidelityConfig:
 
 
 @dataclass(frozen=True)
+class ContextConfig:
+    variables: tuple[str, ...]
+    default_values: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ReviewConfig:
     enabled: bool = False
 
@@ -115,6 +121,7 @@ class CampaignConfig:
     constraints: tuple[ConstraintConfig, ...] = ()
     cost: CostConfig | None = None
     fidelity: FidelityConfig | None = None
+    context: ContextConfig | None = None
     review: ReviewConfig = field(default_factory=ReviewConfig)
     replicates: ReplicateConfig = field(default_factory=ReplicateConfig)
     stages: tuple[StageConfig, ...] = ()
@@ -155,6 +162,24 @@ class CampaignConfig:
         return bool(self.stages)
 
     @property
+    def is_contextual_campaign(self) -> bool:
+        """Return True when this campaign fixes context variables at suggestion time."""
+        return self.context is not None
+
+    @property
+    def context_variable_names(self) -> list[str]:
+        """Return configured context variable names in YAML order."""
+        if self.context is None:
+            return []
+        return list(self.context.variables)
+
+    @property
+    def decision_variable_names(self) -> list[str]:
+        """Return variables optimized by suggestions after fixing context."""
+        context_names = set(self.context_variable_names)
+        return [name for name in self.variable_names if name not in context_names]
+
+    @property
     def stage_names(self) -> list[str]:
         """Return configured stage names in YAML order."""
         return [stage.name for stage in self.stages]
@@ -187,6 +212,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     cost = _parse_cost(raw.get("cost"), variables)
     fidelity = _parse_fidelity(raw.get("fidelity"), variables)
     stages = _parse_stages(raw.get("stages"), variables)
+    context = _parse_context(raw.get("context"), variables)
     if stages and cost is not None:
         raise ConfigError(
             "Structured campaigns with cost are not supported in v1.4.0; "
@@ -196,6 +222,14 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     replicates = _parse_replicates(
         raw.get("replicates"),
         multi_objective=bool(objectives),
+    )
+    _validate_context_combinations(
+        context=context,
+        multi_objective=bool(objectives),
+        stages=stages,
+        fidelity=fidelity,
+        cost=cost,
+        replicates=replicates,
     )
     _validate_fidelity_combinations(
         fidelity=fidelity,
@@ -220,6 +254,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         constraints=tuple(constraints),
         cost=cost,
         fidelity=fidelity,
+        context=context,
         review=review,
         replicates=replicates,
         stages=tuple(stages),
@@ -561,6 +596,87 @@ def _parse_fidelity(
     )
 
 
+def _parse_context(
+    raw: Any,
+    variables: list[VariableConfig],
+) -> ContextConfig | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'context' must be a mapping when provided.")
+    unsupported = sorted(set(raw) - {"variables", "default_values"})
+    if unsupported:
+        raise ConfigError(f"Config key 'context' has unsupported keys: {unsupported}.")
+
+    raw_variables = raw.get("variables")
+    if not isinstance(raw_variables, list) or not raw_variables:
+        raise ConfigError("context.variables must be a non-empty list.")
+    configured_variables = {variable.name: variable for variable in variables}
+    context_variables: list[str] = []
+    seen: set[str] = set()
+    for index, value in enumerate(raw_variables):
+        if not isinstance(value, str) or not value.strip() or value.strip() != value:
+            raise ConfigError(
+                f"context.variables[{index}] must be a non-empty unpadded string."
+            )
+        if value in seen:
+            raise ConfigError(f"Duplicate context variable '{value}'.")
+        if value not in configured_variables:
+            raise ConfigError(f"context.variables references unknown variable '{value}'.")
+        context_variables.append(value)
+        seen.add(value)
+    if len(context_variables) == len(variables):
+        raise ConfigError(
+            "context.variables cannot include every configured variable; at least one "
+            "non-context decision variable is required."
+        )
+
+    raw_defaults = raw.get("default_values", {})
+    if raw_defaults is None:
+        raw_defaults = {}
+    if not isinstance(raw_defaults, dict):
+        raise ConfigError("context.default_values must be a mapping when provided.")
+    context_set = set(context_variables)
+    default_values: dict[str, object] = {}
+    for name, value in raw_defaults.items():
+        if not isinstance(name, str) or not name.strip() or name.strip() != name:
+            raise ConfigError("context.default_values keys must be non-empty strings.")
+        if name not in context_set:
+            raise ConfigError(
+                f"context.default_values contains non-context variable '{name}'."
+            )
+        default_values[name] = _normalise_config_variable_value(
+            configured_variables[name],
+            value,
+            f"context.default_values.{name}",
+        )
+
+    return ContextConfig(variables=tuple(context_variables), default_values=default_values)
+
+
+def _validate_context_combinations(
+    *,
+    context: ContextConfig | None,
+    multi_objective: bool,
+    stages: list[StageConfig],
+    fidelity: FidelityConfig | None,
+    cost: CostConfig | None,
+    replicates: ReplicateConfig,
+) -> None:
+    if context is None:
+        return
+    if multi_objective:
+        raise ConfigError("context is only supported for single-objective campaigns in v1.5.0.")
+    if stages:
+        raise ConfigError("context cannot be combined with structured campaign stages in v1.5.0.")
+    if fidelity is not None:
+        raise ConfigError("context cannot be combined with fidelity campaigns in v1.5.0.")
+    if cost is not None:
+        raise ConfigError("context cannot be combined with cost-aware campaigns in v1.5.0.")
+    if replicates.enabled:
+        raise ConfigError("context cannot be combined with replicate campaigns in v1.5.0.")
+
+
 def _validate_fidelity_combinations(
     *,
     fidelity: FidelityConfig | None,
@@ -878,4 +994,63 @@ def _int_value(value: Any, context: str) -> int:
         raise ConfigError(f"{context} must be an integer.") from exc
     if parsed != value and not (isinstance(value, str) and str(parsed) == value):
         raise ConfigError(f"{context} must be an integer: value={value!r}.")
+    return parsed
+
+
+def _normalise_config_variable_value(
+    variable: VariableConfig,
+    value: Any,
+    context: str,
+) -> object:
+    if variable.type == "continuous":
+        parsed = _finite_config_float(value, context)
+        assert variable.lower is not None and variable.upper is not None
+        if parsed < variable.lower or parsed > variable.upper:
+            raise ConfigError(
+                f"{context} is outside variable '{variable.name}' bounds: "
+                f"value={parsed:g}, lower={variable.lower:g}, upper={variable.upper:g}."
+            )
+        return parsed
+    if variable.type == "integer":
+        parsed = _finite_config_float(value, context)
+        if parsed % 1 != 0:
+            raise ConfigError(f"{context} must be integer-valued: value={value!r}.")
+        assert variable.lower is not None and variable.upper is not None
+        if parsed < variable.lower or parsed > variable.upper:
+            raise ConfigError(
+                f"{context} is outside variable '{variable.name}' bounds: "
+                f"value={parsed:g}, lower={variable.lower:g}, upper={variable.upper:g}."
+            )
+        return int(parsed)
+    if variable.type == "discrete":
+        parsed = _finite_config_float(value, context)
+        allowed = [float(item) for item in variable.values]
+        for allowed_value in allowed:
+            if math.isclose(parsed, allowed_value, rel_tol=1e-12, abs_tol=1e-12):
+                return float(allowed_value)
+        raise ConfigError(
+            f"{context} is not one of variable '{variable.name}' choices: "
+            f"value={value!r}, allowed={allowed}."
+        )
+    if variable.type == "categorical":
+        parsed = str(value)
+        allowed = [str(item) for item in variable.values]
+        if parsed not in allowed:
+            raise ConfigError(
+                f"{context} is not one of variable '{variable.name}' choices: "
+                f"value={value!r}, allowed={allowed}."
+            )
+        return parsed
+    raise ConfigError(f"Variable '{variable.name}' has unsupported type '{variable.type}'.")
+
+
+def _finite_config_float(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ConfigError(f"{context} must be numeric, not a boolean.")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{context} must be numeric.") from exc
+    if not math.isfinite(parsed):
+        raise ConfigError(f"{context} must be finite.")
     return parsed

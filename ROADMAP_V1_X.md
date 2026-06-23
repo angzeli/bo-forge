@@ -6,7 +6,7 @@ This roadmap starts after the first stable public release. It is directional, no
 
 ```mermaid
 flowchart LR
-    v10["v1.0<br/>Stable public release"] --> v11["v1.1<br/>Coupled multi-objective qLogEHVI"] --> v12["v1.2<br/>App Launcher + LAN Access"] --> v13["v1.3<br/>Structured campaigns"] --> v14["v1.4<br/>Single-objective multi-fidelity qMFKG"] --> later["Later<br/>Contextual BO + deeper workflow lines"]
+    v10["v1.0<br/>Stable public release"] --> v11["v1.1<br/>Coupled multi-objective qLogEHVI"] --> v12["v1.2<br/>App Launcher + LAN Access"] --> v13["v1.3<br/>Structured campaigns"] --> v14["v1.4<br/>Single-objective multi-fidelity qMFKG"] --> v15["v1.5<br/>Contextual BO"] --> later["Later<br/>Deeper workflow lines"]
 
     v110["v1.1.0<br/>Two-objective qLogEHVI"]
     v111["v1.1.1<br/>3+ objective generalisation"]
@@ -26,6 +26,7 @@ flowchart LR
     v141["v1.4.1<br/>Fidelity reporting + diagnostics"]
     v142["v1.4.2<br/>Multi-fidelity tutorial"]
     v143["v1.4.3<br/>Streamlit multi-fidelity workflow"]
+    v150["v1.5.0<br/>Contextual BO core"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -45,11 +46,12 @@ flowchart LR
     v14 -.-> v141
     v14 -.-> v142
     v14 -.-> v143
+    v15 -.-> v150
 
-    class v10,v11,v12,v13 majorDone
-    class v14 majorActive
+    class v10,v11,v12,v13,v14 majorDone
+    class v15 majorActive
     class later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141,v142,v143 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141,v142,v143,v150 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -57,7 +59,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.4.3`. The v1.3.x line is complete; v1.4 begins with a conservative single-objective continuous-fidelity qMFKG workflow using BoTorch's current multi-fidelity KG stack, includes read-only fidelity summaries and diagnostics, adds a lightweight notebook tutorial, and now exposes app-created multi-fidelity qMFKG campaigns in Streamlit while keeping multi-objective, structured, cost-aware, replicate-aware, and batch multi-fidelity workflows deferred.
+Current baseline: `v1.5.0`. The v1.4.x line is complete; v1.5 begins with a conservative single-objective contextual LogEI/qLogEI workflow where context variables remain normal CSV variables but are fixed at suggestion time. Contextual multi-objective, structured, multi-fidelity, cost-aware, and replicate-aware workflows remain deferred.
 
 ### Patch Notes So Far
 
@@ -82,6 +84,7 @@ Current baseline: `v1.4.3`. The v1.3.x line is complete; v1.4 begins with a cons
 | `v1.4.1` | Patch | Read-only fidelity summaries, CLI inspection, reports, Streamlit routing, and fidelity diagnostics |
 | `v1.4.2` | Patch | Multi-fidelity qMFKG tutorial notebook and release-readiness documentation |
 | `v1.4.3` | Patch | Streamlit creation and qMFKG suggestion controls for single-objective continuous-fidelity campaigns |
+| `v1.5.0` | Minor | Contextual single-objective LogEI/qLogEI core with fixed context variables |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -135,7 +138,7 @@ Status: completed
 
 ## 🧪 v1.4 - Single-Objective Multi-Fidelity qMFKG
 
-Status: active
+Status: completed
 
 - Optional `fidelity:` config section for one continuous fidelity variable.
 - `bo.acquisition: qmf_kg` for single-objective multi-fidelity campaigns.
@@ -156,10 +159,27 @@ Status: active
 - Multi-objective, structured, cost-aware, replicate-aware, batch, and
   discrete/categorical multi-fidelity workflows remain deferred.
 
+## 🌐 v1.5 - Contextual BO
+
+Status: active
+
+- Optional `context:` config section with context variable names and defaults.
+- Context variables remain normal CSV variable columns; no new CSV columns are
+  added.
+- Single-objective contextual LogEI/qLogEI suggestions fix context variables at
+  suggestion time and optimize only non-context decision variables.
+- Context variables may be continuous, integer, discrete, or categorical.
+- `CampaignSession.suggest_next(..., context_values={...})` and
+  `bo-forge suggest --context NAME=VALUE` are available.
+- Minimal loaded-campaign Streamlit support collects context values in the
+  `Suggest` panel; Streamlit contextual campaign creation remains deferred.
+- Contextual multi-objective, structured, multi-fidelity, cost-aware, and
+  replicate-aware workflows remain deferred.
+
 ## 🔮 Later
 
 Status: directional
 
-- Contextual BO.
+- Context diagnostics, summaries, and tutorial notebooks.
 - More specialised surrogate models or kernels.
 - Deeper app collaboration workflows.

@@ -1125,6 +1125,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             "Active variables",
             active_variables_display(campaign.config, selected_stage),
         )
+    context_values = _render_context_inputs(st, campaign.config)
     is_multi_fidelity = campaign.config.fidelity is not None
     if is_multi_fidelity:
         _render_artifact_note(
@@ -1150,22 +1151,27 @@ def _render_suggest(st: Any, campaign: Any) -> None:
     if generate_clicked:
         try:
             if hasattr(campaign, "suggest_dry_run"):
-                result = campaign.suggest_dry_run(int(batch_size), stage=selected_stage)
+                dry_run_kwargs: dict[str, object] = {}
+                if selected_stage is not None:
+                    dry_run_kwargs["stage"] = selected_stage
+                if context_values is not None:
+                    dry_run_kwargs["context_values"] = context_values
+                result = campaign.suggest_dry_run(int(batch_size), **dry_run_kwargs)
                 suggestions = result.suggestions
                 bundle = result.bundle
             else:
-                if selected_stage is None:
-                    suggestions = campaign.suggest_next(batch_size=int(batch_size))
-                else:
-                    suggestions = campaign.suggest_next(
-                        batch_size=int(batch_size),
-                        stage=selected_stage,
-                    )
+                suggest_kwargs: dict[str, object] = {"batch_size": int(batch_size)}
+                if selected_stage is not None:
+                    suggest_kwargs["stage"] = selected_stage
+                if context_values is not None:
+                    suggest_kwargs["context_values"] = context_values
+                suggestions = campaign.suggest_next(**suggest_kwargs)
                 bundle = make_staged_suggestion_bundle(
                     suggestions,
                     config_path,
                     log_path,
                     stage=selected_stage,
+                    context_values=context_values,
                 )
         except (BOForgeError, OSError, ValueError) as exc:
             st.error(str(exc))
@@ -1180,10 +1186,15 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         _render_empty_state(st, *empty_state_message("staged_suggestions"))
         return
 
-    if selected_stage is None:
+    if selected_stage is None and context_values is None:
         raw_reason = _current_invalidation_reason(st, bundle)
     else:
-        raw_reason = _current_invalidation_reason(st, bundle, stage=selected_stage)
+        raw_reason = _current_invalidation_reason(
+            st,
+            bundle,
+            stage=selected_stage,
+            context_values=context_values,
+        )
     if raw_reason is None:
         st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
     disabled_reason = append_disabled_reason(
@@ -1192,6 +1203,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         log_path,
         st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
         stage=selected_stage,
+        context_values=context_values,
     )
     if raw_reason and raw_reason != "No staged suggestions.":
         st.session_state[STAGED_FRESHNESS_MESSAGE_KEY] = raw_reason
@@ -1273,6 +1285,7 @@ def _render_suggest(st: Any, campaign: Any) -> None:
                     bundle,
                     st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
                     stage=selected_stage,
+                    context_values=context_values,
                 )
                 campaign = result.service
                 appended_fingerprint = result.appended_fingerprint
@@ -1288,6 +1301,78 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         st.session_state[SESSION_KEY] = campaign
         _refresh_validation_cache(st, campaign, config_path, log_path)
         _flash_and_rerun(st, "Staged suggestions appended to the campaign log.")
+
+
+def _render_context_inputs(st: Any, config: Any) -> dict[str, object] | None:
+    if config.context is None:
+        return None
+    _render_artifact_note(
+        st,
+        "Context",
+        "Context variables are fixed for this dry-run suggestion and remain normal CSV "
+        "variable columns.",
+    )
+    context_values: dict[str, object] = {}
+    variables_by_name = {variable.name: variable for variable in config.variables}
+    columns = st.columns(min(len(config.context_variable_names), 3) or 1)
+    for index, name in enumerate(config.context_variable_names):
+        variable = variables_by_name[name]
+        default = config.context.default_values.get(name, _default_context_input(variable))
+        key = f"context_input_{sha1(name.encode('utf-8')).hexdigest()[:10]}"
+        with columns[index % len(columns)]:
+            if variable.type == "categorical":
+                options = [str(value) for value in variable.values]
+                default_index = options.index(str(default)) if str(default) in options else 0
+                context_values[name] = st.selectbox(
+                    f"Context: {name}",
+                    options,
+                    index=default_index,
+                    key=key,
+                )
+            elif variable.type == "discrete":
+                options = [float(value) for value in variable.values]
+                default_float = float(default)
+                default_index = (
+                    options.index(default_float) if default_float in options else 0
+                )
+                context_values[name] = st.selectbox(
+                    f"Context: {name}",
+                    options,
+                    index=default_index,
+                    key=key,
+                )
+            elif variable.type == "integer":
+                context_values[name] = int(
+                    st.number_input(
+                        f"Context: {name}",
+                        min_value=int(variable.lower),
+                        max_value=int(variable.upper),
+                        value=int(default),
+                        step=1,
+                        key=key,
+                    )
+                )
+            else:
+                context_values[name] = float(
+                    st.number_input(
+                        f"Context: {name}",
+                        min_value=float(variable.lower),
+                        max_value=float(variable.upper),
+                        value=float(default),
+                        key=key,
+                    )
+                )
+    return context_values
+
+
+def _default_context_input(variable: Any) -> object:
+    if variable.type in {"continuous", "integer"}:
+        return variable.lower
+    if variable.type == "discrete":
+        return float(variable.values[0])
+    if variable.type == "categorical":
+        return str(variable.values[0])
+    return ""
 
 
 def _render_resolve(
@@ -1994,6 +2079,7 @@ def _current_invalidation_reason(
     bundle: dict[str, object] | None,
     *,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> str | None:
     config_path, log_path = _current_paths(st)
     try:
@@ -2003,6 +2089,7 @@ def _current_invalidation_reason(
             log_path=log_path,
             last_appended_fingerprint=st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
             stage=stage,
+            context_values=context_values,
         )
     except OSError as exc:
         return str(exc)
@@ -2013,6 +2100,7 @@ def _should_clear_staged_bundle(reason: str) -> bool:
         "Config path changed after suggestions were staged.",
         "Log path changed after suggestions were staged.",
         "Stage selection changed after suggestions were staged.",
+        "Context values changed after suggestions were staged.",
         "Config file changed after suggestions were staged.",
         "Log file changed after suggestions were staged.",
         "Staged suggestions changed after they were staged.",

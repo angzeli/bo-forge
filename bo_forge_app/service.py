@@ -194,14 +194,20 @@ class CampaignAppService:
         self,
         batch_size: int,
         stage: str | None = None,
+        context_values: dict[str, object] | None = None,
     ) -> StagedSuggestionResult:
         """Generate non-mutating suggestions and return staged app state."""
-        suggestions = self.session.suggest_next(batch_size=batch_size, stage=stage)
+        suggestions = self.session.suggest_next(
+            batch_size=batch_size,
+            stage=stage,
+            context_values=context_values,
+        )
         bundle = make_staged_suggestion_bundle(
             suggestions,
             self.config_path,
             self.log_path,
             stage=stage,
+            context_values=context_values,
         )
         quality = self.session.suggestion_quality(suggestions)
         return StagedSuggestionResult(suggestions, bundle, quality)
@@ -211,6 +217,7 @@ class CampaignAppService:
         bundle: dict[str, object],
         last_appended_fingerprint: str | None = None,
         stage: str | None = None,
+        context_values: dict[str, object] | None = None,
     ) -> AppendResult:
         """Append a valid staged bundle, reload, and return refreshed service state."""
         reason = staged_bundle_invalidation_reason(
@@ -219,6 +226,7 @@ class CampaignAppService:
             log_path=self.log_path,
             last_appended_fingerprint=last_appended_fingerprint,
             stage=stage,
+            context_values=context_values,
         )
         if reason is not None:
             raise ValueError(reason)

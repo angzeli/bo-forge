@@ -148,6 +148,64 @@ def test_app_service_dry_run_is_non_mutating_and_uses_existing_bundle_shape(
     pd.testing.assert_frame_equal(service.df, before_df)
 
 
+def test_app_service_contextual_dry_run_records_context_without_mutation(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "16_contextual_logei.yaml")
+    log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    before_bytes = log_path.read_bytes()
+
+    result = service.suggest_dry_run(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.25},
+    )
+
+    assert result.bundle["context_values"] == {"feedstock_acidity": 0.25}
+    assert result.suggestions["feedstock_acidity"].astype(float).tolist() == [
+        pytest.approx(0.25)
+    ]
+    assert log_path.read_bytes() == before_bytes
+
+
+def test_app_service_contextual_append_rejects_changed_context_without_mutation(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "16_contextual_logei.yaml")
+    log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    result = service.suggest_dry_run(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.25},
+    )
+    before = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Context values changed after suggestions were staged"):
+        service.append_staged(
+            result.bundle,
+            context_values={"feedstock_acidity": 0.75},
+        )
+    assert log_path.read_bytes() == before
+
+
+def test_app_service_contextual_append_rejects_tampered_context_metadata(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "16_contextual_logei.yaml")
+    log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    result = service.suggest_dry_run(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.25},
+    )
+    result.bundle["context_values"] = {"feedstock_acidity": 0.75}
+    before = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Context values changed after suggestions were staged"):
+        service.append_staged(result.bundle)
+    assert log_path.read_bytes() == before
+
+
 def test_app_service_structured_dry_run_records_stage_without_mutation(
     tmp_path: Path,
 ) -> None:

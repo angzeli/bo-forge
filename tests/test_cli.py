@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.4.3\n"
+    assert captured.out == "bo-forge 1.5.0\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.4.3\n"
+    assert completed.stdout == "bo-forge 1.5.0\n"
     assert completed.stderr == ""
 
 
@@ -931,6 +931,88 @@ def test_constrained_suggest_output_is_feasible(
         (suggestions["solvent"] == "Water")
         & (suggestions["reaction_time"].astype(int) < 35)
     ).any()
+
+
+def test_contextual_suggest_accepts_context_value(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/16_contextual_logei.yaml")
+    log_path = tmp_path / "contextual.csv"
+    output_path = tmp_path / "contextual_suggestions.csv"
+    seed = pd.read_csv(
+        "examples/16_contextual_logei_campaign_log.csv",
+        keep_default_na=False,
+    )
+    seed.to_csv(log_path, index=False)
+
+    assert run(
+        [
+            "suggest",
+            *base_args(config_path, log_path),
+            "--context",
+            "feedstock_acidity=0.25",
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    suggestions = pd.read_csv(output_path, keep_default_na=False)
+    assert suggestions["feedstock_acidity"].astype(float).tolist() == [pytest.approx(0.25)]
+
+
+def test_contextual_suggest_missing_context_does_not_append(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "contextual.yaml"
+    config_path.write_text(
+        """
+campaign_name: contextual_cli
+objective: {name: score, direction: maximize}
+variables:
+  - {name: x, type: continuous, lower: 0, upper: 1}
+  - {name: feedstock_acidity, type: continuous, lower: 0, upper: 1}
+context:
+  variables: [feedstock_acidity]
+bo:
+  batch_size: 1
+  initial_design_size: 2
+  acquisition: log_ei
+""",
+        encoding="utf-8",
+    )
+    cfg = CampaignConfig.from_yaml(config_path)
+    log_path = write_log(tmp_path / "contextual.csv", cfg)
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "missing=['feedstock_acidity']" in captured.err
+    assert "Hint: Use --context NAME=VALUE" in captured.err
+    assert log_path.read_bytes() == before
+
+
+def test_contextual_suggest_rejects_malformed_context(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/16_contextual_logei.yaml")
+    log_path = tmp_path / "contextual.csv"
+    pd.read_csv(
+        "examples/16_contextual_logei_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(["suggest", *base_args(config_path, log_path), "--context", "bad"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Malformed --context value" in captured.err
 
 
 def test_config_load_failure_returns_hint(

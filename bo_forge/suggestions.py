@@ -21,6 +21,13 @@ from bo_forge.acquisition import (
 )
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_variable_names, constraint_violations_for_values
+from bo_forge.contextual import (
+    apply_context_to_candidate,
+    contextual_categorical_combination_count,
+    contextual_fixed_feature_assignments,
+    normalize_context_value,
+    resolve_context_values,
+)
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.models import dataframe_to_tensors, fit_gp_model, fit_multi_fidelity_gp_model
@@ -75,10 +82,13 @@ def suggest_next(
     df: pd.DataFrame,
     batch_size: int | None = None,
     stage: str | None = None,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     """Suggest the next experiment or batch for a campaign."""
     validate_campaign_data(config, df)
     if config.is_structured_campaign:
+        if context_values:
+            raise SuggestionError("Context values are only valid for contextual campaigns.")
         return _suggest_structured_stage(
             config=config,
             df=df,
@@ -91,6 +101,7 @@ def suggest_next(
         raise SuggestionError(
             "Cannot generate new suggestions while unresolved status='suggested' rows exist."
         )
+    resolved_context = resolve_context_values(config, context_values)
 
     requested_batch_size = batch_size if batch_size is not None else config.bo.batch_size
     if requested_batch_size < 1:
@@ -104,6 +115,7 @@ def suggest_next(
             config=config,
             df=df,
             count=min(requested_batch_size, remaining_initial),
+            context_values=resolved_context,
         )
 
     if config.fidelity is not None:
@@ -163,6 +175,7 @@ def suggest_next(
         df=df,
         observed_df=observed_df,
         batch_size=requested_batch_size,
+        context_values=resolved_context,
     )
 
 
@@ -276,6 +289,7 @@ def _suggest_initial_design(
     config: CampaignConfig,
     df: pd.DataFrame,
     count: int,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     source = config.bo.initial_design_method
     candidates = _initial_user_candidates(
@@ -283,6 +297,7 @@ def _suggest_initial_design(
         df=df,
         count=count,
         method=source,
+        context_values=context_values,
     )
     rows = []
     iteration = next_iteration(df)
@@ -883,9 +898,14 @@ def _suggest_model_based(
     df: pd.DataFrame,
     observed_df: pd.DataFrame,
     batch_size: int,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     torch.manual_seed(config.bo.random_seed)
-    combination_count = categorical_combination_count(config)
+    combination_count = (
+        contextual_categorical_combination_count(config)
+        if config.context is not None
+        else categorical_combination_count(config)
+    )
     if combination_count > MAX_CATEGORICAL_COMBINATIONS:
         raise SuggestionError(
             "Model-based mixed-variable suggestions support at most "
@@ -895,7 +915,11 @@ def _suggest_model_based(
 
     model = fit_gp_model(config, observed_df)
     _, train_y_model = dataframe_to_tensors(config, observed_df)
-    fixed_features_list = categorical_feature_assignments(config)
+    fixed_features_list = (
+        contextual_fixed_feature_assignments(config, context_values or {})
+        if config.context is not None
+        else categorical_feature_assignments(config)
+    )
     user_candidates: list[tuple[object, ...]] | None = None
     acquisition_value: torch.Tensor | None = None
     source: str | None = None
@@ -1149,13 +1173,23 @@ def _initial_user_candidates(
     df: pd.DataFrame,
     count: int,
     method: str,
+    context_values: dict[str, object] | None = None,
 ) -> list[tuple[object, ...]]:
     existing = design_tuples(config, df)
-    finite_size = _finite_design_space_size(config)
-    if finite_size is not None and len(existing) + count > finite_size:
+    finite_size = _finite_design_space_size(
+        config,
+        fixed_variable_names=set(context_values or {}),
+    )
+    existing_for_space = (
+        design_tuples(config, _rows_matching_context(config, df, context_values))
+        if context_values
+        else existing
+    )
+    if finite_size is not None and len(existing_for_space) + count > finite_size:
         raise SuggestionError(
             "Could not generate non-duplicate initial suggestions because the finite "
-            f"design space is exhausted: requested={count}, existing={len(existing)}, "
+            f"design space is exhausted: requested={count}, "
+            f"existing={len(existing_for_space)}, "
             f"space_size={finite_size}."
         )
 
@@ -1201,6 +1235,8 @@ def _initial_user_candidates(
                 dtype=torch.double,
             )
         for candidate in unit_cube_to_design_values(config, unit):
+            if context_values:
+                candidate = apply_context_to_candidate(config, candidate, context_values)
             rejection_message = _candidate_rejection_message(config, df, candidate, selected)
             if rejection_message is not None:
                 continue
@@ -1539,9 +1575,15 @@ def _populate_cost_fields(
     row["utility"] = ""
 
 
-def _finite_design_space_size(config: CampaignConfig) -> int | None:
+def _finite_design_space_size(
+    config: CampaignConfig,
+    fixed_variable_names: set[str] | None = None,
+) -> int | None:
+    fixed_names = fixed_variable_names or set()
     sizes = []
     for variable in config.variables:
+        if variable.name in fixed_names:
+            continue
         if variable.type == "continuous":
             return None
         if variable.type == "integer":
@@ -1555,3 +1597,25 @@ def _finite_design_space_size(config: CampaignConfig) -> int | None:
                 f"Variable '{variable.name}' has unsupported type '{variable.type}'."
             )
     return math.prod(sizes)
+
+
+def _rows_matching_context(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    context_values: dict[str, object] | None,
+) -> pd.DataFrame:
+    if not context_values or df.empty:
+        return df
+    variables_by_name = {variable.name: variable for variable in config.variables}
+    mask = pd.Series(True, index=df.index)
+    for name, value in context_values.items():
+        variable = variables_by_name[name]
+        expected = normalize_context_value(variable, value, f"context '{name}'")
+        matches = df[name].map(
+            lambda row_value, variable=variable, expected=expected, name=name: (
+                normalize_context_value(variable, row_value, f"context '{name}'")
+                == expected
+            )
+        )
+        mask &= matches
+    return df.loc[mask]

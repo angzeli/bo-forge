@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.4.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.5.0.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -14,6 +14,7 @@ These names are supported imports from `bo_forge`:
 - `CampaignSession`
 - `ConfigError`
 - `ConstraintConfig`
+- `ContextConfig`
 - `CostConfig`
 - `FidelityConfig`
 - `LogValidationError`
@@ -66,9 +67,18 @@ automatic stage transitions remain deferred.
 
 Multi-fidelity campaigns expose `FidelityConfig` and `fidelity_summary` through
 the top-level package for config construction and read-only inspection.
-v1.4.3 multi-fidelity support remains single-objective, continuous-variable
+v1.4.x multi-fidelity support remains single-objective, continuous-variable
 qMFKG only; BoTorch-facing helper functions in `bo_forge.multifidelity` are
 implementation details rather than stable public API.
+
+Contextual campaigns expose `ContextConfig` through the top-level package for
+config construction and inspection. `CampaignConfig.context_variable_names` and
+`CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
+context variables and optimized decision variables. v1.5.0 contextual support
+is single-objective LogEI/qLogEI only. Use
+`suggest_next(config, df, context_values={...})` or
+`CampaignSession.suggest_next(context_values={...})` when context defaults are
+not fully declared in YAML.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

@@ -79,7 +79,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "1.4.3"
+    assert payload["version"] == "1.5.0"
     assert payload["experimental"] is True
 
 
@@ -165,6 +165,33 @@ def test_api_dry_run_returns_staged_bundle_without_mutating(tmp_path: Path) -> N
     assert log_path.read_bytes() == before
 
 
+def test_api_contextual_dry_run_accepts_context_values_without_mutating(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "16_contextual_logei.yaml",
+        "16_contextual_logei_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    response = client(tmp_path).post(
+        "/campaign/suggestions/dry-run",
+        json={
+            **ref,
+            "batch_size": 1,
+            "context_values": {"feedstock_acidity": 0.25},
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["staged_bundle"]["context_values"] == {"feedstock_acidity": 0.25}
+    assert payload["suggestions"]["records"][0]["feedstock_acidity"] == 0.25
+    assert log_path.read_bytes() == before
+
+
 def test_api_append_valid_bundle_mutates_through_service(tmp_path: Path) -> None:
     ref = copy_campaign(
         tmp_path,
@@ -215,6 +242,39 @@ def test_api_append_tampered_bundle_fails_without_mutation(tmp_path: Path) -> No
     payload = response.json()
     assert payload["ok"] is False
     assert "Staged suggestions changed" in payload["error"]["message"]
+    assert log_path.read_bytes() == before
+
+
+def test_api_append_tampered_context_metadata_fails_without_mutation(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "16_contextual_logei.yaml",
+        "16_contextual_logei_campaign_log.csv",
+    )
+    api_client = client(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    dry_run = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={
+            **ref,
+            "batch_size": 1,
+            "context_values": {"feedstock_acidity": 0.25},
+        },
+    ).json()
+    dry_run["staged_bundle"]["context_values"] = {"feedstock_acidity": 0.75}
+    before = log_path.read_bytes()
+
+    response = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": dry_run["staged_bundle"]},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["ok"] is False
+    assert "Context values changed" in payload["error"]["message"]
     assert log_path.read_bytes() == before
 
 

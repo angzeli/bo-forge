@@ -248,6 +248,52 @@ In v1.4.x, multi-fidelity is single-objective only and cannot be combined with
 `objectives:`, `stages:`, `cost:`, `replicates.enabled: true`, categorical,
 integer, or discrete variables, or model-based `batch_size > 1`.
 
+## 🌐 Contextual LogEI/qLogEI
+
+v1.5.0 adds a conservative contextual BO workflow for single-objective
+LogEI/qLogEI campaigns. Context variables are declared as normal variables and
+remain normal CSV columns, but they are fixed at suggestion time rather than
+optimized:
+
+```yaml
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.5
+```
+
+Try the bundled contextual example:
+
+```bash
+bo-forge validate \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv \
+  --context feedstock_acidity=0.25 \
+  --batch-size 1
+```
+
+From Python:
+
+```python
+campaign = CampaignSession.from_files(
+    "configs/16_contextual_logei.yaml",
+    "examples/16_contextual_logei_campaign_log.csv",
+)
+suggestions = campaign.suggest_next(
+    batch_size=1,
+    context_values={"feedstock_acidity": 0.25},
+)
+```
+
+Contextual campaigns add no CSV columns. The configured context variables use
+their existing variable columns, and suggested rows fill those columns with the
+fixed context values. In v1.5.0, `context:` cannot be combined with
+`objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates.enabled: true`.
+
 ## 🔁 Session API
 
 Notebook campaign workflows should usually start with `CampaignSession`:
@@ -308,7 +354,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 | `campaign.pareto_front()` | Return nondominated observed rows for a multi-objective campaign. |
 | `campaign.pareto_summary()` | Return Pareto-count, reference-point, direction, and hypervolume fields. |
 | `campaign.stage_summary()` | Return read-only structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
-| `campaign.suggest_next(batch_size=None, stage=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. Structured campaigns with multiple stages require `stage`. |
+| `campaign.suggest_next(batch_size=None, stage=None, context_values=None)` | Generate suggestions without mutating `campaign.df` or writing to disk. Structured campaigns with multiple stages require `stage`; contextual campaigns use `context_values` when YAML defaults are incomplete or should be overridden. |
 | `campaign.suggestion_quality(suggestions)` | Return read-only feasibility, duplicate, and distance diagnostics for suggestion review. |
 | `campaign.append_suggestions(suggestions)` | Append suggested rows to the CSV log and refresh `campaign.df`. |
 | `campaign.mark_observed(row_id, objective_value, actual_cost=None)` | Mark one pending suggestion observed, optionally record actual cost, and refresh `campaign.df`. |
@@ -368,6 +414,8 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/12_cost_aware_multi_objective_qlogehvi.yaml`: adds deterministic cost-aware batch ranking to a three-objective qLogEHVI campaign.
 - `configs/13_structured_campaign_core.yaml`: demonstrates structured stage validation and explicit stage-aware suggestions.
 - `configs/14_structured_campaign_tutorial.yaml`: demonstrates a staged screening/refinement workflow with mixed variables, stage-aware constraints, and a notebook walkthrough.
+- `configs/15_multi_fidelity_qmfkg.yaml`: demonstrates single-objective continuous-fidelity qMFKG.
+- `configs/16_contextual_logei.yaml`: demonstrates single-objective contextual LogEI with a fixed feedstock context.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 

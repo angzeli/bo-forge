@@ -113,6 +113,25 @@ def test_dataframe_fingerprint_is_stable_for_identical_values() -> None:
     assert dataframe_fingerprint(df) == dataframe_fingerprint(df.copy(deep=True))
 
 
+def test_staged_bundle_rejects_tampered_context_metadata(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("config", encoding="utf-8")
+    log_path.write_text("log", encoding="utf-8")
+    bundle = make_staged_suggestion_bundle(
+        simple_suggestions(),
+        config_path,
+        log_path,
+        context_values={"ctx": 0.25},
+    )
+    bundle["context_values"] = {"ctx": 0.75}
+
+    assert (
+        staged_bundle_invalidation_reason(bundle, config_path, log_path)
+        == "Context values changed after suggestions were staged."
+    )
+
+
 def test_default_new_campaign_paths_are_derived_from_campaign_name() -> None:
     config_path, log_path = default_new_campaign_paths("My Catalyst Campaign!")
 
@@ -2032,6 +2051,30 @@ def test_streamlit_load_refreshes_source_bar_and_does_not_leak_metric_html() -> 
     assert "examples/01_simple_2d_maximise_logei_campaign_log.csv" in markdown_text
     assert "Valid" in markdown_text
     assert "forge-metric" not in code_text
+
+
+def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/16_contextual_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/16_contextual_logei_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    number_labels = {input_.label for input_ in app.number_input}
+    assert len(app.exception) == 0
+    assert "Context variables are fixed" in markdown_text
+    assert "Context: feedstock_acidity" in number_labels
 
 
 def test_streamlit_loads_cost_aware_multi_objective_reports_panel() -> None:

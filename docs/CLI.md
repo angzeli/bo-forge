@@ -86,6 +86,22 @@ bo-forge suggest \
 
 The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
+For contextual configs, context variables are normal CSV variable columns but
+are fixed at suggestion time. Provide every context value with repeatable
+`--context NAME=VALUE`, or define `context.default_values` in the YAML:
+
+```bash
+bo-forge validate \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv \
+  --context feedstock_acidity=0.25 \
+  --batch-size 1
+```
+
 For single-objective multi-fidelity configs, the fidelity variable is a normal
 CSV variable column. Once the initial design is complete, qMFKG model-based
 suggestions are one-at-a-time:
@@ -315,7 +331,7 @@ bo-forge plot \
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
-| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. |
+| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
