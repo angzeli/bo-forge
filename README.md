@@ -1,10 +1,11 @@
-# 🧪 BO Forge v1.5.0
+# 🧪 BO Forge v1.5.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v1.5.0 adds the conservative contextual BO core: single-objective
-LogEI/qLogEI campaigns where context variables are normal CSV variables but are
-fixed at suggestion time instead of optimized.
+v1.5.1 adds contextual summaries, diagnostics, and a notebook on top of the
+conservative contextual BO core: single-objective LogEI/qLogEI campaigns where
+context variables are normal CSV variables but are fixed at suggestion time
+instead of optimized.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost, review, replicate, CLI, notebook, Streamlit, service, and API workflows remain backward compatible with the v1.4.3 multi-fidelity Streamlit baseline.
 
@@ -141,7 +142,10 @@ with `campaign.fidelity_summary()`, `bo-forge fidelity-summary`, or
 The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
 log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
 suggestions with `CampaignSession.suggest_next(context_values={...})` or
-`bo-forge suggest --context feedstock_acidity=0.25`.
+`bo-forge suggest --context feedstock_acidity=0.25`, inspect context
+combinations with `campaign.context_summary()` or `bo-forge context-summary`,
+and export diagnostics with `bo-forge plot --kind context-diagnostics`. The
+notebook walkthrough is `notebooks/16_contextual_logei_campaign.ipynb`.
 
 ---
 
@@ -185,7 +189,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v1.5.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v1.5.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

@@ -18,6 +18,7 @@ CLI_NOTEBOOK = Path("notebooks/04_cli_four_variable_campaign.ipynb")
 REPLICATE_NOTEBOOK = Path("notebooks/08_replicate_aware_campaign.ipynb")
 FOUR_OBJECTIVE_NOTEBOOK = Path("notebooks/11_four_objective_qlogehvi_campaign.ipynb")
 MULTI_FIDELITY_NOTEBOOK = Path("notebooks/15_multi_fidelity_qmfkg_campaign.ipynb")
+CONTEXTUAL_NOTEBOOK = Path("notebooks/16_contextual_logei_campaign.ipynb")
 
 assert NOTEBOOKS, "No notebooks found under notebooks/*.ipynb"
 
@@ -120,5 +121,58 @@ def test_multi_fidelity_tutorial_loop_reaches_target_with_committed_config(
                 row_id=row_id,
                 objective_value=simulate_activity(row),
             )
+
+    assert len(campaign.observed_data()) == 15
+
+
+def test_contextual_notebook_uses_existing_logei_assets() -> None:
+    source = notebook_source(CONTEXTUAL_NOTEBOOK)
+
+    assert "context_summary()" in source
+    assert "plot_context_diagnostics" in source
+    assert "configs\" / \"16_contextual_logei.yaml" in source
+    assert "examples\" / \"16_contextual_logei_campaign_log.csv" in source
+    assert "TARGET_OBSERVED_ROWS = 15" in source
+    assert "CampaignSession.from_files" in source
+    assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+
+
+def test_contextual_tutorial_loop_reaches_target_with_committed_config(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "16_contextual_logei_working_log.csv"
+    shutil.copyfile("examples/16_contextual_logei_campaign_log.csv", log_path)
+    campaign = CampaignSession.from_files(
+        "configs/16_contextual_logei.yaml",
+        log_path,
+    )
+
+    def simulate_yield(row: object) -> float:
+        loading = float(row["catalyst_loading"])
+        temperature = float(row["reaction_temperature"])
+        acidity = float(row["feedstock_acidity"])
+        solvent_bonus = {"MeCN": 0.08, "EtOH": 0.03, "Water": -0.04}[str(row["solvent"])]
+        loading_term = 0.95 + 0.75 * loading - 1.10 * (loading - 0.55) ** 2
+        temperature_term = -0.00009 * (temperature - 92.0) ** 2
+        context_term = 0.22 * acidity - 0.35 * (acidity - 0.55) ** 2
+        smooth_variation = 0.025 * math.sin(
+            7.0 * loading + 0.04 * temperature + 2.0 * acidity
+        )
+        return round(
+            loading_term + temperature_term + context_term + solvent_bonus + smooth_variation,
+            6,
+        )
+
+    context_cycle = [0.25, 0.5, 0.75]
+    generated = 0
+    while len(campaign.observed_data()) < 15:
+        suggestions = campaign.suggest_next(
+            context_values={"feedstock_acidity": context_cycle[generated % 3]}
+        )
+        campaign.append_suggestions(suggestions)
+        for row_id in suggestions["row_id"]:
+            row = campaign.df.loc[campaign.df["row_id"] == row_id].iloc[0]
+            campaign.mark_observed(row_id=row_id, objective_value=simulate_yield(row))
+            generated += 1
 
     assert len(campaign.observed_data()) == 15

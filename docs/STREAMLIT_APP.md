@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.5.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.5.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -16,10 +16,12 @@ workflow. The app can create conservative continuous-fidelity qMFKG configs,
 load existing fidelity configs, show fidelity summaries, and route fidelity
 diagnostic plots through the existing backend/session workflow.
 
-v1.5.0 adds loaded-campaign support for contextual BO. When a config defines
+v1.5.1 adds loaded-campaign support for contextual BO. When a config defines
 `context:`, the `Suggest` panel renders one input per context variable, passes
 those values to `CampaignSession.suggest_next(context_values=...)`, and records
-the values in the staged suggestion bundle before explicit append.
+the values in the staged suggestion bundle before explicit append. Loaded
+contextual campaigns also show Context Summary tables and expose Context
+Diagnostics in `Reports`.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -79,9 +81,12 @@ When a loaded config defines `context:`, the app:
 - stages suggestions with the selected context values recorded in the app
   bundle;
 - blocks append if the config, log, staged suggestions, selected stage, or
-  context values changed after staging.
+  context values changed after staging;
+- shows Context Summary tables in `Overview` and `Data`;
+- exposes the backend Context Diagnostics (`context-diagnostics`) plot in
+  `Reports`.
 
-v1.5.0 app support is limited to loaded single-objective contextual
+v1.5.1 app support is limited to loaded single-objective contextual
 LogEI/qLogEI campaigns. Contextual campaign creation, contextual
 multi-objective BO, contextual structured campaigns, contextual
 multi-fidelity, contextual cost-aware, and contextual replicate-aware workflows

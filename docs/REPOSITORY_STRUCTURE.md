@@ -48,7 +48,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 - `config.py`: dataclasses and strict YAML parsing.
 - `constraints.py`: safe constraint expression validation and row feasibility checks.
-- `contextual.py`: context-value resolution and fixed-feature translation for contextual suggestions.
+- `contextual.py`: context-value resolution, fixed-feature translation, and read-only summaries for contextual suggestions.
 - `costs.py`: safe deterministic cost expressions, effective-cost accounting, and budget summaries.
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
@@ -150,7 +150,7 @@ The repository also includes:
 - `configs/13_structured_campaign_core.yaml` as a structured stage-validation and explicit stage-aware suggestion example,
 - `configs/14_structured_campaign_tutorial.yaml` as a staged screening/refinement tutorial paired with `notebooks/14_structured_campaign_tutorial.ipynb`,
 - `configs/15_multi_fidelity_qmfkg.yaml` as a single-objective continuous-fidelity qMFKG example paired with `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`,
-- and `configs/16_contextual_logei.yaml` as a single-objective contextual LogEI example with `feedstock_acidity` fixed at suggestion time.
+- and `configs/16_contextual_logei.yaml` as a single-objective contextual LogEI example with `feedstock_acidity` fixed at suggestion time, paired with `notebooks/16_contextual_logei_campaign.ipynb`.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

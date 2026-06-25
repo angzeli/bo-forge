@@ -1,5 +1,23 @@
 # 📝 BO Forge Changelog
 
+## v1.5.1 - Contextual Reports, Diagnostics, and Notebook
+
+This patch adds the read-only inspection and tutorial layer for BO Forge's
+conservative contextual BO workflow. It does not change contextual model fitting,
+YAML/CSV schema, acquisition behavior, or supported contextual combinations.
+
+- Adds `context_summary(config, df)` and `CampaignSession.context_summary()`.
+- Adds `bo-forge context-summary`.
+- Adds `CampaignSession.plot_context_diagnostics()` and
+  `bo-forge plot --kind context-diagnostics`.
+- Includes contextual summaries in campaign reports and the Streamlit app
+  service/view data for loaded contextual campaigns.
+- Adds `notebooks/16_contextual_logei_campaign.ipynb`, an output-free tutorial
+  using the existing `configs/16_contextual_logei.yaml` and seed CSV log.
+- Keeps contextual Streamlit campaign creation, contextual multi-objective,
+  structured, multi-fidelity, cost-aware, and replicate-aware workflows out of
+  scope.
+
 ## v1.5.0 - Contextual BO Core
 
 This release adds BO Forge's conservative contextual BO foundation for

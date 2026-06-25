@@ -7,8 +7,10 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 
+from bo_forge.config import CampaignConfig
 from bo_forge.errors import LogWriteError
 from bo_forge.session import CampaignSession
+from bo_forge.validation import canonical_columns
 from bo_forge_app.service import CampaignAppService, CampaignViewData
 from bo_forge_app.streamlit_helpers import make_staged_suggestion_bundle
 
@@ -96,6 +98,12 @@ print("ok")
             "15_multi_fidelity_qmfkg_campaign_log.csv",
             "Overview",
             ["summary", "next_action", "observed", "pending", "fidelity_summary"],
+        ),
+        (
+            "16_contextual_logei.yaml",
+            "16_contextual_logei_campaign_log.csv",
+            "Overview",
+            ["summary", "next_action", "observed", "pending", "context_summary"],
         ),
     ],
 )
@@ -523,6 +531,58 @@ def test_app_service_fidelity_summary_and_diagnostics_plot_routing(tmp_path: Pat
     assert plot_path.exists()
     assert result.written_path == plot_path
     plt.close(result.figure)
+
+
+def test_app_service_context_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "16_contextual_logei.yaml",
+        log_path,
+    )
+
+    assert callable(service.context_summary)
+    assert "context_diagnostics" in service.available_plot_kinds()
+    plot_path = tmp_path / "plots" / "context_diagnostics.png"
+    result = service.plot("context_diagnostics", save_path=plot_path)
+
+    assert plot_path.exists()
+    assert result.written_path == plot_path
+    plt.close(result.figure)
+
+
+def test_app_service_context_summary_handles_pending_only_log(tmp_path: Path) -> None:
+    cfg = CampaignConfig.from_yaml(PROJECT_ROOT / "configs" / "16_contextual_logei.yaml")
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "catalyst_loading": 0.5,
+        "reaction_temperature": 80,
+        "solvent": "MeCN",
+        "feedstock_acidity": 0.25,
+        "yield_score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log_path = tmp_path / "contextual_pending.csv"
+    pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    ).to_csv(log_path, index=False)
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "16_contextual_logei.yaml",
+        log_path,
+    )
+
+    view_data = service.collect_view_data("Overview")
+
+    assert view_data.context_summary is not None
+    assert view_data.context_summary["context_key"].tolist() == [
+        "feedstock_acidity=0.25"
+    ]
+    assert int(view_data.context_summary["pending_suggestions"].iloc[0]) == 1
 
 
 def test_app_service_read_helper_allowlist_exposes_only_non_mutating_helpers(

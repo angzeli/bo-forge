@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 1.5.0\n"
+    assert captured.out == "bo-forge 1.5.1\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 1.5.0\n"
+    assert completed.stdout == "bo-forge 1.5.1\n"
     assert completed.stderr == ""
 
 
@@ -1013,6 +1013,155 @@ def test_contextual_suggest_rejects_malformed_context(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Malformed --context value" in captured.err
+
+
+def test_contextual_cli_context_summary_outputs_table(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/16_contextual_logei.yaml")
+    log_path = tmp_path / "contextual.csv"
+    pd.read_csv(
+        "examples/16_contextual_logei_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(["context-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "context_key" in captured.out
+    assert "feedstock_acidity=0.3" in captured.out
+    assert "ctx_seed_1" in captured.out
+
+
+def test_contextual_cli_context_summary_handles_pending_only_log(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cfg = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "catalyst_loading": 0.5,
+        "reaction_temperature": 80,
+        "solvent": "MeCN",
+        "feedstock_acidity": 0.25,
+        "yield_score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log_path = tmp_path / "contextual_pending.csv"
+    pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "context-summary",
+                *base_args(Path("configs/16_contextual_logei.yaml"), log_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "context_key" in captured.out
+    assert "feedstock_acidity=0.25" in captured.out
+    assert "pending_suggestions" in captured.out
+
+
+def test_contextual_cli_context_summary_rejects_non_context_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config(), observed_log(config()))
+
+    assert run(["context-summary", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "context-summary requires a contextual config" in captured.err
+
+
+def test_contextual_cli_plot_context_diagnostics_handles_pending_only_log(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cfg = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "catalyst_loading": 0.5,
+        "reaction_temperature": 80,
+        "solvent": "MeCN",
+        "feedstock_acidity": 0.25,
+        "yield_score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log_path = tmp_path / "contextual_pending.csv"
+    pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    ).to_csv(log_path, index=False)
+    output_path = tmp_path / "reports" / "context_pending.png"
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(Path("configs/16_contextual_logei.yaml"), log_path),
+                "--kind",
+                "context-diagnostics",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert f"Wrote context-diagnostics plot: {output_path}" in captured.out
+    assert output_path.exists()
+
+
+def test_contextual_cli_plot_context_diagnostics_writes_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/16_contextual_logei.yaml")
+    log_path = tmp_path / "contextual.csv"
+    pd.read_csv(
+        "examples/16_contextual_logei_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+    output_path = tmp_path / "reports" / "context.png"
+
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "context-diagnostics",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert f"Wrote context-diagnostics plot: {output_path}" in captured.out
+    assert output_path.exists()
 
 
 def test_config_load_failure_returns_hint(

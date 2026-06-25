@@ -666,15 +666,15 @@ def _validate_context_combinations(
     if context is None:
         return
     if multi_objective:
-        raise ConfigError("context is only supported for single-objective campaigns in v1.5.0.")
+        raise ConfigError("context is only supported for single-objective campaigns in v1.5.x.")
     if stages:
-        raise ConfigError("context cannot be combined with structured campaign stages in v1.5.0.")
+        raise ConfigError("context cannot be combined with structured campaign stages in v1.5.x.")
     if fidelity is not None:
-        raise ConfigError("context cannot be combined with fidelity campaigns in v1.5.0.")
+        raise ConfigError("context cannot be combined with fidelity campaigns in v1.5.x.")
     if cost is not None:
-        raise ConfigError("context cannot be combined with cost-aware campaigns in v1.5.0.")
+        raise ConfigError("context cannot be combined with cost-aware campaigns in v1.5.x.")
     if replicates.enabled:
-        raise ConfigError("context cannot be combined with replicate campaigns in v1.5.0.")
+        raise ConfigError("context cannot be combined with replicate campaigns in v1.5.x.")
 
 
 def _validate_fidelity_combinations(

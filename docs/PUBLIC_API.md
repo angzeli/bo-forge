@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.5.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v1.5.1.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -31,6 +31,7 @@ These names are supported imports from `bo_forge`:
 - `aggregate_observed_replicates`
 - `best_replicate_group`
 - `configured_stage_names`
+- `context_summary`
 - `evaluate_cost`
 - `fidelity_summary`
 - `get_observed_data`
@@ -71,14 +72,17 @@ v1.4.x multi-fidelity support remains single-objective, continuous-variable
 qMFKG only; BoTorch-facing helper functions in `bo_forge.multifidelity` are
 implementation details rather than stable public API.
 
-Contextual campaigns expose `ContextConfig` through the top-level package for
-config construction and inspection. `CampaignConfig.context_variable_names` and
+Contextual campaigns expose `ContextConfig` and `context_summary` through the
+top-level package for config construction and read-only inspection.
+`CampaignConfig.context_variable_names` and
 `CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
-context variables and optimized decision variables. v1.5.0 contextual support
+context variables and optimized decision variables. v1.5.x contextual support
 is single-objective LogEI/qLogEI only. Use
 `suggest_next(config, df, context_values={...})` or
 `CampaignSession.suggest_next(context_values={...})` when context defaults are
-not fully declared in YAML.
+not fully declared in YAML. Use `context_summary(config, df)` or
+`CampaignSession.context_summary()` to inspect observed and pending rows by
+context combination.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

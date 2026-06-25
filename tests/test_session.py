@@ -813,6 +813,74 @@ def test_fidelity_summary_rejects_non_fidelity_session(tmp_path: Path) -> None:
         campaign.fidelity_summary()
 
 
+def test_context_summary_and_report_include_context_section() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/16_contextual_logei.yaml",
+        "examples/16_contextual_logei_campaign_log.csv",
+    )
+
+    summary = campaign.context_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert summary["context_key"].tolist() == [
+        "feedstock_acidity=0.3",
+        "feedstock_acidity=0.7",
+    ]
+    assert "context_summary" in report
+    assert "Context Summary\n---------------" in text
+    assert "feedstock_acidity=0.3" in text
+
+
+def test_contextual_report_handles_pending_only_log(tmp_path: Path) -> None:
+    cfg = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "catalyst_loading": 0.5,
+        "reaction_temperature": 80,
+        "solvent": "MeCN",
+        "feedstock_acidity": 0.25,
+        "yield_score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log = pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    )
+    log_path = tmp_path / "contextual_pending_only.csv"
+    log.to_csv(log_path, index=False)
+    campaign = CampaignSession.from_files("configs/16_contextual_logei.yaml", log_path)
+
+    summary = campaign.context_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert summary["context_key"].tolist() == ["feedstock_acidity=0.25"]
+    assert int(summary["pending_suggestions"].iloc[0]) == 1
+    assert "context_summary" in report
+    assert "Context Summary\n---------------" in text
+    assert "feedstock_acidity=0.25" in text
+
+
+def test_context_summary_rejects_non_context_session(tmp_path: Path) -> None:
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0]))
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    with pytest.raises(ValueError, match="requires a config with a context section"):
+        campaign.context_summary()
+
+
 def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path) -> None:
     cfg = structured_config()
     log_path = write_log(tmp_path / "structured.csv", cfg, structured_pending_log(cfg))

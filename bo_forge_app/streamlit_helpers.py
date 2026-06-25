@@ -512,6 +512,10 @@ def empty_state_message(kind: str) -> tuple[str, str]:
             "No fidelity summary available.",
             "Fidelity summaries appear only when a fidelity section is configured.",
         ),
+        "context_summary": (
+            "No context summary available.",
+            "Context summaries appear only when a context section is configured.",
+        ),
         "report_preview": (
             "No report preview available.",
             "Load a valid campaign before exporting a report.",
@@ -610,6 +614,8 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
         kinds.append("stage_diagnostics")
     if config.fidelity is not None:
         kinds.append("fidelity_diagnostics")
+    if config.context is not None:
+        kinds.append("context_diagnostics")
     if config.cost is not None:
         kinds.append("cost_progress")
     if config.replicates.enabled:

@@ -11,6 +11,7 @@ import pandas as pd
 from matplotlib.ticker import MaxNLocator
 
 from bo_forge.config import CampaignConfig
+from bo_forge.contextual import context_summary
 from bo_forge.costs import effective_row_cost
 from bo_forge.multi_objective import (
     hypervolume_progress,
@@ -406,6 +407,122 @@ def plot_fidelity_diagnostics(
     add_legend(count_ax)
     fig.suptitle(
         f"{config.campaign_name}: fidelity diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def plot_context_diagnostics(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot observed counts and best objective by context combination."""
+    validate_campaign_data(config, df)
+    if config.context is None:
+        raise ValueError("plot_context_diagnostics() requires a config with context.")
+
+    summary = context_summary(config, df)
+    observed_total = (
+        0 if summary.empty else int(pd.to_numeric(summary["observed_rows"]).sum())
+    )
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(15, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    count_ax, best_ax = axes
+
+    if observed_total == 0:
+        count_ax.text(
+            0.5,
+            0.5,
+            "No observed contextual rows yet.",
+            ha="center",
+            va="center",
+            transform=count_ax.transAxes,
+        )
+        best_ax.text(
+            0.5,
+            0.5,
+            "No best objective by context yet.",
+            ha="center",
+            va="center",
+            transform=best_ax.transAxes,
+        )
+    else:
+        plotted = (
+            summary.sort_values(
+                by=["observed_rows", "context_key"],
+                ascending=[False, True],
+                kind="stable",
+            )
+            .head(20)
+            .copy()
+        )
+        labels = plotted["context_key"].astype(str).tolist()
+        x = list(range(len(plotted)))
+        counts = pd.to_numeric(plotted["observed_rows"])
+        count_ax.bar(x, counts, color="#2563eb", alpha=0.88)
+        count_ax.set_xticks(x)
+        count_ax.set_xticklabels(labels, rotation=45, ha="right")
+        count_ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+        best_rows = plotted.loc[plotted["best_objective"].notna()].copy()
+        if best_rows.empty:
+            best_ax.text(
+                0.5,
+                0.5,
+                "No best objective by context yet.",
+                ha="center",
+                va="center",
+                transform=best_ax.transAxes,
+            )
+        else:
+            best_labels = best_rows["context_key"].astype(str).tolist()
+            best_x = list(range(len(best_rows)))
+            best_values = pd.to_numeric(best_rows["best_objective"])
+            best_ax.bar(best_x, best_values, color="#0f766e", alpha=0.88)
+            best_ax.set_xticks(best_x)
+            best_ax.set_xticklabels(best_labels, rotation=45, ha="right")
+
+    count_title = (
+        "Observed rows by context (top 20)"
+        if len(summary) > 20
+        else "Observed rows by context"
+    )
+    best_title = (
+        "Best objective by context (top 20)"
+        if len(summary) > 20
+        else "Best objective by context"
+    )
+    set_title(count_ax, count_title)
+    set_axis_labels(count_ax, "Context", "Observed rows")
+    set_title(best_ax, best_title)
+    set_axis_labels(
+        best_ax,
+        "Context",
+        f"{config.objective.name} ({config.objective.direction})",
+    )
+    fig.suptitle(
+        f"{config.campaign_name}: context diagnostics",
         fontsize=18,
         fontweight="bold",
         color="black",

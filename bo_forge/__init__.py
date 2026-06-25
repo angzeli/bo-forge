@@ -1,6 +1,6 @@
-"""BO Forge v1.5.0."""
+"""BO Forge v1.5.1."""
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 from bo_forge.config import (
     BOConfig,
@@ -18,6 +18,7 @@ from bo_forge.config import (
     configured_stage_names,
     is_structured_campaign,
 )
+from bo_forge.contextual import context_summary
 from bo_forge.costs import evaluate_cost
 from bo_forge.errors import (
     BOForgeError,
@@ -68,6 +69,7 @@ __all__ = [
     "aggregate_observed_replicates",
     "best_replicate_group",
     "configured_stage_names",
+    "context_summary",
     "evaluate_cost",
     "fidelity_summary",
     "get_observed_data",

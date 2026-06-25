@@ -100,6 +100,16 @@ bo-forge suggest \
   --log examples/16_contextual_logei_campaign_log.csv \
   --context feedstock_acidity=0.25 \
   --batch-size 1
+
+bo-forge context-summary \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv
+
+bo-forge plot \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv \
+  --kind context-diagnostics \
+  --output /tmp/bo_forge_context_diagnostics.png
 ```
 
 For single-objective multi-fidelity configs, the fidelity variable is a normal
@@ -328,6 +338,7 @@ bo-forge plot \
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
 | `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
+| `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
@@ -335,7 +346,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, or fidelity-diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, or context-diagnostics figure. |
 
 ## 🧯 CLI Error Output
 

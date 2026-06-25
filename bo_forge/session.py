@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
+from bo_forge.contextual import context_summary as _context_summary
 from bo_forge.costs import (
     accepted_pending_estimated_cost,
     budget_remaining,
@@ -497,6 +498,8 @@ class CampaignSession:
                 tables["cost_summary"] = self.cost_summary()
             if self.config.is_structured_campaign:
                 tables["stage_summary"] = self.stage_summary()
+            if self.config.context is not None:
+                tables["context_summary"] = self.context_summary()
             return tables
         tables = {
             "summary": self.summary(),
@@ -512,6 +515,8 @@ class CampaignSession:
             tables["stage_summary"] = self.stage_summary()
         if self.config.fidelity is not None:
             tables["fidelity_summary"] = self.fidelity_summary()
+        if self.config.context is not None:
+            tables["context_summary"] = self.context_summary()
         return tables
 
     def export_report(self, path: str | Path) -> Path:
@@ -557,6 +562,10 @@ class CampaignSession:
     def fidelity_summary(self) -> pd.DataFrame:
         """Return multi-fidelity campaign summary fields."""
         return _fidelity_summary(self.config, self.df)
+
+    def context_summary(self) -> pd.DataFrame:
+        """Return contextual-campaign summary rows by context combination."""
+        return _context_summary(self.config, self.df)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -678,6 +687,14 @@ class CampaignSession:
 
         return _plot_fidelity_diagnostics(self.config, self.df, **kwargs)
 
+    def plot_context_diagnostics(self, **kwargs: Any) -> Any:
+        """Plot observed contextual diagnostics."""
+        from bo_forge.diagnostics import (
+            plot_context_diagnostics as _plot_context_diagnostics,
+        )
+
+        return _plot_context_diagnostics(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -713,6 +730,14 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             sections.append(
                 "Stage Summary\n-------------\n\n"
                 + _format_report_table(tables["stage_summary"], "No structured stages configured.")
+            )
+        if "context_summary" in tables:
+            sections.append(
+                "Context Summary\n---------------\n\n"
+                + _format_report_table(
+                    tables["context_summary"],
+                    "No contextual observations or pending suggestions yet.",
+                )
             )
         sections.append(
             "Pending Suggestions\n-------------------\n\n"
@@ -767,6 +792,17 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
                     )
                 ]
                 if "stage_summary" in tables
+                else []
+            ),
+            *(
+                [
+                    "Context Summary\n---------------\n\n"
+                    + _format_report_table(
+                        tables["context_summary"],
+                        "No contextual observations or pending suggestions yet.",
+                    )
+                ]
+                if "context_summary" in tables
                 else []
             ),
         ]

@@ -250,10 +250,10 @@ integer, or discrete variables, or model-based `batch_size > 1`.
 
 ## 🌐 Contextual LogEI/qLogEI
 
-v1.5.0 adds a conservative contextual BO workflow for single-objective
-LogEI/qLogEI campaigns. Context variables are declared as normal variables and
-remain normal CSV columns, but they are fixed at suggestion time rather than
-optimized:
+v1.5.1 includes a conservative contextual BO workflow for single-objective
+LogEI/qLogEI campaigns plus read-only context summaries, diagnostics, and a
+notebook. Context variables are declared as normal variables and remain normal
+CSV columns, but they are fixed at suggestion time rather than optimized:
 
 ```yaml
 context:
@@ -274,6 +274,16 @@ bo-forge suggest \
   --log examples/16_contextual_logei_campaign_log.csv \
   --context feedstock_acidity=0.25 \
   --batch-size 1
+
+bo-forge context-summary \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv
+
+bo-forge plot \
+  --config configs/16_contextual_logei.yaml \
+  --log examples/16_contextual_logei_campaign_log.csv \
+  --kind context-diagnostics \
+  --output /tmp/bo_forge_context_diagnostics.png
 ```
 
 From Python:
@@ -287,11 +297,13 @@ suggestions = campaign.suggest_next(
     batch_size=1,
     context_values={"feedstock_acidity": 0.25},
 )
+campaign.context_summary()
 ```
 
 Contextual campaigns add no CSV columns. The configured context variables use
 their existing variable columns, and suggested rows fill those columns with the
-fixed context values. In v1.5.0, `context:` cannot be combined with
+fixed context values. The tutorial notebook is
+`notebooks/16_contextual_logei_campaign.ipynb`. In v1.5.x, `context:` cannot be combined with
 `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates.enabled: true`.
 
 ## 🔁 Session API

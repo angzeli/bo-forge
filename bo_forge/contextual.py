@@ -6,9 +6,76 @@ import math
 from collections.abc import Mapping
 from itertools import product
 
+import pandas as pd
+
 from bo_forge.config import CampaignConfig, VariableConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.transforms import encoded_feature_indices, values_to_unit_cube
+from bo_forge.validation import get_observed_data, validate_campaign_data
+
+
+def context_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
+    """Return one read-only summary row per observed or pending context combination."""
+    if config.context is None:
+        raise ValueError("context_summary() requires a config with a context section.")
+    validate_campaign_data(config, df)
+
+    columns = _context_summary_columns(config)
+    observed = get_observed_data(config, df)
+    suggested = df.loc[df["status"] == "suggested"]
+    if config.review.enabled:
+        suggested = suggested.loc[suggested["review_status"].isin(["pending", "accepted"])]
+    if observed.empty and suggested.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows_by_key: dict[str, dict[str, object]] = {}
+    context_variables = {variable.name: variable for variable in config.variables}
+    for _, row in pd.concat([observed, suggested], ignore_index=True).iterrows():
+        context_values = _summary_context_values(config, context_variables, row)
+        key = _context_key(context_values)
+        rows_by_key.setdefault(
+            key,
+            {
+                "context_key": key,
+                **{name: context_values[name] for name in config.context_variable_names},
+                "observed_rows": 0,
+                "pending_suggestions": 0,
+                "best_row_id": None,
+                "best_objective": None,
+            },
+        )
+
+    objective_name = config.objective.name
+    if not observed.empty:
+        observed_keys = observed.apply(
+            lambda row: _context_key(
+                _summary_context_values(config, context_variables, row)
+            ),
+            axis=1,
+        )
+        for key, group in observed.groupby(observed_keys, sort=False):
+            values = pd.to_numeric(group[objective_name])
+            best_index = (
+                values.idxmax()
+                if config.objective.direction == "maximize"
+                else values.idxmin()
+            )
+            rows_by_key[key]["observed_rows"] = int(len(group))
+            rows_by_key[key]["best_row_id"] = str(group.loc[best_index, "row_id"])
+            rows_by_key[key]["best_objective"] = float(values.loc[best_index])
+
+    if not suggested.empty:
+        suggested_keys = suggested.apply(
+            lambda row: _context_key(
+                _summary_context_values(config, context_variables, row)
+            ),
+            axis=1,
+        )
+        for key, count in suggested_keys.value_counts(sort=False).items():
+            rows_by_key[str(key)]["pending_suggestions"] = int(count)
+
+    rows = sorted(rows_by_key.values(), key=lambda item: str(item["context_key"]))
+    return pd.DataFrame(rows, columns=columns)
 
 
 def resolve_context_values(
@@ -157,6 +224,40 @@ def context_metadata(
     if config.context is None:
         return {}
     return {name: context_values[name] for name in config.context_variable_names}
+
+
+def _context_summary_columns(config: CampaignConfig) -> list[str]:
+    return [
+        "context_key",
+        *config.context_variable_names,
+        "observed_rows",
+        "pending_suggestions",
+        "best_row_id",
+        "best_objective",
+    ]
+
+
+def _summary_context_values(
+    config: CampaignConfig,
+    variables: Mapping[str, VariableConfig],
+    row: pd.Series,
+) -> dict[str, object]:
+    return {
+        name: _format_context_value(
+            normalize_context_value(variables[name], row[name], f"context '{name}'")
+        )
+        for name in config.context_variable_names
+    }
+
+
+def _context_key(context_values: Mapping[str, object]) -> str:
+    return "|".join(f"{name}={context_values[name]}" for name in context_values)
+
+
+def _format_context_value(value: object) -> object:
+    if isinstance(value, float):
+        return f"{value:g}"
+    return value
 
 
 def _context_fixed_features(

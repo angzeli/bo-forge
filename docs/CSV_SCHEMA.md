@@ -182,7 +182,7 @@ with `objectives:`, `stages:`, `cost:`, or `replicates.enabled: true`.
 
 ## 🌐 Contextual BO Rules
 
-v1.5.0 adds a conservative single-objective contextual LogEI/qLogEI workflow:
+v1.5.x adds a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -205,8 +205,11 @@ Rules:
   different context is a distinct design;
 - constraints are evaluated against the full candidate, including fixed context
   values.
+- `context_summary()`, `bo-forge context-summary`, and
+  `bo-forge plot --kind context-diagnostics` inspect the same CSV rows and do
+  not add schema columns.
 
-Unsupported v1.5.0 combinations are intentional: `context:` cannot be combined
+Unsupported v1.5.x combinations are intentional: `context:` cannot be combined
 with `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates:`.
 
 ## 🔁 Suggested To Observed Transition

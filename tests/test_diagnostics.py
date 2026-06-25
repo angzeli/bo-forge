@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
+    ContextConfig,
     FidelityConfig,
     ObjectiveConfig,
     ReplicateConfig,
@@ -17,6 +18,7 @@ from bo_forge.config import (
 from bo_forge.diagnostics import (
     _directional_best_so_far,
     _normalised_variable_coverage,
+    plot_context_diagnostics,
     plot_diagnostics,
     plot_fidelity_diagnostics,
     plot_progress,
@@ -78,6 +80,42 @@ def observed_log() -> pd.DataFrame:
         ],
         columns=canonical_columns(cfg),
     )
+
+
+def contextual_config(direction: str = "maximize") -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="context_diagnostics",
+        objective=ObjectiveConfig(name="activity", direction=direction),
+        variables=(
+            VariableConfig("loading", "continuous", 0.0, 1.0),
+            VariableConfig("feedstock_acidity", "continuous", 0.0, 30.0),
+        ),
+        bo=BOConfig(),
+        context=ContextConfig(
+            variables=("feedstock_acidity",),
+            default_values={"feedstock_acidity": 0.5},
+        ),
+    )
+
+
+def contextual_log(count: int = 3) -> pd.DataFrame:
+    cfg = contextual_config()
+    rows = [
+        {
+            "row_id": f"ctx_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "loading": 0.2 + 0.01 * index,
+            "feedstock_acidity": float(index),
+            "activity": 1.0 + index,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+        for index in range(count)
+    ]
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
 def config_3d(direction: str = "maximize") -> CampaignConfig:
@@ -488,6 +526,99 @@ def test_plot_fidelity_diagnostics_handles_empty_observed_log() -> None:
 def test_plot_fidelity_diagnostics_rejects_non_fidelity_config() -> None:
     with pytest.raises(ValueError, match="requires a config with fidelity"):
         plot_fidelity_diagnostics(config(), observed_log())
+
+
+def test_plot_context_diagnostics_writes_nested_output_and_labels(tmp_path: Path) -> None:
+    cfg = contextual_config()
+    save_path = tmp_path / "reports" / "context.png"
+
+    fig, axes = plot_context_diagnostics(cfg, contextual_log(), save_path=save_path)
+
+    assert save_path.exists()
+    assert axes[0].get_title() == "Observed rows by context"
+    assert axes[0].get_xlabel() == "Context"
+    assert axes[0].get_ylabel() == "Observed rows"
+    assert axes[1].get_title() == "Best objective by context"
+    assert axes[1].get_ylabel() == "activity (maximize)"
+    plt.close(fig)
+
+
+def test_plot_context_diagnostics_handles_empty_observed_log() -> None:
+    cfg = contextual_config()
+
+    fig, axes = plot_context_diagnostics(cfg, pd.DataFrame(columns=canonical_columns(cfg)))
+
+    assert "No observed contextual rows yet." in axes[0].texts[0].get_text()
+    assert "No best objective by context yet." in axes[1].texts[0].get_text()
+    assert axes[0].get_xlabel() == "Context"
+    assert axes[1].get_ylabel() == "activity (maximize)"
+    plt.close(fig)
+
+
+def test_plot_context_diagnostics_handles_pending_only_log(tmp_path: Path) -> None:
+    cfg = contextual_config()
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "loading": 0.4,
+        "feedstock_acidity": 0.25,
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log = pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    )
+    save_path = tmp_path / "context_pending_only.png"
+
+    fig, axes = plot_context_diagnostics(cfg, log, save_path=save_path)
+
+    assert save_path.exists()
+    assert "No observed contextual rows yet." in axes[0].texts[0].get_text()
+    assert "No best objective by context yet." in axes[1].texts[0].get_text()
+    plt.close(fig)
+
+
+def test_plot_context_diagnostics_limits_large_context_sets_to_top_20() -> None:
+    cfg = contextual_config()
+    rows = []
+    row_index = 0
+    for context_value in range(25):
+        for _ in range(25 - context_value):
+            rows.append(
+                {
+                    "row_id": f"ctx_{row_index}",
+                    "iteration": row_index,
+                    "status": "observed",
+                    "source": "manual",
+                    "loading": 0.2 + 0.001 * row_index,
+                    "feedstock_acidity": float(context_value),
+                    "activity": 1.0 + context_value,
+                    "predicted_mean": "",
+                    "predicted_std": "",
+                    "acquisition": "",
+                }
+            )
+            row_index += 1
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+    fig, axes = plot_context_diagnostics(cfg, df)
+
+    labels = [label.get_text() for label in axes[0].get_xticklabels()]
+    assert axes[0].get_title() == "Observed rows by context (top 20)"
+    assert len(labels) == 20
+    assert "feedstock_acidity=0" in labels
+    assert "feedstock_acidity=24" not in labels
+    plt.close(fig)
+
+
+def test_plot_context_diagnostics_rejects_non_context_config() -> None:
+    with pytest.raises(ValueError, match="requires a config with context"):
+        plot_context_diagnostics(config(), observed_log())
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

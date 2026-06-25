@@ -934,6 +934,14 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             empty_kind="fidelity_summary",
             expanded_raw=False,
         )
+    if campaign.config.context is not None:
+        _render_table_section(
+            st,
+            "Context Summary",
+            _view_data_value(view_data, "context_summary", campaign.context_summary),
+            empty_kind="context_summary",
+            expanded_raw=False,
+        )
     if campaign.config.is_structured_campaign:
         _render_table_section(
             st,
@@ -1040,6 +1048,14 @@ def _render_data(
             "Fidelity Summary",
             _view_data_value(view_data, "fidelity_summary", campaign.fidelity_summary),
             empty_kind="fidelity_summary",
+            expanded_raw=False,
+        )
+    if campaign.config.context is not None:
+        _render_table_section(
+            st,
+            "Context Summary",
+            _view_data_value(view_data, "context_summary", campaign.context_summary),
+            empty_kind="context_summary",
             expanded_raw=False,
         )
     if campaign.config.is_structured_campaign:
@@ -1693,6 +1709,7 @@ def _available_plot_options(
         "hypervolume": ("Hypervolume", "plot_hypervolume"),
         "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
         "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
+        "context_diagnostics": ("Context Diagnostics", "plot_context_diagnostics"),
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:

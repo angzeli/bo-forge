@@ -11,9 +11,11 @@ from bo_forge.config import (
     ConstraintConfig,
     ContextConfig,
     ObjectiveConfig,
+    ReviewConfig,
     VariableConfig,
 )
 from bo_forge.contextual import (
+    context_summary,
     contextual_fixed_feature_assignments,
     resolve_context_values,
 )
@@ -318,6 +320,149 @@ def test_model_based_suggestions_fix_context_values_and_are_non_mutating() -> No
     assert suggestions["source"].isin({"log_ei", "qlog_ei"}).all()
     assert pd.to_numeric(suggestions["predicted_mean"]).map(pd.notna).all()
     pd.testing.assert_frame_equal(log, before)
+
+
+def test_context_summary_reports_context_counts_best_rows_and_pending() -> None:
+    cfg = contextual_config()
+    log = observed_contextual_log(cfg)
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 2,
+        "status": "suggested",
+        "source": "log_ei",
+        "catalyst_loading": 0.4,
+        "feedstock_acidity": 0.2,
+        "yield_score": "",
+        "predicted_mean": 0.7,
+        "predicted_std": 0.1,
+        "acquisition": 0.01,
+    }
+    log.loc[len(log)] = [pending[column] for column in canonical_columns(cfg)]
+
+    summary = context_summary(cfg, log)
+
+    assert summary["context_key"].tolist() == [
+        "feedstock_acidity=0.2",
+        "feedstock_acidity=0.8",
+    ]
+    first = summary.loc[summary["feedstock_acidity"] == "0.2"].iloc[0]
+    second = summary.loc[summary["feedstock_acidity"] == "0.8"].iloc[0]
+    assert int(first["observed_rows"]) == 2
+    assert int(first["pending_suggestions"]) == 1
+    assert first["best_row_id"] == "obs_1"
+    assert float(first["best_objective"]) == pytest.approx(0.8)
+    assert int(second["observed_rows"]) == 2
+    assert int(second["pending_suggestions"]) == 0
+    assert second["best_row_id"] == "obs_3"
+
+
+def test_context_summary_handles_empty_contextual_log() -> None:
+    cfg = contextual_config()
+
+    summary = context_summary(cfg, empty_campaign_log(cfg))
+
+    assert summary.empty
+    assert summary.columns.tolist() == [
+        "context_key",
+        "feedstock_acidity",
+        "observed_rows",
+        "pending_suggestions",
+        "best_row_id",
+        "best_objective",
+    ]
+
+
+def test_context_summary_handles_pending_only_contextual_log() -> None:
+    cfg = contextual_config()
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 0,
+        "status": "suggested",
+        "source": "sobol",
+        "catalyst_loading": 0.4,
+        "feedstock_acidity": 0.25,
+        "yield_score": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    log = pd.DataFrame(
+        [[pending[column] for column in canonical_columns(cfg)]],
+        columns=canonical_columns(cfg),
+    )
+
+    summary = context_summary(cfg, log)
+
+    assert summary["context_key"].tolist() == ["feedstock_acidity=0.25"]
+    row = summary.iloc[0]
+    assert row["feedstock_acidity"] == "0.25"
+    assert int(row["observed_rows"]) == 0
+    assert int(row["pending_suggestions"]) == 1
+    assert row["best_row_id"] is None
+    assert row["best_objective"] is None
+
+
+def test_context_summary_is_direction_aware_for_minimization() -> None:
+    cfg = replace(
+        contextual_config(),
+        objective=ObjectiveConfig("yield_score", "minimize"),
+    )
+    log = observed_contextual_log(cfg)
+
+    summary = context_summary(cfg, log)
+
+    first = summary.loc[summary["feedstock_acidity"] == "0.2"].iloc[0]
+    assert first["best_row_id"] == "obs_0"
+    assert float(first["best_objective"]) == pytest.approx(0.5)
+
+
+def test_context_summary_counts_only_review_blocking_pending_suggestions() -> None:
+    cfg = replace(contextual_config(), review=ReviewConfig(enabled=True))
+    rows = []
+    for row in observed_contextual_log(contextual_config()).to_dict("records"):
+        row.update({"review_status": "accepted", "review_note": ""})
+        rows.append(row)
+    for index, (status, acidity) in enumerate(
+        [
+            ("pending", 0.2),
+            ("accepted", 0.2),
+            ("rejected", 0.2),
+            ("deferred", 0.8),
+        ],
+        start=1,
+    ):
+        rows.append(
+            {
+                "row_id": f"{status}_suggestion",
+                "iteration": 2,
+                "status": "suggested",
+                "source": "log_ei",
+                "review_status": status,
+                "review_note": "",
+                "catalyst_loading": 0.35 + 0.05 * index,
+                "feedstock_acidity": acidity,
+                "yield_score": "",
+                "predicted_mean": 0.7,
+                "predicted_std": 0.1,
+                "acquisition": 0.01,
+            }
+        )
+    log = pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+    summary = context_summary(cfg, log)
+
+    first = summary.loc[summary["feedstock_acidity"] == "0.2"].iloc[0]
+    second = summary.loc[summary["feedstock_acidity"] == "0.8"].iloc[0]
+    assert int(first["pending_suggestions"]) == 2
+    assert int(second["pending_suggestions"]) == 0
+
+
+def test_context_summary_rejects_non_contextual_config() -> None:
+    cfg = replace(contextual_config(), context=None)
+    df = pd.DataFrame(columns=canonical_columns(cfg))
+
+    with pytest.raises(ValueError, match="requires a config with a context section"):
+        context_summary(cfg, df)
 
 
 def test_missing_context_values_fail_before_suggestion() -> None:

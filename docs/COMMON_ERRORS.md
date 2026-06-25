@@ -131,7 +131,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v1.5.0 contextual BO support is deliberately conservative.
+v1.5.x contextual BO support is deliberately conservative.
 
 Fix: do not combine `context:` with `objectives:`, `stages:`, `fidelity:`,
 `cost:`, or `replicates.enabled: true`. Contextual multi-objective,

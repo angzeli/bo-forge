@@ -869,6 +869,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
     )
     multi_cost = CampaignConfig.from_yaml("configs/12_cost_aware_multi_objective_qlogehvi.yaml")
     fidelity = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
+    context = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
 
     assert available_plot_kinds(plain) == ["progress", "diagnostics"]
     assert available_plot_kinds(cost) == ["progress", "diagnostics", "cost_progress"]
@@ -889,6 +890,11 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "progress",
         "diagnostics",
         "fidelity_diagnostics",
+    ]
+    assert available_plot_kinds(context) == [
+        "progress",
+        "diagnostics",
+        "context_diagnostics",
     ]
 
 
@@ -2067,6 +2073,9 @@ def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
     )
     next(button for button in app.button if button.label == "Load campaign").click()
     app.run(timeout=10)
+
+    assert any(subheader.value == "Context Summary" for subheader in app.subheader)
+
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
     app.run(timeout=10)
 
@@ -2075,6 +2084,12 @@ def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
     assert len(app.exception) == 0
     assert "Context variables are fixed" in markdown_text
     assert "Context: feedstock_acidity" in number_labels
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
+    app.run(timeout=10)
+    plot_select = next(selectbox for selectbox in app.selectbox if selectbox.label == "Plot kind")
+    assert len(app.exception) == 0
+    assert "Context Diagnostics" in list(plot_select.options)
 
 
 def test_streamlit_loads_cost_aware_multi_objective_reports_panel() -> None:
