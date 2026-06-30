@@ -369,6 +369,34 @@ def test_compact_replicate_summary_keeps_multi_objective_sem_columns() -> None:
     assert "waste_score_sem" in compact.columns
 
 
+def test_compact_context_summary_keeps_documented_columns() -> None:
+    summary = pd.DataFrame(
+        [
+            {
+                "context_key": "acid=0.2|solvent=MeCN",
+                "acid": "0.2",
+                "solvent": "MeCN",
+                "observed_rows": 2,
+                "pending_suggestions": 1,
+                "best_row_id": "obs_1",
+                "best_objective": 0.8,
+            }
+        ]
+    )
+
+    compact = streamlit_app._compact_context_summary(summary)
+
+    assert compact.columns.tolist() == [
+        "context_key",
+        "acid",
+        "solvent",
+        "observed_rows",
+        "pending_suggestions",
+        "best_row_id",
+        "best_objective",
+    ]
+
+
 def test_empty_state_messages_are_defined() -> None:
     title, detail = empty_state_message("staged_suggestions")
 
@@ -2115,8 +2143,8 @@ def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
     markdown_text = "\n".join(markdown.value for markdown in app.markdown)
     number_labels = {input_.label for input_ in app.number_input}
     assert len(app.exception) == 0
-    assert "Context variables are fixed" in markdown_text
-    assert "Context: feedstock_acidity" in number_labels
+    assert "Suggestion context values are used only" in markdown_text
+    assert "Suggestion context: feedstock_acidity" in number_labels
 
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
     app.run(timeout=10)
@@ -2147,7 +2175,9 @@ def test_streamlit_context_change_clears_staged_bundle_without_mutation(
     app.run(timeout=10)
 
     context_input = next(
-        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+        input_
+        for input_ in app.number_input
+        if input_.label == "Suggestion context: feedstock_acidity"
     )
     context_input.set_value(0.25)
     app.run(timeout=10)
@@ -2160,7 +2190,9 @@ def test_streamlit_context_change_clears_staged_bundle_without_mutation(
     assert bundle["context_values"] == {"feedstock_acidity": 0.25}
 
     context_input = next(
-        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+        input_
+        for input_ in app.number_input
+        if input_.label == "Suggestion context: feedstock_acidity"
     )
     context_input.set_value(0.75)
     app.run(timeout=10)
@@ -2222,7 +2254,9 @@ bo:
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
     app.run(timeout=10)
     next(
-        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+        input_
+        for input_ in app.number_input
+        if input_.label == "Suggestion context: feedstock_acidity"
     ).set_value(0.25)
     app.run(timeout=10)
 
@@ -2238,9 +2272,52 @@ bo:
     app.run(timeout=10)
 
     context_input = next(
-        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+        input_
+        for input_ in app.number_input
+        if input_.label == "Suggestion context: feedstock_acidity"
     )
     assert context_input.value == pytest.approx(0.8)
+    assert len(app.exception) == 0
+
+
+def test_streamlit_contextual_bundle_clears_when_loading_non_contextual_campaign(
+    tmp_path: Path,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    contextual_log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    before_bytes = contextual_log_path.read_bytes()
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/16_contextual_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(contextual_log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY in app.session_state
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/01_simple_2d_maximise_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/01_simple_2d_maximise_logei_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in app.session_state
+    assert contextual_log_path.read_bytes() == before_bytes
     assert len(app.exception) == 0
 
 
@@ -2424,6 +2501,8 @@ def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> N
     )
     app.run(timeout=10)
 
+    assert any(input_.label == "Default context: x2" for input_ in app.number_input)
+
     next(
         input_
         for input_ in app.text_input
@@ -2451,8 +2530,8 @@ def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> N
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
     app.run(timeout=10)
     markdown_text = "\n".join(markdown.value for markdown in app.markdown)
-    assert "Context variables are fixed" in markdown_text
-    assert any(input_.label == "Context: x2" for input_ in app.number_input)
+    assert "Suggestion context values are used only" in markdown_text
+    assert any(input_.label == "Suggestion context: x2" for input_ in app.number_input)
 
     next(
         button for button in app.button if button.label == "Generate suggestions (dry run)"
@@ -2463,6 +2542,38 @@ def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> N
     suggestions = bundle["suggestions"]
     assert bundle["context_values"] == {"x2": 0.0}
     assert suggestions["x2"].astype(float).tolist() == [pytest.approx(0.0)]
+
+    next(button for button in app.button if button.label == "Append staged suggestions").click()
+    app.run(timeout=10)
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in app.session_state
+    appended = pd.read_csv(log_path, keep_default_na=False)
+    assert appended["status"].tolist() == ["suggested"]
+    assert appended["x2"].astype(float).tolist() == [pytest.approx(0.0)]
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        str(config_path)
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Resolve")
+    app.run(timeout=10)
+    next(input_ for input_ in app.number_input if input_.label == "Observed activity").set_value(
+        0.42
+    )
+    next(button for button in app.button if button.label == "Mark row observed").click()
+    app.run(timeout=10)
+
+    reloaded = CampaignSession.from_files(config_path, log_path)
+    reloaded.validate()
+    observed = reloaded.observed_data()
+    assert observed["status"].tolist() == ["observed"]
+    assert observed["activity"].astype(float).tolist() == [pytest.approx(0.42)]
+    assert observed["x2"].astype(float).tolist() == [pytest.approx(0.0)]
 
 
 def test_streamlit_multi_fidelity_target_defaults_to_selected_variable_upper(

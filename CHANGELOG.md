@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v1.5.3 - Contextual BO Release Closeout
+
+This patch closes the v1.5.x contextual BO line with Streamlit state-safety,
+labeling, docs, and release-readiness polish. It does not add contextual
+modeling scope, new config keys, new CSV columns, new public APIs, or new CLI
+commands.
+
+- Distinguishes app-created YAML defaults (`Default context: ...`) from
+  per-batch suggestion values (`Suggestion context: ...`).
+- Scopes contextual Streamlit widget state by campaign/config/log identity and
+  context schema so campaign switches do not reuse stale values.
+- Keeps staged contextual suggestions protected against context, config, log,
+  and staged-payload changes before append.
+- Adds AppTest coverage for context changes after staging, campaign switches,
+  contextual-to-non-contextual loads, and app-created contextual append/observe
+  round trips.
+- Keeps contextual multi-objective, structured, multi-fidelity, cost-aware, and
+  replicate-aware workflows deferred to a later minor release line.
+
 ## v1.5.2 - Streamlit Contextual Workflow
 
 This patch adds Streamlit creation support for the existing conservative

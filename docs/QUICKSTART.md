@@ -250,7 +250,7 @@ integer, or discrete variables, or model-based `batch_size > 1`.
 
 ## 🌐 Contextual LogEI/qLogEI
 
-v1.5.2 includes a conservative contextual BO workflow for single-objective
+v1.5.3 includes a conservative contextual BO workflow for single-objective
 LogEI/qLogEI campaigns plus read-only context summaries, diagnostics, and a
 notebook. Context variables are declared as normal variables and remain normal
 CSV columns, but they are fixed at suggestion time rather than optimized:

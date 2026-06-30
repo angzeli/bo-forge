@@ -816,7 +816,10 @@ def _collect_new_campaign_context_settings(
         variable_names,
         default=default_context_variables,
         key="new_campaign_context_variables",
-        help="Selected variables remain normal CSV columns but are fixed at suggestion time.",
+        help=(
+            "Selected variables remain normal CSV columns but are fixed at suggestion "
+            "time. Enabled defaults are written to YAML context.default_values."
+        ),
     )
     selected_names = [str(name) for name in selected_names]
     if not selected_names:
@@ -835,7 +838,10 @@ def _collect_new_campaign_context_settings(
             f"Set default for context: {name}",
             value=True,
             key=_stable_widget_key("new_context_default_enabled", name),
-            help="Defaults are optional; users can still override context values in Suggest.",
+            help=(
+                "Defaults are optional and are written to YAML context.default_values. "
+                "Users can still override context values in Suggest."
+            ),
         )
         if use_default:
             default_values[name] = _collect_new_campaign_context_default(st, variable)
@@ -854,12 +860,13 @@ def _collect_new_campaign_context_default(
     variable_type = str(variable.get("type", "continuous"))
     key = _stable_widget_key("new_context_default", name)
     label = f"Default context: {name}"
+    help_text = "Written to YAML context.default_values for app-created contextual configs."
     if variable_type == "categorical":
         values = [str(value) for value in variable.get("values", [])]
-        return st.selectbox(label, values, key=key)
+        return st.selectbox(label, values, key=key, help=help_text)
     if variable_type == "discrete":
         values = [float(value) for value in variable.get("values", [])]
-        return float(st.selectbox(label, values, key=key))
+        return float(st.selectbox(label, values, key=key, help=help_text))
     if variable_type == "integer":
         lower = int(variable["lower"])
         upper = int(variable["upper"])
@@ -871,6 +878,7 @@ def _collect_new_campaign_context_default(
                 value=lower,
                 step=1,
                 key=key,
+                help=help_text,
             )
         )
     lower = float(variable["lower"])
@@ -882,6 +890,7 @@ def _collect_new_campaign_context_default(
             max_value=upper,
             value=lower,
             key=key,
+            help=help_text,
         )
     )
 
@@ -1047,11 +1056,17 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             expanded_raw=False,
         )
     if campaign.config.context is not None:
+        context_summary = _view_data_value(
+            view_data,
+            "context_summary",
+            campaign.context_summary,
+        )
         _render_table_section(
             st,
             "Context Summary",
-            _view_data_value(view_data, "context_summary", campaign.context_summary),
+            _compact_context_summary(context_summary),
             empty_kind="context_summary",
+            raw_df=context_summary,
             expanded_raw=False,
         )
     if campaign.config.is_structured_campaign:
@@ -1163,11 +1178,17 @@ def _render_data(
             expanded_raw=False,
         )
     if campaign.config.context is not None:
+        context_summary = _view_data_value(
+            view_data,
+            "context_summary",
+            campaign.context_summary,
+        )
         _render_table_section(
             st,
             "Context Summary",
-            _view_data_value(view_data, "context_summary", campaign.context_summary),
+            _compact_context_summary(context_summary),
             empty_kind="context_summary",
+            raw_df=context_summary,
             expanded_raw=False,
         )
     if campaign.config.is_structured_campaign:
@@ -1448,8 +1469,8 @@ def _render_context_inputs(
     _render_artifact_note(
         st,
         "Context",
-        "Context variables are fixed for this dry-run suggestion and remain normal CSV "
-        "variable columns.",
+        "Suggestion context values are used only for this dry-run batch and remain "
+        "normal CSV variable columns.",
     )
     context_values: dict[str, object] = {}
     variables_by_name = {variable.name: variable for variable in config.variables}
@@ -1464,10 +1485,11 @@ def _render_context_inputs(
                 options = [str(value) for value in variable.values]
                 default_index = options.index(str(default)) if str(default) in options else 0
                 context_values[name] = st.selectbox(
-                    f"Context: {name}",
+                    f"Suggestion context: {name}",
                     options,
                     index=default_index,
                     key=key,
+                    help="Used only for this dry-run suggestion batch.",
                 )
             elif variable.type == "discrete":
                 options = [float(value) for value in variable.values]
@@ -1476,30 +1498,33 @@ def _render_context_inputs(
                     options.index(default_float) if default_float in options else 0
                 )
                 context_values[name] = st.selectbox(
-                    f"Context: {name}",
+                    f"Suggestion context: {name}",
                     options,
                     index=default_index,
                     key=key,
+                    help="Used only for this dry-run suggestion batch.",
                 )
             elif variable.type == "integer":
                 context_values[name] = int(
                     st.number_input(
-                        f"Context: {name}",
+                        f"Suggestion context: {name}",
                         min_value=int(variable.lower),
                         max_value=int(variable.upper),
                         value=int(default),
                         step=1,
                         key=key,
+                        help="Used only for this dry-run suggestion batch.",
                     )
                 )
             else:
                 context_values[name] = float(
                     st.number_input(
-                        f"Context: {name}",
+                        f"Suggestion context: {name}",
                         min_value=float(variable.lower),
                         max_value=float(variable.upper),
                         value=float(default),
                         key=key,
+                        help="Used only for this dry-run suggestion batch.",
                     )
                 )
     return context_values
@@ -2165,6 +2190,25 @@ def _compact_replicate_summary(df: Any) -> Any:
         if column.endswith(("_mean", "_std", "_sem", "_min", "_max"))
         and column not in columns
     )
+    return df.loc[:, [column for column in columns if column in df.columns]]
+
+
+def _compact_context_summary(df: Any) -> Any:
+    if getattr(df, "empty", True):
+        return df
+    fixed_columns = [
+        "context_key",
+        "observed_rows",
+        "pending_suggestions",
+        "best_row_id",
+        "best_objective",
+    ]
+    context_columns = [
+        column
+        for column in df.columns
+        if column not in fixed_columns
+    ]
+    columns = ["context_key", *context_columns, *fixed_columns[1:]]
     return df.loc[:, [column for column in columns if column in df.columns]]
 
 
