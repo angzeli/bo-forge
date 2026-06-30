@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import time
@@ -1252,7 +1253,12 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             "Active variables",
             active_variables_display(campaign.config, selected_stage),
         )
-    context_values = _render_context_inputs(st, campaign.config)
+    context_values = _render_context_inputs(
+        st,
+        campaign.config,
+        config_path=config_path,
+        log_path=log_path,
+    )
     is_multi_fidelity = campaign.config.fidelity is not None
     if is_multi_fidelity:
         _render_artifact_note(
@@ -1430,7 +1436,13 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         _flash_and_rerun(st, "Staged suggestions appended to the campaign log.")
 
 
-def _render_context_inputs(st: Any, config: Any) -> dict[str, object] | None:
+def _render_context_inputs(
+    st: Any,
+    config: Any,
+    *,
+    config_path: object | None = None,
+    log_path: object | None = None,
+) -> dict[str, object] | None:
     if config.context is None:
         return None
     _render_artifact_note(
@@ -1441,11 +1453,12 @@ def _render_context_inputs(st: Any, config: Any) -> dict[str, object] | None:
     )
     context_values: dict[str, object] = {}
     variables_by_name = {variable.name: variable for variable in config.variables}
+    key_scope = _context_widget_key_scope(config, config_path=config_path, log_path=log_path)
     columns = st.columns(min(len(config.context_variable_names), 3) or 1)
     for index, name in enumerate(config.context_variable_names):
         variable = variables_by_name[name]
         default = config.context.default_values.get(name, _default_context_input(variable))
-        key = f"context_input_{sha1(name.encode('utf-8')).hexdigest()[:10]}"
+        key = f"context_input_{key_scope}_{sha1(name.encode('utf-8')).hexdigest()[:10]}"
         with columns[index % len(columns)]:
             if variable.type == "categorical":
                 options = [str(value) for value in variable.values]
@@ -1490,6 +1503,39 @@ def _render_context_inputs(st: Any, config: Any) -> dict[str, object] | None:
                     )
                 )
     return context_values
+
+
+def _context_widget_key_scope(
+    config: Any,
+    *,
+    config_path: object | None = None,
+    log_path: object | None = None,
+) -> str:
+    variable_payload = []
+    for variable in config.variables:
+        variable_payload.append(
+            {
+                "name": variable.name,
+                "type": variable.type,
+                "lower": getattr(variable, "lower", None),
+                "upper": getattr(variable, "upper", None),
+                "values": list(getattr(variable, "values", ()) or ()),
+            }
+        )
+    payload = {
+        "config_path": str(Path(str(config_path)).expanduser().resolve(strict=False))
+        if config_path is not None
+        else "",
+        "log_path": str(Path(str(log_path)).expanduser().resolve(strict=False))
+        if log_path is not None
+        else "",
+        "campaign_name": getattr(config, "campaign_name", ""),
+        "context_variables": list(getattr(config, "context_variable_names", [])),
+        "context_defaults": dict(getattr(config.context, "default_values", {})),
+        "variables": variable_payload,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return sha1(encoded.encode("utf-8")).hexdigest()[:10]
 
 
 def _default_context_input(variable: Any) -> object:

@@ -2125,6 +2125,125 @@ def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
     assert "Context Diagnostics" in list(plot_select.options)
 
 
+def test_streamlit_context_change_clears_staged_bundle_without_mutation(
+    tmp_path: Path,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    before_bytes = log_path.read_bytes()
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/16_contextual_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+
+    context_input = next(
+        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+    )
+    context_input.set_value(0.25)
+    app.run(timeout=10)
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+
+    bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+    assert bundle["context_values"] == {"feedstock_acidity": 0.25}
+
+    context_input = next(
+        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+    )
+    context_input.set_value(0.75)
+    app.run(timeout=10)
+
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in app.session_state
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Cleared stale staged suggestions." in markdown_text
+    assert log_path.read_bytes() == before_bytes
+    assert len(app.exception) == 0
+
+
+def test_streamlit_context_inputs_reset_after_campaign_switch(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    first_log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
+    second_config_path = tmp_path / "contextual_second.yaml"
+    second_log_path = tmp_path / "contextual_second.csv"
+    second_config_path.write_text(
+        """
+campaign_name: contextual_second
+objective:
+  name: yield_score
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+  - name: feedstock_acidity
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.8
+bo:
+  batch_size: 1
+  initial_design_size: 2
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 7
+""",
+        encoding="utf-8",
+    )
+    second_config = CampaignConfig.from_yaml(second_config_path)
+    empty_campaign_log(second_config).to_csv(second_log_path, index=False)
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/16_contextual_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(first_log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    next(
+        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+    ).set_value(0.25)
+    app.run(timeout=10)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        str(second_config_path)
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(second_log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+
+    context_input = next(
+        input_ for input_ in app.number_input if input_.label == "Context: feedstock_acidity"
+    )
+    assert context_input.value == pytest.approx(0.8)
+    assert len(app.exception) == 0
+
+
 def test_streamlit_loads_cost_aware_multi_objective_reports_panel() -> None:
     from streamlit.testing.v1 import AppTest
 
