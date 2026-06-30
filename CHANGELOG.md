@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v1.5.2 - Streamlit Contextual Workflow
+
+This patch adds Streamlit creation support for the existing conservative
+contextual BO workflow. It does not change contextual model fitting, YAML/CSV
+schema semantics, acquisition behavior, or supported contextual combinations.
+
+- Adds `Campaign kind = Contextual LogEI` to the Streamlit create flow.
+- Lets app users choose one or more configured variables as context variables.
+- Adds optional typed default-value inputs for selected context variables.
+- Generates YAML with `context.variables`, optional `context.default_values`,
+  and `bo.acquisition: log_ei`.
+- Keeps editable YAML preview, no-overwrite creation, canonical empty CSV logs,
+  immediate load-after-create, and staged suggestion fingerprint safety.
+- Keeps contextual multi-objective, structured, multi-fidelity, cost-aware, and
+  replicate-aware workflows out of scope.
+
 ## v1.5.1 - Contextual Reports, Diagnostics, and Notebook
 
 This patch adds the read-only inspection and tutorial layer for BO Forge's

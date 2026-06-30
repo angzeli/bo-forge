@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.5.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v1.5.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -16,12 +16,13 @@ workflow. The app can create conservative continuous-fidelity qMFKG configs,
 load existing fidelity configs, show fidelity summaries, and route fidelity
 diagnostic plots through the existing backend/session workflow.
 
-v1.5.1 adds loaded-campaign support for contextual BO. When a config defines
-`context:`, the `Suggest` panel renders one input per context variable, passes
-those values to `CampaignSession.suggest_next(context_values=...)`, and records
-the values in the staged suggestion bundle before explicit append. Loaded
-contextual campaigns also show Context Summary tables and expose Context
-Diagnostics in `Reports`.
+v1.5.2 adds Streamlit creation support for contextual BO. The app can create
+single-objective Contextual LogEI configs with selected context variables and
+optional defaults. When a loaded config defines `context:`, the `Suggest` panel
+renders one input per context variable, passes those values to
+`CampaignSession.suggest_next(context_values=...)`, and records the values in
+the staged suggestion bundle before explicit append. Contextual campaigns also
+show Context Summary tables and expose Context Diagnostics in `Reports`.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -70,8 +71,17 @@ When `Create Campaign` uses `Campaign kind = Multi-fidelity qMFKG`, the app:
 ## 🌐 Contextual Campaigns
 
 Contextual campaigns remain backend-owned through `CampaignSession`; the app
-does not implement a separate contextual optimizer or contextual campaign
-creation flow.
+does not implement a separate contextual optimizer.
+
+When `Create Campaign` uses `Campaign kind = Contextual LogEI`, the app:
+
+- keeps the campaign single-objective;
+- lets one or more configured variables act as context variables;
+- writes a top-level `context:` block with `context.variables`;
+- writes `context.default_values` only for defaults enabled in the form;
+- sets `bo.acquisition: log_ei`;
+- leaves multi-objective, structured, multi-fidelity, cost-aware, and
+  replicate-aware contextual workflows out of scope.
 
 When a loaded config defines `context:`, the app:
 
@@ -86,11 +96,10 @@ When a loaded config defines `context:`, the app:
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
 
-v1.5.1 app support is limited to loaded single-objective contextual
-LogEI/qLogEI campaigns. Contextual campaign creation, contextual
-multi-objective BO, contextual structured campaigns, contextual
-multi-fidelity, contextual cost-aware, and contextual replicate-aware workflows
-remain deferred.
+v1.5.2 app support is limited to single-objective contextual LogEI/qLogEI
+campaigns. Contextual multi-objective BO, contextual structured campaigns,
+contextual multi-fidelity, contextual cost-aware, and contextual
+replicate-aware workflows remain deferred.
 
 ## 🧰 Install
 
@@ -167,7 +176,7 @@ Then use the compact campaign source bar to enter:
 
 Use a working log rather than editing seed example logs directly.
 
-You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. Choose `Campaign kind` for single-objective, multi-objective, or multi-fidelity qMFKG creation. Multi-objective creation supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. Multi-fidelity creation is single-objective continuous-fidelity qMFKG only. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. Choose `Campaign kind` for single-objective, multi-objective, multi-fidelity qMFKG, or Contextual LogEI creation. Multi-objective creation supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. Multi-fidelity creation is single-objective continuous-fidelity qMFKG only. Contextual creation is single-objective LogEI only. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
 
 For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
 
@@ -231,8 +240,7 @@ Environment checks remain CLI workflows. Empty-log creation is also still availa
   campaign engine;
 - no multi-objective, structured, cost-aware, replicate-aware,
   discrete/categorical, or batch multi-fidelity workflows.
-- no Streamlit contextual campaign creation or contextual combinations beyond
-  loaded single-objective LogEI/qLogEI configs.
+- no contextual combinations beyond single-objective LogEI/qLogEI configs.
 
 The v1.2.3 FastAPI probe is experimental, optional, and separate from the
 Streamlit workflow. It is not a production backend.

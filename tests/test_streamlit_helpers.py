@@ -259,6 +259,39 @@ def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
     assert list(empty_log.columns) == canonical_columns(config)
 
 
+def test_build_campaign_yaml_text_supports_contextual_logei() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_contextual_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "feedstock_acidity", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "solvent", "type": "categorical", "values": ["MeCN", "EtOH"]},
+        ],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        context={
+            "variables": ["feedstock_acidity", "solvent"],
+            "default_values": {"feedstock_acidity": 0.25, "solvent": "MeCN"},
+        },
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.context is not None
+    assert config.context_variable_names == ["feedstock_acidity", "solvent"]
+    assert config.context.default_values == {
+        "feedstock_acidity": 0.25,
+        "solvent": "MeCN",
+    }
+    assert config.bo.acquisition == "log_ei"
+    assert list(empty_log.columns) == canonical_columns(config)
+
+
 def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
     df = pd.DataFrame({"field": ["a", "b"], "value": ["text", 3]})
 
@@ -2253,6 +2286,64 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
     assert batch_inputs[-1].min == 1
     assert batch_inputs[-1].max == 1
     assert batch_inputs[-1].proto.disabled
+
+
+def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "contextual.yaml"
+    log_path = tmp_path / "logs" / "contextual.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Contextual LogEI"
+    )
+    app.run(timeout=10)
+
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.context is not None
+    assert config.context_variable_names == ["x2"]
+    assert config.context.default_values == {"x2": 0.0}
+    assert config.bo.acquisition == "log_ei"
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+    assert any(subheader.value == "Context Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Context variables are fixed" in markdown_text
+    assert any(input_.label == "Context: x2" for input_ in app.number_input)
+
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+
+    bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+    suggestions = bundle["suggestions"]
+    assert bundle["context_values"] == {"x2": 0.0}
+    assert suggestions["x2"].astype(float).tolist() == [pytest.approx(0.0)]
 
 
 def test_streamlit_multi_fidelity_target_defaults_to_selected_variable_upper(

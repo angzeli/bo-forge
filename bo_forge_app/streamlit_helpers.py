@@ -102,6 +102,7 @@ def build_campaign_yaml_text(
     replicates_enabled: bool = False,
     cost: dict[str, object] | None = None,
     fidelity: dict[str, object] | None = None,
+    context: dict[str, object] | None = None,
     bo_overrides: dict[str, object] | None = None,
 ) -> str:
     """Build editable YAML text from structured app form values."""
@@ -129,6 +130,9 @@ def build_campaign_yaml_text(
     if fidelity is not None:
         raw["fidelity"] = fidelity
         raw["bo"]["acquisition"] = "qmf_kg"
+    if context is not None:
+        raw["context"] = context
+        raw["bo"]["acquisition"] = "log_ei"
     if bo_overrides:
         raw["bo"].update(bo_overrides)
     if review_enabled:

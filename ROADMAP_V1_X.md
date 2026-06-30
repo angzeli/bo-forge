@@ -28,6 +28,7 @@ flowchart LR
     v143["v1.4.3<br/>Streamlit multi-fidelity workflow"]
     v150["v1.5.0<br/>Contextual BO core"]
     v151["v1.5.1<br/>Context reports + notebook"]
+    v152["v1.5.2<br/>Streamlit contextual workflow"]
     
     v11 -.-> v110
     v11 -.-> v111
@@ -49,11 +50,12 @@ flowchart LR
     v14 -.-> v143
     v15 -.-> v150
     v15 -.-> v151
+    v15 -.-> v152
 
     class v10,v11,v12,v13,v14 majorDone
     class v15 majorActive
     class later majorFuture
-    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141,v142,v143,v150,v151 patchDone
+    class v110,v111,v112,v113,v114,v120,v121,v122,v123,v130,v131,v132,v133,v134,v140,v141,v142,v143,v150,v151,v152 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -61,7 +63,7 @@ flowchart LR
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
-Current baseline: `v1.5.1`. The v1.4.x line is complete; v1.5 now includes the conservative single-objective contextual LogEI/qLogEI core plus read-only contextual summaries, diagnostics, and a notebook. Context variables remain normal CSV variables but are fixed at suggestion time. Contextual multi-objective, structured, multi-fidelity, cost-aware, and replicate-aware workflows remain deferred.
+Current baseline: `v1.5.2`. The v1.4.x line is complete; v1.5 now includes the conservative single-objective contextual LogEI/qLogEI core, read-only contextual summaries, diagnostics, a notebook, and Streamlit contextual campaign creation. Context variables remain normal CSV variables but are fixed at suggestion time. Contextual multi-objective, structured, multi-fidelity, cost-aware, and replicate-aware workflows remain deferred.
 
 ### Patch Notes So Far
 
@@ -88,6 +90,7 @@ Current baseline: `v1.5.1`. The v1.4.x line is complete; v1.5 now includes the c
 | `v1.4.3` | Patch | Streamlit creation and qMFKG suggestion controls for single-objective continuous-fidelity campaigns |
 | `v1.5.0` | Minor | Contextual single-objective LogEI/qLogEI core with fixed context variables |
 | `v1.5.1` | Patch | Context summaries, context diagnostics, CLI inspection, reports, and contextual tutorial notebook |
+| `v1.5.2` | Patch | Streamlit creation and suggestion controls for single-objective contextual LogEI campaigns |
 
 ## 🧬 v1.1 - Coupled Multi-Objective qLogEHVI Campaigns
 
@@ -179,8 +182,10 @@ Status: active
   provide read-only contextual inspection.
 - `notebooks/16_contextual_logei_campaign.ipynb` demonstrates a lightweight
   sequential contextual workflow.
-- Minimal loaded-campaign Streamlit support collects context values in the
-  `Suggest` panel; Streamlit contextual campaign creation remains deferred.
+- Streamlit can create single-objective Contextual LogEI campaigns with
+  selected context variables and optional defaults.
+- Loaded contextual campaigns collect context values in the `Suggest` panel and
+  protect staged suggestions against context changes before append.
 - Contextual multi-objective, structured, multi-fidelity, cost-aware, and
   replicate-aware workflows remain deferred.
 

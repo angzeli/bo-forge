@@ -250,7 +250,7 @@ integer, or discrete variables, or model-based `batch_size > 1`.
 
 ## 🌐 Contextual LogEI/qLogEI
 
-v1.5.1 includes a conservative contextual BO workflow for single-objective
+v1.5.2 includes a conservative contextual BO workflow for single-objective
 LogEI/qLogEI campaigns plus read-only context summaries, diagnostics, and a
 notebook. Context variables are declared as normal variables and remain normal
 CSV columns, but they are fixed at suggestion time rather than optimized:
@@ -303,7 +303,9 @@ campaign.context_summary()
 Contextual campaigns add no CSV columns. The configured context variables use
 their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
-`notebooks/16_contextual_logei_campaign.ipynb`. In v1.5.x, `context:` cannot be combined with
+`notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
+create `Campaign kind = Contextual LogEI` configs with selected context
+variables and optional defaults. In v1.5.x, `context:` cannot be combined with
 `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates.enabled: true`.
 
 ## 🔁 Session API

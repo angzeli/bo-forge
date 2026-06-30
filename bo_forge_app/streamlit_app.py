@@ -327,22 +327,35 @@ def _render_create_new_campaign(st: Any) -> None:
 
     campaign_kind = st.radio(
         "Campaign kind",
-        ["Single-objective", "Multi-objective", "Multi-fidelity qMFKG"],
+        [
+            "Single-objective",
+            "Multi-objective",
+            "Multi-fidelity qMFKG",
+            "Contextual LogEI",
+        ],
         horizontal=True,
         key=NEW_CAMPAIGN_KIND_KEY,
         help=(
-            "Multi-fidelity qMFKG creates a single-objective config with one "
-            "continuous fidelity variable."
+            "Choose a backend campaign template. Contextual LogEI creates a "
+            "single-objective config with one or more fixed context variables."
         ),
     )
     is_multi_objective = campaign_kind == "Multi-objective"
     is_multi_fidelity = campaign_kind == "Multi-fidelity qMFKG"
+    is_contextual = campaign_kind == "Contextual LogEI"
     if is_multi_fidelity:
         _render_callout(
             st,
             "Multi-fidelity qMFKG",
             "App-created multi-fidelity campaigns are single-objective, continuous-variable "
             "qMFKG campaigns. Advanced qMFKG defaults stay editable in the YAML preview.",
+        )
+    if is_contextual:
+        _render_callout(
+            st,
+            "Contextual LogEI",
+            "App-created contextual campaigns are single-objective LogEI campaigns. "
+            "Context variables stay ordinary CSV columns but are fixed at suggestion time.",
         )
 
     _render_section_label(st, "Objective")
@@ -416,7 +429,7 @@ def _render_create_new_campaign(st: Any) -> None:
     _render_section_label(st, "Variables")
     variable_count = st.number_input(
         "Number of variables",
-        min_value=1,
+        min_value=2 if is_contextual else 1,
         max_value=12,
         value=2,
         key="new_campaign_variable_count",
@@ -433,6 +446,7 @@ def _render_create_new_campaign(st: Any) -> None:
         replicates_enabled = False
         cost_settings = None
         fidelity_settings = None
+        context_settings = None
         bo_overrides = None
         if is_multi_fidelity:
             _render_section_label(st, "Fidelity")
@@ -500,6 +514,16 @@ def _render_create_new_campaign(st: Any) -> None:
                     "weight": float(cost_weight),
                     "budget": float(cost_budget),
                 }
+        elif is_contextual:
+            _render_section_label(st, "Context")
+            context_settings = _collect_new_campaign_context_settings(st, variables)
+            _render_artifact_note(
+                st,
+                "Contextual scope",
+                "Generated YAML uses bo.acquisition=log_ei. Contextual multi-objective, "
+                "structured, multi-fidelity, cost-aware, and replicate-aware workflows "
+                "remain out of scope.",
+            )
         generated_yaml = build_campaign_yaml_text(
             campaign_name=campaign_name,
             objective_name=objective_name,
@@ -514,6 +538,7 @@ def _render_create_new_campaign(st: Any) -> None:
             replicates_enabled=replicates_enabled,
             cost=cost_settings,
             fidelity=fidelity_settings,
+            context=context_settings,
             bo_overrides=bo_overrides,
         )
     except ValueError as exc:
@@ -772,6 +797,92 @@ def _collect_new_campaign_fidelity_settings(
         "fidelity_cost_weight": 1.0,
         "num_fantasies": 8,
     }
+
+
+def _collect_new_campaign_context_settings(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> dict[str, object]:
+    variable_names = [str(variable["name"]) for variable in variables]
+    if len(variable_names) < 2:
+        raise ValueError(
+            "Contextual LogEI campaigns require at least one decision variable and one "
+            "context variable."
+        )
+    default_context_variables = [variable_names[-1]]
+    selected_names = st.multiselect(
+        "Context variables",
+        variable_names,
+        default=default_context_variables,
+        key="new_campaign_context_variables",
+        help="Selected variables remain normal CSV columns but are fixed at suggestion time.",
+    )
+    selected_names = [str(name) for name in selected_names]
+    if not selected_names:
+        raise ValueError("Contextual LogEI campaigns require at least one context variable.")
+    if len(set(selected_names)) == len(variable_names):
+        raise ValueError(
+            "Context variables cannot include every variable; at least one decision "
+            "variable is required."
+        )
+
+    variable_by_name = {str(variable["name"]): variable for variable in variables}
+    default_values: dict[str, object] = {}
+    for name in selected_names:
+        variable = variable_by_name[name]
+        use_default = st.checkbox(
+            f"Set default for context: {name}",
+            value=True,
+            key=_stable_widget_key("new_context_default_enabled", name),
+            help="Defaults are optional; users can still override context values in Suggest.",
+        )
+        if use_default:
+            default_values[name] = _collect_new_campaign_context_default(st, variable)
+
+    context: dict[str, object] = {"variables": selected_names}
+    if default_values:
+        context["default_values"] = default_values
+    return context
+
+
+def _collect_new_campaign_context_default(
+    st: Any,
+    variable: dict[str, object],
+) -> object:
+    name = str(variable["name"])
+    variable_type = str(variable.get("type", "continuous"))
+    key = _stable_widget_key("new_context_default", name)
+    label = f"Default context: {name}"
+    if variable_type == "categorical":
+        values = [str(value) for value in variable.get("values", [])]
+        return st.selectbox(label, values, key=key)
+    if variable_type == "discrete":
+        values = [float(value) for value in variable.get("values", [])]
+        return float(st.selectbox(label, values, key=key))
+    if variable_type == "integer":
+        lower = int(variable["lower"])
+        upper = int(variable["upper"])
+        return int(
+            st.number_input(
+                label,
+                min_value=lower,
+                max_value=upper,
+                value=lower,
+                step=1,
+                key=key,
+            )
+        )
+    lower = float(variable["lower"])
+    upper = float(variable["upper"])
+    return float(
+        st.number_input(
+            label,
+            min_value=lower,
+            max_value=upper,
+            value=lower,
+            key=key,
+        )
+    )
 
 
 def _create_campaign_from_inputs(
