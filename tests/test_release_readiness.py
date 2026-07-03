@@ -30,6 +30,13 @@ def test_no_duplicate_release_artifacts_in_worktree() -> None:
     assert duplicate_artifacts == []
 
 
+def test_manifest_does_not_reference_removed_screenshot_assets() -> None:
+    manifest = (PROJECT_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+    assert "recursive-include docs *.md" in manifest
+    assert "*.png" not in manifest
+
+
 def test_structured_tutorial_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/14_structured_campaign_tutorial.yaml",
@@ -193,6 +200,8 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
     for phrase in required_phrases:
         assert phrase in guide
 
+    assert "v1.2.3" not in guide
+
 
 def test_v1_5_roadmap_line_is_completed_after_contextual_closeout() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
@@ -314,6 +323,11 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
         assert "--stage screen" in content
         assert "stage-summary" in content
         assert "stage-diagnostics" in content
+    assert (
+        "bo-forge suggest --config PATH --log PATH [--batch-size N] "
+        "[--stage STAGE_NAME] [--context NAME=VALUE ...]"
+    ) in cli_docs
+    assert "Structured campaigns use `--stage`; contextual campaigns use repeatable" in cli_docs
     assert "14_structured_campaign_tutorial.yaml" in quickstart
     assert "14_structured_campaign_tutorial_campaign_log.csv" in quickstart
     assert "manually staged rows" not in quickstart

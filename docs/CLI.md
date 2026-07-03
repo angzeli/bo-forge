@@ -342,7 +342,7 @@ bo-forge plot \
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
-| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Contextual campaigns use repeatable `--context`. |
+| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |

@@ -1,6 +1,6 @@
 # Experimental FastAPI Probe
 
-BO Forge v1.2.3 adds an experimental optional FastAPI probe around the internal
+BO Forge includes an experimental optional FastAPI probe around the internal
 `CampaignAppService`. It is for local or trusted-network API exploration only.
 It is not a stable public API and does not replace the Streamlit workbench.
 Do not expose it directly to the public internet.
@@ -142,7 +142,7 @@ existing `CampaignAppService.append_staged()` path:
 
 Clients should not edit the staged bundle. Append rechecks the staged bundle's
 embedded `config_fingerprint` and `log_fingerprint`; append does not use a
-separate `expected_log_fingerprint` in v1.2.3. Contextual dry-runs also record
+separate `expected_log_fingerprint`. Contextual dry-runs also record
 the supplied `context_values` in the staged bundle so trusted clients can retain
 the context used to generate the suggestions.
 
@@ -150,7 +150,7 @@ Staged bundles are fingerprint and integrity checked. They are not
 authenticated, signed, or server-issued. A trusted client can craft a
 schema-valid staged bundle, so this probe must only be used with trusted clients
 on localhost or trusted networks. Signed staged bundles and server-side staged
-state are out of scope for v1.2.3.
+state are out of scope for this experimental probe.
 
 Review and observation mutations require `expected_log_fingerprint`. If the log
 changed since the caller last read it, or if the fingerprint is missing, the

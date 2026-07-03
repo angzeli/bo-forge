@@ -5,7 +5,7 @@ include ROADMAP_V0_TO_V1.md
 include ROADMAP_V1_X.md
 include requirements-lock.txt
 recursive-include configs *.yaml
-recursive-include docs *.md *.png
+recursive-include docs *.md
 include examples/quickstart.py
 recursive-include examples *_campaign_log.csv
 recursive-include notebooks *.ipynb
