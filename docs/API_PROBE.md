@@ -5,6 +5,9 @@ BO Forge includes an experimental optional FastAPI probe around the internal
 It is not a stable public API and does not replace the Streamlit workbench.
 Do not expose it directly to the public internet.
 
+For the supported and deferred workflow combinations around the API probe, see
+[CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
+
 The API has no built-in auth, no database, no multi-user state coordination,
 and no persistent staged server state. Do not expose it directly to the public
 internet.

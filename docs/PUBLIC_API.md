@@ -1,8 +1,11 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v1.5.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.0.0.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
+
+For supported and intentionally deferred workflow combinations, see
+[CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
 ## ✅ Public Package Exports
 
@@ -101,7 +104,7 @@ suggestions = suggest_next(config, campaign.df)
 
 ## 🚧 Not Public API
 
-The following are intentionally not guaranteed as stable v1.0 public APIs:
+The following are intentionally not guaranteed as stable public APIs:
 
 - private functions beginning with `_`;
 - Streamlit app helper internals;

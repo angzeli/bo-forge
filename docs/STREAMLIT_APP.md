@@ -1,8 +1,11 @@
 # 🖥️ Streamlit App
 
-BO Forge v1.5.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.0.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
+
+For the current support boundary across backend, CLI, Streamlit, service, and
+API workflows, see [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
 The v1.1.4 UI baseline uses a Forge Suite-inspired workbench style with a compact source bar, stateful panel selector, in-app campaign creation, compact tables, and lazy report/plot rendering.
 
@@ -16,7 +19,8 @@ workflow. The app can create conservative continuous-fidelity qMFKG configs,
 load existing fidelity configs, show fidelity summaries, and route fidelity
 diagnostic plots through the existing backend/session workflow.
 
-v1.5.3 closes the Streamlit-facing contextual BO workflow. The app can create
+The completed v1.5.x line closed the Streamlit-facing contextual BO workflow.
+The app can create
 single-objective Contextual LogEI configs with selected context variables and
 optional defaults. When a loaded config defines `context:`, the `Suggest` panel
 renders one input per context variable, passes those values to
@@ -96,7 +100,7 @@ When a loaded config defines `context:`, the app:
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
 
-v1.5.3 app support is limited to single-objective contextual LogEI/qLogEI
+v2.0.0 app support is limited to single-objective contextual LogEI/qLogEI
 campaigns. Contextual multi-objective BO, contextual structured campaigns,
 contextual multi-fidelity, contextual cost-aware, and contextual
 replicate-aware workflows remain deferred.

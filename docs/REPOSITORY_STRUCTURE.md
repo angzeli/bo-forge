@@ -19,6 +19,7 @@ bo-forge/
 │   ├── STREAMLIT_APP.md
 │   ├── STREAMLIT_DEPLOYMENT.md
 │   ├── API_PROBE.md
+│   ├── CAPABILITY_MATRIX.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md
@@ -29,7 +30,8 @@ bo-forge/
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
 ├── ROADMAP_V0_TO_V1.md               # Milestones through v1.0.0
-├── ROADMAP_V1_X.md                   # v1.x direction
+├── ROADMAP_V1_X.md                   # Completed v1.x roadmap
+├── ROADMAP_V2_X.md                   # Active v2.x roadmap
 ├── CHANGELOG.md                      # Release history
 ├── MANIFEST.in                       # Source distribution file inclusion rules
 ├── pyproject.toml                    # Package metadata and dependencies

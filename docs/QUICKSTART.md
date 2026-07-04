@@ -2,6 +2,9 @@
 
 This page covers setup, the quickstart script, CLI workflow, notebook session API, example notebooks, and diagnostics.
 
+For a compact overview of supported, read-only, rejected, and deferred feature
+combinations, see [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
+
 ## 🧰 Setup
 
 Create a dedicated environment at the project root:
@@ -104,7 +107,8 @@ See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warn
 
 ## 🧪 Experimental API Probe
 
-v1.2.3 adds an optional FastAPI probe around the internal app service layer:
+BO Forge includes an optional FastAPI probe around the internal app service
+layer:
 
 ```bash
 pip install "bo-forge[api]"
@@ -250,7 +254,7 @@ integer, or discrete variables, or model-based `batch_size > 1`.
 
 ## 🌐 Contextual LogEI/qLogEI
 
-v1.5.3 includes a conservative contextual BO workflow for single-objective
+BO Forge includes a conservative contextual BO workflow for single-objective
 LogEI/qLogEI campaigns plus read-only context summaries, diagnostics, and a
 notebook. Context variables are declared as normal variables and remain normal
 CSV columns, but they are fixed at suggestion time rather than optimized:

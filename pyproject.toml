@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "1.5.3"
+version = "2.0.0"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,7 +47,7 @@ bo-forge-api = "bo_forge_app.api_cli:main"
 Repository = "https://github.com/angzeli/bo-forge"
 Issues = "https://github.com/angzeli/bo-forge/issues"
 Documentation = "https://github.com/angzeli/bo-forge/tree/main/docs"
-Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md"
+Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md"
 
 [project.optional-dependencies]
 app = [

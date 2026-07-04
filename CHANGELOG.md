@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v2.0.0 - Stable Interface Hardening Baseline
+
+This release starts the v2.x line as a hardening-only major baseline after
+v1.5.3. It does not add BO algorithms, config keys, CSV columns, or new workflow
+combinations.
+
+- Preserves v1 YAML/CSV/session/CLI/notebook/Streamlit/service/API probe
+  behavior as the compatibility baseline.
+- Adds `docs/CAPABILITY_MATRIX.md` to document supported, read-only, rejected,
+  and deferred feature combinations.
+- Adds `ROADMAP_V2_X.md` as the active roadmap while keeping `ROADMAP_V1_X.md`
+  as completed history.
+- Fixes the source-distribution manifest license directive and strengthens
+  release-readiness checks for manifest directives, wheel/sdist contents, and
+  optional app/API extras.
+- Keeps contextual multi-objective, structured-contextual,
+  multi-fidelity-contextual, cost-aware contextual, replicate-aware contextual,
+  database, auth, production API, and SaaS workflows deferred.
+
 ## v1.5.3 - Contextual BO Release Closeout
 
 This patch closes the v1.5.x contextual BO line with Streamlit state-safety,
