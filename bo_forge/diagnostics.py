@@ -13,6 +13,7 @@ from matplotlib.ticker import MaxNLocator
 from bo_forge.config import CampaignConfig
 from bo_forge.contextual import context_summary
 from bo_forge.costs import effective_row_cost
+from bo_forge.models import dataframe_to_training_tensors, fit_gp_model
 from bo_forge.multi_objective import (
     hypervolume_progress,
     multi_objective_observed_data,
@@ -30,7 +31,11 @@ from bo_forge.plot_style import (
 )
 from bo_forge.replicates import replicate_summary
 from bo_forge.structured import stage_summary
-from bo_forge.transforms import dataframe_to_variable_coverage, has_mixed_variables
+from bo_forge.transforms import (
+    dataframe_to_variable_coverage,
+    has_mixed_variables,
+    objective_from_model_space,
+)
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
 _HIGH_DIM_TITLE_SIZE = 16
@@ -523,6 +528,112 @@ def plot_context_diagnostics(
     )
     fig.suptitle(
         f"{config.campaign_name}: context diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def plot_model_diagnostics(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot observed objective values against posterior mean and residuals."""
+    validate_campaign_data(config, df)
+    if config.is_multi_objective:
+        raise ValueError("plot_model_diagnostics() requires a single-objective config.")
+    if config.fidelity is not None:
+        raise ValueError("plot_model_diagnostics() does not support fidelity configs.")
+    if config.is_structured_campaign:
+        raise ValueError("plot_model_diagnostics() does not support structured configs.")
+
+    observed = get_observed_data(config, df)
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(14, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    fit_ax, residual_ax = axes
+
+    if observed.empty:
+        fit_ax.text(
+            0.5,
+            0.5,
+            "No observed rows available for model diagnostics.",
+            ha="center",
+            va="center",
+            transform=fit_ax.transAxes,
+        )
+        residual_ax.text(
+            0.5,
+            0.5,
+            "No residuals available.",
+            ha="center",
+            va="center",
+            transform=residual_ax.transAxes,
+        )
+    else:
+        training = dataframe_to_training_tensors(config, observed)
+        model = fit_gp_model(config, observed)
+        posterior = model.posterior(training.train_x)
+        predicted_user = objective_from_model_space(
+            config,
+            posterior.mean.squeeze(-1).detach(),
+        )
+        observed_user = objective_from_model_space(
+            config,
+            training.train_y.squeeze(-1).detach(),
+        )
+        residuals = observed_user - predicted_user
+
+        observed_values = observed_user.cpu().numpy()
+        predicted_values = predicted_user.cpu().numpy()
+        residual_values = residuals.cpu().numpy()
+        x = list(range(1, len(observed_values) + 1))
+
+        fit_ax.scatter(observed_values, predicted_values, color="#2563eb", alpha=0.85)
+        min_value = float(min(observed_values.min(), predicted_values.min()))
+        max_value = float(max(observed_values.max(), predicted_values.max()))
+        if math.isclose(min_value, max_value):
+            min_value -= 0.5
+            max_value += 0.5
+        fit_ax.plot(
+            [min_value, max_value],
+            [min_value, max_value],
+            color="#64748b",
+            linestyle="--",
+            linewidth=1.5,
+            label="ideal",
+        )
+        add_legend(fit_ax)
+
+        residual_ax.axhline(0.0, color="#64748b", linestyle="--", linewidth=1.5)
+        residual_ax.scatter(x, residual_values, color="#dc2626", alpha=0.85)
+        residual_ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    set_title(fit_ax, "Observed vs posterior mean")
+    set_axis_labels(fit_ax, f"Observed {config.objective.name}", "Posterior mean")
+    set_title(residual_ax, "Residuals on fitting rows")
+    set_axis_labels(residual_ax, "Fitting row", "Observed - posterior mean")
+    fig.suptitle(
+        f"{config.campaign_name}: model diagnostics ({config.model.profile})",
         fontsize=18,
         fontweight="bold",
         color="black",

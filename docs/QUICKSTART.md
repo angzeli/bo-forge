@@ -312,6 +312,40 @@ create `Campaign kind = Contextual LogEI` configs with selected context
 variables and optional defaults. In v1.5.x, `context:` cannot be combined with
 `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates.enabled: true`.
 
+## 🧠 Model Profiles
+
+v2.1.0 adds optional model profiles for single-objective LogEI/qLogEI campaigns.
+Profiles select curated GP covariance behavior without exposing raw BoTorch
+kernel passthrough:
+
+```yaml
+model:
+  profile: smooth
+```
+
+Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
+profiles are intentionally limited to single-objective LogEI/qLogEI workflows
+in v2.1.0; multi-objective, multi-fidelity, and structured campaigns should use
+the default profile.
+
+Try the bundled model-profile example:
+
+```bash
+bo-forge validate \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv
+
+bo-forge model-summary \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv
+
+bo-forge plot \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv \
+  --kind model-diagnostics \
+  --output /tmp/bo_forge_model_diagnostics.png
+```
+
 ## 🔁 Session API
 
 Notebook campaign workflows should usually start with `CampaignSession`:

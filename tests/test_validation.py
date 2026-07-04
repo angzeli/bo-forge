@@ -555,6 +555,14 @@ def test_validate_campaign_data_accepts_structured_tutorial_log() -> None:
     assert config_structured.stage_names == ["screening", "refinement"]
 
 
+def test_validate_campaign_data_accepts_model_profile_example_log() -> None:
+    config_model = CampaignConfig.from_yaml("configs/17_model_profile_logei.yaml")
+    df = load_campaign_log("examples/17_model_profile_campaign_log.csv", config_model)
+
+    validate_campaign_data(config_model, df)
+    assert config_model.model.profile == "smooth"
+
+
 def test_canonical_columns_for_schema_combinations() -> None:
     base = config()
     cost = cost_review_config()

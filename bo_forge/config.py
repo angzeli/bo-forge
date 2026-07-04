@@ -93,6 +93,11 @@ class ReplicateConfig:
 
 
 @dataclass(frozen=True)
+class ModelConfig:
+    profile: str = "default"
+
+
+@dataclass(frozen=True)
 class StageConfig:
     name: str
     variables: tuple[str, ...]
@@ -122,6 +127,7 @@ class CampaignConfig:
     cost: CostConfig | None = None
     fidelity: FidelityConfig | None = None
     context: ContextConfig | None = None
+    model: ModelConfig = field(default_factory=ModelConfig)
     review: ReviewConfig = field(default_factory=ReviewConfig)
     replicates: ReplicateConfig = field(default_factory=ReplicateConfig)
     stages: tuple[StageConfig, ...] = ()
@@ -223,6 +229,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         raw.get("replicates"),
         multi_objective=bool(objectives),
     )
+    model = _parse_model(raw.get("model"))
     _validate_context_combinations(
         context=context,
         multi_objective=bool(objectives),
@@ -244,6 +251,13 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         multi_objective=bool(objectives),
         has_fidelity=fidelity is not None,
     )
+    _validate_model_combinations(
+        model=model,
+        bo=bo,
+        multi_objective=bool(objectives),
+        fidelity=fidelity,
+        stages=stages,
+    )
 
     return CampaignConfig(
         campaign_name=campaign_name,
@@ -255,6 +269,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         cost=cost,
         fidelity=fidelity,
         context=context,
+        model=model,
         review=review,
         replicates=replicates,
         stages=tuple(stages),
@@ -652,6 +667,54 @@ def _parse_context(
         )
 
     return ContextConfig(variables=tuple(context_variables), default_values=default_values)
+
+
+def _parse_model(raw: Any) -> ModelConfig:
+    if raw is None:
+        return ModelConfig()
+    if not isinstance(raw, dict):
+        raise ConfigError("Config key 'model' must be a mapping when provided.")
+    unsupported = sorted(set(raw) - {"profile"})
+    if unsupported:
+        raise ConfigError(f"Config key 'model' has unsupported keys: {unsupported}.")
+    profile = str(raw.get("profile", "default"))
+    if profile not in {"default", "smooth", "rough", "robust"}:
+        raise ConfigError(
+            "model.profile must be one of ['default', 'rough', 'robust', 'smooth']."
+        )
+    return ModelConfig(profile=profile)
+
+
+def _validate_model_combinations(
+    *,
+    model: ModelConfig,
+    bo: BOConfig,
+    multi_objective: bool,
+    fidelity: FidelityConfig | None,
+    stages: list[StageConfig],
+) -> None:
+    if model.profile == "default":
+        return
+    if multi_objective:
+        raise ConfigError(
+            "Non-default model profiles are only supported for single-objective "
+            "LogEI/qLogEI campaigns in v2.1.0; use model.profile: default for "
+            "multi-objective campaigns."
+        )
+    if fidelity is not None:
+        raise ConfigError(
+            "Non-default model profiles cannot be combined with fidelity campaigns "
+            "in v2.1.0; use model.profile: default."
+        )
+    if stages:
+        raise ConfigError(
+            "Non-default model profiles cannot be combined with structured campaign "
+            "stages in v2.1.0; use model.profile: default."
+        )
+    if bo.acquisition != "log_ei":
+        raise ConfigError(
+            "Non-default model profiles require bo.acquisition: log_ei in v2.1.0."
+        )
 
 
 def _validate_context_combinations(

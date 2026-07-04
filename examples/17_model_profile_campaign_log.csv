@@ -1,0 +1,5 @@
+row_id,iteration,status,source,catalyst_loading,reaction_temperature,activity,predicted_mean,predicted_std,acquisition
+profile_seed_0,0,observed,manual,0.12,55,0.48,,,
+profile_seed_1,0,observed,manual,0.35,80,0.74,,,
+profile_seed_2,0,observed,manual,0.70,110,0.91,,,
+profile_seed_3,0,observed,manual,0.92,130,0.76,,,

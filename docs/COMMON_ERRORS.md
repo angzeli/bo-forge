@@ -16,6 +16,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `invalid replicate_group` or `invalid replicate_index`: check explicit replicate metadata.
 - `require an explicit stage`, `unknown stage`, or `inactive variable`: check structured-campaign `stages:`, pass `--stage` for structured suggestions, and keep inactive variable cells blank.
 - `Contextual suggestions require values`: pass every configured context value through `context.default_values`, `context_values={...}`, the app context inputs, API `context_values`, or CLI `--context NAME=VALUE`.
+- `Non-default model profiles`: use `model.profile: default` for multi-objective, multi-fidelity, or structured campaigns.
 
 ## ⚙️ Config Errors
 
@@ -137,6 +138,14 @@ Fix: do not combine `context:` with `objectives:`, `stages:`, `fidelity:`,
 `cost:`, or `replicates.enabled: true`. Contextual multi-objective,
 structured, multi-fidelity, cost-aware, and replicate-aware workflows remain
 deferred.
+
+### `Non-default model profiles ...`
+
+v2.1.0 model profiles are deliberately conservative.
+
+Fix: use `model.profile: smooth`, `rough`, or `robust` only for
+single-objective LogEI/qLogEI campaigns. Use `model.profile: default` for
+multi-objective, multi-fidelity, and structured campaigns.
 
 ### `Constraint '...' uses unsupported syntax`
 

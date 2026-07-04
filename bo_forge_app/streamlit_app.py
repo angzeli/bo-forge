@@ -218,6 +218,7 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
         if panel in {"Overview", "Data", "Reports"}:
             view_data["summary"] = campaign.summary()
             view_data["next_action"] = campaign.next_action()
+            view_data["model_summary"] = campaign.model_summary()
         if panel in {"Overview", "Data"}:
             view_data["observed"] = campaign.observed_data()
             view_data["pending"] = campaign.pending_suggestions()
@@ -238,6 +239,8 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
             view_data["stage_summary"] = campaign.stage_summary()
         if panel in {"Overview", "Data", "Reports"} and campaign.config.fidelity is not None:
             view_data["fidelity_summary"] = campaign.fidelity_summary()
+        if panel in {"Overview", "Data", "Reports"} and campaign.config.context is not None:
+            view_data["context_summary"] = campaign.context_summary()
     return view_data
 
 
@@ -357,6 +360,30 @@ def _render_create_new_campaign(st: Any) -> None:
             "Contextual LogEI",
             "App-created contextual campaigns are single-objective LogEI campaigns. "
             "Context variables stay ordinary CSV columns but are fixed at suggestion time.",
+        )
+
+    _render_section_label(st, "Model profile")
+    if is_multi_objective or is_multi_fidelity:
+        model_profile = st.selectbox(
+            "Model profile",
+            ["default"],
+            key="new_campaign_model_profile_default_only",
+            disabled=True,
+            help=(
+                "Non-default model profiles are supported only for single-objective "
+                "LogEI/qLogEI campaigns in v2.1.0."
+            ),
+        )
+    else:
+        model_profile = st.selectbox(
+            "Model profile",
+            ["default", "smooth", "rough", "robust"],
+            key="new_campaign_model_profile",
+            help=(
+                "default preserves BO Forge's current GP path; smooth uses an RBF/ARD "
+                "kernel; rough uses a Matern-1.5/ARD kernel; robust records fitting "
+                "warnings for diagnostics."
+            ),
         )
 
     _render_section_label(st, "Objective")
@@ -540,6 +567,7 @@ def _render_create_new_campaign(st: Any) -> None:
             cost=cost_settings,
             fidelity=fidelity_settings,
             context=context_settings,
+            model={"profile": str(model_profile)},
             bo_overrides=bo_overrides,
         )
     except ValueError as exc:
@@ -1069,6 +1097,13 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             raw_df=context_summary,
             expanded_raw=False,
         )
+    _render_table_section(
+        st,
+        "Model Summary",
+        _view_data_value(view_data, "model_summary", campaign.model_summary),
+        empty_kind="report_preview",
+        expanded_raw=False,
+    )
     if campaign.config.is_structured_campaign:
         _render_table_section(
             st,
@@ -1191,6 +1226,13 @@ def _render_data(
             raw_df=context_summary,
             expanded_raw=False,
         )
+    _render_table_section(
+        st,
+        "Model Summary",
+        _view_data_value(view_data, "model_summary", campaign.model_summary),
+        empty_kind="report_preview",
+        expanded_raw=False,
+    )
     if campaign.config.is_structured_campaign:
         _render_table_section(
             st,
@@ -1892,6 +1934,7 @@ def _available_plot_options(
         "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
         "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
         "context_diagnostics": ("Context Diagnostics", "plot_context_diagnostics"),
+        "model_diagnostics": ("Model Diagnostics", "plot_model_diagnostics"),
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:

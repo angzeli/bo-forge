@@ -103,6 +103,7 @@ def build_campaign_yaml_text(
     cost: dict[str, object] | None = None,
     fidelity: dict[str, object] | None = None,
     context: dict[str, object] | None = None,
+    model: dict[str, object] | None = None,
     bo_overrides: dict[str, object] | None = None,
 ) -> str:
     """Build editable YAML text from structured app form values."""
@@ -133,6 +134,8 @@ def build_campaign_yaml_text(
     if context is not None:
         raw["context"] = context
         raw["bo"]["acquisition"] = "log_ei"
+    if model is not None:
+        raw["model"] = model
     if bo_overrides:
         raw["bo"].update(bo_overrides)
     if review_enabled:
@@ -614,6 +617,8 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
             kinds.append("pareto_parallel")
     else:
         kinds = ["progress", "diagnostics"]
+        if config.fidelity is None and not config.is_structured_campaign:
+            kinds.append("model_diagnostics")
     if config.is_structured_campaign:
         kinds.append("stage_diagnostics")
     if config.fidelity is not None:

@@ -112,6 +112,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(context_summary_parser)
     context_summary_parser.set_defaults(handler=_cmd_context_summary)
 
+    model_summary_parser = subparsers.add_parser(
+        "model-summary",
+        help="Print model profile and fitting-input summary fields.",
+    )
+    _add_config_log_arguments(model_summary_parser)
+    model_summary_parser.set_defaults(handler=_cmd_model_summary)
+
     pareto_front_parser = subparsers.add_parser(
         "pareto-front",
         help="Print nondominated observed rows for a multi-objective campaign.",
@@ -208,6 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
             "stage-diagnostics",
             "fidelity-diagnostics",
             "context-diagnostics",
+            "model-diagnostics",
         ],
         required=True,
         help="Plot type to export.",
@@ -346,6 +354,12 @@ def _cmd_context_summary(args: argparse.Namespace) -> int:
     if campaign.config.context is None:
         raise ConfigError("context-summary requires a contextual config.")
     _print_table(campaign.context_summary())
+    return 0
+
+
+def _cmd_model_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    _print_table(campaign.model_summary())
     return 0
 
 
@@ -515,6 +529,20 @@ def _cmd_plot(args: argparse.Namespace) -> int:
                     "plot --kind context-diagnostics requires a contextual config."
                 )
             campaign.plot_context_diagnostics(save_path=args.output)
+        elif args.kind == "model-diagnostics":
+            if campaign.config.is_multi_objective:
+                raise ConfigError(
+                    "plot --kind model-diagnostics requires a single-objective config."
+                )
+            if campaign.config.fidelity is not None:
+                raise ConfigError(
+                    "plot --kind model-diagnostics does not support multi-fidelity configs."
+                )
+            if campaign.config.is_structured_campaign:
+                raise ConfigError(
+                    "plot --kind model-diagnostics does not support structured configs."
+                )
+            campaign.plot_model_diagnostics(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

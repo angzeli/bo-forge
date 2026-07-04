@@ -112,6 +112,21 @@ bo-forge plot \
   --output /tmp/bo_forge_context_diagnostics.png
 ```
 
+For single-objective model profiles, the CSV schema is unchanged. Inspect the
+configured profile and fitting inputs, then export model diagnostics:
+
+```bash
+bo-forge model-summary \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv
+
+bo-forge plot \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv \
+  --kind model-diagnostics \
+  --output /tmp/bo_forge_model_diagnostics.png
+```
+
 For single-objective multi-fidelity configs, the fidelity variable is a normal
 CSV variable column. Once the initial design is complete, qMFKG model-based
 suggestions are one-at-a-time:
@@ -339,6 +354,7 @@ bo-forge plot \
 | `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
+| `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and latest fit metadata. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
@@ -346,7 +362,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics --output PATH` | Export one progress, diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, or context-diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|model-diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics --output PATH` | Export one progress, diagnostics, model-diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, or context-diagnostics figure. |
 
 ## 🧯 CLI Error Output
 

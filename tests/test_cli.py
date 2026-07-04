@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.0.0\n"
+    assert captured.out == "bo-forge 2.1.0\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.0.0\n"
+    assert completed.stdout == "bo-forge 2.1.0\n"
     assert completed.stderr == ""
 
 
@@ -1086,6 +1086,26 @@ def test_contextual_cli_context_summary_rejects_non_context_config(
 
     captured = capsys.readouterr()
     assert "context-summary requires a contextual config" in captured.err
+
+
+def test_cli_model_summary_outputs_table(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/17_model_profile_logei.yaml")
+    log_path = tmp_path / "model_profile.csv"
+    pd.read_csv(
+        "examples/17_model_profile_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(["model-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "model_profile" in captured.out
+    assert "smooth" in captured.out
+    assert "covariance_profile" in captured.out
+    assert "RBF/ARD" in captured.out
 
 
 def test_contextual_cli_plot_context_diagnostics_handles_pending_only_log(
@@ -2040,7 +2060,7 @@ def test_review_and_mark_observed_with_actual_cost(
     assert float(row["cost_actual"]) == pytest.approx(1.7)
 
 
-@pytest.mark.parametrize("kind", ["progress", "diagnostics"])
+@pytest.mark.parametrize("kind", ["progress", "diagnostics", "model-diagnostics"])
 def test_plot_writes_nested_output_path(
     kind: str,
     tmp_path: Path,

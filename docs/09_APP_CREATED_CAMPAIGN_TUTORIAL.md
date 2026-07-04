@@ -36,6 +36,7 @@ Use these values in the structured form:
 | New YAML config output path | `configs/09_app_created_practical_catalyst.yaml` |
 | New CSV log output path | `examples/09_app_created_practical_catalyst_campaign_log.csv` |
 | Campaign kind | `Single-objective` |
+| Model profile | `default` |
 | Objective name | `yield_score` |
 | Objective direction | `maximize` |
 | Batch size | `2` |
@@ -158,6 +159,9 @@ This `09` campaign is useful as a compact practical app demo:
 - the app can create a campaign from scratch;
 - `Campaign kind` selects single-objective, multi-objective, multi-fidelity
   qMFKG, or Contextual LogEI creation paths;
+- `Model profile` can choose curated single-objective profiles such as
+  `default`, `smooth`, `rough`, or `robust` when the selected campaign kind
+  supports them;
 - structured fields handle the basic config;
 - advanced YAML adds constraints, cost, review, and replicates;
 - BO Forge still writes a strict canonical CSV log;

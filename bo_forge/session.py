@@ -27,6 +27,7 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
+from bo_forge.models import model_summary as _model_summary
 from bo_forge.multi_objective import (
     pareto_front as _pareto_front,
 )
@@ -124,6 +125,7 @@ class CampaignSession:
             ("next_iteration", next_iteration(self.df)),
             ("best_row_id", best_row_id),
             ("best_objective_value", best_objective_value),
+            ("model_profile", self.config.model.profile),
         ]
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
@@ -210,6 +212,7 @@ class CampaignSession:
             ("pending_suggestions", pending_count),
             ("initial_design_remaining", initial_design_remaining),
             ("next_iteration", next_iteration(self.df)),
+            ("model_profile", self.config.model.profile),
         ]
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
@@ -486,6 +489,7 @@ class CampaignSession:
             tables = {
                 "summary": self.summary(),
                 "next_action": self.next_action(),
+                "model_summary": self.model_summary(),
                 "pareto_summary": self.pareto_summary(),
                 "pareto_front": self.pareto_front(),
                 "pending_suggestions": self.pending_suggestions(),
@@ -504,6 +508,7 @@ class CampaignSession:
         tables = {
             "summary": self.summary(),
             "next_action": self.next_action(),
+            "model_summary": self.model_summary(),
             "best_observation": self.best_observation(),
             "best_replicate_group": self.best_replicate_group(),
             "replicate_summary": self.replicate_summary(),
@@ -566,6 +571,10 @@ class CampaignSession:
     def context_summary(self) -> pd.DataFrame:
         """Return contextual-campaign summary rows by context combination."""
         return _context_summary(self.config, self.df)
+
+    def model_summary(self) -> pd.DataFrame:
+        """Return model-profile and fitting-input summary fields."""
+        return _model_summary(self.config, self.df)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -695,6 +704,14 @@ class CampaignSession:
 
         return _plot_context_diagnostics(self.config, self.df, **kwargs)
 
+    def plot_model_diagnostics(self, **kwargs: Any) -> Any:
+        """Plot model posterior-vs-observed diagnostics."""
+        from bo_forge.diagnostics import (
+            plot_model_diagnostics as _plot_model_diagnostics,
+        )
+
+        return _plot_model_diagnostics(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -708,6 +725,8 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             "BO Forge Campaign Report\n========================",
             "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
             "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+            "Model Summary\n-------------\n\n"
+            + _format_report_table(tables["model_summary"], "No model summary available."),
             "Pareto Summary\n--------------\n\n"
             + _format_report_table(tables["pareto_summary"], "No Pareto summary available."),
             "Pareto Front\n------------\n\n"
@@ -757,6 +776,8 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
             "BO Forge Campaign Report\n========================",
             "Summary\n-------\n\n" + tables["summary"].to_string(index=False),
             "Next Action\n-----------\n\n" + _format_next_action(tables["next_action"]),
+            "Model Summary\n-------------\n\n"
+            + _format_report_table(tables["model_summary"], "No model summary available."),
             "Best Raw Observation\n--------------------\n\n"
             + _format_best_observation(tables["best_observation"]),
             "Best Replicate Group By Mean Objective\n--------------------------------------\n\n"

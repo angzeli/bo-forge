@@ -1,6 +1,6 @@
-"""BO Forge v2.0.0."""
+"""BO Forge v2.1.0."""
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 from bo_forge.config import (
     BOConfig,
@@ -9,6 +9,7 @@ from bo_forge.config import (
     ContextConfig,
     CostConfig,
     FidelityConfig,
+    ModelConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -28,6 +29,7 @@ from bo_forge.errors import (
     SuggestionError,
 )
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
+from bo_forge.models import model_summary
 from bo_forge.multi_objective import (
     hypervolume,
     hypervolume_progress,
@@ -57,6 +59,7 @@ __all__ = [
     "FidelityConfig",
     "LogValidationError",
     "LogWriteError",
+    "ModelConfig",
     "ObjectiveConfig",
     "ReplicateConfig",
     "ReviewConfig",
@@ -78,6 +81,7 @@ __all__ = [
     "is_structured_campaign",
     "load_campaign_log",
     "mark_observed",
+    "model_summary",
     "pareto_front",
     "pareto_summary",
     "review_suggestion",

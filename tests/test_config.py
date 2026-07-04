@@ -185,6 +185,139 @@ replicates:
     assert config.replicates.noise_floor == pytest.approx(1.0e-6)
 
 
+def test_config_from_yaml_parses_model_profile(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: model_profile
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+model:
+  profile: smooth
+bo:
+  acquisition: log_ei
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.model.profile == "smooth"
+
+
+def test_config_from_yaml_rejects_unknown_model_profile(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_model_profile
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+model:
+  profile: too_fancy
+""",
+    )
+
+    with pytest.raises(ConfigError, match="model.profile"):
+        CampaignConfig.from_yaml(path)
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (
+            """
+objectives:
+  - name: activity
+    direction: maximize
+    reference_point: 0
+  - name: stability
+    direction: maximize
+    reference_point: 0
+""",
+            "multi-objective",
+        ),
+        (
+            """
+fidelity:
+  variable: fidelity
+  target: 1.0
+bo:
+  acquisition: qmf_kg
+""",
+            "fidelity campaigns",
+        ),
+        (
+            """
+stages:
+  - name: screen
+    variables: [x]
+""",
+            "structured campaign",
+        ),
+        (
+            """
+bo:
+  acquisition: qmf_kg
+""",
+            "requires",
+        ),
+    ],
+)
+def test_non_default_model_profiles_reject_unsupported_combinations(
+    tmp_path: Path,
+    extra: str,
+    message: str,
+) -> None:
+    objective = (
+        ""
+        if "objectives:" in extra
+        else """
+objective:
+  name: activity
+  direction: maximize
+"""
+    )
+    variables = """
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+"""
+    if "fidelity:" in extra:
+        variables += """
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+"""
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: bad_model_profile
+{objective}
+{variables}
+model:
+  profile: rough
+{extra}
+""",
+    )
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
 def test_config_from_yaml_parses_structured_stages(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",
@@ -978,6 +1111,15 @@ def test_example_multi_fidelity_config_parses() -> None:
     assert config.bo.acquisition == "qmf_kg"
     assert config.bo.min_normalized_distance == 0.0
     assert config.variable_names == ["catalyst_loading", "fidelity"]
+
+
+def test_example_model_profile_config_parses() -> None:
+    config = CampaignConfig.from_yaml("configs/17_model_profile_logei.yaml")
+
+    assert config.campaign_name == "model_profile_logei"
+    assert config.model.profile == "smooth"
+    assert config.bo.acquisition == "log_ei"
+    assert config.variable_names == ["catalyst_loading", "reaction_temperature"]
 
 
 def test_config_rejects_invalid_bounds(tmp_path: Path) -> None:

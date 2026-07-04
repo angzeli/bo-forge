@@ -138,15 +138,18 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/INSTALLATION.md" in readme
 
 
-def test_v2_0_docs_describe_hardening_release_scope() -> None:
+def test_v2_1_docs_describe_model_profile_release_scope() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.0.0" in readme
-    assert "v2.0.0 is a hardening baseline" in readme
-    assert "without adding new BO algorithms" in readme
+    assert "# 🧪 BO Forge v2.1.0" in readme
+    assert "v2.1.0 adds curated single-objective model profiles" in readme
+    assert "avoids raw BoTorch kernel passthrough" in readme
+    assert "configs/17_model_profile_logei.yaml" in readme
+    assert "bo-forge model-summary" in readme
+    assert "bo-forge plot --kind model-diagnostics" in readme
     assert "single-objective contextual LogEI/qLogEI" in readme
     assert "backward compatible with prior v1.x baselines" in readme
     assert "ROADMAP_V2_X.md" in readme
@@ -154,7 +157,9 @@ def test_v2_0_docs_describe_hardening_release_scope() -> None:
     assert "configs/16_contextual_logei.yaml" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.0.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.1.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "v2.1.0 adds model-profile visibility" in streamlit_app_docs
+    assert "Model Diagnostics" in streamlit_app_docs
     assert "adds Streamlit support for existing structured campaign semantics" in (
         streamlit_app_docs
     )
@@ -191,11 +196,13 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.0.0",
+        "BO Forge v2.1.0",
         "supported",
         "read-only/reporting only",
         "rejected",
         "deferred",
+        "Single-objective model profiles",
+        "Non-default model profile + multi-objective",
         "Multi-objective + deterministic cost",
         "Structured + contextual",
         "Contextual + multi-objective",
@@ -326,12 +333,15 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.0.0`" in roadmap
+    assert "Current baseline: `v2.1.0`" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert "v2.0.x - Stable v2 Baseline" in roadmap
+    assert "Status: completed" in roadmap
     assert "Status: active" in roadmap
     assert "v2.1.x - Model Profiles And Advanced Surrogates" in roadmap
+    assert "bo-forge model-summary" in roadmap
+    assert "plot --kind model-diagnostics" in roadmap
     assert "v2.2.x - Noisy And Pending-Aware BO" in roadmap
     assert "v2.3.x - Controlled Feature Combinations" in roadmap
     assert "v2.4.x - Multi-Fidelity Expansion" in roadmap
@@ -373,6 +383,8 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "--kind fidelity-diagnostics" in checklist
     assert "context-summary --config configs/16_contextual_logei.yaml" in checklist
     assert "--kind context-diagnostics" in checklist
+    assert "model-summary --config configs/17_model_profile_logei.yaml" in checklist
+    assert "--kind model-diagnostics" in checklist
 
 
 def test_requirements_lock_matches_current_release_snapshot() -> None:
@@ -380,7 +392,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.0.0" in requirements_lock
+    assert "BO Forge v2.1.0" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -391,8 +403,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install "bo-forge[api]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-2.0.0-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-2.0.0.tar.gz" in tutorial
+    assert "dist/bo_forge-2.1.0-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-2.1.0.tar.gz" in tutorial
     assert "pip check" in tutorial
 
 
@@ -500,6 +512,27 @@ def test_contextual_docs_reference_example_and_context_contract() -> None:
     assert "context variables are stored as normal CSV variable columns" in csv_schema
     assert "Contextual suggestions require values" in common_errors
     assert "context cannot be combined with" in common_errors
+
+
+def test_model_profile_docs_reference_example_and_contract() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    cli_docs = (PROJECT_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
+    quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
+    csv_schema = (PROJECT_ROOT / "docs" / "CSV_SCHEMA.md").read_text(encoding="utf-8")
+    common_errors = (PROJECT_ROOT / "docs" / "COMMON_ERRORS.md").read_text(
+        encoding="utf-8"
+    )
+    public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
+
+    for content in (readme, cli_docs, quickstart):
+        assert "17_model_profile_logei" in content
+        assert "model-summary" in content
+        assert "model-diagnostics" in content
+    assert "ModelConfig" in public_api
+    assert "model_summary" in public_api
+    assert "model.profile" in csv_schema
+    assert "does not add or remove CSV columns" in csv_schema
+    assert "Non-default model profiles" in common_errors
 
 
 def test_cost_aware_multi_objective_notebook_uses_current_version_wording() -> None:
@@ -614,10 +647,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-2.0.0-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-2.0.0.tar.gz"))
-    assert wheels, "No v2.0.0 wheel was built."
-    assert sdists, "No v2.0.0 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-2.1.0-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-2.1.0.tar.gz"))
+    assert wheels, "No v2.1.0 wheel was built."
+    assert sdists, "No v2.1.0 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -660,7 +693,7 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-2.0.0.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-2.1.0.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge/contextual.py" in names
@@ -672,8 +705,8 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge_app/api.py" in names
     assert "bo_forge_app/api_cli.py" in names
     assert "bo_forge_app/__main__.py" in names
-    assert "bo_forge-2.0.0.dist-info/entry_points.txt" in names
-    assert "bo_forge-2.0.0.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-2.1.0.dist-info/entry_points.txt" in names
+    assert "bo_forge-2.1.0.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -689,45 +722,47 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-2.0.0/README.md" in names
-    assert "bo_forge-2.0.0/LICENSE" in names
-    assert "bo_forge-2.0.0/requirements-lock.txt" in names
-    assert "bo_forge-2.0.0/ROADMAP_V0_TO_V1.md" in names
-    assert "bo_forge-2.0.0/ROADMAP_V1_X.md" in names
-    assert "bo_forge-2.0.0/ROADMAP_V2_X.md" in names
-    assert "bo_forge-2.0.0/docs/PUBLIC_API.md" in names
-    assert "bo_forge-2.0.0/docs/STREAMLIT_DEPLOYMENT.md" in names
-    assert "bo_forge-2.0.0/docs/API_PROBE.md" in names
-    assert "bo_forge-2.0.0/docs/CAPABILITY_MATRIX.md" in names
-    assert "bo_forge-2.0.0/examples/quickstart.py" in names
-    assert "bo_forge-2.0.0/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/README.md" in names
+    assert "bo_forge-2.1.0/LICENSE" in names
+    assert "bo_forge-2.1.0/requirements-lock.txt" in names
+    assert "bo_forge-2.1.0/ROADMAP_V0_TO_V1.md" in names
+    assert "bo_forge-2.1.0/ROADMAP_V1_X.md" in names
+    assert "bo_forge-2.1.0/ROADMAP_V2_X.md" in names
+    assert "bo_forge-2.1.0/docs/PUBLIC_API.md" in names
+    assert "bo_forge-2.1.0/docs/STREAMLIT_DEPLOYMENT.md" in names
+    assert "bo_forge-2.1.0/docs/API_PROBE.md" in names
+    assert "bo_forge-2.1.0/docs/CAPABILITY_MATRIX.md" in names
+    assert "bo_forge-2.1.0/examples/quickstart.py" in names
+    assert "bo_forge-2.1.0/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
     assert (
-        "bo_forge-2.0.0/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-2.1.0/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
         in names
     )
     assert (
-        "bo_forge-2.0.0/examples/11_four_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-2.1.0/examples/11_four_objective_mixed_constrained_campaign_log.csv"
         in names
     )
-    assert "bo_forge-2.0.0/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
-    assert "bo_forge-2.0.0/examples/13_structured_campaign_core_campaign_log.csv" in names
-    assert "bo_forge-2.0.0/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
-    assert "bo_forge-2.0.0/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
-    assert "bo_forge-2.0.0/examples/16_contextual_logei_campaign_log.csv" in names
-    assert "bo_forge-2.0.0/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-2.0.0/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-2.0.0/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
-    assert "bo_forge-2.0.0/configs/13_structured_campaign_core.yaml" in names
-    assert "bo_forge-2.0.0/configs/14_structured_campaign_tutorial.yaml" in names
-    assert "bo_forge-2.0.0/configs/15_multi_fidelity_qmfkg.yaml" in names
-    assert "bo_forge-2.0.0/configs/16_contextual_logei.yaml" in names
-    assert "bo_forge-2.0.0/notebooks/01_maximisation_logei_campaign.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/14_structured_campaign_tutorial.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in names
-    assert "bo_forge-2.0.0/notebooks/16_contextual_logei_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/examples/13_structured_campaign_core_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/examples/16_contextual_logei_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/examples/17_model_profile_campaign_log.csv" in names
+    assert "bo_forge-2.1.0/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-2.1.0/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-2.1.0/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
+    assert "bo_forge-2.1.0/configs/13_structured_campaign_core.yaml" in names
+    assert "bo_forge-2.1.0/configs/14_structured_campaign_tutorial.yaml" in names
+    assert "bo_forge-2.1.0/configs/15_multi_fidelity_qmfkg.yaml" in names
+    assert "bo_forge-2.1.0/configs/16_contextual_logei.yaml" in names
+    assert "bo_forge-2.1.0/configs/17_model_profile_logei.yaml" in names
+    assert "bo_forge-2.1.0/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/14_structured_campaign_tutorial.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in names
+    assert "bo_forge-2.1.0/notebooks/16_contextual_logei_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -769,7 +804,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 2.0.0\n"
+    assert completed.stdout == "bo-forge 2.1.0\n"
     subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
         cwd=probe_dir,
@@ -794,7 +829,7 @@ assert scripts["bo-forge-api"] == "bo_forge_app.api_cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "2.0.0"
+assert bo_forge.__version__ == "2.1.0"
 
 real_import = builtins.__import__
 def block_optional_app_deps(name, *args, **kwargs):

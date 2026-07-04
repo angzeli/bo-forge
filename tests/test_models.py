@@ -7,6 +7,7 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     FidelityConfig,
+    ModelConfig,
     ObjectiveConfig,
     ReplicateConfig,
     VariableConfig,
@@ -15,6 +16,7 @@ from bo_forge.models import (
     dataframe_to_training_tensors,
     fit_gp_model,
     fit_multi_fidelity_gp_model,
+    model_summary,
 )
 from bo_forge.validation import canonical_columns
 
@@ -162,6 +164,35 @@ def multi_fidelity_log(cfg: CampaignConfig) -> pd.DataFrame:
     )
 
 
+def model_profile_config(profile: str) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name=f"{profile}_profile_model",
+        objective=ObjectiveConfig("activity", "maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(batch_size=1, initial_design_size=1),
+        model=ModelConfig(profile=profile),
+    )
+
+
+def model_profile_log(cfg: CampaignConfig) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "row_id": "model_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.2,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_dataframe_to_training_tensors_includes_replicate_yvar() -> None:
     cfg = replicate_config()
 
@@ -232,6 +263,61 @@ def test_fit_gp_model_omits_train_yvar_when_unavailable(monkeypatch: pytest.Monk
     fit_gp_model(cfg, replicate_log(cfg).iloc[[0]].copy())
 
     assert "train_Yvar" not in captured["kwargs"]
+
+
+@pytest.mark.parametrize(
+    ("profile", "kernel_name"),
+    [("smooth", "RBFKernel"), ("rough", "MaternKernel")],
+)
+def test_fit_gp_model_passes_profile_covariance_module(
+    monkeypatch: pytest.MonkeyPatch,
+    profile: str,
+    kernel_name: str,
+) -> None:
+    cfg = model_profile_config(profile)
+    captured: dict[str, object] = {}
+
+    class FakeModel:
+        likelihood = object()
+
+    def fake_single_task_gp(*args: object, **kwargs: object) -> FakeModel:
+        captured["kwargs"] = kwargs
+        return FakeModel()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", fake_single_task_gp)
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    fit_gp_model(cfg, model_profile_log(cfg))
+
+    covar_module = captured["kwargs"]["covar_module"]
+    assert covar_module.__class__.__name__ == "ScaleKernel"
+    assert covar_module.base_kernel.__class__.__name__ == kernel_name
+
+
+def test_model_summary_reports_profile_and_fit_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("robust")
+
+    class FakeModel:
+        likelihood = object()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", lambda *_args, **_kwargs: FakeModel())
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    df = model_profile_log(cfg)
+    fit_gp_model(cfg, df)
+
+    summary = model_summary(cfg, df)
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+
+    assert values["model_profile"] == "robust"
+    assert values["model_class"] == "SingleTaskGP"
+    assert values["covariance_profile"] == "default/robust"
+    assert values["observed_rows_used_for_fitting"] == 1
+    assert values["last_fit_status"] == "ok"
 
 
 def test_fit_multi_fidelity_gp_model_uses_fidelity_feature(

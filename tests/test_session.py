@@ -881,6 +881,24 @@ def test_context_summary_rejects_non_context_session(tmp_path: Path) -> None:
         campaign.context_summary()
 
 
+def test_model_summary_and_report_include_model_section() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/17_model_profile_logei.yaml",
+        "examples/17_model_profile_campaign_log.csv",
+    )
+
+    summary = campaign.model_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+    assert values["model_profile"] == "smooth"
+    assert values["covariance_profile"] == "RBF/ARD"
+    assert values["observed_rows_used_for_fitting"] == 4
+    assert "model_summary" in report
+    assert "Model Summary\n-------------" in text
+
+
 def test_structured_session_mutations_use_config_aware_validation(tmp_path: Path) -> None:
     cfg = structured_config()
     log_path = write_log(tmp_path / "structured.csv", cfg, structured_pending_log(cfg))
@@ -967,6 +985,7 @@ def test_mixed_session_loads_validates_reports_and_suggests(tmp_path: Path) -> N
     assert list(report) == [
         "summary",
         "next_action",
+        "model_summary",
         "best_observation",
         "best_replicate_group",
         "replicate_summary",
@@ -1218,6 +1237,7 @@ def test_report_returns_read_only_dataframes(tmp_path: Path) -> None:
     assert list(report) == [
         "summary",
         "next_action",
+        "model_summary",
         "best_observation",
         "best_replicate_group",
         "replicate_summary",

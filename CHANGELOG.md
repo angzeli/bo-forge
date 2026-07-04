@@ -1,5 +1,28 @@
 # 📝 BO Forge Changelog
 
+## v2.1.0 - Model Profiles And Diagnostics
+
+This release adds curated single-objective model profiles and read-only model
+diagnostics without changing CSV schemas or exposing raw BoTorch kernel
+configuration.
+
+- Adds optional `model.profile` config support with `default`, `smooth`,
+  `rough`, and `robust` profiles.
+- Keeps non-default profiles limited to single-objective LogEI/qLogEI campaigns;
+  multi-objective, multi-fidelity, and structured campaigns use the default
+  profile in v2.1.0.
+- Adds RBF/ARD (`smooth`) and Matern-1.5/ARD (`rough`) covariance profiles for
+  supported single-objective campaigns.
+- Adds `model_summary(config, df)`, `CampaignSession.model_summary()`, and
+  report Model Summary sections.
+- Adds `bo-forge model-summary` and
+  `bo-forge plot --kind model-diagnostics`.
+- Adds Streamlit model-profile creation controls for supported
+  single-objective campaigns, plus Model Summary and Model Diagnostics routing
+  for loaded campaigns.
+- Adds `configs/17_model_profile_logei.yaml` and
+  `examples/17_model_profile_campaign_log.csv`.
+
 ## v2.0.0 - Stable Interface Hardening Baseline
 
 This release starts the v2.x line as a hardening-only major baseline after

@@ -174,6 +174,7 @@ def test_build_campaign_yaml_text_parses_through_config_validation() -> None:
         initial_design_size=6,
         initial_design_method="sobol",
         random_seed=7,
+        model={"profile": "rough"},
     )
 
     config = parse_campaign_config_text(text)
@@ -182,6 +183,7 @@ def test_build_campaign_yaml_text_parses_through_config_validation() -> None:
     assert config.objective.name == "yield"
     assert config.variable_names == ["temperature", "solvent"]
     assert config.bo.batch_size == 2
+    assert config.model.profile == "rough"
 
 
 def test_build_campaign_yaml_text_supports_advanced_multi_objective_sections() -> None:
@@ -932,9 +934,19 @@ def test_available_plot_kinds_follow_config_features() -> None:
     fidelity = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
     context = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
 
-    assert available_plot_kinds(plain) == ["progress", "diagnostics"]
-    assert available_plot_kinds(cost) == ["progress", "diagnostics", "cost_progress"]
-    assert available_plot_kinds(replicate) == ["progress", "diagnostics", "replicates"]
+    assert available_plot_kinds(plain) == ["progress", "diagnostics", "model_diagnostics"]
+    assert available_plot_kinds(cost) == [
+        "progress",
+        "diagnostics",
+        "model_diagnostics",
+        "cost_progress",
+    ]
+    assert available_plot_kinds(replicate) == [
+        "progress",
+        "diagnostics",
+        "model_diagnostics",
+        "replicates",
+    ]
     assert available_plot_kinds(multi) == ["pareto", "hypervolume"]
     assert available_plot_kinds(four_objective) == [
         "pareto",
@@ -955,6 +967,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
     assert available_plot_kinds(context) == [
         "progress",
         "diagnostics",
+        "model_diagnostics",
         "context_diagnostics",
     ]
 
@@ -985,7 +998,7 @@ def test_non_structured_stage_display_helpers_are_empty() -> None:
 
     assert structured_stage_options(config) == []
     assert structured_stage_config_table(config).empty
-    assert available_plot_kinds(config) == ["progress", "diagnostics"]
+    assert available_plot_kinds(config) == ["progress", "diagnostics", "model_diagnostics"]
 
 
 def test_default_export_path_uses_reports_directory() -> None:
@@ -2406,6 +2419,12 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     app.radio[0].set_value("Create Campaign")
     app.run(timeout=10)
 
+    next(selectbox for selectbox in app.selectbox if selectbox.label == "Model profile").set_value(
+        "smooth"
+    )
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
     app.text_input[1].set_value(str(config_path))
     app.text_input[2].set_value(str(log_path))
     create_button = next(button for button in app.button if button.label == "Create campaign")
@@ -2415,12 +2434,15 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert len(app.exception) == 0
     assert config_path.exists()
     assert log_path.exists()
+    config = CampaignConfig.from_yaml(config_path)
+    assert config.model.profile == "smooth"
     markdown_text = "\n".join(markdown.value for markdown in app.markdown)
     success_text = "\n".join(success.value for success in app.success)
     assert str(config_path) in markdown_text
     assert str(log_path) in markdown_text
     assert "Valid" in markdown_text
     assert "Campaign created and loaded" in success_text
+    assert any(subheader.value == "Model Summary" for subheader in app.subheader)
 
 
 def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) -> None:

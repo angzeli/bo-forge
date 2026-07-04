@@ -11,6 +11,7 @@ from bo_forge.config import (
     ConstraintConfig,
     CostConfig,
     FidelityConfig,
+    ModelConfig,
     ObjectiveConfig,
     ReplicateConfig,
     ReviewConfig,
@@ -1175,6 +1176,27 @@ def test_suggest_next_returns_model_based_single_suggestion() -> None:
     assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
     assert float(suggestions.loc[0, "x"]) >= 0.0
     assert float(suggestions.loc[0, "x"]) <= 1.0
+
+
+def test_suggest_next_supports_non_default_model_profile_without_mutating() -> None:
+    base = config(batch_size=1, initial_design_size=3)
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=base.variables,
+        bo=base.bo,
+        model=ModelConfig(profile="rough"),
+    )
+    df = observed_log(cfg)
+    before = df.copy(deep=True)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "log_ei"
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean"]))
+    assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
 
 
 def test_multi_fidelity_qmfkg_returns_one_valid_non_mutating_suggestion() -> None:

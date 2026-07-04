@@ -21,6 +21,7 @@ from bo_forge.diagnostics import (
     plot_context_diagnostics,
     plot_diagnostics,
     plot_fidelity_diagnostics,
+    plot_model_diagnostics,
     plot_progress,
     plot_replicates,
     plot_stage_diagnostics,
@@ -619,6 +620,35 @@ def test_plot_context_diagnostics_limits_large_context_sets_to_top_20() -> None:
 def test_plot_context_diagnostics_rejects_non_context_config() -> None:
     with pytest.raises(ValueError, match="requires a config with context"):
         plot_context_diagnostics(config(), observed_log())
+
+
+def test_plot_model_diagnostics_writes_file_and_labels(tmp_path: Path) -> None:
+    cfg = config()
+    save_path = tmp_path / "model_diagnostics.png"
+
+    fig, axes = plot_model_diagnostics(cfg, observed_log(), save_path=save_path)
+
+    assert save_path.exists()
+    assert axes[0].get_title() == "Observed vs posterior mean"
+    assert axes[0].get_xlabel() == "Observed activity"
+    assert axes[1].get_title() == "Residuals on fitting rows"
+    assert axes[1].get_ylabel() == "Observed - posterior mean"
+    plt.close(fig)
+
+
+def test_plot_model_diagnostics_handles_empty_observed_log() -> None:
+    cfg = config()
+
+    fig, axes = plot_model_diagnostics(cfg, pd.DataFrame(columns=canonical_columns(cfg)))
+
+    assert "No observed rows available" in axes[0].texts[0].get_text()
+    assert "No residuals available" in axes[1].texts[0].get_text()
+    plt.close(fig)
+
+
+def test_plot_model_diagnostics_rejects_fidelity_config() -> None:
+    with pytest.raises(ValueError, match="fidelity"):
+        plot_model_diagnostics(fidelity_config(), fidelity_log())
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

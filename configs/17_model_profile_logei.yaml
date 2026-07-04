@@ -1,0 +1,29 @@
+campaign_name: model_profile_logei
+objective:
+  name: activity
+  direction: maximize
+
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.05
+    upper: 1.0
+
+  - name: reaction_temperature
+    type: continuous
+    lower: 40
+    upper: 140
+
+model:
+  profile: smooth
+
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 17
+  raw_samples: 32
+  num_restarts: 2
+  mc_samples: 64
+  min_normalized_distance: 0.0

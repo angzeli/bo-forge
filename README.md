@@ -1,11 +1,10 @@
-# 🧪 BO Forge v2.0.0
+# 🧪 BO Forge v2.1.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.0.0 is a hardening baseline after the completed v1.x feature lines. It adds
-clearer capability/combinations documentation, stronger package-boundary checks,
-and the active v2.x roadmap without adding new BO algorithms, config keys, CSV
-columns, or workflow semantics.
+v2.1.0 adds curated single-objective model profiles and read-only model
+diagnostics on top of the v2.0 hardening baseline. It preserves YAML/CSV
+compatibility and avoids raw BoTorch kernel passthrough.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -18,6 +17,7 @@ BO Forge deliberately supports only:
 - maximize or minimize direction
 - Sobol or random initial suggestions
 - BoTorch `SingleTaskGP` and `SingleTaskMultiFidelityGP`
+- optional single-objective model profiles: `default`, `smooth`, `rough`, and `robust`
 - LogEI/qLogEI for standard single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
@@ -27,14 +27,14 @@ BO Forge deliberately supports only:
 - optional single-objective multi-fidelity qMFKG with one continuous fidelity variable and read-only fidelity diagnostics
 - optional single-objective contextual LogEI/qLogEI with context variables fixed at suggestion time
 - resume from existing logs
-- basic diagnostics, Pareto-front plots, and hypervolume progress
+- basic diagnostics, model diagnostics, Pareto-front plots, and hypervolume progress
 - a notebook-first `CampaignSession` workflow
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -151,6 +151,12 @@ notebook walkthrough is `notebooks/16_contextual_logei_campaign.ipynb`.
 Streamlit can also create `Campaign kind = Contextual LogEI` configs with
 selected context variables and optional defaults.
 
+The bundled model-profile example is `configs/17_model_profile_logei.yaml` with
+seed log `examples/17_model_profile_campaign_log.csv`. Inspect profile and
+fitting inputs with `campaign.model_summary()` or `bo-forge model-summary`, and
+export posterior-vs-observed diagnostics with
+`bo-forge plot --kind model-diagnostics`.
+
 ---
 
 ## 🗂️ Repository Structure
@@ -195,7 +201,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.0.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.1.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

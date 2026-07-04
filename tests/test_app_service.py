@@ -61,13 +61,21 @@ print("ok")
             "01_simple_2d_maximise_logei.yaml",
             "01_simple_2d_maximise_logei_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending"],
+            ["summary", "next_action", "model_summary", "observed", "pending"],
         ),
         (
             "10_multi_objective_mixed_constrained_qlogehvi.yaml",
             "10_multi_objective_mixed_constrained_campaign_log.csv",
             "Data",
-            ["summary", "next_action", "observed", "pending", "pareto_summary", "pareto_front"],
+            [
+                "summary",
+                "next_action",
+                "model_summary",
+                "observed",
+                "pending",
+                "pareto_summary",
+                "pareto_front",
+            ],
         ),
         (
             "07_cost_aware_human_review_logei.yaml",
@@ -79,31 +87,39 @@ print("ok")
             "08_replicate_aware_logei.yaml",
             "08_replicate_aware_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending", "replicate_summary"],
+            ["summary", "next_action", "model_summary", "observed", "pending", "replicate_summary"],
         ),
         (
             "12_cost_aware_multi_objective_qlogehvi.yaml",
             "12_cost_aware_multi_objective_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending", "pareto_summary", "cost_summary"],
+            [
+                "summary",
+                "next_action",
+                "model_summary",
+                "observed",
+                "pending",
+                "pareto_summary",
+                "cost_summary",
+            ],
         ),
         (
             "13_structured_campaign_core.yaml",
             "13_structured_campaign_core_campaign_log.csv",
             "Data",
-            ["summary", "next_action", "observed", "pending", "stage_summary"],
+            ["summary", "next_action", "model_summary", "observed", "pending", "stage_summary"],
         ),
         (
             "15_multi_fidelity_qmfkg.yaml",
             "15_multi_fidelity_qmfkg_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending", "fidelity_summary"],
+            ["summary", "next_action", "model_summary", "observed", "pending", "fidelity_summary"],
         ),
         (
             "16_contextual_logei.yaml",
             "16_contextual_logei_campaign_log.csv",
             "Overview",
-            ["summary", "next_action", "observed", "pending", "context_summary"],
+            ["summary", "next_action", "model_summary", "observed", "pending", "context_summary"],
         ),
     ],
 )
@@ -544,6 +560,23 @@ def test_app_service_context_summary_and_diagnostics_plot_routing(tmp_path: Path
     assert "context_diagnostics" in service.available_plot_kinds()
     plot_path = tmp_path / "plots" / "context_diagnostics.png"
     result = service.plot("context_diagnostics", save_path=plot_path)
+
+    assert plot_path.exists()
+    assert result.written_path == plot_path
+    plt.close(result.figure)
+
+
+def test_app_service_model_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "17_model_profile_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "17_model_profile_logei.yaml",
+        log_path,
+    )
+
+    assert callable(service.model_summary)
+    assert "model_diagnostics" in service.available_plot_kinds()
+    plot_path = tmp_path / "plots" / "model_diagnostics.png"
+    result = service.plot("model_diagnostics", save_path=plot_path)
 
     assert plot_path.exists()
     assert result.written_path == plot_path

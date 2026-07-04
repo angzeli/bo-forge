@@ -293,7 +293,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v1.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.1.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -303,7 +303,7 @@ BO Forge supports `m >= 2` objectives with coupled evaluation. The primary teste
 - Hypervolume is computed in internal maximisation space after applying objective directions.
 - If no observed point dominates the reference point, hypervolume is reported as `0.0`.
 
-Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns in v1.4.0. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
+Review, replicate, and deterministic cost metadata are supported for multi-objective campaigns. Multi-objective cost-aware ranking uses qLogEHVI batch utility; cost is not modeled as another objective.
 
 ## 🧑‍⚖️ Review And Budget Rules
 
@@ -330,7 +330,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v1.4.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.1.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -351,6 +351,19 @@ replicate_group,<variable columns...>,n_replicates,<objective>_mean,<objective>_
 ```
 
 Pareto fronts and hypervolume use one group-mean objective vector per `replicate_group` when multi-objective replicates are enabled. Multi-objective qLogEHVI also consumes replicate-derived per-objective `train_Yvar`, but active repeat selection for multi-objective campaigns remains deferred.
+
+## 🧠 Model Profile Rules
+
+`model.profile` changes only model-fitting behavior for supported
+single-objective LogEI/qLogEI campaigns. It does not add or remove CSV columns.
+The canonical single-objective columns remain:
+
+```text
+row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predicted_std,acquisition
+```
+
+Non-default model profiles are rejected for multi-objective, multi-fidelity,
+and structured campaigns in v2.1.0.
 
 ## 🧪 Variable Value Rules
 
