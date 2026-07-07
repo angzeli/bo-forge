@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.1.0\n"
+    assert captured.out == "bo-forge 2.1.1\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.1.0\n"
+    assert completed.stdout == "bo-forge 2.1.1\n"
     assert completed.stderr == ""
 
 
@@ -1106,6 +1106,8 @@ def test_cli_model_summary_outputs_table(
     assert "smooth" in captured.out
     assert "covariance_profile" in captured.out
     assert "RBF/ARD" in captured.out
+    assert "last_fit_status" in captured.out
+    assert "not_recorded" in captured.out
 
 
 def test_contextual_cli_plot_context_diagnostics_handles_pending_only_log(

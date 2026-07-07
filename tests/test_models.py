@@ -320,6 +320,155 @@ def test_model_summary_reports_profile_and_fit_metadata(
     assert values["last_fit_status"] == "ok"
 
 
+def test_model_summary_ignores_stale_fit_metadata_when_log_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("smooth")
+
+    class FakeModel:
+        likelihood = object()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", lambda *_args, **_kwargs: FakeModel())
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    df = model_profile_log(cfg)
+    fit_gp_model(cfg, df)
+    changed_df = pd.concat(
+        [
+            df,
+            pd.DataFrame(
+                [
+                    {
+                        "row_id": "model_1",
+                        "iteration": 1,
+                        "status": "observed",
+                        "source": "manual",
+                        "x": 0.8,
+                        "activity": 1.4,
+                        "predicted_mean": "",
+                        "predicted_std": "",
+                        "acquisition": "",
+                    }
+                ],
+                columns=canonical_columns(cfg),
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    summary = model_summary(cfg, changed_df)
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+
+    assert values["observed_rows_used_for_fitting"] == 2
+    assert values["last_fit_status"] == "not_recorded"
+    assert values["fallback_status"] == "not_recorded"
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [("x", 0.8), ("activity", 1.8)],
+)
+def test_model_summary_ignores_stale_fit_metadata_when_same_shape_values_change(
+    monkeypatch: pytest.MonkeyPatch,
+    column: str,
+    value: float,
+) -> None:
+    cfg = model_profile_config("smooth")
+
+    class FakeModel:
+        likelihood = object()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", lambda *_args, **_kwargs: FakeModel())
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    df = model_profile_log(cfg)
+    fit_gp_model(cfg, df)
+    changed_df = df.copy()
+    changed_df.loc[0, column] = value
+
+    summary = model_summary(cfg, changed_df)
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+
+    assert values["observed_rows_used_for_fitting"] == 1
+    assert values["last_fit_status"] == "not_recorded"
+
+
+def test_model_summary_ignores_stale_fit_metadata_when_same_shape_yvar_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config()
+
+    class FakeModel:
+        likelihood = object()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", lambda *_args, **_kwargs: FakeModel())
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    df = replicate_log(cfg)
+    fit_gp_model(cfg, df)
+    changed_df = df.copy()
+    changed_df.loc[0, "activity"] = 0.9
+    changed_df.loc[1, "activity"] = 1.5
+
+    summary = model_summary(cfg, changed_df)
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+
+    assert values["observed_rows_used_for_fitting"] == 1
+    assert values["train_yvar_used"] is True
+    assert values["last_fit_status"] == "not_recorded"
+
+
+def test_model_summary_ignores_stale_fit_metadata_when_config_shape_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("rough")
+    wider_cfg = CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("z", "continuous", 0.0, 1.0),
+        ),
+        bo=cfg.bo,
+        model=cfg.model,
+    )
+
+    class FakeModel:
+        likelihood = object()
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", lambda *_args, **_kwargs: FakeModel())
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
+
+    fit_gp_model(cfg, model_profile_log(cfg))
+    wider_df = pd.DataFrame(
+        [
+            {
+                "row_id": "model_0",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.2,
+                "z": 0.6,
+                "activity": 1.0,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(wider_cfg),
+    )
+
+    summary = model_summary(wider_cfg, wider_df)
+    values = dict(zip(summary["field"], summary["value"], strict=True))
+
+    assert values["encoded_dimension"] == 2
+    assert values["last_fit_status"] == "not_recorded"
+
+
 def test_fit_multi_fidelity_gp_model_uses_fidelity_feature(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

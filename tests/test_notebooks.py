@@ -2,6 +2,7 @@ import math
 import shutil
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import nbformat
 import pytest
 from nbformat.validator import validate
@@ -19,6 +20,7 @@ REPLICATE_NOTEBOOK = Path("notebooks/08_replicate_aware_campaign.ipynb")
 FOUR_OBJECTIVE_NOTEBOOK = Path("notebooks/11_four_objective_qlogehvi_campaign.ipynb")
 MULTI_FIDELITY_NOTEBOOK = Path("notebooks/15_multi_fidelity_qmfkg_campaign.ipynb")
 CONTEXTUAL_NOTEBOOK = Path("notebooks/16_contextual_logei_campaign.ipynb")
+MODEL_PROFILE_NOTEBOOK = Path("notebooks/17_model_profile_logei_campaign.ipynb")
 
 assert NOTEBOOKS, "No notebooks found under notebooks/*.ipynb"
 
@@ -176,3 +178,59 @@ def test_contextual_tutorial_loop_reaches_target_with_committed_config(
             generated += 1
 
     assert len(campaign.observed_data()) == 15
+
+
+def test_model_profile_notebook_uses_existing_logei_assets() -> None:
+    source = notebook_source(MODEL_PROFILE_NOTEBOOK)
+
+    assert "model_summary()" in source
+    assert "plot_model_diagnostics" in source
+    assert "configs\" / \"17_model_profile_logei.yaml" in source
+    assert "examples\" / \"17_model_profile_campaign_log.csv" in source
+    assert "TARGET_OBSERVED_ROWS = 15" in source
+    assert "CampaignSession.from_files" in source
+    assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+
+
+def test_model_profile_tutorial_workflow_smoke(tmp_path: Path) -> None:
+    log_path = tmp_path / "17_model_profile_logei_working_log.csv"
+    latest_path = tmp_path / "17_model_profile_logei_latest_suggestions.csv"
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    shutil.copyfile("examples/17_model_profile_campaign_log.csv", log_path)
+    campaign = CampaignSession.from_files(
+        "configs/17_model_profile_logei.yaml",
+        log_path,
+    )
+
+    def simulate_activity(row: object) -> float:
+        loading = float(row["catalyst_loading"])
+        temperature = float(row["reaction_temperature"])
+        loading_term = 0.62 + 0.85 * loading - 0.92 * (loading - 0.68) ** 2
+        temperature_term = -0.00008 * (temperature - 108.0) ** 2
+        smooth_variation = 0.035 * math.sin(9.0 * loading + 0.035 * temperature)
+        return round(loading_term + temperature_term + smooth_variation, 6)
+
+    campaign.validate()
+    model_summary = campaign.model_summary()
+    model_values = dict(
+        zip(model_summary["field"], model_summary["value"], strict=True)
+    )
+    assert model_values["model_profile"] == "smooth"
+    before = log_path.read_bytes()
+    suggestions = campaign.suggest_next(batch_size=1)
+    assert log_path.read_bytes() == before
+    suggestions.to_csv(latest_path, index=False)
+    campaign.append_suggestions(suggestions)
+    for row_id in suggestions["row_id"]:
+        row = campaign.df.loc[campaign.df["row_id"] == row_id].iloc[0]
+        campaign.mark_observed(row_id=row_id, objective_value=simulate_activity(row))
+
+    campaign = CampaignSession.from_files("configs/17_model_profile_logei.yaml", log_path)
+    campaign.plot_model_diagnostics(save_path=report_dir / "17_model_profile_diagnostics.png")
+    campaign.export_report(report_dir / "17_model_profile_report.md")
+
+    assert latest_path.exists()
+    assert (report_dir / "17_model_profile_diagnostics.png").exists()
+    assert (report_dir / "17_model_profile_report.md").exists()
+    plt.close("all")

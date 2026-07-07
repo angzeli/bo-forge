@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.1.0`. The v2.1.0 release preserves v1 YAML/CSV/session,
+Current baseline: `v2.1.1`. The v2.1.1 release preserves v1 YAML/CSV/session,
 CLI, notebook, Streamlit, service, and experimental API probe behavior while
-adding curated single-objective model profiles, model summaries, and
-model-diagnostics plots on top of the v2.0 hardening baseline.
+hardening curated single-objective model-profile summaries and adding a
+lightweight model-profile tutorial on top of the v2.1.0 model-profile baseline.
 
 ## Roadmap So Far
 
@@ -43,12 +43,14 @@ Status: active
 
 - `v2.1.0` introduces curated model profiles instead of raw BoTorch kernel
   passthrough.
+- `v2.1.1` hardens process-local `last_fit_*` summary metadata and adds the
+  model-profile tutorial notebook.
 - Supports `default`, `smooth`, `rough`, and `robust` profiles for
   single-objective LogEI/qLogEI campaigns.
 - Adds `model_summary`, `bo-forge model-summary`, and
   `plot --kind model-diagnostics`.
 - Keeps non-default profiles rejected for multi-objective, multi-fidelity, and
-  structured campaigns in v2.1.0.
+  structured campaigns in v2.1.1.
 - Preserves CSV schema compatibility.
 
 ## v2.2.x - Noisy And Pending-Aware BO

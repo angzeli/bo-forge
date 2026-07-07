@@ -57,7 +57,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.1.0-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.1.1-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -74,7 +74,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.1.0-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.1.1-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -91,7 +91,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.1.0-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.1.1-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -104,7 +104,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.1.0.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.1.1.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -151,6 +151,8 @@ Confirm the full local loop still works:
   generated YAML contains `context:` and `bo.acquisition: log_ei`;
 - create a supported single-objective campaign with `model.profile: smooth` and
   confirm Model Summary and Model Diagnostics are available;
+- open `notebooks/17_model_profile_logei_campaign.ipynb` or inspect its source
+  to confirm it uses the current model-profile config and seed log;
 - load `configs/16_contextual_logei.yaml`, generate a dry-run contextual
   suggestion with `feedstock_acidity`, and confirm append is blocked if the
   context value changes after staging;
@@ -164,8 +166,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.1.0`.
-- Tag the release as `v2.1.0`.
+  install paths, and the release tag all agree on `v2.1.1`.
+- Tag the release as `v2.1.1`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

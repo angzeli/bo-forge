@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import warnings
 from dataclasses import dataclass
 
@@ -121,8 +122,13 @@ def model_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     """Return read-only model-profile and fitting-input summary fields."""
     validate_campaign_data(config, df)
     observed = get_observed_data(config, df)
+    model_class = _model_class_name(config)
+    covariance_profile = _covariance_profile_name(config)
+    encoded_dim = encoded_dimension(config)
+    objective_count = len(config.objective_names)
     observed_rows_used = 0
     train_yvar_used = False
+    training_fingerprint = None
     if not observed.empty:
         if config.is_structured_campaign:
             observed_rows_used = int(len(observed))
@@ -130,20 +136,32 @@ def model_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
             training = dataframe_to_training_tensors(config, observed)
             observed_rows_used = int(training.train_x.shape[0])
             train_yvar_used = training.train_yvar is not None
+            training_fingerprint = _training_fingerprint(training)
 
-    metadata = _matching_last_fit_metadata(config)
+    metadata = _matching_last_fit_metadata(
+        config,
+        {
+            "model_class": model_class,
+            "covariance_profile": covariance_profile,
+            "encoded_dimension": encoded_dim,
+            "observed_rows_used_for_fitting": observed_rows_used,
+            "objective_count": objective_count,
+            "train_yvar_used": train_yvar_used,
+            "training_fingerprint": training_fingerprint,
+        },
+    )
     rows = [
         ("model_profile", config.model.profile),
-        ("model_class", _model_class_name(config)),
-        ("covariance_profile", _covariance_profile_name(config)),
-        ("encoded_dimension", encoded_dimension(config)),
+        ("model_class", model_class),
+        ("covariance_profile", covariance_profile),
+        ("encoded_dimension", encoded_dim),
         ("observed_rows_used_for_fitting", observed_rows_used),
-        ("objective_count", len(config.objective_names)),
+        ("objective_count", objective_count),
         ("train_yvar_used", train_yvar_used),
-        ("last_fit_status", metadata.get("fit_status")),
+        ("last_fit_status", metadata.get("fit_status", "not_recorded")),
         ("last_fit_warning_count", metadata.get("fit_warning_count", 0)),
         ("last_fit_warnings", metadata.get("fit_warnings", "")),
-        ("fallback_status", metadata.get("fallback_status")),
+        ("fallback_status", metadata.get("fallback_status", "not_recorded")),
     ]
     return pd.DataFrame(rows, columns=["field", "value"])
 
@@ -230,6 +248,7 @@ def _record_fit_metadata(
             "observed_rows_used_for_fitting": int(training.train_x.shape[0]),
             "objective_count": int(training.train_y.shape[-1]),
             "train_yvar_used": training.train_yvar is not None,
+            "training_fingerprint": _training_fingerprint(training),
             "fit_status": fit_status,
             "fit_warning_count": len(fit_warnings),
             "fit_warnings": "; ".join(fit_warnings),
@@ -238,13 +257,37 @@ def _record_fit_metadata(
     )
 
 
-def _matching_last_fit_metadata(config: CampaignConfig) -> dict[str, object]:
+def _matching_last_fit_metadata(
+    config: CampaignConfig,
+    expected: dict[str, object],
+) -> dict[str, object]:
     if (
-        _LAST_FIT_METADATA.get("campaign_name") == config.campaign_name
-        and _LAST_FIT_METADATA.get("profile") == config.model.profile
+        _LAST_FIT_METADATA.get("campaign_name") != config.campaign_name
+        or _LAST_FIT_METADATA.get("profile") != config.model.profile
     ):
-        return dict(_LAST_FIT_METADATA)
-    return {}
+        return {}
+    for key, value in expected.items():
+        if _LAST_FIT_METADATA.get(key) != value:
+            return {}
+    return dict(_LAST_FIT_METADATA)
+
+
+def _training_fingerprint(training: TrainingTensors) -> str:
+    digest = hashlib.sha256()
+    for name, tensor in (
+        ("train_x", training.train_x),
+        ("train_y", training.train_y),
+        ("train_yvar", training.train_yvar),
+    ):
+        digest.update(name.encode("utf-8"))
+        if tensor is None:
+            digest.update(b"<none>")
+            continue
+        detached = tensor.detach().cpu().contiguous()
+        digest.update(str(tuple(detached.shape)).encode("utf-8"))
+        digest.update(str(detached.dtype).encode("utf-8"))
+        digest.update(detached.numpy().tobytes())
+    return digest.hexdigest()
 
 
 def _model_class_name(config: CampaignConfig) -> str:

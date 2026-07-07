@@ -1,10 +1,10 @@
-# 🧪 BO Forge v2.1.0
+# 🧪 BO Forge v2.1.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.1.0 adds curated single-objective model profiles and read-only model
-diagnostics on top of the v2.0 hardening baseline. It preserves YAML/CSV
-compatibility and avoids raw BoTorch kernel passthrough.
+v2.1.1 hardens curated single-objective model-profile diagnostics and adds a
+notebook walkthrough on top of the v2.1.0 model-profile baseline. It preserves
+YAML/CSV compatibility and avoids raw BoTorch kernel passthrough.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -155,7 +155,8 @@ The bundled model-profile example is `configs/17_model_profile_logei.yaml` with
 seed log `examples/17_model_profile_campaign_log.csv`. Inspect profile and
 fitting inputs with `campaign.model_summary()` or `bo-forge model-summary`, and
 export posterior-vs-observed diagnostics with
-`bo-forge plot --kind model-diagnostics`.
+`bo-forge plot --kind model-diagnostics`. The notebook walkthrough is
+`notebooks/17_model_profile_logei_campaign.ipynb`.
 
 ---
 
@@ -201,7 +202,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.1.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.1.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

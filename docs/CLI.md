@@ -113,7 +113,9 @@ bo-forge plot \
 ```
 
 For single-objective model profiles, the CSV schema is unchanged. Inspect the
-configured profile and fitting inputs, then export model diagnostics:
+configured profile and fitting inputs, then export model diagnostics. The
+`last_fit_*` fields are process-local and show `not_recorded` until a model fit
+has happened in the same Python process for the same current fitting inputs.
 
 ```bash
 bo-forge model-summary \
@@ -354,7 +356,7 @@ bo-forge plot \
 | `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
-| `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and latest fit metadata. |
+| `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and process-local latest fit metadata when available. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |

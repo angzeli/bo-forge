@@ -314,7 +314,7 @@ variables and optional defaults. In v1.5.x, `context:` cannot be combined with
 
 ## 🧠 Model Profiles
 
-v2.1.0 adds optional model profiles for single-objective LogEI/qLogEI campaigns.
+The v2.1 line includes optional model profiles for single-objective LogEI/qLogEI campaigns.
 Profiles select curated GP covariance behavior without exposing raw BoTorch
 kernel passthrough:
 
@@ -325,7 +325,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to single-objective LogEI/qLogEI workflows
-in v2.1.0; multi-objective, multi-fidelity, and structured campaigns should use
+in v2.1.1; multi-objective, multi-fidelity, and structured campaigns should use
 the default profile.
 
 Try the bundled model-profile example:
@@ -345,6 +345,10 @@ bo-forge plot \
   --kind model-diagnostics \
   --output /tmp/bo_forge_model_diagnostics.png
 ```
+
+The tutorial notebook is:
+
+- `notebooks/17_model_profile_logei_campaign.ipynb`.
 
 ## 🔁 Session API
 
@@ -690,6 +694,7 @@ The notebooks write only ignored working files:
 - `examples/06_mixed_constrained_logei_working_log.csv`
 - `examples/07_cost_aware_human_review_working_log.csv`
 - `examples/08_replicate_aware_working_log.csv`
+- `examples/17_model_profile_logei_working_log.csv`
 - `examples/*_latest_suggestions.csv`
 
 Generated reports and figure exports should go under ignored paths such as `reports/`.

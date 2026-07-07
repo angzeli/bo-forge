@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v2.1.1 - Model Profile Hardening And Tutorial
+
+This focused follow-up hardens model-profile diagnostics and adds a lightweight
+notebook walkthrough without changing model profiles, covariance behavior,
+config keys, or CSV schemas.
+
+- Ensures `model_summary()` only shows process-local `last_fit_*` metadata when
+  the current fitting inputs match the most recent in-process fit.
+- Reports `last_fit_status: not_recorded` and `fallback_status: not_recorded`
+  when no matching fit metadata is available.
+- Clarifies CLI and public API docs for process-local `last_fit_*` metadata.
+- Adds `notebooks/17_model_profile_logei_campaign.ipynb` using the existing
+  model-profile config and seed log.
+- Keeps non-default model profiles limited to supported single-objective
+  LogEI/qLogEI campaigns.
+
 ## v2.1.0 - Model Profiles And Diagnostics
 
 This release adds curated single-objective model profiles and read-only model

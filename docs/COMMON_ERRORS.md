@@ -141,7 +141,7 @@ deferred.
 
 ### `Non-default model profiles ...`
 
-v2.1.0 model profiles are deliberately conservative.
+v2.1.1 model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
 single-objective LogEI/qLogEI campaigns. Use `model.profile: default` for

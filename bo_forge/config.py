@@ -698,22 +698,22 @@ def _validate_model_combinations(
     if multi_objective:
         raise ConfigError(
             "Non-default model profiles are only supported for single-objective "
-            "LogEI/qLogEI campaigns in v2.1.0; use model.profile: default for "
+            "LogEI/qLogEI campaigns in v2.1.1; use model.profile: default for "
             "multi-objective campaigns."
         )
     if fidelity is not None:
         raise ConfigError(
             "Non-default model profiles cannot be combined with fidelity campaigns "
-            "in v2.1.0; use model.profile: default."
+            "in v2.1.1; use model.profile: default."
         )
     if stages:
         raise ConfigError(
             "Non-default model profiles cannot be combined with structured campaign "
-            "stages in v2.1.0; use model.profile: default."
+            "stages in v2.1.1; use model.profile: default."
         )
     if bo.acquisition != "log_ei":
         raise ConfigError(
-            "Non-default model profiles require bo.acquisition: log_ei in v2.1.0."
+            "Non-default model profiles require bo.acquisition: log_ei in v2.1.1."
         )
 
 

@@ -371,7 +371,7 @@ def _render_create_new_campaign(st: Any) -> None:
             disabled=True,
             help=(
                 "Non-default model profiles are supported only for single-objective "
-                "LogEI/qLogEI campaigns in v2.1.0."
+                "LogEI/qLogEI campaigns in v2.1.1."
             ),
         )
     else:

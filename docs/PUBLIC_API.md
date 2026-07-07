@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.1.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.1.1.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -90,12 +90,13 @@ not fully declared in YAML. Use `context_summary(config, df)` or
 context combination.
 
 Model profiles expose `ModelConfig` and `model_summary` through the top-level
-package for config construction and read-only inspection. v2.1.0 supports
+package for config construction and read-only inspection. v2.1.1 supports
 `default`, `smooth`, `rough`, and `robust` profiles; non-default profiles are
 single-objective LogEI/qLogEI only. Use `model_summary(config, df)` or
 `CampaignSession.model_summary()` to inspect the configured profile, model
-class, covariance profile, fitting-row count, train-Y variance use, and latest
-fit metadata.
+class, covariance profile, fitting-row count, and train-Y variance use.
+`last_fit_*` fields are process-local and report `not_recorded` unless a model
+fit has happened in the same Python process for matching current fitting inputs.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

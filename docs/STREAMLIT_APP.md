@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.1.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.1.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -32,7 +32,7 @@ The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
 Streamlit workbench.
 
-v2.1.0 adds model-profile visibility for supported single-objective campaigns.
+The v2.1 line includes model-profile visibility for supported single-objective campaigns.
 The create flow can write `model.profile` for standard and contextual
 single-objective LogEI/qLogEI campaigns, while multi-objective, multi-fidelity,
 and structured create/load paths keep the default model profile. Loaded
@@ -107,7 +107,7 @@ When a loaded config defines `context:`, the app:
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
 
-v2.1.0 app support is limited to single-objective contextual LogEI/qLogEI
+v2.1.1 app support is limited to single-objective contextual LogEI/qLogEI
 campaigns. Contextual multi-objective BO, contextual structured campaigns,
 contextual multi-fidelity, contextual cost-aware, and contextual
 replicate-aware workflows remain deferred.
@@ -125,7 +125,7 @@ offers:
 - `rough`: Matern-1.5/ARD covariance;
 - `robust`: default fitting path with explicit warning metadata.
 
-Non-default model profiles are single-objective LogEI/qLogEI only in v2.1.0.
+Non-default model profiles are single-objective LogEI/qLogEI only in v2.1.1.
 The app disables non-default profiles for multi-objective, multi-fidelity, and
 structured campaign creation.
 
