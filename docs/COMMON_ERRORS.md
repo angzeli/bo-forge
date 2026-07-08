@@ -141,11 +141,21 @@ deferred.
 
 ### `Non-default model profiles ...`
 
-v2.1.1 model profiles are deliberately conservative.
+v2.1.2 model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
-single-objective LogEI/qLogEI campaigns. Use `model.profile: default` for
-multi-objective, multi-fidelity, and structured campaigns.
+single-objective campaigns configured with `bo.acquisition: log_ei`. Use
+`model.profile: default` for multi-objective, multi-fidelity, and structured
+campaigns.
+
+### `model_profile_comparison() does not support ...`
+
+Model-profile comparison is a read-only diagnostic for supported
+single-objective model-profile workflows. It is not automatic model selection.
+
+Fix: run `bo-forge model-compare` only on single-objective, non-structured,
+non-multi-fidelity campaigns. Multi-objective, structured, and multi-fidelity
+campaigns should use their dedicated diagnostics instead.
 
 ### `Constraint '...' uses unsupported syntax`
 

@@ -370,8 +370,8 @@ def _render_create_new_campaign(st: Any) -> None:
             key="new_campaign_model_profile_default_only",
             disabled=True,
             help=(
-                "Non-default model profiles are supported only for single-objective "
-                "LogEI/qLogEI campaigns in v2.1.1."
+                "Non-default model profiles require a single-objective config with "
+                "bo.acquisition: log_ei in v2.1.2."
             ),
         )
     else:
@@ -1898,6 +1898,23 @@ def _render_reports(
         else:
             st.success(f"Wrote report: {written_path}")
 
+    if _supports_model_profile_comparison(campaign.config):
+        with st.form("model_comparison_form"):
+            run_comparison = st.form_submit_button("Run model comparison")
+        if run_comparison:
+            try:
+                comparison = campaign.model_profile_comparison()
+            except (BOForgeError, ValueError) as exc:
+                st.error(str(exc))
+            else:
+                _render_table_section(
+                    st,
+                    "Model Profile Comparison",
+                    comparison,
+                    empty_kind="report_preview",
+                    expanded_raw=False,
+                )
+
     plot_options = _available_plot_options(campaign, flags, log_path)
     if not plot_options:
         _render_empty_state(st, *empty_state_message("plots"))
@@ -1935,6 +1952,7 @@ def _available_plot_options(
         "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
         "context_diagnostics": ("Context Diagnostics", "plot_context_diagnostics"),
         "model_diagnostics": ("Model Diagnostics", "plot_model_diagnostics"),
+        "model_comparison": ("Model Comparison", "plot_model_comparison"),
     }
     for kind, (label, plotter_name) in mapping.items():
         if kind in plot_kinds:
@@ -1980,6 +1998,14 @@ def _available_plot_options(
             }
         )
     return options
+
+
+def _supports_model_profile_comparison(config: Any) -> bool:
+    return (
+        not config.is_multi_objective
+        and config.fidelity is None
+        and not config.is_structured_campaign
+    )
 
 
 def _service_plotter(campaign: Any, kind: str) -> Any:

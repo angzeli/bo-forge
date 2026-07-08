@@ -113,20 +113,34 @@ bo-forge plot \
 ```
 
 For single-objective model profiles, the CSV schema is unchanged. Inspect the
-configured profile and fitting inputs, then export model diagnostics. The
-`last_fit_*` fields are process-local and show `not_recorded` until a model fit
-has happened in the same Python process for the same current fitting inputs.
+configured profile and fitting inputs, compare profiles read-only, then export
+model diagnostics. The `last_fit_*` fields are process-local and show
+`not_recorded` until a model fit has happened in the same Python process for
+the same current fitting inputs. `model-compare` is diagnostic only; it does
+not change the configured profile or automatically select a model.
 
 ```bash
 bo-forge model-summary \
   --config configs/17_model_profile_logei.yaml \
   --log examples/17_model_profile_campaign_log.csv
 
+bo-forge model-compare \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv \
+  --profile default \
+  --profile smooth
+
 bo-forge plot \
   --config configs/17_model_profile_logei.yaml \
   --log examples/17_model_profile_campaign_log.csv \
   --kind model-diagnostics \
   --output /tmp/bo_forge_model_diagnostics.png
+
+bo-forge plot \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv \
+  --kind model-comparison \
+  --output /tmp/bo_forge_model_comparison.png
 ```
 
 For single-objective multi-fidelity configs, the fidelity variable is a normal
@@ -357,6 +371,7 @@ bo-forge plot \
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
 | `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and process-local latest fit metadata when available. |
+| `bo-forge model-compare --config PATH --log PATH [--profile NAME ...]` | Compare model profiles on current observed fitting rows without changing CSV logs or the configured profile. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |

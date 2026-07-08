@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.1.1\n"
+    assert captured.out == "bo-forge 2.1.2\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.1.1\n"
+    assert completed.stdout == "bo-forge 2.1.2\n"
     assert completed.stderr == ""
 
 
@@ -1108,6 +1108,84 @@ def test_cli_model_summary_outputs_table(
     assert "RBF/ARD" in captured.out
     assert "last_fit_status" in captured.out
     assert "not_recorded" in captured.out
+
+
+def test_cli_model_compare_outputs_all_profiles(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/17_model_profile_logei.yaml")
+    log_path = tmp_path / "model_profile.csv"
+    pd.read_csv(
+        "examples/17_model_profile_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(["model-compare", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "model_profile" in captured.out
+    assert "rmse_model_space" in captured.out
+    assert "mean_predicted_std" in captured.out
+    assert "default" in captured.out
+    assert "smooth" in captured.out
+    assert "rough" in captured.out
+    assert "robust" in captured.out
+
+
+def test_cli_model_compare_filters_repeated_profile_args(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/17_model_profile_logei.yaml")
+    log_path = tmp_path / "model_profile.csv"
+    pd.read_csv(
+        "examples/17_model_profile_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "model-compare",
+                *base_args(config_path, log_path),
+                "--profile",
+                "smooth",
+                "--profile",
+                "rough",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert "smooth" in captured.out
+    assert "rough" in captured.out
+    assert "robust" not in captured.out
+
+
+def test_cli_model_compare_rejects_unsupported_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_path = tmp_path / "multi_fidelity.csv"
+    pd.read_csv(
+        "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "model-compare",
+                *base_args(Path("configs/15_multi_fidelity_qmfkg.yaml"), log_path),
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert "does not support multi-fidelity configs" in captured.err
 
 
 def test_contextual_cli_plot_context_diagnostics_handles_pending_only_log(
@@ -2062,7 +2140,9 @@ def test_review_and_mark_observed_with_actual_cost(
     assert float(row["cost_actual"]) == pytest.approx(1.7)
 
 
-@pytest.mark.parametrize("kind", ["progress", "diagnostics", "model-diagnostics"])
+@pytest.mark.parametrize(
+    "kind", ["progress", "diagnostics", "model-diagnostics", "model-comparison"]
+)
 def test_plot_writes_nested_output_path(
     kind: str,
     tmp_path: Path,

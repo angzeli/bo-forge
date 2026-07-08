@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.1.1`. The v2.1.1 release preserves v1 YAML/CSV/session,
+Current baseline: `v2.1.2`. The v2.1.2 release preserves v1 YAML/CSV/session,
 CLI, notebook, Streamlit, service, and experimental API probe behavior while
-hardening curated single-objective model-profile summaries and adding a
-lightweight model-profile tutorial on top of the v2.1.0 model-profile baseline.
+closing the v2.1 model-profile line with read-only profile comparison
+diagnostics on top of the v2.1.0 and v2.1.1 model-profile baseline.
 
 ## Roadmap So Far
 
@@ -15,8 +15,7 @@ lightweight model-profile tutorial on top of the v2.1.0 model-profile baseline.
 flowchart LR
     v10["v1.x<br/>Stable local BO Forge baseline"] --> v20["v2.0<br/>Hardening + capability matrix"] --> v21["v2.1<br/>Model profiles"] --> v22["v2.2<br/>Noisy + pending-aware BO"] --> v23["v2.3<br/>Controlled combinations"] --> v24["v2.4<br/>Multi-fidelity expansion"] --> v25["v2.5<br/>App/API operational hardening"]
 
-    class v10,v20 done
-    class v21 active
+    class v10,v20,v21 done
     class v22,v23,v24,v25 future
 
     classDef done fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
@@ -39,18 +38,23 @@ Status: completed
 
 ## v2.1.x - Model Profiles And Advanced Surrogates
 
-Status: active
+Status: completed
 
 - `v2.1.0` introduces curated model profiles instead of raw BoTorch kernel
   passthrough.
 - `v2.1.1` hardens process-local `last_fit_*` summary metadata and adds the
   model-profile tutorial notebook.
+- `v2.1.2` adds read-only model-profile comparison diagnostics through
+  `model_profile_comparison`, `bo-forge model-compare`, and
+  `plot --kind model-comparison`.
 - Supports `default`, `smooth`, `rough`, and `robust` profiles for
   single-objective LogEI/qLogEI campaigns.
 - Adds `model_summary`, `bo-forge model-summary`, and
   `plot --kind model-diagnostics`.
+- Model comparison is diagnostic only; BO Forge does not automatically select
+  or change the configured profile.
 - Keeps non-default profiles rejected for multi-objective, multi-fidelity, and
-  structured campaigns in v2.1.1.
+  structured campaigns in v2.1.x.
 - Preserves CSV schema compatibility.
 
 ## v2.2.x - Noisy And Pending-Aware BO

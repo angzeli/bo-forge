@@ -934,17 +934,24 @@ def test_available_plot_kinds_follow_config_features() -> None:
     fidelity = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
     context = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
 
-    assert available_plot_kinds(plain) == ["progress", "diagnostics", "model_diagnostics"]
+    assert available_plot_kinds(plain) == [
+        "progress",
+        "diagnostics",
+        "model_diagnostics",
+        "model_comparison",
+    ]
     assert available_plot_kinds(cost) == [
         "progress",
         "diagnostics",
         "model_diagnostics",
+        "model_comparison",
         "cost_progress",
     ]
     assert available_plot_kinds(replicate) == [
         "progress",
         "diagnostics",
         "model_diagnostics",
+        "model_comparison",
         "replicates",
     ]
     assert available_plot_kinds(multi) == ["pareto", "hypervolume"]
@@ -968,6 +975,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "progress",
         "diagnostics",
         "model_diagnostics",
+        "model_comparison",
         "context_diagnostics",
     ]
 
@@ -998,7 +1006,12 @@ def test_non_structured_stage_display_helpers_are_empty() -> None:
 
     assert structured_stage_options(config) == []
     assert structured_stage_config_table(config).empty
-    assert available_plot_kinds(config) == ["progress", "diagnostics", "model_diagnostics"]
+    assert available_plot_kinds(config) == [
+        "progress",
+        "diagnostics",
+        "model_diagnostics",
+        "model_comparison",
+    ]
 
 
 def test_default_export_path_uses_reports_directory() -> None:

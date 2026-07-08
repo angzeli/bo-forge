@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pandas as pd
 import torch
@@ -15,7 +15,8 @@ from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
-from bo_forge.config import CampaignConfig
+from bo_forge.config import CampaignConfig, ModelConfig
+from bo_forge.errors import ConfigError
 from bo_forge.multi_objective import objectives_to_model_space
 from bo_forge.multifidelity import fidelity_feature_index
 from bo_forge.replicates import modeling_observed_data_with_variance
@@ -27,6 +28,20 @@ from bo_forge.transforms import (
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
 _LAST_FIT_METADATA: dict[str, object] = {}
+_DEFAULT_COMPARISON_PROFILES = ("default", "smooth", "rough", "robust")
+_MODEL_PROFILE_COMPARISON_COLUMNS = [
+    "model_profile",
+    "model_class",
+    "covariance_profile",
+    "fit_status",
+    "fit_warning_count",
+    "observed_rows_used_for_fitting",
+    "encoded_dimension",
+    "train_yvar_used",
+    "rmse_model_space",
+    "mae_model_space",
+    "mean_predicted_std",
+]
 
 
 @dataclass(frozen=True)
@@ -164,6 +179,161 @@ def model_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
         ("fallback_status", metadata.get("fallback_status", "not_recorded")),
     ]
     return pd.DataFrame(rows, columns=["field", "value"])
+
+
+def model_profile_comparison(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    profiles: list[str] | tuple[str, ...] | None = None,
+) -> pd.DataFrame:
+    """Compare model-profile fit diagnostics on the current fitting rows."""
+    _validate_model_profile_comparison_supported(config)
+    profile_names = _normalise_comparison_profiles(profiles)
+    validate_campaign_data(config, df)
+    observed = get_observed_data(config, df)
+    model_class = _model_class_name(config)
+    encoded_dim = encoded_dimension(config)
+    training: TrainingTensors | None = None
+    observed_rows_used = 0
+    train_yvar_used = False
+    if not observed.empty:
+        training = dataframe_to_training_tensors(config, observed)
+        observed_rows_used = int(training.train_x.shape[0])
+        train_yvar_used = training.train_yvar is not None
+
+    if training is None or observed_rows_used < 2:
+        return pd.DataFrame(
+            [
+                _comparison_row(
+                    config,
+                    profile,
+                    model_class=model_class,
+                    encoded_dim=encoded_dim,
+                    observed_rows_used=observed_rows_used,
+                    train_yvar_used=train_yvar_used,
+                    fit_status="insufficient_observed",
+                )
+                for profile in profile_names
+            ],
+            columns=_MODEL_PROFILE_COMPARISON_COLUMNS,
+        )
+
+    rows: list[dict[str, object]] = []
+    previous_metadata = dict(_LAST_FIT_METADATA)
+    try:
+        for profile in profile_names:
+            profile_config = replace(config, model=ModelConfig(profile=profile))
+            try:
+                model = fit_gp_model(profile_config, observed)
+                metadata = _comparison_fit_metadata(profile)
+                posterior = model.posterior(training.train_x)
+                predicted = posterior.mean.detach().reshape(-1)
+                observed_model = training.train_y.detach().reshape(-1)
+                predicted_std = (
+                    posterior.variance.detach().clamp_min(0.0).sqrt().reshape(-1)
+                )
+                residual = observed_model - predicted
+                rmse = float(torch.sqrt(torch.mean(residual.square())).item())
+                mae = float(torch.mean(torch.abs(residual)).item())
+                mean_std = float(torch.mean(predicted_std).item())
+                rows.append(
+                    _comparison_row(
+                        profile_config,
+                        profile,
+                        model_class=model_class,
+                        encoded_dim=encoded_dim,
+                        observed_rows_used=observed_rows_used,
+                        train_yvar_used=train_yvar_used,
+                        fit_status=str(metadata.get("fit_status", "ok")),
+                        fit_warning_count=int(metadata.get("fit_warning_count", 0)),
+                        rmse_model_space=rmse,
+                        mae_model_space=mae,
+                        mean_predicted_std=mean_std,
+                    )
+                )
+            except Exception:
+                metadata = _comparison_fit_metadata(profile)
+                rows.append(
+                    _comparison_row(
+                        profile_config,
+                        profile,
+                        model_class=model_class,
+                        encoded_dim=encoded_dim,
+                        observed_rows_used=observed_rows_used,
+                        train_yvar_used=train_yvar_used,
+                        fit_status="failed",
+                        fit_warning_count=int(metadata.get("fit_warning_count", 0)),
+                    )
+                )
+    finally:
+        _LAST_FIT_METADATA.clear()
+        _LAST_FIT_METADATA.update(previous_metadata)
+
+    return pd.DataFrame(rows, columns=_MODEL_PROFILE_COMPARISON_COLUMNS)
+
+
+def _validate_model_profile_comparison_supported(config: CampaignConfig) -> None:
+    if config.is_multi_objective:
+        raise ConfigError("model_profile_comparison() requires a single-objective config.")
+    if config.fidelity is not None:
+        raise ConfigError(
+            "model_profile_comparison() does not support multi-fidelity configs."
+        )
+    if config.is_structured_campaign:
+        raise ConfigError(
+            "model_profile_comparison() does not support structured configs."
+        )
+
+
+def _normalise_comparison_profiles(
+    profiles: list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    requested = list(_DEFAULT_COMPARISON_PROFILES if profiles is None else profiles)
+    if not requested:
+        raise ConfigError("model_profile_comparison() requires at least one profile.")
+    normalised: list[str] = []
+    for profile in requested:
+        if profile not in _DEFAULT_COMPARISON_PROFILES:
+            choices = ", ".join(_DEFAULT_COMPARISON_PROFILES)
+            raise ConfigError(f"Unknown model profile '{profile}'. Expected one of: {choices}.")
+        if profile not in normalised:
+            normalised.append(profile)
+    return normalised
+
+
+def _comparison_fit_metadata(profile: str) -> dict[str, object]:
+    if _LAST_FIT_METADATA.get("profile") != profile:
+        return {}
+    return dict(_LAST_FIT_METADATA)
+
+
+def _comparison_row(
+    config: CampaignConfig,
+    profile: str,
+    *,
+    model_class: str,
+    encoded_dim: int,
+    observed_rows_used: int,
+    train_yvar_used: bool,
+    fit_status: str,
+    fit_warning_count: int = 0,
+    rmse_model_space: float = float("nan"),
+    mae_model_space: float = float("nan"),
+    mean_predicted_std: float = float("nan"),
+) -> dict[str, object]:
+    return {
+        "model_profile": profile,
+        "model_class": model_class,
+        "covariance_profile": _covariance_profile_name(config),
+        "fit_status": fit_status,
+        "fit_warning_count": fit_warning_count,
+        "observed_rows_used_for_fitting": observed_rows_used,
+        "encoded_dimension": encoded_dim,
+        "train_yvar_used": train_yvar_used,
+        "rmse_model_space": rmse_model_space,
+        "mae_model_space": mae_model_space,
+        "mean_predicted_std": mean_predicted_std,
+    }
 
 
 def _covar_module_for_profile(config: CampaignConfig, dimension: int):

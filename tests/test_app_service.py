@@ -574,13 +574,24 @@ def test_app_service_model_summary_and_diagnostics_plot_routing(tmp_path: Path) 
     )
 
     assert callable(service.model_summary)
+    assert callable(service.model_profile_comparison)
     assert "model_diagnostics" in service.available_plot_kinds()
+    assert "model_comparison" in service.available_plot_kinds()
+    comparison = service.model_profile_comparison(profiles=["default"])
+    assert comparison["model_profile"].tolist() == ["default"]
     plot_path = tmp_path / "plots" / "model_diagnostics.png"
     result = service.plot("model_diagnostics", save_path=plot_path)
 
     assert plot_path.exists()
     assert result.written_path == plot_path
     plt.close(result.figure)
+
+    comparison_path = tmp_path / "plots" / "model_comparison.png"
+    comparison_result = service.plot("model_comparison", save_path=comparison_path)
+
+    assert comparison_path.exists()
+    assert comparison_result.written_path == comparison_path
+    plt.close(comparison_result.figure)
 
 
 def test_app_service_context_summary_handles_pending_only_log(tmp_path: Path) -> None:

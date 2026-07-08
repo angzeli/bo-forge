@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.1.1 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v2.1.2 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while making supported and intentionally
 deferred combinations explicit. v2.1 adds curated single-objective model
 profiles without raw BoTorch kernel passthrough.
@@ -18,7 +18,7 @@ Legend:
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Single-objective LogEI/qLogEI | supported | Standard BO Forge campaign path. |
-| Single-objective model profiles | supported | `default`, `smooth`, `rough`, and `robust` profiles for LogEI/qLogEI. |
+| Single-objective model profiles | supported | `default`, `smooth`, `rough`, and `robust` profiles for configs with `bo.acquisition: log_ei`. |
 | Coupled multi-objective qLogEHVI | supported | Primary tested range is `2 <= m <= 4`. |
 | Review metadata | supported | Works for single-objective and coupled multi-objective campaigns. |
 | Replicate metadata | supported | Includes group-mean summaries and replicate-derived `train_Yvar` where available. |
@@ -39,7 +39,7 @@ Legend:
 | Multi-objective + review + replicates + cost | supported | Backend/session/CLI support through v1.1.x semantics. |
 | Structured + review | supported | Stage-aware rows and review metadata can coexist. |
 | Structured + replicates | supported | Stage summaries use replicate group means where needed. |
-| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.1.1. |
+| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.1.2. |
 | Structured + contextual | deferred | No contextual structured-stage suggestion path yet. |
 | Structured + multi-fidelity | deferred | No staged qMFKG or fidelity-by-stage workflow yet. |
 | Contextual + review | deferred | Planned as a controlled v2.x combination. |
@@ -51,7 +51,8 @@ Legend:
 | Multi-fidelity + cost | rejected | qMFKG fidelity cost is separate from BO Forge `cost:`. |
 | Multi-fidelity + replicates | rejected | Replicate-aware qMFKG is not implemented. |
 | Multi-fidelity + multi-objective | rejected | qMFKG support is single-objective only. |
-| Non-default model profile + multi-objective | rejected | Non-default profiles are single-objective LogEI/qLogEI only in v2.1.1. |
+| Model-profile comparison diagnostics | supported | Read-only comparison of `default`, `smooth`, `rough`, and `robust` on current single-objective fitting rows; not automatic model selection. |
+| Non-default model profile + multi-objective | rejected | Non-default profiles require single-objective configs with `bo.acquisition: log_ei` in v2.1.2. |
 | Non-default model profile + multi-fidelity | rejected | qMFKG keeps its existing multi-fidelity GP path. |
 | Non-default model profile + structured stages | rejected | Stage-specific model-profile support is deferred. |
 

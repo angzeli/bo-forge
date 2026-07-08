@@ -314,7 +314,8 @@ variables and optional defaults. In v1.5.x, `context:` cannot be combined with
 
 ## 🧠 Model Profiles
 
-The v2.1 line includes optional model profiles for single-objective LogEI/qLogEI campaigns.
+The v2.1 line includes optional model profiles for single-objective campaigns
+configured with `bo.acquisition: log_ei`.
 Profiles select curated GP covariance behavior without exposing raw BoTorch
 kernel passthrough:
 
@@ -324,9 +325,9 @@ model:
 ```
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
-profiles are intentionally limited to single-objective LogEI/qLogEI workflows
-in v2.1.1; multi-objective, multi-fidelity, and structured campaigns should use
-the default profile.
+profiles are intentionally limited to single-objective workflows configured
+with `bo.acquisition: log_ei` in v2.1.2; multi-objective, multi-fidelity, and
+structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
 
@@ -339,12 +340,25 @@ bo-forge model-summary \
   --config configs/17_model_profile_logei.yaml \
   --log examples/17_model_profile_campaign_log.csv
 
+bo-forge model-compare \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv
+
 bo-forge plot \
   --config configs/17_model_profile_logei.yaml \
   --log examples/17_model_profile_campaign_log.csv \
   --kind model-diagnostics \
   --output /tmp/bo_forge_model_diagnostics.png
+
+bo-forge plot \
+  --config configs/17_model_profile_logei.yaml \
+  --log examples/17_model_profile_campaign_log.csv \
+  --kind model-comparison \
+  --output /tmp/bo_forge_model_comparison.png
 ```
+
+Model comparison is diagnostic only. It does not update the YAML profile,
+rewrite the CSV log, or automatically select a model.
 
 The tutorial notebook is:
 

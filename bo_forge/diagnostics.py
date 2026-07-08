@@ -13,7 +13,11 @@ from matplotlib.ticker import MaxNLocator
 from bo_forge.config import CampaignConfig
 from bo_forge.contextual import context_summary
 from bo_forge.costs import effective_row_cost
-from bo_forge.models import dataframe_to_training_tensors, fit_gp_model
+from bo_forge.models import (
+    dataframe_to_training_tensors,
+    fit_gp_model,
+    model_profile_comparison,
+)
 from bo_forge.multi_objective import (
     hypervolume_progress,
     multi_objective_observed_data,
@@ -634,6 +638,115 @@ def plot_model_diagnostics(
     set_axis_labels(residual_ax, "Fitting row", "Observed - posterior mean")
     fig.suptitle(
         f"{config.campaign_name}: model diagnostics ({config.model.profile})",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def plot_model_comparison(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot read-only model-profile comparison diagnostics."""
+    comparison = model_profile_comparison(config, df)
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(14, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    error_ax, std_ax = axes
+    fitted = comparison[comparison["fit_status"] != "insufficient_observed"].copy()
+    fitted["rmse_model_space"] = pd.to_numeric(
+        fitted["rmse_model_space"], errors="coerce"
+    )
+    fitted["mae_model_space"] = pd.to_numeric(
+        fitted["mae_model_space"], errors="coerce"
+    )
+    fitted["mean_predicted_std"] = pd.to_numeric(
+        fitted["mean_predicted_std"], errors="coerce"
+    )
+    fitted = fitted.dropna(subset=["rmse_model_space", "mae_model_space"])
+
+    if fitted.empty:
+        insufficient = comparison["fit_status"].eq("insufficient_observed").all()
+        if insufficient:
+            message = "At least two fitting rows are required for model comparison."
+            secondary_message = "No predicted standard deviations available."
+        else:
+            message = "Model comparison fits failed."
+            secondary_message = "Run model-compare to inspect profile fit statuses."
+        error_ax.text(
+            0.5,
+            0.5,
+            message,
+            ha="center",
+            va="center",
+            transform=error_ax.transAxes,
+        )
+        std_ax.text(
+            0.5,
+            0.5,
+            secondary_message,
+            ha="center",
+            va="center",
+            transform=std_ax.transAxes,
+        )
+    else:
+        x = list(range(len(fitted)))
+        labels = fitted["model_profile"].astype(str).tolist()
+        width = 0.35
+        error_ax.bar(
+            [position - width / 2 for position in x],
+            fitted["rmse_model_space"],
+            width=width,
+            color="#2563eb",
+            label="RMSE",
+        )
+        error_ax.bar(
+            [position + width / 2 for position in x],
+            fitted["mae_model_space"],
+            width=width,
+            color="#0891b2",
+            label="MAE",
+        )
+        error_ax.set_xticks(x)
+        error_ax.set_xticklabels(labels)
+        add_legend(error_ax)
+
+        std_ax.bar(
+            x,
+            fitted["mean_predicted_std"],
+            color="#7c3aed",
+            label="Mean predicted std",
+        )
+        std_ax.set_xticks(x)
+        std_ax.set_xticklabels(labels)
+        add_legend(std_ax)
+
+    set_title(error_ax, "Model-space residual metrics")
+    set_axis_labels(error_ax, "Model profile", "Error")
+    set_title(std_ax, "Mean predicted uncertainty")
+    set_axis_labels(std_ax, "Model profile", "Posterior std")
+    fig.suptitle(
+        f"{config.campaign_name}: model profile comparison",
         fontsize=18,
         fontweight="bold",
         color="black",

@@ -619,6 +619,7 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
         kinds = ["progress", "diagnostics"]
         if config.fidelity is None and not config.is_structured_campaign:
             kinds.append("model_diagnostics")
+            kinds.append("model_comparison")
     if config.is_structured_campaign:
         kinds.append("stage_diagnostics")
     if config.fidelity is not None:

@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.1.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.1.2.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -45,6 +45,7 @@ These names are supported imports from `bo_forge`:
 - `load_campaign_log`
 - `mark_observed`
 - `model_summary`
+- `model_profile_comparison`
 - `pareto_front`
 - `pareto_summary`
 - `review_suggestion`
@@ -89,12 +90,17 @@ not fully declared in YAML. Use `context_summary(config, df)` or
 `CampaignSession.context_summary()` to inspect observed and pending rows by
 context combination.
 
-Model profiles expose `ModelConfig` and `model_summary` through the top-level
-package for config construction and read-only inspection. v2.1.1 supports
-`default`, `smooth`, `rough`, and `robust` profiles; non-default profiles are
-single-objective LogEI/qLogEI only. Use `model_summary(config, df)` or
-`CampaignSession.model_summary()` to inspect the configured profile, model
-class, covariance profile, fitting-row count, and train-Y variance use.
+Model profiles expose `ModelConfig`, `model_summary`, and
+`model_profile_comparison` through the top-level package for config construction
+and read-only inspection. v2.1.2 supports `default`, `smooth`, `rough`, and
+`robust` profiles; non-default profiles require single-objective configs with
+`bo.acquisition: log_ei`.
+Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect
+the configured profile, model class, covariance profile, fitting-row count, and
+train-Y variance use. Use `model_profile_comparison(config, df)` or
+`CampaignSession.model_profile_comparison()` to compare supported profiles on
+the current observed fitting rows without changing the configured profile or
+CSV log.
 `last_fit_*` fields are process-local and report `not_recorded` unless a model
 fit has happened in the same Python process for matching current fitting inputs.
 

@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 
+import bo_forge.diagnostics as diagnostics_module
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
@@ -21,11 +22,13 @@ from bo_forge.diagnostics import (
     plot_context_diagnostics,
     plot_diagnostics,
     plot_fidelity_diagnostics,
+    plot_model_comparison,
     plot_model_diagnostics,
     plot_progress,
     plot_replicates,
     plot_stage_diagnostics,
 )
+from bo_forge.errors import ConfigError
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
 
@@ -649,6 +652,67 @@ def test_plot_model_diagnostics_handles_empty_observed_log() -> None:
 def test_plot_model_diagnostics_rejects_fidelity_config() -> None:
     with pytest.raises(ValueError, match="fidelity"):
         plot_model_diagnostics(fidelity_config(), fidelity_log())
+
+
+def test_plot_model_comparison_writes_file_and_labels(tmp_path: Path) -> None:
+    cfg = config()
+    save_path = tmp_path / "model_comparison.png"
+
+    fig, axes = plot_model_comparison(cfg, observed_log(), save_path=save_path)
+
+    assert save_path.exists()
+    assert axes[0].get_title() == "Model-space residual metrics"
+    assert axes[0].get_xlabel() == "Model profile"
+    assert axes[1].get_title() == "Mean predicted uncertainty"
+    assert axes[1].get_ylabel() == "Posterior std"
+    plt.close(fig)
+
+
+def test_plot_model_comparison_handles_insufficient_observed_log() -> None:
+    cfg = config()
+    one_row = observed_log().head(1)
+
+    fig, axes = plot_model_comparison(cfg, one_row)
+
+    assert "At least two fitting rows" in axes[0].texts[0].get_text()
+    assert "No predicted standard deviations" in axes[1].texts[0].get_text()
+    plt.close(fig)
+
+
+def test_plot_model_comparison_handles_all_failed_profile_fits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failed_comparison(*_args: object, **_kwargs: object) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {
+                    "model_profile": "default",
+                    "model_class": "SingleTaskGP",
+                    "covariance_profile": "default",
+                    "fit_status": "failed",
+                    "fit_warning_count": 0,
+                    "observed_rows_used_for_fitting": 2,
+                    "encoded_dimension": 2,
+                    "train_yvar_used": False,
+                    "rmse_model_space": float("nan"),
+                    "mae_model_space": float("nan"),
+                    "mean_predicted_std": float("nan"),
+                }
+            ]
+        )
+
+    monkeypatch.setattr(diagnostics_module, "model_profile_comparison", failed_comparison)
+
+    fig, axes = plot_model_comparison(config(), observed_log())
+
+    assert "Model comparison fits failed" in axes[0].texts[0].get_text()
+    assert "Run model-compare" in axes[1].texts[0].get_text()
+    plt.close(fig)
+
+
+def test_plot_model_comparison_rejects_fidelity_config() -> None:
+    with pytest.raises(ConfigError, match="multi-fidelity"):
+        plot_model_comparison(fidelity_config(), fidelity_log())
 
 
 def test_directional_best_so_far_uses_campaign_direction() -> None:

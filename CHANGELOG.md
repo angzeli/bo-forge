@@ -1,5 +1,22 @@
 # 📝 BO Forge Changelog
 
+## v2.1.2 - Model Profile Comparison Diagnostics
+
+This read-only closeout patch adds model-profile comparison diagnostics without
+changing model configuration, suggestion behavior, config keys, or CSV schemas.
+
+- Adds `model_profile_comparison(config, df)` and
+  `CampaignSession.model_profile_comparison()`.
+- Adds `bo-forge model-compare` with repeatable `--profile` filters.
+- Adds `plot --kind model-comparison` and Streamlit Reports routing for
+  supported single-objective campaigns.
+- Compares `default`, `smooth`, `rough`, and `robust` on current observed
+  fitting rows and reports model-space RMSE, MAE, predicted uncertainty, fit
+  status, fitting-row count, encoded dimension, and train-Y variance use.
+- Preserves process-local `last_fit_*` metadata used by `model_summary()`.
+- Keeps comparison diagnostic only; BO Forge does not automatically choose or
+  change the configured profile.
+
 ## v2.1.1 - Model Profile Hardening And Tutorial
 
 This focused follow-up hardens model-profile diagnostics and adds a lightweight

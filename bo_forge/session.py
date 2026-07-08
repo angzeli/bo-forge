@@ -27,6 +27,7 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
+from bo_forge.models import model_profile_comparison as _model_profile_comparison
 from bo_forge.models import model_summary as _model_summary
 from bo_forge.multi_objective import (
     pareto_front as _pareto_front,
@@ -576,6 +577,12 @@ class CampaignSession:
         """Return model-profile and fitting-input summary fields."""
         return _model_summary(self.config, self.df)
 
+    def model_profile_comparison(
+        self, profiles: list[str] | tuple[str, ...] | None = None
+    ) -> pd.DataFrame:
+        """Return read-only model-profile comparison diagnostics."""
+        return _model_profile_comparison(self.config, self.df, profiles=profiles)
+
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
         return _replicate_summary(self.config, self.df)
@@ -711,6 +718,14 @@ class CampaignSession:
         )
 
         return _plot_model_diagnostics(self.config, self.df, **kwargs)
+
+    def plot_model_comparison(self, **kwargs: Any) -> Any:
+        """Plot model-profile comparison diagnostics."""
+        from bo_forge.diagnostics import (
+            plot_model_comparison as _plot_model_comparison,
+        )
+
+        return _plot_model_comparison(self.config, self.df, **kwargs)
 
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:

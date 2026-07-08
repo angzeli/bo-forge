@@ -12,10 +12,12 @@ from bo_forge.config import (
     ReplicateConfig,
     VariableConfig,
 )
+from bo_forge.errors import ConfigError
 from bo_forge.models import (
     dataframe_to_training_tensors,
     fit_gp_model,
     fit_multi_fidelity_gp_model,
+    model_profile_comparison,
     model_summary,
 )
 from bo_forge.validation import canonical_columns
@@ -191,6 +193,54 @@ def model_profile_log(cfg: CampaignConfig) -> pd.DataFrame:
         ],
         columns=canonical_columns(cfg),
     )
+
+
+def model_profile_two_row_log(cfg: CampaignConfig) -> pd.DataFrame:
+    df = model_profile_log(cfg)
+    extra = pd.DataFrame(
+        [
+            {
+                "row_id": "model_1",
+                "iteration": 1,
+                "status": "observed",
+                "source": "manual",
+                "x": 0.8,
+                "activity": 1.8,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+    return pd.concat([df, extra], ignore_index=True)
+
+
+def patch_fake_gp(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePosterior:
+        def __init__(self, mean: torch.Tensor) -> None:
+            self.mean = mean
+            self.variance = torch.full_like(mean, 0.04)
+
+    class FakeModel:
+        def __init__(self, train_y: torch.Tensor) -> None:
+            self.likelihood = object()
+            self._train_y = train_y
+
+        def posterior(self, _train_x: torch.Tensor) -> FakePosterior:
+            return FakePosterior(self._train_y)
+
+    def fake_single_task_gp(
+        _train_x: torch.Tensor,
+        train_y: torch.Tensor,
+        *_args: object,
+        **_kwargs: object,
+    ) -> FakeModel:
+        return FakeModel(train_y)
+
+    monkeypatch.setattr(models_module, "SingleTaskGP", fake_single_task_gp)
+    monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
 
 def test_dataframe_to_training_tensors_includes_replicate_yvar() -> None:
@@ -467,6 +517,136 @@ def test_model_summary_ignores_stale_fit_metadata_when_config_shape_changes(
 
     assert values["encoded_dimension"] == 2
     assert values["last_fit_status"] == "not_recorded"
+
+
+def test_model_profile_comparison_returns_default_profiles_and_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("smooth")
+    df = model_profile_two_row_log(cfg)
+    original = df.copy(deep=True)
+    patch_fake_gp(monkeypatch)
+
+    comparison = model_profile_comparison(cfg, df)
+
+    assert comparison["model_profile"].tolist() == ["default", "smooth", "rough", "robust"]
+    assert set(comparison["fit_status"]) == {"ok"}
+    assert comparison["observed_rows_used_for_fitting"].tolist() == [2, 2, 2, 2]
+    assert comparison["encoded_dimension"].tolist() == [1, 1, 1, 1]
+    assert comparison["rmse_model_space"].tolist() == pytest.approx([0.0, 0.0, 0.0, 0.0])
+    assert comparison["mae_model_space"].tolist() == pytest.approx([0.0, 0.0, 0.0, 0.0])
+    assert comparison["mean_predicted_std"].tolist() == pytest.approx([0.2, 0.2, 0.2, 0.2])
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_model_profile_comparison_respects_custom_profile_subset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("default")
+    patch_fake_gp(monkeypatch)
+
+    comparison = model_profile_comparison(
+        cfg,
+        model_profile_two_row_log(cfg),
+        profiles=["smooth", "rough", "smooth"],
+    )
+
+    assert comparison["model_profile"].tolist() == ["smooth", "rough"]
+
+
+def test_model_profile_comparison_marks_insufficient_observed_without_fitting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("default")
+
+    def fail_fit(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("fit should not run for insufficient rows")
+
+    monkeypatch.setattr(models_module, "fit_gp_model", fail_fit)
+
+    comparison = model_profile_comparison(cfg, model_profile_log(cfg), profiles=["default"])
+
+    assert comparison.loc[0, "fit_status"] == "insufficient_observed"
+    assert comparison.loc[0, "observed_rows_used_for_fitting"] == 1
+    assert pd.isna(comparison.loc[0, "rmse_model_space"])
+
+
+def test_model_profile_comparison_restores_model_summary_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("robust")
+    df = model_profile_two_row_log(cfg)
+    patch_fake_gp(monkeypatch)
+    fit_gp_model(cfg, df)
+
+    before_summary = model_summary(cfg, df)
+    before = dict(zip(before_summary["field"], before_summary["value"], strict=True))
+    comparison = model_profile_comparison(cfg, df, profiles=["smooth"])
+    after_summary = model_summary(cfg, df)
+    after = dict(zip(after_summary["field"], after_summary["value"], strict=True))
+
+    assert comparison["model_profile"].tolist() == ["smooth"]
+    assert before["model_profile"] == "robust"
+    assert before["last_fit_status"] == "ok"
+    assert after["model_profile"] == "robust"
+    assert after["last_fit_status"] == "ok"
+
+
+def test_model_profile_comparison_reports_replicate_train_yvar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replicate_config()
+    df = pd.concat(
+        [
+            replicate_log(cfg),
+            pd.DataFrame(
+                [
+                    {
+                        "row_id": "rep_1a",
+                        "iteration": 1,
+                        "status": "observed",
+                        "source": "manual",
+                        "replicate_group": "group_1",
+                        "replicate_index": 0,
+                        "x": 0.8,
+                        "activity": 2.0,
+                        "predicted_mean": "",
+                        "predicted_std": "",
+                        "acquisition": "",
+                    },
+                    {
+                        "row_id": "rep_1b",
+                        "iteration": 1,
+                        "status": "observed",
+                        "source": "manual",
+                        "replicate_group": "group_1",
+                        "replicate_index": 1,
+                        "x": 0.8,
+                        "activity": 2.4,
+                        "predicted_mean": "",
+                        "predicted_std": "",
+                        "acquisition": "",
+                    },
+                ],
+                columns=canonical_columns(cfg),
+            ),
+        ],
+        ignore_index=True,
+    )
+    patch_fake_gp(monkeypatch)
+
+    comparison = model_profile_comparison(cfg, df, profiles=["default"])
+
+    assert comparison.loc[0, "fit_status"] == "ok"
+    assert comparison.loc[0, "observed_rows_used_for_fitting"] == 2
+    assert bool(comparison.loc[0, "train_yvar_used"]) is True
+
+
+def test_model_profile_comparison_rejects_unsupported_campaign_kinds() -> None:
+    cfg = multi_fidelity_config()
+
+    with pytest.raises(ConfigError, match="multi-fidelity"):
+        model_profile_comparison(cfg, multi_fidelity_log(cfg))
 
 
 def test_fit_multi_fidelity_gp_model_uses_fidelity_feature(

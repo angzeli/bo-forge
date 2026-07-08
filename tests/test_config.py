@@ -232,6 +232,30 @@ model:
         CampaignConfig.from_yaml(path)
 
 
+def test_non_default_model_profiles_require_logei_acquisition(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: bad_model_profile_acquisition
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+model:
+  profile: smooth
+bo:
+  acquisition: qlog_ei
+""",
+    )
+
+    with pytest.raises(ConfigError, match=r"Expected one of \['log_ei'\]"):
+        CampaignConfig.from_yaml(path)
+
+
 @pytest.mark.parametrize(
     ("extra", "message"),
     [

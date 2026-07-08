@@ -119,6 +119,19 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(model_summary_parser)
     model_summary_parser.set_defaults(handler=_cmd_model_summary)
 
+    model_compare_parser = subparsers.add_parser(
+        "model-compare",
+        help="Compare model profiles on current observed fitting rows.",
+    )
+    _add_config_log_arguments(model_compare_parser)
+    model_compare_parser.add_argument(
+        "--profile",
+        action="append",
+        choices=["default", "smooth", "rough", "robust"],
+        help="Model profile to compare; repeat to compare a subset.",
+    )
+    model_compare_parser.set_defaults(handler=_cmd_model_compare)
+
     pareto_front_parser = subparsers.add_parser(
         "pareto-front",
         help="Print nondominated observed rows for a multi-objective campaign.",
@@ -216,6 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
             "fidelity-diagnostics",
             "context-diagnostics",
             "model-diagnostics",
+            "model-comparison",
         ],
         required=True,
         help="Plot type to export.",
@@ -360,6 +374,12 @@ def _cmd_context_summary(args: argparse.Namespace) -> int:
 def _cmd_model_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     _print_table(campaign.model_summary())
+    return 0
+
+
+def _cmd_model_compare(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    _print_table(campaign.model_profile_comparison(profiles=args.profile))
     return 0
 
 
@@ -543,6 +563,20 @@ def _cmd_plot(args: argparse.Namespace) -> int:
                     "plot --kind model-diagnostics does not support structured configs."
                 )
             campaign.plot_model_diagnostics(save_path=args.output)
+        elif args.kind == "model-comparison":
+            if campaign.config.is_multi_objective:
+                raise ConfigError(
+                    "plot --kind model-comparison requires a single-objective config."
+                )
+            if campaign.config.fidelity is not None:
+                raise ConfigError(
+                    "plot --kind model-comparison does not support multi-fidelity configs."
+                )
+            if campaign.config.is_structured_campaign:
+                raise ConfigError(
+                    "plot --kind model-comparison does not support structured configs."
+                )
+            campaign.plot_model_comparison(save_path=args.output)
         else:
             campaign.plot_diagnostics(save_path=args.output)
     except OSError as exc:

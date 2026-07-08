@@ -1,6 +1,6 @@
-"""BO Forge v2.1.1."""
+"""BO Forge v2.1.2."""
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 
 from bo_forge.config import (
     BOConfig,
@@ -29,7 +29,7 @@ from bo_forge.errors import (
     SuggestionError,
 )
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
-from bo_forge.models import model_summary
+from bo_forge.models import model_profile_comparison, model_summary
 from bo_forge.multi_objective import (
     hypervolume,
     hypervolume_progress,
@@ -82,6 +82,7 @@ __all__ = [
     "load_campaign_log",
     "mark_observed",
     "model_summary",
+    "model_profile_comparison",
     "pareto_front",
     "pareto_summary",
     "review_suggestion",
