@@ -4,10 +4,11 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.1.2`. The v2.1.2 release preserves v1 YAML/CSV/session,
-CLI, notebook, Streamlit, service, and experimental API probe behavior while
-closing the v2.1 model-profile line with read-only profile comparison
-diagnostics on top of the v2.1.0 and v2.1.1 model-profile baseline.
+Current baseline: `v2.1.3`. The v2.1.3 release closes the v2.1 model-profile
+line with summary hardening, a tutorial, read-only profile comparison
+diagnostics, and final closeout polish while preserving v1 YAML/CSV/session,
+CLI, notebook, Streamlit, service, and experimental API probe behavior. The
+next planned line is v2.2.x for noisy and pending-aware BO.
 
 ## Roadmap So Far
 
@@ -15,12 +16,24 @@ diagnostics on top of the v2.1.0 and v2.1.1 model-profile baseline.
 flowchart LR
     v10["v1.x<br/>Stable local BO Forge baseline"] --> v20["v2.0<br/>Hardening + capability matrix"] --> v21["v2.1<br/>Model profiles"] --> v22["v2.2<br/>Noisy + pending-aware BO"] --> v23["v2.3<br/>Controlled combinations"] --> v24["v2.4<br/>Multi-fidelity expansion"] --> v25["v2.5<br/>App/API operational hardening"]
 
-    class v10,v20,v21 done
-    class v22,v23,v24,v25 future
+    v210["v2.1.0<br/>Model profiles + diagnostics"]
+    v211["v2.1.1<br/>Summary hardening + tutorial"]
+    v212["v2.1.2<br/>Comparison diagnostics"]
+    v213["v2.1.3<br/>Model-profile closeout"]
 
-    classDef done fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
-    classDef active fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
-    classDef future fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
+    v21 -.-> v210
+    v21 -.-> v211
+    v21 -.-> v212
+    v21 -.-> v213
+
+    class v10,v20,v21 majorDone
+    class v22,v23,v24,v25 majorFuture
+    class v210,v211,v212,v213 patchDone
+
+    classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
+    classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
+    classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
+    classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
 ```
 
 ## v2.0.x - Stable v2 Baseline
@@ -47,6 +60,8 @@ Status: completed
 - `v2.1.2` adds read-only model-profile comparison diagnostics through
   `model_profile_comparison`, `bo-forge model-compare`, and
   `plot --kind model-comparison`.
+- `v2.1.3` closes the model-profile line with comparison hardening, Streamlit
+  laziness checks, roadmap closeout, and release-readiness polish.
 - Supports `default`, `smooth`, `rough`, and `robust` profiles for
   single-objective LogEI/qLogEI campaigns.
 - Adds `model_summary`, `bo-forge model-summary`, and

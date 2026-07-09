@@ -79,7 +79,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.1.2"
+    assert payload["version"] == "2.1.3"
     assert payload["experimental"] is True
 
 

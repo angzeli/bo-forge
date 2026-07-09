@@ -530,6 +530,7 @@ def test_model_profile_comparison_returns_default_profiles_and_metrics(
     comparison = model_profile_comparison(cfg, df)
 
     assert comparison["model_profile"].tolist() == ["default", "smooth", "rough", "robust"]
+    assert comparison["fit_message"].tolist() == ["", "", "", ""]
     assert set(comparison["fit_status"]) == {"ok"}
     assert comparison["observed_rows_used_for_fitting"].tolist() == [2, 2, 2, 2]
     assert comparison["encoded_dimension"].tolist() == [1, 1, 1, 1]
@@ -539,7 +540,7 @@ def test_model_profile_comparison_returns_default_profiles_and_metrics(
     pd.testing.assert_frame_equal(df, original)
 
 
-def test_model_profile_comparison_respects_custom_profile_subset(
+def test_model_profile_comparison_preserves_custom_profile_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = model_profile_config("default")
@@ -548,10 +549,32 @@ def test_model_profile_comparison_respects_custom_profile_subset(
     comparison = model_profile_comparison(
         cfg,
         model_profile_two_row_log(cfg),
-        profiles=["smooth", "rough", "smooth"],
+        profiles=["smooth", "default", "rough"],
     )
 
-    assert comparison["model_profile"].tolist() == ["smooth", "rough"]
+    assert comparison["model_profile"].tolist() == ["smooth", "default", "rough"]
+
+
+def test_model_profile_comparison_rejects_duplicate_profile_names() -> None:
+    cfg = model_profile_config("default")
+
+    with pytest.raises(ConfigError, match="Duplicate model profile requested: smooth"):
+        model_profile_comparison(
+            cfg,
+            model_profile_two_row_log(cfg),
+            profiles=["smooth", "rough", "smooth"],
+        )
+
+
+def test_model_profile_comparison_rejects_unknown_profile_names() -> None:
+    cfg = model_profile_config("default")
+
+    with pytest.raises(ConfigError, match="Unknown model profile 'experimental'"):
+        model_profile_comparison(
+            cfg,
+            model_profile_two_row_log(cfg),
+            profiles=["experimental"],
+        )
 
 
 def test_model_profile_comparison_marks_insufficient_observed_without_fitting(
@@ -567,6 +590,7 @@ def test_model_profile_comparison_marks_insufficient_observed_without_fitting(
     comparison = model_profile_comparison(cfg, model_profile_log(cfg), profiles=["default"])
 
     assert comparison.loc[0, "fit_status"] == "insufficient_observed"
+    assert "At least two fitting rows" in comparison.loc[0, "fit_message"]
     assert comparison.loc[0, "observed_rows_used_for_fitting"] == 1
     assert pd.isna(comparison.loc[0, "rmse_model_space"])
 
@@ -586,6 +610,45 @@ def test_model_profile_comparison_restores_model_summary_metadata(
     after = dict(zip(after_summary["field"], after_summary["value"], strict=True))
 
     assert comparison["model_profile"].tolist() == ["smooth"]
+    assert before["model_profile"] == "robust"
+    assert before["last_fit_status"] == "ok"
+    assert after["model_profile"] == "robust"
+    assert after["last_fit_status"] == "ok"
+
+
+def test_model_profile_comparison_restores_metadata_after_profile_fit_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = model_profile_config("robust")
+    df = model_profile_two_row_log(cfg)
+    patch_fake_gp(monkeypatch)
+    fit_gp_model(cfg, df)
+
+    before_summary = model_summary(cfg, df)
+    before = dict(zip(before_summary["field"], before_summary["value"], strict=True))
+    training = dataframe_to_training_tensors(model_profile_config("smooth"), df)
+
+    def fail_after_metadata(profile_config: CampaignConfig, _observed: pd.DataFrame) -> object:
+        models_module._record_fit_metadata(
+            profile_config,
+            training,
+            model_class="SingleTaskGP",
+            covariance_profile="RBF/ARD",
+            fit_status="failed",
+            fit_warnings=[],
+            fallback_status="raised",
+        )
+        raise RuntimeError("synthetic profile fit failure")
+
+    monkeypatch.setattr(models_module, "fit_gp_model", fail_after_metadata)
+
+    comparison = model_profile_comparison(cfg, df, profiles=["smooth"])
+    after_summary = model_summary(cfg, df)
+    after = dict(zip(after_summary["field"], after_summary["value"], strict=True))
+
+    assert comparison.loc[0, "model_profile"] == "smooth"
+    assert comparison.loc[0, "fit_status"] == "failed"
+    assert comparison.loc[0, "fit_message"] == "synthetic profile fit failure"
     assert before["model_profile"] == "robust"
     assert before["last_fit_status"] == "ok"
     assert after["model_profile"] == "robust"

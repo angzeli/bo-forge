@@ -117,7 +117,9 @@ configured profile and fitting inputs, compare profiles read-only, then export
 model diagnostics. The `last_fit_*` fields are process-local and show
 `not_recorded` until a model fit has happened in the same Python process for
 the same current fitting inputs. `model-compare` is diagnostic only; it does
-not change the configured profile or automatically select a model.
+not change the configured profile or automatically select a model. Repeated
+`--profile` flags must name distinct profiles. Failed or insufficient profile
+fits are reported in `fit_status` with details in `fit_message`.
 
 ```bash
 bo-forge model-summary \

@@ -1,8 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v2.1.3 - Model Profile Release Closeout
+
+This final v2.1.x hardening patch closes the model-profile line without adding
+new profiles, config keys, CSV columns, or modeling scope.
+
+- Rejects duplicate requested profiles in `model_profile_comparison()` and
+  `bo-forge model-compare` instead of silently deduplicating them.
+- Preserves requested profile order for comparison diagnostics.
+- Adds `fit_message` details for failed or insufficient model-comparison rows.
+- Keeps process-local `last_fit_*` metadata restored even when a profile fit
+  fails during comparison.
+- Labels model-comparison plots as diagnostic only and shows profiles that have
+  no metric bars because fitting failed or observed rows are insufficient.
+- Updates the v2 roadmap graph with completed v2.1 patch nodes and leaves
+  v2.2.x as the next planned noisy/pending-aware BO line.
+
 ## v2.1.2 - Model Profile Comparison Diagnostics
 
-This read-only closeout patch adds model-profile comparison diagnostics without
+This read-only diagnostics patch adds model-profile comparison diagnostics without
 changing model configuration, suggestion behavior, config keys, or CSV schemas.
 
 - Adds `model_profile_comparison(config, df)` and

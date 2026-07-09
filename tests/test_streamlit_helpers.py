@@ -1995,6 +1995,91 @@ def test_reports_are_lazy_and_render_only_selected_plot(
     assert "Pareto export path" not in FakeStreamlit.text_labels
 
 
+def test_reports_model_comparison_is_lazy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    class _Context:
+        def __enter__(self) -> "_Context":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        session_state = {
+            "bo_forge_config_path": "configs/17_model_profile_logei.yaml",
+            "bo_forge_log_path": "examples/17_model_profile_campaign_log.csv",
+        }
+
+        @classmethod
+        def markdown(cls, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        @classmethod
+        def text_input(cls, *_args: object, **_kwargs: object) -> str:
+            return "/tmp/plot.png"
+
+        @classmethod
+        def selectbox(cls, _label: str, options: list[str], **_kwargs: object) -> str:
+            return "Progress"
+
+        @classmethod
+        def form(cls, *_args: object, **_kwargs: object) -> _Context:
+            return _Context()
+
+        @classmethod
+        def columns(cls, count: int, *_args: object, **_kwargs: object) -> list[_Context]:
+            return [_Context() for _ in range(count)]
+
+        @classmethod
+        def form_submit_button(cls, *_args: object, **_kwargs: object) -> bool:
+            return False
+
+        @classmethod
+        def text_area(cls, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("Report text should not render until preview is requested.")
+
+    class FakeCampaign:
+        config = CampaignConfig.from_yaml("configs/17_model_profile_logei.yaml")
+
+        def summary(self) -> pd.DataFrame:
+            raise AssertionError("summary should come from view data")
+
+        def model_profile_comparison(self) -> pd.DataFrame:
+            raise AssertionError("model comparison should be lazy")
+
+        def available_plot_kinds(self) -> list[str]:
+            return ["progress"]
+
+        def plot_progress(self, *_args: object, **_kwargs: object) -> None:
+            calls.append("progress")
+
+    monkeypatch.setattr(
+        streamlit_app,
+        "campaign_report_text",
+        lambda *_args, **_kwargs: pytest.fail("report preview should be lazy"),
+    )
+    summary = pd.DataFrame(
+        [
+            {"field": "campaign_status", "value": "ready_for_bo"},
+            {"field": "observed_rows", "value": 3},
+            {"field": "pending_suggestions", "value": 0},
+            {"field": "best_objective_value", "value": 1.2},
+        ]
+    )
+
+    streamlit_app._render_reports(
+        FakeStreamlit,
+        FakeCampaign(),
+        {"has_cost": False, "has_replicates": False},
+        {"summary": summary},
+    )
+
+    assert calls == []
+
+
 def test_multi_objective_observation_keys_are_row_scoped(tmp_path: Path) -> None:
     cfg = CampaignConfig(
         campaign_name="mo_app",

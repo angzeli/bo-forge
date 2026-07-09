@@ -665,6 +665,7 @@ def test_plot_model_comparison_writes_file_and_labels(tmp_path: Path) -> None:
     assert axes[0].get_xlabel() == "Model profile"
     assert axes[1].get_title() == "Mean predicted uncertainty"
     assert axes[1].get_ylabel() == "Posterior std"
+    assert any("diagnostic only" in text.get_text() for text in fig.texts)
     plt.close(fig)
 
 
@@ -707,6 +708,69 @@ def test_plot_model_comparison_handles_all_failed_profile_fits(
 
     assert "Model comparison fits failed" in axes[0].texts[0].get_text()
     assert "Run model-compare" in axes[1].texts[0].get_text()
+    plt.close(fig)
+
+
+def test_plot_model_comparison_shows_mixed_failed_and_insufficient_profiles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def mixed_comparison(*_args: object, **_kwargs: object) -> pd.DataFrame:
+        return pd.DataFrame(
+            [
+                {
+                    "model_profile": "default",
+                    "model_class": "SingleTaskGP",
+                    "covariance_profile": "default",
+                    "fit_status": "ok",
+                    "fit_message": "",
+                    "fit_warning_count": 0,
+                    "observed_rows_used_for_fitting": 3,
+                    "encoded_dimension": 2,
+                    "train_yvar_used": False,
+                    "rmse_model_space": 0.2,
+                    "mae_model_space": 0.1,
+                    "mean_predicted_std": 0.3,
+                },
+                {
+                    "model_profile": "smooth",
+                    "model_class": "SingleTaskGP",
+                    "covariance_profile": "RBF/ARD",
+                    "fit_status": "failed",
+                    "fit_message": "synthetic failure",
+                    "fit_warning_count": 0,
+                    "observed_rows_used_for_fitting": 3,
+                    "encoded_dimension": 2,
+                    "train_yvar_used": False,
+                    "rmse_model_space": float("nan"),
+                    "mae_model_space": float("nan"),
+                    "mean_predicted_std": float("nan"),
+                },
+                {
+                    "model_profile": "rough",
+                    "model_class": "SingleTaskGP",
+                    "covariance_profile": "Matern-1.5/ARD",
+                    "fit_status": "insufficient_observed",
+                    "fit_message": "At least two fitting rows are required.",
+                    "fit_warning_count": 0,
+                    "observed_rows_used_for_fitting": 1,
+                    "encoded_dimension": 2,
+                    "train_yvar_used": False,
+                    "rmse_model_space": float("nan"),
+                    "mae_model_space": float("nan"),
+                    "mean_predicted_std": float("nan"),
+                },
+            ]
+        )
+
+    monkeypatch.setattr(diagnostics_module, "model_profile_comparison", mixed_comparison)
+
+    fig, axes = plot_model_comparison(config(), observed_log())
+
+    note_text = "\n".join(text.get_text() for axis in axes for text in axis.texts)
+    assert "smooth=failed" in note_text
+    assert "synthetic failure" in note_text
+    assert "rough=insufficient_observed" in note_text
+    assert [label.get_text() for label in axes[0].get_xticklabels()] == ["default"]
     plt.close(fig)
 
 

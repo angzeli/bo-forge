@@ -141,7 +141,7 @@ deferred.
 
 ### `Non-default model profiles ...`
 
-v2.1.2 model profiles are deliberately conservative.
+v2.1.3 model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
 single-objective campaigns configured with `bo.acquisition: log_ei`. Use

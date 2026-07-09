@@ -326,7 +326,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to single-objective workflows configured
-with `bo.acquisition: log_ei` in v2.1.2; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` in v2.1.3; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:

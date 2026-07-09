@@ -673,7 +673,17 @@ def plot_model_comparison(
         constrained_layout=True,
     )
     error_ax, std_ax = axes
-    fitted = comparison[comparison["fit_status"] != "insufficient_observed"].copy()
+    metric_rows = comparison.copy()
+    metric_rows["rmse_model_space"] = pd.to_numeric(
+        metric_rows["rmse_model_space"], errors="coerce"
+    )
+    metric_rows["mae_model_space"] = pd.to_numeric(
+        metric_rows["mae_model_space"], errors="coerce"
+    )
+    metric_rows["mean_predicted_std"] = pd.to_numeric(
+        metric_rows["mean_predicted_std"], errors="coerce"
+    )
+    fitted = metric_rows[metric_rows["fit_status"] != "insufficient_observed"].copy()
     fitted["rmse_model_space"] = pd.to_numeric(
         fitted["rmse_model_space"], errors="coerce"
     )
@@ -684,6 +694,9 @@ def plot_model_comparison(
         fitted["mean_predicted_std"], errors="coerce"
     )
     fitted = fitted.dropna(subset=["rmse_model_space", "mae_model_space"])
+    status_note = _model_comparison_status_note(
+        metric_rows.loc[~metric_rows.index.isin(fitted.index)]
+    )
 
     if fitted.empty:
         insufficient = comparison["fit_status"].eq("insufficient_observed").all()
@@ -709,6 +722,17 @@ def plot_model_comparison(
             va="center",
             transform=std_ax.transAxes,
         )
+        if status_note:
+            std_ax.text(
+                0.5,
+                0.25,
+                status_note,
+                ha="center",
+                va="center",
+                fontsize=9,
+                color="#475569",
+                transform=std_ax.transAxes,
+            )
     else:
         x = list(range(len(fitted)))
         labels = fitted["model_profile"].astype(str).tolist()
@@ -740,13 +764,30 @@ def plot_model_comparison(
         std_ax.set_xticks(x)
         std_ax.set_xticklabels(labels)
         add_legend(std_ax)
+        if status_note:
+            error_ax.text(
+                0.02,
+                0.98,
+                status_note,
+                ha="left",
+                va="top",
+                fontsize=9,
+                color="#475569",
+                transform=error_ax.transAxes,
+                bbox={
+                    "boxstyle": "round,pad=0.35",
+                    "facecolor": "#f8fafc",
+                    "edgecolor": "#cbd5e1",
+                    "alpha": 0.95,
+                },
+            )
 
     set_title(error_ax, "Model-space residual metrics")
     set_axis_labels(error_ax, "Model profile", "Error")
     set_title(std_ax, "Mean predicted uncertainty")
     set_axis_labels(std_ax, "Model profile", "Posterior std")
     fig.suptitle(
-        f"{config.campaign_name}: model profile comparison",
+        f"{config.campaign_name}: model profile comparison (diagnostic only)",
         fontsize=18,
         fontweight="bold",
         color="black",
@@ -760,6 +801,22 @@ def plot_model_comparison(
         show=show,
         tick_label_size=10,
     )
+
+
+def _model_comparison_status_note(rows: pd.DataFrame) -> str:
+    if rows.empty:
+        return ""
+    pieces: list[str] = []
+    for _, row in rows.iterrows():
+        profile = str(row.get("model_profile", "unknown"))
+        status = str(row.get("fit_status", "not_plotted"))
+        message = str(row.get("fit_message", "") or "").strip()
+        detail = f"{profile}={status}"
+        if message:
+            shortened = message if len(message) <= 80 else f"{message[:77]}..."
+            detail = f"{detail} ({shortened})"
+        pieces.append(detail)
+    return "No metric bars: " + "; ".join(pieces)
 
 
 def plot_stage_diagnostics(

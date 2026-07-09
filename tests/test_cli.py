@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.1.2\n"
+    assert captured.out == "bo-forge 2.1.3\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.1.2\n"
+    assert completed.stdout == "bo-forge 2.1.3\n"
     assert completed.stderr == ""
 
 
@@ -1125,6 +1125,7 @@ def test_cli_model_compare_outputs_all_profiles(
 
     captured = capsys.readouterr()
     assert "model_profile" in captured.out
+    assert "fit_message" in captured.out
     assert "rmse_model_space" in captured.out
     assert "mean_predicted_std" in captured.out
     assert "default" in captured.out
@@ -1133,7 +1134,7 @@ def test_cli_model_compare_outputs_all_profiles(
     assert "robust" in captured.out
 
 
-def test_cli_model_compare_filters_repeated_profile_args(
+def test_cli_model_compare_preserves_profile_arg_order(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1152,16 +1153,71 @@ def test_cli_model_compare_filters_repeated_profile_args(
                 "--profile",
                 "smooth",
                 "--profile",
-                "rough",
+                "default",
             ]
         )
         == 0
     )
 
     captured = capsys.readouterr()
-    assert "smooth" in captured.out
-    assert "rough" in captured.out
+    assert captured.out.find("smooth") < captured.out.find("default")
     assert "robust" not in captured.out
+
+
+def test_cli_model_compare_rejects_duplicate_profile_args(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/17_model_profile_logei.yaml")
+    log_path = tmp_path / "model_profile.csv"
+    pd.read_csv(
+        "examples/17_model_profile_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "model-compare",
+                *base_args(config_path, log_path),
+                "--profile",
+                "smooth",
+                "--profile",
+                "smooth",
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert "Duplicate model profile requested: smooth" in captured.err
+
+
+def test_cli_model_compare_rejects_unknown_profile_arg(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/17_model_profile_logei.yaml")
+    log_path = tmp_path / "model_profile.csv"
+    pd.read_csv(
+        "examples/17_model_profile_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "model-compare",
+                *base_args(config_path, log_path),
+                "--profile",
+                "experimental",
+            ]
+        )
+        == 2
+    )
+
+    captured = capsys.readouterr()
+    assert "invalid choice: 'experimental'" in captured.err
 
 
 def test_cli_model_compare_rejects_unsupported_config(

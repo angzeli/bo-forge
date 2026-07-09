@@ -34,6 +34,7 @@ _MODEL_PROFILE_COMPARISON_COLUMNS = [
     "model_class",
     "covariance_profile",
     "fit_status",
+    "fit_message",
     "fit_warning_count",
     "observed_rows_used_for_fitting",
     "encoded_dimension",
@@ -212,6 +213,7 @@ def model_profile_comparison(
                     observed_rows_used=observed_rows_used,
                     train_yvar_used=train_yvar_used,
                     fit_status="insufficient_observed",
+                    fit_message="At least two fitting rows are required.",
                 )
                 for profile in profile_names
             ],
@@ -251,7 +253,7 @@ def model_profile_comparison(
                         mean_predicted_std=mean_std,
                     )
                 )
-            except Exception:
+            except Exception as exc:
                 metadata = _comparison_fit_metadata(profile)
                 rows.append(
                     _comparison_row(
@@ -262,6 +264,7 @@ def model_profile_comparison(
                         observed_rows_used=observed_rows_used,
                         train_yvar_used=train_yvar_used,
                         fit_status="failed",
+                        fit_message=str(exc) or exc.__class__.__name__,
                         fit_warning_count=int(metadata.get("fit_warning_count", 0)),
                     )
                 )
@@ -296,8 +299,9 @@ def _normalise_comparison_profiles(
         if profile not in _DEFAULT_COMPARISON_PROFILES:
             choices = ", ".join(_DEFAULT_COMPARISON_PROFILES)
             raise ConfigError(f"Unknown model profile '{profile}'. Expected one of: {choices}.")
-        if profile not in normalised:
-            normalised.append(profile)
+        if profile in normalised:
+            raise ConfigError(f"Duplicate model profile requested: {profile}.")
+        normalised.append(profile)
     return normalised
 
 
@@ -316,6 +320,7 @@ def _comparison_row(
     observed_rows_used: int,
     train_yvar_used: bool,
     fit_status: str,
+    fit_message: str = "",
     fit_warning_count: int = 0,
     rmse_model_space: float = float("nan"),
     mae_model_space: float = float("nan"),
@@ -326,6 +331,7 @@ def _comparison_row(
         "model_class": model_class,
         "covariance_profile": _covariance_profile_name(config),
         "fit_status": fit_status,
+        "fit_message": fit_message,
         "fit_warning_count": fit_warning_count,
         "observed_rows_used_for_fitting": observed_rows_used,
         "encoded_dimension": encoded_dim,
