@@ -241,6 +241,11 @@ def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
             view_data["fidelity_summary"] = campaign.fidelity_summary()
         if panel in {"Overview", "Data", "Reports"} and campaign.config.context is not None:
             view_data["context_summary"] = campaign.context_summary()
+        if (
+            panel in {"Overview", "Data", "Reports"}
+            and campaign.config.bo.acquisition == "qlog_nei"
+        ):
+            view_data["qlog_nei_summary"] = campaign.qlog_nei_summary()
     return view_data
 
 
@@ -333,6 +338,7 @@ def _render_create_new_campaign(st: Any) -> None:
         "Campaign kind",
         [
             "Single-objective",
+            "Single-objective qLogNEI",
             "Multi-objective",
             "Multi-fidelity qMFKG",
             "Contextual LogEI",
@@ -340,13 +346,23 @@ def _render_create_new_campaign(st: Any) -> None:
         horizontal=True,
         key=NEW_CAMPAIGN_KIND_KEY,
         help=(
-            "Choose a backend campaign template. Contextual LogEI creates a "
-            "single-objective config with one or more fixed context variables."
+            "Choose a backend campaign template. qLogNEI adds noisy/pending-aware "
+            "single-objective suggestions; Contextual LogEI creates a config with "
+            "one or more fixed context variables."
         ),
     )
+    is_qlog_nei = campaign_kind == "Single-objective qLogNEI"
     is_multi_objective = campaign_kind == "Multi-objective"
     is_multi_fidelity = campaign_kind == "Multi-fidelity qMFKG"
     is_contextual = campaign_kind == "Contextual LogEI"
+    if is_qlog_nei:
+        _render_callout(
+            st,
+            "Single-objective qLogNEI",
+            "App-created qLogNEI campaigns support single-objective noisy/pending-aware "
+            "suggestions. Review rows marked pending block; accepted review rows become "
+            "active pending candidates.",
+        )
     if is_multi_fidelity:
         _render_callout(
             st,
@@ -371,7 +387,7 @@ def _render_create_new_campaign(st: Any) -> None:
             disabled=True,
             help=(
                 "Non-default model profiles require a single-objective config with "
-                "bo.acquisition: log_ei in v2.1.2."
+                "bo.acquisition: log_ei or qlog_nei in v2.2.1."
             ),
         )
     else:
@@ -542,6 +558,24 @@ def _render_create_new_campaign(st: Any) -> None:
                     "weight": float(cost_weight),
                     "budget": float(cost_budget),
                 }
+        elif is_qlog_nei:
+            _render_section_label(st, "qLogNEI review semantics")
+            review_enabled = st.checkbox(
+                "Enable review",
+                value=True,
+                key="new_campaign_review_enabled_qlog_nei",
+                help=(
+                    "Review-pending rows block qLogNEI. Accepted rows are treated as "
+                    "active pending experiments and passed as X_pending."
+                ),
+            )
+            bo_overrides = {"acquisition": "qlog_nei"}
+            _render_artifact_note(
+                st,
+                "qLogNEI scope",
+                "Generated YAML uses bo.acquisition=qlog_nei. Cost-aware, contextual, "
+                "structured, multi-fidelity, and multi-objective qLogNEI remain deferred.",
+            )
         elif is_contextual:
             _render_section_label(st, "Context")
             context_settings = _collect_new_campaign_context_settings(st, variables)
@@ -1097,6 +1131,14 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
             raw_df=context_summary,
             expanded_raw=False,
         )
+    if campaign.config.bo.acquisition == "qlog_nei":
+        _render_table_section(
+            st,
+            "qLogNEI Summary",
+            _view_data_value(view_data, "qlog_nei_summary", campaign.qlog_nei_summary),
+            empty_kind="qlog_nei_summary",
+            expanded_raw=False,
+        )
     _render_table_section(
         st,
         "Model Summary",
@@ -1226,6 +1268,14 @@ def _render_data(
             raw_df=context_summary,
             expanded_raw=False,
         )
+    if campaign.config.bo.acquisition == "qlog_nei":
+        _render_table_section(
+            st,
+            "qLogNEI Summary",
+            _view_data_value(view_data, "qlog_nei_summary", campaign.qlog_nei_summary),
+            empty_kind="qlog_nei_summary",
+            expanded_raw=False,
+        )
     _render_table_section(
         st,
         "Model Summary",
@@ -1329,6 +1379,13 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             "qMFKG suggestions",
             "Multi-fidelity qMFKG suggestions are sequential in v1.4, so the "
             "dry-run batch size is capped at 1.",
+        )
+    if campaign.config.bo.acquisition == "qlog_nei":
+        _render_artifact_note(
+            st,
+            "qLogNEI pending semantics",
+            "Review-pending rows must be resolved first. Accepted pending suggestions "
+            "can stay in the log and are accounted for as X_pending.",
         )
     with st.form("suggest_dry_run_form"):
         batch_size = st.number_input(
@@ -1951,6 +2008,7 @@ def _available_plot_options(
         "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
         "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
         "context_diagnostics": ("Context Diagnostics", "plot_context_diagnostics"),
+        "qlog_nei_diagnostics": ("qLogNEI Diagnostics", "plot_qlog_nei_diagnostics"),
         "model_diagnostics": ("Model Diagnostics", "plot_model_diagnostics"),
         "model_comparison": ("Model Comparison", "plot_model_comparison"),
     }

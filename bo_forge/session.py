@@ -36,6 +36,7 @@ from bo_forge.multi_objective import (
     pareto_summary as _pareto_summary,
 )
 from bo_forge.multifidelity import fidelity_summary as _fidelity_summary
+from bo_forge.noisy import qlog_nei_summary as _qlog_nei_summary
 from bo_forge.replicates import (
     best_replicate_group as _best_replicate_group,
 )
@@ -130,6 +131,7 @@ class CampaignSession:
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
         self._extend_context_summary_rows(rows)
+        self._extend_qlog_nei_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -225,6 +227,7 @@ class CampaignSession:
         self._extend_structured_summary_rows(rows)
         self._extend_fidelity_summary_rows(rows)
         self._extend_context_summary_rows(rows)
+        self._extend_qlog_nei_summary_rows(rows)
         if self.config.review.enabled:
             review_counts = self._review_status_counts()
             rows.extend(
@@ -300,6 +303,25 @@ class CampaignSession:
                 ("contextual_campaign", True),
                 ("context_variables", ", ".join(self.config.context_variable_names)),
                 ("decision_variables", ", ".join(self.config.decision_variable_names)),
+            ]
+        )
+
+    def _extend_qlog_nei_summary_rows(self, rows: list[tuple[str, object]]) -> None:
+        if self.config.bo.acquisition != "qlog_nei":
+            return
+        values = {
+            str(row["field"]): row["value"]
+            for _, row in self.qlog_nei_summary().iterrows()
+        }
+        rows.extend(
+            [
+                ("qlog_nei_active_pending_rows", values["active_pending_rows"]),
+                (
+                    "qlog_nei_blocking_review_pending_rows",
+                    values["blocking_review_pending_rows"],
+                ),
+                ("qlog_nei_ready", values["ready_for_qlog_nei"]),
+                ("qlog_nei_x_pending_used", values["x_pending_used"]),
             ]
         )
 
@@ -538,6 +560,8 @@ class CampaignSession:
                 tables["stage_summary"] = self.stage_summary()
             if self.config.context is not None:
                 tables["context_summary"] = self.context_summary()
+            if self.config.bo.acquisition == "qlog_nei":
+                tables["qlog_nei_summary"] = self.qlog_nei_summary()
             return tables
         tables = {
             "summary": self.summary(),
@@ -556,6 +580,8 @@ class CampaignSession:
             tables["fidelity_summary"] = self.fidelity_summary()
         if self.config.context is not None:
             tables["context_summary"] = self.context_summary()
+        if self.config.bo.acquisition == "qlog_nei":
+            tables["qlog_nei_summary"] = self.qlog_nei_summary()
         return tables
 
     def export_report(self, path: str | Path) -> Path:
@@ -605,6 +631,10 @@ class CampaignSession:
     def context_summary(self) -> pd.DataFrame:
         """Return contextual-campaign summary rows by context combination."""
         return _context_summary(self.config, self.df)
+
+    def qlog_nei_summary(self) -> pd.DataFrame:
+        """Return qLogNEI pending-state summary fields."""
+        return _qlog_nei_summary(self.config, self.df)
 
     def model_summary(self) -> pd.DataFrame:
         """Return model-profile and fitting-input summary fields."""
@@ -760,6 +790,14 @@ class CampaignSession:
 
         return _plot_model_comparison(self.config, self.df, **kwargs)
 
+    def plot_qlog_nei_diagnostics(self, **kwargs: Any) -> Any:
+        """Plot qLogNEI pending-state diagnostics."""
+        from bo_forge.diagnostics import (
+            plot_qlog_nei_diagnostics as _plot_qlog_nei_diagnostics,
+        )
+
+        return _plot_qlog_nei_diagnostics(self.config, self.df, **kwargs)
+
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:
     if df.empty:
@@ -804,6 +842,14 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
                 + _format_report_table(
                     tables["context_summary"],
                     "No contextual observations or pending suggestions yet.",
+                )
+            )
+        if "qlog_nei_summary" in tables:
+            sections.append(
+                "qLogNEI Summary\n---------------\n\n"
+                + _format_report_table(
+                    tables["qlog_nei_summary"],
+                    "No qLogNEI summary available.",
                 )
             )
         sections.append(
@@ -872,6 +918,17 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
                     )
                 ]
                 if "context_summary" in tables
+                else []
+            ),
+            *(
+                [
+                    "qLogNEI Summary\n---------------\n\n"
+                    + _format_report_table(
+                        tables["qlog_nei_summary"],
+                        "No qLogNEI summary available.",
+                    )
+                ]
+                if "qlog_nei_summary" in tables
                 else []
             ),
         ]

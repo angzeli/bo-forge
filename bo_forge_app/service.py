@@ -39,6 +39,7 @@ _SESSION_READ_HELPERS = {
     "stage_summary",
     "fidelity_summary",
     "context_summary",
+    "qlog_nei_summary",
     "model_summary",
     "model_profile_comparison",
 }
@@ -70,6 +71,7 @@ class CampaignViewData:
     stage_summary: pd.DataFrame | None = None
     fidelity_summary: pd.DataFrame | None = None
     context_summary: pd.DataFrame | None = None
+    qlog_nei_summary: pd.DataFrame | None = None
     model_summary: pd.DataFrame | None = None
     model_profile_comparison: pd.DataFrame | None = None
 
@@ -197,6 +199,11 @@ class CampaignAppService:
             data.fidelity_summary = self.session.fidelity_summary()
         if panel in {"Overview", "Data", "Reports"} and self.config.context is not None:
             data.context_summary = self.session.context_summary()
+        if (
+            panel in {"Overview", "Data", "Reports"}
+            and self.config.bo.acquisition == "qlog_nei"
+        ):
+            data.qlog_nei_summary = self.session.qlog_nei_summary()
         return data
 
     def suggest_dry_run(
@@ -294,6 +301,7 @@ class CampaignAppService:
             "stage_diagnostics": self.session.plot_stage_diagnostics,
             "fidelity_diagnostics": self.session.plot_fidelity_diagnostics,
             "context_diagnostics": self.session.plot_context_diagnostics,
+            "qlog_nei_diagnostics": self.session.plot_qlog_nei_diagnostics,
             "model_diagnostics": self.session.plot_model_diagnostics,
             "model_comparison": self.session.plot_model_comparison,
         }

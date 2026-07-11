@@ -1,11 +1,12 @@
-# 🧪 BO Forge v2.2.0
+# 🧪 BO Forge v2.2.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.2.0 starts the noisy and pending-aware BO line with conservative
-single-objective qLogNEI support. It preserves YAML/CSV compatibility, keeps
-suggestion generation non-mutating, and lets qLogNEI account for accepted
-pending experiments through BoTorch `X_pending`.
+v2.2.1 continues the noisy and pending-aware BO line with conservative
+single-objective qLogNEI support, read-only pending-state diagnostics, and a
+tutorial notebook. It preserves YAML/CSV compatibility, keeps suggestion
+generation non-mutating, and lets qLogNEI account for accepted pending
+experiments through BoTorch `X_pending`.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -164,6 +165,7 @@ The notebook walkthrough is `notebooks/17_model_profile_logei_campaign.ipynb`.
 The bundled qLogNEI example is `configs/18_noisy_pending_qlognei.yaml` with
 seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates
 accepted pending review suggestions being passed to qLogNEI as `X_pending`.
+The tutorial walkthrough is `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
 
 ---
 
@@ -209,7 +211,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.2.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.2.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

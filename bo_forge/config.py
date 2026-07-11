@@ -708,23 +708,23 @@ def _validate_model_combinations(
         raise ConfigError(
             "Non-default model profiles are only supported for single-objective "
             "campaigns configured with bo.acquisition: log_ei or qlog_nei "
-            "in v2.2.0; "
+            "in v2.2.x; "
             "use model.profile: default for multi-objective campaigns."
         )
     if fidelity is not None:
         raise ConfigError(
             "Non-default model profiles cannot be combined with fidelity campaigns "
-            "in v2.2.0; use model.profile: default."
+            "in v2.2.x; use model.profile: default."
         )
     if stages:
         raise ConfigError(
             "Non-default model profiles cannot be combined with structured campaign "
-            "stages in v2.2.0; use model.profile: default."
+            "stages in v2.2.x; use model.profile: default."
         )
     if bo.acquisition not in {"log_ei", "qlog_nei"}:
         raise ConfigError(
             "Non-default model profiles require bo.acquisition: log_ei or "
-            "qlog_nei in v2.2.0."
+            "qlog_nei in v2.2.x."
         )
 
 
@@ -741,23 +741,23 @@ def _validate_qlog_nei_combinations(
     if bo.acquisition != "qlog_nei":
         return
     if multi_objective:
-        raise ConfigError("bo.acquisition='qlog_nei' is single-objective only in v2.2.0.")
+        raise ConfigError("bo.acquisition='qlog_nei' is single-objective only in v2.2.x.")
     if fidelity is not None:
-        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with fidelity in v2.2.0.")
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with fidelity in v2.2.x.")
     if stages:
         raise ConfigError(
-            "bo.acquisition='qlog_nei' cannot be combined with structured stages in v2.2.0."
+            "bo.acquisition='qlog_nei' cannot be combined with structured stages in v2.2.x."
         )
     if context is not None:
-        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with context in v2.2.0.")
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with context in v2.2.x.")
     if cost is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nei' cannot be combined with cost-aware campaigns in v2.2.0."
+            "bo.acquisition='qlog_nei' cannot be combined with cost-aware campaigns in v2.2.x."
         )
     if replicates.enabled and replicates.suggestion_policy == "uncertain_best":
         raise ConfigError(
             "bo.acquisition='qlog_nei' supports replicate campaigns only with "
-            "replicates.suggestion_policy: new_only in v2.2.0."
+            "replicates.suggestion_policy: new_only in v2.2.x."
         )
 
 

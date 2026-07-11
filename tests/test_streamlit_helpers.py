@@ -186,6 +186,33 @@ def test_build_campaign_yaml_text_parses_through_config_validation() -> None:
     assert config.model.profile == "rough"
 
 
+def test_build_campaign_yaml_text_supports_single_objective_qlog_nei() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_qlog_nei_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "temperature", "type": "continuous", "lower": 40.0, "upper": 140.0},
+        ],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        review_enabled=True,
+        model={"profile": "smooth"},
+        bo_overrides={"acquisition": "qlog_nei"},
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.bo.acquisition == "qlog_nei"
+    assert config.review.enabled
+    assert config.model.profile == "smooth"
+    assert list(empty_log.columns) == canonical_columns(config)
+
+
 def test_build_campaign_yaml_text_supports_advanced_multi_objective_sections() -> None:
     text = build_campaign_yaml_text(
         campaign_name="advanced_app_campaign",
@@ -933,6 +960,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
     multi_cost = CampaignConfig.from_yaml("configs/12_cost_aware_multi_objective_qlogehvi.yaml")
     fidelity = CampaignConfig.from_yaml("configs/15_multi_fidelity_qmfkg.yaml")
     context = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
+    qlog_nei = CampaignConfig.from_yaml("configs/18_noisy_pending_qlognei.yaml")
 
     assert available_plot_kinds(plain) == [
         "progress",
@@ -977,6 +1005,13 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "model_diagnostics",
         "model_comparison",
         "context_diagnostics",
+    ]
+    assert available_plot_kinds(qlog_nei) == [
+        "progress",
+        "diagnostics",
+        "model_diagnostics",
+        "model_comparison",
+        "qlog_nei_diagnostics",
     ]
 
 
@@ -2541,6 +2576,51 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert "Valid" in markdown_text
     assert "Campaign created and loaded" in success_text
     assert any(subheader.value == "Model Summary" for subheader in app.subheader)
+
+
+def test_streamlit_app_can_create_qlog_nei_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "qlog_nei.yaml"
+    log_path = tmp_path / "logs" / "qlog_nei.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Single-objective qLogNEI"
+    )
+    app.run(timeout=10)
+
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.bo.acquisition == "qlog_nei"
+    assert config.review.enabled
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+    assert any(subheader.value == "qLogNEI Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    markdown_text = "\n".join(markdown.value for markdown in app.markdown)
+    assert "qLogNEI pending semantics" in markdown_text
 
 
 def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) -> None:

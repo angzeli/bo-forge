@@ -4,11 +4,11 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.2.0`. The v2.2.0 release starts the v2.2 noisy and
-pending-aware BO line with conservative single-objective qLogNEI support while
-preserving v1 YAML/CSV/session, CLI, notebook, Streamlit, service, and
-experimental API probe behavior. The next planned v2.2 patches focus on
-tutorials, diagnostics, and noisy multi-objective feasibility review.
+Current baseline: `v2.2.1`. The v2.2.1 release keeps the v2.2 noisy and
+pending-aware BO line focused on conservative single-objective qLogNEI support
+while adding read-only qLogNEI summaries, diagnostics, a tutorial notebook, and
+Streamlit/CLI polish. The next planned v2.2 patches focus on noisy
+multi-objective feasibility review and closeout hardening.
 
 ## Roadmap So Far
 
@@ -21,18 +21,21 @@ flowchart LR
     v212["v2.1.2<br/>Comparison diagnostics"]
     v213["v2.1.3<br/>Model-profile closeout"]
     v220["v2.2.0<br/>qLogNEI + X_pending"]
+    v221["v2.2.1<br/>qLogNEI diagnostics + tutorial"]
 
     v21 -.-> v210
     v21 -.-> v211
     v21 -.-> v212
     v21 -.-> v213
     v22 -.-> v220
+    v22 -.-> v221
 
     class v10,v20,v21 majorDone
     class v22 majorActive
     class v23,v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
-    class v220 patchActive
+    class v220 patchDone
+    class v221 patchActive
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -83,8 +86,9 @@ Status: active
 
 - `v2.2.0` adds `bo.acquisition: qlog_nei` for supported single-objective
   workflows and passes accepted pending suggestions as BoTorch `X_pending`.
-- `v2.2.1` is reserved for a qLogNEI tutorial, diagnostics, and app/CLI wording
-  polish after feedback on v2.2.0.
+- `v2.2.1` adds `qlog_nei_summary`, `bo-forge qlog-nei-summary`,
+  `plot --kind qlog-nei-diagnostics`, a qLogNEI tutorial notebook, and
+  Streamlit workflow polish.
 - `v2.2.2` reviews qLogNEHVI feasibility after the single-objective noisy path
   is stable.
 - `v2.2.3` is reserved for closeout hardening.

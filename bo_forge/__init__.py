@@ -1,6 +1,6 @@
-"""BO Forge v2.2.0."""
+"""BO Forge v2.2.1."""
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 from bo_forge.config import (
     BOConfig,
@@ -37,6 +37,7 @@ from bo_forge.multi_objective import (
     pareto_summary,
 )
 from bo_forge.multifidelity import fidelity_summary
+from bo_forge.noisy import qlog_nei_summary
 from bo_forge.replicates import (
     aggregate_observed_replicates,
     best_replicate_group,
@@ -85,6 +86,7 @@ __all__ = [
     "model_profile_comparison",
     "pareto_front",
     "pareto_summary",
+    "qlog_nei_summary",
     "review_suggestion",
     "replicate_summary",
     "suggest_next",

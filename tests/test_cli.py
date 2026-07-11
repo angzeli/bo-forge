@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.2.0\n"
+    assert captured.out == "bo-forge 2.2.1\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.2.0\n"
+    assert completed.stdout == "bo-forge 2.2.1\n"
     assert completed.stderr == ""
 
 
@@ -960,6 +960,107 @@ def test_qlog_nei_cli_suggest_works_with_accepted_pending_rows(
     assert "Generated 1 suggestion(s)." in captured.out
     suggestions = pd.read_csv(output_path, keep_default_na=False)
     assert suggestions.loc[0, "source"] == "qlog_nei"
+
+
+def test_qlog_nei_cli_summary_outputs_pending_state_fields(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/18_noisy_pending_qlognei.yaml")
+    log_path = tmp_path / "qlog_nei.csv"
+    pd.read_csv(
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(["qlog-nei-summary", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "observed_baseline_rows" in captured.out
+    assert "active_pending_rows" in captured.out
+    assert "ready_for_qlog_nei" in captured.out
+
+
+def test_qlog_nei_cli_plot_diagnostics_writes_output(tmp_path: Path) -> None:
+    output = tmp_path / "plots" / "qlog_nei_diagnostics.png"
+
+    assert run(
+        [
+            "plot",
+            *base_args(
+                Path("configs/18_noisy_pending_qlognei.yaml"),
+                Path("examples/18_noisy_pending_qlognei_campaign_log.csv"),
+            ),
+            "--kind",
+            "qlog-nei-diagnostics",
+            "--output",
+            str(output),
+        ]
+    ) == 0
+
+    assert output.exists()
+
+
+def test_qlog_nei_cli_suggest_hint_for_review_pending_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/18_noisy_pending_qlognei.yaml")
+    log_path = tmp_path / "qlog_nei.csv"
+    df = pd.read_csv(
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+        keep_default_na=False,
+    )
+    df.loc[df["row_id"] == "nei_pending_0", "review_status"] = "pending"
+    df.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "1"]) == 1
+
+    captured = capsys.readouterr()
+    assert "review_status='pending'" in captured.err
+    assert "accepted suggestions as X_pending" in captured.err
+    assert log_path.read_bytes() == before
+
+
+def test_qlog_nei_cli_suggest_hint_for_pending_initial_design_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cfg = CampaignConfig.from_yaml("configs/18_noisy_pending_qlognei.yaml")
+    config_path = Path("configs/18_noisy_pending_qlognei.yaml")
+    log_path = tmp_path / "qlog_nei.csv"
+    df = pd.read_csv(
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+        keep_default_na=False,
+    ).iloc[:3].copy()
+    pending_initial = {
+        "row_id": "initial_pending",
+        "iteration": 1,
+        "status": "suggested",
+        "source": "sobol",
+        "review_status": "accepted",
+        "review_note": "",
+        "catalyst_loading": 0.58,
+        "reaction_temperature": 96.0,
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.concat(
+        [df, pd.DataFrame([pending_initial], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+    df.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "1"]) == 1
+
+    captured = capsys.readouterr()
+    assert "observe accepted pending initial suggestions" in captured.err
+    assert "requires observed initial-design rows" in captured.err
+    assert log_path.read_bytes() == before
 
 
 def test_contextual_suggest_accepts_context_value(

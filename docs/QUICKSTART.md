@@ -326,7 +326,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.0; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.1; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -372,14 +372,26 @@ python -m bo_forge validate \
   --config configs/18_noisy_pending_qlognei.yaml \
   --log examples/18_noisy_pending_qlognei_campaign_log.csv
 
+python -m bo_forge qlog-nei-summary \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv
+
 python -m bo_forge suggest \
   --config configs/18_noisy_pending_qlognei.yaml \
   --log examples/18_noisy_pending_qlognei_campaign_log.csv \
   --batch-size 1
+
+python -m bo_forge plot \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv \
+  --kind qlog-nei-diagnostics \
+  --output /tmp/bo_forge_qlog_nei_diagnostics.png
 ```
 
 Accepted review suggestions are treated as active pending experiments for
 qLogNEI; review rows still marked `pending` must be resolved first.
+The notebook walkthrough is
+`notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
 
 ## 🔁 Session API
 
@@ -508,7 +520,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

@@ -25,6 +25,7 @@ from bo_forge.diagnostics import (
     plot_model_comparison,
     plot_model_diagnostics,
     plot_progress,
+    plot_qlog_nei_diagnostics,
     plot_replicates,
     plot_stage_diagnostics,
 )
@@ -623,6 +624,56 @@ def test_plot_context_diagnostics_limits_large_context_sets_to_top_20() -> None:
 def test_plot_context_diagnostics_rejects_non_context_config() -> None:
     with pytest.raises(ValueError, match="requires a config with context"):
         plot_context_diagnostics(config(), observed_log())
+
+
+def test_plot_qlog_nei_diagnostics_writes_figure_and_labels(tmp_path: Path) -> None:
+    cfg = CampaignConfig.from_yaml("configs/18_noisy_pending_qlognei.yaml")
+    df = load_campaign_log("examples/18_noisy_pending_qlognei_campaign_log.csv", cfg)
+    save_path = tmp_path / "nested" / "qlog_nei_diagnostics.png"
+
+    fig, axes = plot_qlog_nei_diagnostics(cfg, df, save_path=save_path)
+
+    assert save_path.exists()
+    assert "qLogNEI pending-state counts" in axes[0].get_title()
+    assert "qLogNEI readiness" in axes[1].get_title()
+    assert "qLogNEI diagnostics" in fig._suptitle.get_text()
+
+
+def test_plot_qlog_nei_diagnostics_explains_pending_initial_rows() -> None:
+    cfg = CampaignConfig.from_yaml("configs/18_noisy_pending_qlognei.yaml")
+    df = load_campaign_log(
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+        cfg,
+    ).iloc[:3].copy()
+    pending_initial = {
+        "row_id": "initial_pending",
+        "iteration": 1,
+        "status": "suggested",
+        "source": "sobol",
+        "review_status": "accepted",
+        "review_note": "",
+        "catalyst_loading": 0.58,
+        "reaction_temperature": 96.0,
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.concat(
+        [df, pd.DataFrame([pending_initial], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+
+    _fig, axes = plot_qlog_nei_diagnostics(cfg, df)
+
+    readiness_text = "\n".join(text.get_text() for text in axes[1].texts)
+    assert "Accepted pending initial-design rows must be observed." in readiness_text
+    assert "Observed rows still needed: 0" not in readiness_text
+
+
+def test_plot_qlog_nei_diagnostics_rejects_non_qlog_nei_config() -> None:
+    with pytest.raises(ValueError, match="bo.acquisition: qlog_nei"):
+        plot_qlog_nei_diagnostics(config(), observed_log())
 
 
 def test_plot_model_diagnostics_writes_file_and_labels(tmp_path: Path) -> None:

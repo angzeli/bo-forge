@@ -1,5 +1,27 @@
 # 📝 BO Forge Changelog
 
+## v2.2.1 - qLogNEI Diagnostics, Tutorial, And App Workflow
+
+This follow-up keeps qLogNEI behavior unchanged while adding read-only
+inspection, diagnostics, tutorial, CLI, and Streamlit support around the v2.2.0
+noisy/pending-aware foundation.
+
+- Adds `qlog_nei_summary(config, df)` and `CampaignSession.qlog_nei_summary()`
+  for pending-state inspection.
+- Adds `bo-forge qlog-nei-summary`.
+- Adds `plot --kind qlog-nei-diagnostics` and
+  `CampaignSession.plot_qlog_nei_diagnostics()`.
+- Includes qLogNEI summaries in campaign reports and the local Streamlit
+  Overview/Data panels.
+- Adds lazy Streamlit Reports routing for qLogNEI diagnostics.
+- Adds a Streamlit campaign creation option for supported single-objective
+  qLogNEI configs.
+- Adds `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
+- Keeps qLogNEI suggestion behavior, CSV schemas, config keys, and unsupported
+  noisy combinations unchanged.
+- Keeps qLogNEHVI, cost-aware qLogNEI, contextual qLogNEI, structured qLogNEI,
+  and noisy multi-fidelity BO deferred.
+
 ## v2.2.0 - Noisy And Pending-Aware qLogNEI
 
 This release starts the v2.2 noisy/pending-aware BO line with conservative

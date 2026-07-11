@@ -23,6 +23,7 @@ from bo_forge.multi_objective import (
     multi_objective_observed_data,
     pareto_front,
 )
+from bo_forge.noisy import qlog_nei_summary
 from bo_forge.plot_style import (
     add_legend,
     configure_plot_style,
@@ -532,6 +533,128 @@ def plot_context_diagnostics(
     )
     fig.suptitle(
         f"{config.campaign_name}: context diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def plot_qlog_nei_diagnostics(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot read-only qLogNEI pending-state diagnostics."""
+    if config.bo.acquisition != "qlog_nei":
+        raise ValueError("plot_qlog_nei_diagnostics() requires bo.acquisition: qlog_nei.")
+    summary = qlog_nei_summary(config, df)
+    values = {str(row["field"]): row["value"] for _, row in summary.iterrows()}
+
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(14, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    count_ax, readiness_ax = axes
+    labels = [
+        "Observed\nbaseline",
+        "Active\npending",
+        "Blocking\nreview",
+        "Rejected /\ndeferred",
+    ]
+    counts = [
+        int(values["observed_baseline_rows"]),
+        int(values["active_pending_rows"]),
+        int(values["blocking_review_pending_rows"]),
+        int(values["rejected_or_deferred_pending_rows"]),
+    ]
+    count_ax.bar(
+        range(len(counts)),
+        counts,
+        color=["#2563eb", "#0f766e", "#dc2626", "#64748b"],
+        alpha=0.88,
+    )
+    count_ax.set_xticks(range(len(counts)))
+    count_ax.set_xticklabels(labels)
+    count_ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ready = bool(values["ready_for_qlog_nei"])
+    blocking = int(values["blocking_review_pending_rows"])
+    remaining = int(values["initial_design_remaining"])
+    active_pending_initial = int(values["active_pending_initial_rows"])
+    if ready:
+        message = (
+            "Ready for model-based qLogNEI.\n"
+            f"X_pending used: {values['x_pending_used']}."
+        )
+        color = "#0f766e"
+    elif blocking > 0:
+        message = (
+            "Blocked by review-pending rows.\n"
+            "Accept, reject, or defer them first."
+        )
+        color = "#dc2626"
+    elif active_pending_initial > 0:
+        message = (
+            "Accepted pending initial-design rows must be observed.\n"
+            "Mark them observed before model-based qLogNEI."
+        )
+        color = "#d97706"
+    else:
+        message = (
+            "Observed initial design is incomplete.\n"
+            f"Observed rows still needed: {remaining}."
+        )
+        color = "#d97706"
+    readiness_ax.text(
+        0.5,
+        0.62,
+        message,
+        ha="center",
+        va="center",
+        transform=readiness_ax.transAxes,
+        fontsize=13,
+        color=color,
+        fontweight="bold",
+    )
+    readiness_ax.text(
+        0.5,
+        0.30,
+        (
+            f"initial_design_size = {values['initial_design_size']}\n"
+            f"train_yvar_available = {values['train_yvar_available']}\n"
+            f"model_profile = {values['model_profile']}"
+        ),
+        ha="center",
+        va="center",
+        transform=readiness_ax.transAxes,
+        fontsize=11,
+        color="#334155",
+    )
+    readiness_ax.set_xticks([])
+    readiness_ax.set_yticks([])
+
+    set_title(count_ax, "qLogNEI pending-state counts")
+    set_axis_labels(count_ax, "Row state", "Rows")
+    set_title(readiness_ax, "qLogNEI readiness")
+    fig.suptitle(
+        f"{config.campaign_name}: qLogNEI diagnostics",
         fontsize=18,
         fontweight="bold",
         color="black",

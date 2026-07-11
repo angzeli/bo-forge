@@ -881,6 +881,37 @@ def test_context_summary_rejects_non_context_session(tmp_path: Path) -> None:
         campaign.context_summary()
 
 
+def test_qlog_nei_summary_and_report_include_pending_state_section() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/18_noisy_pending_qlognei.yaml",
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+    )
+
+    summary = campaign.qlog_nei_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert summary_value(summary, "observed_baseline_rows") == 4
+    assert summary_value(summary, "active_pending_rows") == 1
+    assert summary_value(summary, "ready_for_qlog_nei") is True
+    assert "qlog_nei_summary" in report
+    assert "qLogNEI Summary\n---------------" in text
+
+
+def test_qlog_nei_summary_rejects_non_qlog_nei_session(tmp_path: Path) -> None:
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg, [1.0]))
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=log_path,
+        config=cfg,
+        df=pd.read_csv(log_path, keep_default_na=False),
+    )
+
+    with pytest.raises(ValueError, match="bo.acquisition: qlog_nei"):
+        campaign.qlog_nei_summary()
+
+
 def test_model_summary_and_report_include_model_section() -> None:
     campaign = CampaignSession.from_files(
         "configs/17_model_profile_logei.yaml",

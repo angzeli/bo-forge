@@ -523,6 +523,10 @@ def empty_state_message(kind: str) -> tuple[str, str]:
             "No context summary available.",
             "Context summaries appear only when a context section is configured.",
         ),
+        "qlog_nei_summary": (
+            "No qLogNEI summary available.",
+            "qLogNEI summaries appear only when bo.acquisition is qlog_nei.",
+        ),
         "report_preview": (
             "No report preview available.",
             "Load a valid campaign before exporting a report.",
@@ -626,6 +630,8 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
         kinds.append("fidelity_diagnostics")
     if config.context is not None:
         kinds.append("context_diagnostics")
+    if config.bo.acquisition == "qlog_nei":
+        kinds.append("qlog_nei_diagnostics")
     if config.cost is not None:
         kinds.append("cost_progress")
     if config.replicates.enabled:

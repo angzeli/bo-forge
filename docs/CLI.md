@@ -96,10 +96,20 @@ bo-forge validate \
   --config configs/18_noisy_pending_qlognei.yaml \
   --log examples/18_noisy_pending_qlognei_campaign_log.csv
 
+bo-forge qlog-nei-summary \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv
+
 bo-forge suggest \
   --config configs/18_noisy_pending_qlognei.yaml \
   --log examples/18_noisy_pending_qlognei_campaign_log.csv \
   --batch-size 1
+
+bo-forge plot \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv \
+  --kind qlog-nei-diagnostics \
+  --output /tmp/bo_forge_qlog_nei_diagnostics.png
 ```
 
 For contextual configs, context variables are normal CSV variable columns but
@@ -390,6 +400,7 @@ bo-forge plot \
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
 | `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and process-local latest fit metadata when available. |
 | `bo-forge model-compare --config PATH --log PATH [--profile NAME ...]` | Compare model profiles on current observed fitting rows without changing CSV logs or the configured profile. |
+| `bo-forge qlog-nei-summary --config PATH --log PATH` | Print qLogNEI observed baseline rows, active pending rows, review blockers, initial-design readiness, train-Y variance availability, and model profile. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
@@ -397,7 +408,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|model-diagnostics\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics --output PATH` | Export one progress, diagnostics, model-diagnostics, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, or context-diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|model-diagnostics\|model-comparison\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics\|qlog-nei-diagnostics --output PATH` | Export one progress, diagnostics, model-diagnostics, model-comparison, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, context-diagnostics, or qLogNEI diagnostics figure. |
 
 ## 🧯 CLI Error Output
 

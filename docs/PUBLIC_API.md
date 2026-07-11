@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.2.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.2.1.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -48,6 +48,7 @@ These names are supported imports from `bo_forge`:
 - `model_profile_comparison`
 - `pareto_front`
 - `pareto_summary`
+- `qlog_nei_summary`
 - `review_suggestion`
 - `replicate_summary`
 - `stage_summary`
@@ -92,7 +93,7 @@ context combination.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.2.0 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.2.1 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect
@@ -104,6 +105,13 @@ CSV log. Comparison rows include `fit_status` and `fit_message` so failed or
 insufficient profile fits stay visible in tables and plots.
 `last_fit_*` fields are process-local and report `not_recorded` unless a model
 fit has happened in the same Python process for matching current fitting inputs.
+
+qLogNEI pending-state diagnostics expose `qlog_nei_summary` through the
+top-level package for read-only inspection. Use `qlog_nei_summary(config, df)`
+or `CampaignSession.qlog_nei_summary()` on configs with
+`bo.acquisition: qlog_nei` to inspect observed baseline rows, active
+`X_pending` rows, review-pending blockers, initial-design readiness,
+replicate-derived `train_Yvar` availability, and the configured model profile.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

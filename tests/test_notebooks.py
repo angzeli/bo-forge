@@ -21,6 +21,7 @@ FOUR_OBJECTIVE_NOTEBOOK = Path("notebooks/11_four_objective_qlogehvi_campaign.ip
 MULTI_FIDELITY_NOTEBOOK = Path("notebooks/15_multi_fidelity_qmfkg_campaign.ipynb")
 CONTEXTUAL_NOTEBOOK = Path("notebooks/16_contextual_logei_campaign.ipynb")
 MODEL_PROFILE_NOTEBOOK = Path("notebooks/17_model_profile_logei_campaign.ipynb")
+QLOG_NEI_NOTEBOOK = Path("notebooks/18_noisy_pending_qlognei_campaign.ipynb")
 
 assert NOTEBOOKS, "No notebooks found under notebooks/*.ipynb"
 
@@ -190,6 +191,19 @@ def test_model_profile_notebook_uses_existing_logei_assets() -> None:
     assert "TARGET_OBSERVED_ROWS = 15" in source
     assert "CampaignSession.from_files" in source
     assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+
+
+def test_qlog_nei_notebook_uses_existing_pending_aware_assets() -> None:
+    source = notebook_source(QLOG_NEI_NOTEBOOK)
+
+    assert "qlog_nei_summary()" in source
+    assert "plot_qlog_nei_diagnostics" in source
+    assert "configs\" / \"18_noisy_pending_qlognei.yaml" in source
+    assert "examples\" / \"18_noisy_pending_qlognei_campaign_log.csv" in source
+    assert "TARGET_OBSERVED_ROWS = 15" in source
+    assert "CampaignSession.from_files" in source
+    assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+    assert "X_pending" in source
 
 
 def test_model_profile_tutorial_workflow_smoke(tmp_path: Path) -> None:

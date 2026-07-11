@@ -141,7 +141,7 @@ deferred.
 
 ### `Non-default model profiles ...`
 
-v2.2.0 model profiles are deliberately conservative.
+v2.2.x model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
 single-objective campaigns configured with `bo.acquisition: log_ei` or
@@ -151,7 +151,7 @@ campaigns.
 
 ### `bo.acquisition='qlog_nei' cannot be combined with ...`
 
-v2.2.0 qLogNEI support is deliberately conservative.
+v2.2.x qLogNEI support is deliberately conservative.
 
 Fix: use `bo.acquisition: qlog_nei` only for single-objective, non-structured,
 non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use

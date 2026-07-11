@@ -112,6 +112,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(context_summary_parser)
     context_summary_parser.set_defaults(handler=_cmd_context_summary)
 
+    qlog_nei_summary_parser = subparsers.add_parser(
+        "qlog-nei-summary",
+        help="Print qLogNEI pending-state summary fields.",
+    )
+    _add_config_log_arguments(qlog_nei_summary_parser)
+    qlog_nei_summary_parser.set_defaults(handler=_cmd_qlog_nei_summary)
+
     model_summary_parser = subparsers.add_parser(
         "model-summary",
         help="Print model profile and fitting-input summary fields.",
@@ -228,6 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
             "stage-diagnostics",
             "fidelity-diagnostics",
             "context-diagnostics",
+            "qlog-nei-diagnostics",
             "model-diagnostics",
             "model-comparison",
         ],
@@ -368,6 +376,14 @@ def _cmd_context_summary(args: argparse.Namespace) -> int:
     if campaign.config.context is None:
         raise ConfigError("context-summary requires a contextual config.")
     _print_table(campaign.context_summary())
+    return 0
+
+
+def _cmd_qlog_nei_summary(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if campaign.config.bo.acquisition != "qlog_nei":
+        raise ConfigError("qlog-nei-summary requires bo.acquisition: qlog_nei.")
+    _print_table(campaign.qlog_nei_summary())
     return 0
 
 
@@ -549,6 +565,12 @@ def _cmd_plot(args: argparse.Namespace) -> int:
                     "plot --kind context-diagnostics requires a contextual config."
                 )
             campaign.plot_context_diagnostics(save_path=args.output)
+        elif args.kind == "qlog-nei-diagnostics":
+            if campaign.config.bo.acquisition != "qlog_nei":
+                raise ConfigError(
+                    "plot --kind qlog-nei-diagnostics requires bo.acquisition: qlog_nei."
+                )
+            campaign.plot_qlog_nei_diagnostics(save_path=args.output)
         elif args.kind == "model-diagnostics":
             if campaign.config.is_multi_objective:
                 raise ConfigError(
@@ -675,6 +697,17 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
     if isinstance(exc, SuggestionError):
+        message = str(exc)
+        if "review_status='pending'" in message and "qLogNEI" in message:
+            return (
+                "Hint: qLogNEI can use accepted suggestions as X_pending, but rows "
+                "still awaiting review must be accepted, rejected, or deferred first."
+            )
+        if "observe accepted pending initial suggestions" in message:
+            return (
+                "Hint: qLogNEI requires observed initial-design rows before "
+                "model-based suggestions; mark accepted initial suggestions observed first."
+            )
         if "Context" in str(exc) or "context" in str(exc):
             return (
                 "Hint: Use --context NAME=VALUE for each configured context "

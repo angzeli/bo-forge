@@ -622,6 +622,28 @@ def test_app_service_qlog_nei_dry_run_handles_active_pending(
     assert result.bundle["suggestions_fingerprint"]
 
 
+def test_app_service_qlog_nei_summary_and_diagnostics_plot_routing(
+    tmp_path: Path,
+) -> None:
+    log_path = copy_example_log(tmp_path, "18_noisy_pending_qlognei_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "18_noisy_pending_qlognei.yaml",
+        log_path,
+    )
+
+    view_data = service.collect_view_data("Overview")
+    summary = service.qlog_nei_summary()
+    plot_path = tmp_path / "plots" / "qlog_nei_diagnostics.png"
+    result = service.plot("qlog_nei_diagnostics", save_path=plot_path)
+
+    assert view_data.qlog_nei_summary is not None
+    assert summary.loc[summary["field"] == "active_pending_rows", "value"].iloc[0] == 1
+    assert "qlog_nei_diagnostics" in service.available_plot_kinds()
+    assert plot_path.exists()
+    assert result.written_path == plot_path
+    plt.close(result.figure)
+
+
 def test_app_service_context_summary_handles_pending_only_log(tmp_path: Path) -> None:
     cfg = CampaignConfig.from_yaml(PROJECT_ROOT / "configs" / "16_contextual_logei.yaml")
     pending = {
