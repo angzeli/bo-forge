@@ -26,6 +26,7 @@ VALID_SOURCES = {
     "sobol",
     "log_ei",
     "qlog_ei",
+    "qlog_nei",
     "cost_log_ei",
     "qmf_kg",
 }
@@ -108,6 +109,33 @@ def has_pending_suggestions(df: pd.DataFrame, config: CampaignConfig | None = No
         blocking = df["review_status"].isin({"pending", "accepted"})
         return bool((suggested & blocking).any())
     return bool(suggested.any())
+
+
+def has_blocking_qlog_nei_review_suggestions(
+    df: pd.DataFrame,
+    config: CampaignConfig,
+) -> bool:
+    """Return True when review-pending rows must block qLogNEI suggestions."""
+    if not config.review.enabled or "review_status" not in df.columns:
+        return False
+    if "status" not in df.columns or df.empty:
+        return False
+    return bool(
+        ((df["status"] == "suggested") & (df["review_status"] == "pending")).any()
+    )
+
+
+def qlog_nei_active_pending_suggestions(
+    df: pd.DataFrame,
+    config: CampaignConfig,
+) -> pd.DataFrame:
+    """Return pending design rows encoded as qLogNEI X_pending."""
+    if "status" not in df.columns or df.empty:
+        return df.iloc[0:0].copy()
+    suggested = df["status"] == "suggested"
+    if config.review.enabled:
+        suggested = suggested & (df["review_status"] == "accepted")
+    return df.loc[suggested].copy()
 
 
 def design_tuples(config: CampaignConfig, df: pd.DataFrame) -> set[tuple[object, ...]]:

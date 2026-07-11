@@ -17,6 +17,7 @@ from bo_forge.acquisition import (
     optimize_log_ei,
     optimize_posterior_mean_at_target_fidelity,
     optimize_qlog_ehvi,
+    optimize_qlog_nei,
     optimize_qmf_kg,
 )
 from bo_forge.config import CampaignConfig
@@ -30,7 +31,12 @@ from bo_forge.contextual import (
 )
 from bo_forge.costs import budget_remaining, evaluate_cost
 from bo_forge.errors import SuggestionError
-from bo_forge.models import dataframe_to_tensors, fit_gp_model, fit_multi_fidelity_gp_model
+from bo_forge.models import (
+    dataframe_to_tensors,
+    dataframe_to_training_tensors,
+    fit_gp_model,
+    fit_multi_fidelity_gp_model,
+)
 from bo_forge.multi_objective import (
     objectives_from_model_space,
     reference_point_to_model_space,
@@ -39,6 +45,7 @@ from bo_forge.replicates import aggregate_observed_replicates, modeling_observed
 from bo_forge.transforms import (
     categorical_combination_count,
     categorical_feature_assignments,
+    dataframe_to_unit_cube,
     encoded_dimension,
     objective_from_model_space,
     unit_cube_to_design_values,
@@ -50,8 +57,10 @@ from bo_forge.validation import (
     design_key_for_values,
     design_tuples,
     get_observed_data,
+    has_blocking_qlog_nei_review_suggestions,
     has_pending_suggestions,
     next_iteration,
+    qlog_nei_active_pending_suggestions,
     validate_campaign_data,
 )
 
@@ -97,7 +106,14 @@ def suggest_next(
         )
     if stage is not None:
         raise SuggestionError("--stage is only valid for structured campaign configs.")
-    if has_pending_suggestions(df, config):
+    uses_qlog_nei = config.bo.acquisition == "qlog_nei"
+    if uses_qlog_nei:
+        if has_blocking_qlog_nei_review_suggestions(df, config):
+            raise SuggestionError(
+                "Cannot generate qLogNEI suggestions while review_status='pending' "
+                "rows await review; accept, reject, or defer them first."
+            )
+    elif has_pending_suggestions(df, config):
         raise SuggestionError(
             "Cannot generate new suggestions while unresolved status='suggested' rows exist."
         )
@@ -109,13 +125,30 @@ def suggest_next(
 
     observed_df = get_observed_data(config, df)
     training_observed_df = modeling_observed_data(config, observed_df)
+    active_pending_df = (
+        qlog_nei_active_pending_suggestions(df, config)
+        if uses_qlog_nei
+        else df.iloc[0:0].copy()
+    )
+    pending_initial_count = (
+        int(active_pending_df["source"].isin({"sobol", "random"}).sum())
+        if uses_qlog_nei and not active_pending_df.empty
+        else 0
+    )
     remaining_initial = config.bo.initial_design_size - len(training_observed_df)
+    if uses_qlog_nei:
+        remaining_initial -= pending_initial_count
     if remaining_initial > 0:
         return _suggest_initial_design(
             config=config,
             df=df,
             count=min(requested_batch_size, remaining_initial),
             context_values=resolved_context,
+        )
+    if uses_qlog_nei and len(training_observed_df) < config.bo.initial_design_size:
+        raise SuggestionError(
+            "qLogNEI requires observed initial-design rows before model-based "
+            "suggestions; observe accepted pending initial suggestions first."
         )
 
     if config.fidelity is not None:
@@ -167,6 +200,15 @@ def suggest_next(
             config=config,
             df=df,
             observed_df=observed_df,
+            batch_size=requested_batch_size,
+        )
+
+    if uses_qlog_nei:
+        return _suggest_qlog_nei_model_based(
+            config=config,
+            df=df,
+            observed_df=observed_df,
+            active_pending_df=active_pending_df,
             batch_size=requested_batch_size,
         )
 
@@ -964,6 +1006,86 @@ def _suggest_model_based(
         row["iteration"] = iteration
         row["status"] = "suggested"
         row["source"] = source
+        _populate_replicate_fields(config, row)
+        _populate_review_fields(config, row)
+        for name, value in zip(config.variable_names, user_candidates[index], strict=True):
+            row[name] = value
+        row["predicted_mean"] = float(mean_user[index])
+        row["predicted_std"] = float(std[index])
+        row["acquisition"] = acquisition_scalar
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _suggest_qlog_nei_model_based(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    active_pending_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    torch.manual_seed(config.bo.random_seed)
+    combination_count = categorical_combination_count(config)
+    if combination_count > MAX_CATEGORICAL_COMBINATIONS:
+        raise SuggestionError(
+            "qLogNEI mixed-variable suggestions support at most "
+            f"{MAX_CATEGORICAL_COMBINATIONS} categorical combinations: "
+            f"configured={combination_count}."
+        )
+
+    model = fit_gp_model(config, observed_df)
+    training = dataframe_to_training_tensors(config, observed_df)
+    fixed_features_list = categorical_feature_assignments(config)
+    x_pending = (
+        dataframe_to_unit_cube(config, active_pending_df)
+        if not active_pending_df.empty
+        else None
+    )
+    user_candidates: list[tuple[object, ...]] | None = None
+    acquisition_value: torch.Tensor | None = None
+    rejection_message = "no candidate was decoded"
+    for attempt in range(MAX_DECODE_RETRIES):
+        torch.manual_seed(config.bo.random_seed + attempt)
+        x_unit_raw, acquisition_value, _source = optimize_qlog_nei(
+            config=config,
+            model=model,
+            x_baseline=training.train_x,
+            x_pending=x_pending,
+            batch_size=batch_size,
+            model_dim=encoded_dimension(config),
+            fixed_features_list=fixed_features_list,
+        )
+        decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
+        rejection_message = _candidate_batch_rejection_message(config, df, decoded_candidates)
+        if rejection_message is None:
+            user_candidates = decoded_candidates
+            break
+
+    if user_candidates is None or acquisition_value is None:
+        raise _CandidateGenerationExhausted(
+            "Could not generate enough feasible, non-duplicate qLogNEI suggestions "
+            f"after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+            f"Last rejection: {rejection_message}"
+        )
+
+    x_unit_repaired = values_to_unit_cube(config, user_candidates)
+
+    with torch.no_grad():
+        posterior = model.posterior(x_unit_repaired)
+        mean_model = posterior.mean.squeeze(-1)
+        std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
+        mean_user = objective_from_model_space(config, mean_model)
+
+    rows = []
+    iteration = next_iteration(df)
+    acquisition_scalar = float(acquisition_value.reshape(-1)[0])
+    for index in range(batch_size):
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = "qlog_nei"
         _populate_replicate_fields(config, row)
         _populate_review_fields(config, row)
         for name, value in zip(config.variable_names, user_candidates[index], strict=True):

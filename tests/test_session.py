@@ -1478,6 +1478,88 @@ def test_next_action_review_accepted_suggestions(tmp_path: Path) -> None:
     )
 
 
+def test_qlog_nei_accepted_pending_suggestions_are_ready_for_bo(tmp_path: Path) -> None:
+    log_path = tmp_path / "qlog_nei.csv"
+    log_path.write_text(
+        Path("examples/18_noisy_pending_qlognei_campaign_log.csv").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    campaign = CampaignSession.from_files("configs/18_noisy_pending_qlognei.yaml", log_path)
+
+    action = campaign.next_action()
+
+    assert campaign.campaign_status() == "ready_for_bo"
+    assert action.loc[0, "campaign_status"] == "ready_for_bo"
+    assert action.loc[0, "action"] == "suggest_bo"
+    assert "X_pending" in action.loc[0, "reason"]
+
+
+def test_qlog_nei_summary_counts_accepted_pending_initial_rows(
+    tmp_path: Path,
+) -> None:
+    cfg = CampaignConfig(
+        campaign_name="qlog_nei_initial_pending",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(
+            VariableConfig("x", "continuous", 0.0, 1.0),
+            VariableConfig("temperature", "continuous", 300.0, 800.0),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=4, acquisition="qlog_nei"),
+        review=ReviewConfig(enabled=True),
+    )
+    rows = [
+        {
+            "row_id": f"obs_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": x_value,
+            "temperature": temperature,
+            "score": score,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+        for index, (x_value, temperature, score) in enumerate(
+            [(0.1, 350.0, 0.5), (0.3, 500.0, 1.1), (0.6, 650.0, 1.8)]
+        )
+    ]
+    rows.append(
+        {
+            "row_id": "initial_pending",
+            "iteration": 3,
+            "status": "suggested",
+            "source": "sobol",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": 0.75,
+            "temperature": 700.0,
+            "score": "",
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+    )
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+    campaign = CampaignSession(
+        config_path=tmp_path / "campaign.yaml",
+        log_path=tmp_path / "campaign.csv",
+        config=cfg,
+        df=df,
+    )
+
+    summary = campaign.summary()
+
+    assert summary_value(summary, "observed_rows") == 3
+    assert summary_value(summary, "pending_suggestions") == 1
+    assert summary_value(summary, "initial_design_remaining") == 0
+    assert campaign.campaign_status() == "has_pending_suggestions"
+
+
 def test_review_suggestion_and_mark_observed_with_actual_cost_reload(tmp_path: Path) -> None:
     config_path = write_cost_review_config(tmp_path / "campaign.yaml")
     cfg = cost_review_config()

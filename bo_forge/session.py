@@ -55,7 +55,9 @@ from bo_forge.suggestions import (
 from bo_forge.validation import (
     canonical_columns,
     get_observed_data,
+    has_blocking_qlog_nei_review_suggestions,
     next_iteration,
+    qlog_nei_active_pending_suggestions,
     validate_campaign_data,
 )
 
@@ -102,10 +104,7 @@ class CampaignSession:
         observed_count = len(observed)
         training_observed_count = len(modeling_observed_data(self.config, observed))
         pending_count = len(pending)
-        initial_design_remaining = max(
-            self.config.bo.initial_design_size - training_observed_count,
-            0,
-        )
+        initial_design_remaining = self._initial_design_remaining(training_observed_count)
         best = self.best_observation()
         if best.empty:
             best_row_id = None
@@ -183,16 +182,24 @@ class CampaignSession:
             )
         return pd.DataFrame(rows, columns=["field", "value"])
 
+    def _initial_design_remaining(self, training_observed_count: int) -> int:
+        remaining = self.config.bo.initial_design_size - training_observed_count
+        if self.config.bo.acquisition == "qlog_nei":
+            active_pending = qlog_nei_active_pending_suggestions(self.df, self.config)
+            if not active_pending.empty:
+                pending_initial_count = int(
+                    active_pending["source"].isin({"sobol", "random"}).sum()
+                )
+                remaining -= pending_initial_count
+        return max(remaining, 0)
+
     def _multi_objective_summary(self) -> pd.DataFrame:
         observed = self.observed_data()
         pending = self.pending_suggestions()
         observed_count = len(observed)
         training_observed_count = len(modeling_observed_data(self.config, observed))
         pending_count = len(pending)
-        initial_design_remaining = max(
-            self.config.bo.initial_design_size - training_observed_count,
-            0,
-        )
+        initial_design_remaining = self._initial_design_remaining(training_observed_count)
         rows: list[tuple[str, object]] = [
             ("campaign_name", self.config.campaign_name),
             ("campaign_status", self.campaign_status()),
@@ -355,7 +362,17 @@ class CampaignSession:
     def campaign_status(self) -> str:
         """Return the current campaign status without mutating session state."""
         self.validate()
-        if self.config.review.enabled:
+        if self.config.bo.acquisition == "qlog_nei":
+            if has_blocking_qlog_nei_review_suggestions(self.df, self.config):
+                return "has_pending_suggestions"
+            active_pending = qlog_nei_active_pending_suggestions(self.df, self.config)
+            active_pending_initial = (
+                active_pending["source"].isin({"sobol", "random"})
+                if not active_pending.empty
+                else pd.Series(dtype=bool)
+            )
+            pending_count = int(active_pending_initial.sum())
+        elif self.config.review.enabled:
             pending_count = int(
                 (
                     (self.df["status"] == "suggested")
@@ -366,10 +383,17 @@ class CampaignSession:
             pending_count = int((self.df["status"] == "suggested").sum())
         observed = get_observed_data(self.config, self.df)
         observed_count = len(modeling_observed_data(self.config, observed))
-        if pending_count > 0:
-            return "has_pending_suggestions"
         if observed_count < self.config.bo.initial_design_size:
+            if (
+                self.config.bo.acquisition == "qlog_nei"
+                and observed_count + pending_count < self.config.bo.initial_design_size
+            ):
+                return "ready_for_initial_design"
+            if pending_count > 0:
+                return "has_pending_suggestions"
             return "ready_for_initial_design"
+        if self.config.bo.acquisition != "qlog_nei" and pending_count > 0:
+            return "has_pending_suggestions"
         return "ready_for_bo"
 
     def next_action(self) -> pd.DataFrame:
@@ -459,7 +483,16 @@ class CampaignSession:
                 )
         else:
             action = "suggest_bo"
-            reason = "Initial design is complete and no pending suggestions remain."
+            if (
+                self.config.bo.acquisition == "qlog_nei"
+                and not self.pending_suggestions().empty
+            ):
+                reason = (
+                    "Initial design is complete; qLogNEI can account for accepted "
+                    "pending suggestions as X_pending."
+                )
+            else:
+                reason = "Initial design is complete and no pending suggestions remain."
             args = suggest_call_args(include_batch_size=True)
             if args:
                 suggested_call = (

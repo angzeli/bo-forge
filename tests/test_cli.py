@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.1.3\n"
+    assert captured.out == "bo-forge 2.2.0\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.1.3\n"
+    assert completed.stdout == "bo-forge 2.2.0\n"
     assert completed.stderr == ""
 
 
@@ -931,6 +931,35 @@ def test_constrained_suggest_output_is_feasible(
         (suggestions["solvent"] == "Water")
         & (suggestions["reaction_time"].astype(int) < 35)
     ).any()
+
+
+def test_qlog_nei_cli_suggest_works_with_accepted_pending_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/18_noisy_pending_qlognei.yaml")
+    log_path = tmp_path / "qlog_nei.csv"
+    output_path = tmp_path / "qlog_nei_suggestions.csv"
+    pd.read_csv(
+        "examples/18_noisy_pending_qlognei_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(
+        [
+            "suggest",
+            *base_args(config_path, log_path),
+            "--batch-size",
+            "1",
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    suggestions = pd.read_csv(output_path, keep_default_na=False)
+    assert suggestions.loc[0, "source"] == "qlog_nei"
 
 
 def test_contextual_suggest_accepts_context_value(

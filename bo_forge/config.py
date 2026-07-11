@@ -258,6 +258,15 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         fidelity=fidelity,
         stages=stages,
     )
+    _validate_qlog_nei_combinations(
+        bo=bo,
+        multi_objective=bool(objectives),
+        fidelity=fidelity,
+        stages=stages,
+        context=context,
+        cost=cost,
+        replicates=replicates,
+    )
 
     return CampaignConfig(
         campaign_name=campaign_name,
@@ -459,8 +468,8 @@ def _parse_bo(
     elif multi_objective:
         supported = {"qlog_ehvi"}
     else:
-        supported = {"log_ei"}
-    if acquisition not in supported:
+        supported = {"log_ei", "qlog_nei"}
+    if acquisition not in supported and acquisition != "qlog_nei":
         raise ConfigError(
             f"Unsupported acquisition '{acquisition}'. "
             f"Expected one of {sorted(supported)}."
@@ -698,22 +707,57 @@ def _validate_model_combinations(
     if multi_objective:
         raise ConfigError(
             "Non-default model profiles are only supported for single-objective "
-            "campaigns configured with bo.acquisition: log_ei in v2.1.3; "
+            "campaigns configured with bo.acquisition: log_ei or qlog_nei "
+            "in v2.2.0; "
             "use model.profile: default for multi-objective campaigns."
         )
     if fidelity is not None:
         raise ConfigError(
             "Non-default model profiles cannot be combined with fidelity campaigns "
-            "in v2.1.3; use model.profile: default."
+            "in v2.2.0; use model.profile: default."
         )
     if stages:
         raise ConfigError(
             "Non-default model profiles cannot be combined with structured campaign "
-            "stages in v2.1.3; use model.profile: default."
+            "stages in v2.2.0; use model.profile: default."
         )
-    if bo.acquisition != "log_ei":
+    if bo.acquisition not in {"log_ei", "qlog_nei"}:
         raise ConfigError(
-            "Non-default model profiles require bo.acquisition: log_ei in v2.1.3."
+            "Non-default model profiles require bo.acquisition: log_ei or "
+            "qlog_nei in v2.2.0."
+        )
+
+
+def _validate_qlog_nei_combinations(
+    *,
+    bo: BOConfig,
+    multi_objective: bool,
+    fidelity: FidelityConfig | None,
+    stages: list[StageConfig],
+    context: ContextConfig | None,
+    cost: CostConfig | None,
+    replicates: ReplicateConfig,
+) -> None:
+    if bo.acquisition != "qlog_nei":
+        return
+    if multi_objective:
+        raise ConfigError("bo.acquisition='qlog_nei' is single-objective only in v2.2.0.")
+    if fidelity is not None:
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with fidelity in v2.2.0.")
+    if stages:
+        raise ConfigError(
+            "bo.acquisition='qlog_nei' cannot be combined with structured stages in v2.2.0."
+        )
+    if context is not None:
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with context in v2.2.0.")
+    if cost is not None:
+        raise ConfigError(
+            "bo.acquisition='qlog_nei' cannot be combined with cost-aware campaigns in v2.2.0."
+        )
+    if replicates.enabled and replicates.suggestion_policy == "uncertain_best":
+        raise ConfigError(
+            "bo.acquisition='qlog_nei' supports replicate campaigns only with "
+            "replicates.suggestion_policy: new_only in v2.2.0."
         )
 
 

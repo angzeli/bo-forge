@@ -22,6 +22,8 @@ Use this checklist before publishing a GitHub release or PyPI package.
 ./.venv/bin/python -m bo_forge model-compare --config configs/17_model_profile_logei.yaml --log examples/17_model_profile_campaign_log.csv
 ./.venv/bin/python -m bo_forge plot --config configs/17_model_profile_logei.yaml --log examples/17_model_profile_campaign_log.csv --kind model-diagnostics --output /tmp/bo_forge_model_diagnostics.png
 ./.venv/bin/python -m bo_forge plot --config configs/17_model_profile_logei.yaml --log examples/17_model_profile_campaign_log.csv --kind model-comparison --output /tmp/bo_forge_model_comparison.png
+./.venv/bin/python -m bo_forge validate --config configs/18_noisy_pending_qlognei.yaml --log examples/18_noisy_pending_qlognei_campaign_log.csv
+./.venv/bin/python -m bo_forge suggest --config configs/18_noisy_pending_qlognei.yaml --log examples/18_noisy_pending_qlognei_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m streamlit --version
 git diff --check
 ```
@@ -59,7 +61,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.1.3-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.2.0-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -76,7 +78,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.1.3-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.2.0-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -93,7 +95,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.1.3-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.2.0-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -106,7 +108,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.1.3.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.2.0.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -168,8 +170,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.1.3`.
-- Tag the release as `v2.1.3`.
+  install paths, and the release tag all agree on `v2.2.0`.
+- Tag the release as `v2.2.0`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

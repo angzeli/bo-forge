@@ -1,0 +1,32 @@
+campaign_name: noisy_pending_qlognei
+objective:
+  name: activity
+  direction: maximize
+
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.05
+    upper: 1.0
+
+  - name: reaction_temperature
+    type: continuous
+    lower: 40
+    upper: 140
+
+model:
+  profile: smooth
+
+review:
+  enabled: true
+
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: qlog_nei
+  initial_design_method: sobol
+  random_seed: 18
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 16
+  min_normalized_distance: 0.0

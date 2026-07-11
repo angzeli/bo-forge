@@ -314,8 +314,8 @@ variables and optional defaults. In v1.5.x, `context:` cannot be combined with
 
 ## 🧠 Model Profiles
 
-The v2.1 line includes optional model profiles for single-objective campaigns
-configured with `bo.acquisition: log_ei`.
+The v2.2 line includes optional model profiles for supported single-objective
+campaigns configured with `bo.acquisition: log_ei` or `qlog_nei`.
 Profiles select curated GP covariance behavior without exposing raw BoTorch
 kernel passthrough:
 
@@ -325,8 +325,8 @@ model:
 ```
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
-profiles are intentionally limited to single-objective workflows configured
-with `bo.acquisition: log_ei` in v2.1.3; multi-objective, multi-fidelity, and
+profiles are intentionally limited to supported single-objective workflows configured
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.0; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -363,6 +363,23 @@ rewrite the CSV log, or automatically select a model.
 The tutorial notebook is:
 
 - `notebooks/17_model_profile_logei_campaign.ipynb`.
+
+For noisy or pending-aware single-objective BO, inspect the qLogNEI seed
+campaign:
+
+```bash
+python -m bo_forge validate \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv
+
+python -m bo_forge suggest \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv \
+  --batch-size 1
+```
+
+Accepted review suggestions are treated as active pending experiments for
+qLogNEI; review rows still marked `pending` must be resolved first.
 
 ## 🔁 Session API
 
@@ -486,10 +503,12 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/14_structured_campaign_tutorial.yaml`: demonstrates a staged screening/refinement workflow with mixed variables, stage-aware constraints, and a notebook walkthrough.
 - `configs/15_multi_fidelity_qmfkg.yaml`: demonstrates single-objective continuous-fidelity qMFKG.
 - `configs/16_contextual_logei.yaml`: demonstrates single-objective contextual LogEI with a fixed feedstock context.
+- `configs/17_model_profile_logei.yaml`: demonstrates single-objective model-profile diagnostics.
+- `configs/18_noisy_pending_qlognei.yaml`: demonstrates single-objective qLogNEI with accepted pending review suggestions.
 
 ## 🎯 Multi-Objective qLogEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v1.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

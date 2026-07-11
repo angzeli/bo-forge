@@ -563,6 +563,15 @@ def test_validate_campaign_data_accepts_model_profile_example_log() -> None:
     assert config_model.model.profile == "smooth"
 
 
+def test_validate_campaign_data_accepts_qlog_nei_example_log() -> None:
+    config_nei = CampaignConfig.from_yaml("configs/18_noisy_pending_qlognei.yaml")
+    df = load_campaign_log("examples/18_noisy_pending_qlognei_campaign_log.csv", config_nei)
+
+    validate_campaign_data(config_nei, df)
+    assert config_nei.bo.acquisition == "qlog_nei"
+    assert config_nei.review.enabled
+
+
 def test_canonical_columns_for_schema_combinations() -> None:
     base = config()
     cost = cost_review_config()
@@ -866,7 +875,10 @@ def test_validate_campaign_data_rejects_categorical_whitespace() -> None:
         validate_campaign_data(mixed_config(), df)
 
 
-@pytest.mark.parametrize("source", ["manual", "sobol", "random", "log_ei", "qlog_ei"])
+@pytest.mark.parametrize(
+    "source",
+    ["manual", "sobol", "random", "log_ei", "qlog_ei", "qlog_nei"],
+)
 def test_constraints_apply_to_all_sources_and_statuses(source: str) -> None:
     cfg = constrained_mixed_config()
     df = mixed_df()

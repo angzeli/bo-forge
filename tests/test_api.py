@@ -6,8 +6,12 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import torch
 from fastapi.testclient import TestClient
 
+import bo_forge.suggestions as suggestions_module
+from bo_forge.config import CampaignConfig
+from bo_forge.transforms import values_to_unit_cube
 from bo_forge_app import api_cli
 from bo_forge_app.api import create_app
 from bo_forge_app.streamlit_helpers import file_fingerprint, make_staged_suggestion_bundle
@@ -79,7 +83,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.1.3"
+    assert payload["version"] == "2.2.0"
     assert payload["experimental"] is True
 
 
@@ -163,6 +167,52 @@ def test_api_dry_run_returns_staged_bundle_without_mutating(tmp_path: Path) -> N
     assert payload["staged_bundle"]["config_path"] == ref["config_path"]
     assert payload["staged_bundle"]["log_path"] == ref["log_path"]
     assert log_path.read_bytes() == before
+
+
+def test_api_qlog_nei_dry_run_and_append_use_pending_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "18_noisy_pending_qlognei.yaml",
+        "18_noisy_pending_qlognei_campaign_log.csv",
+    )
+    cfg = CampaignConfig.from_yaml(tmp_path / ref["config_path"])
+    candidate = values_to_unit_cube(cfg, [(0.50, 92.0)])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+    api_client = client(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    dry_run = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 1},
+    )
+
+    assert dry_run.status_code == 200, dry_run.text
+    payload = dry_run.json()
+    x_pending = captured["x_pending"]
+    assert isinstance(x_pending, torch.Tensor)
+    assert x_pending.shape == (1, 2)
+    assert payload["suggestions"]["records"][0]["source"] == "qlog_nei"
+    assert payload["staged_bundle"]["suggestions"]["records"][0]["source"] == "qlog_nei"
+    assert log_path.read_bytes() == before
+
+    append = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": payload["staged_bundle"]},
+    )
+
+    assert append.status_code == 200, append.text
+    assert append.json()["validation"]["ok"] is True
+    assert log_path.read_bytes() != before
 
 
 def test_api_contextual_dry_run_accepts_context_values_without_mutating(

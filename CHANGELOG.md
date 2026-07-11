@@ -1,5 +1,30 @@
 # 📝 BO Forge Changelog
 
+## v2.2.0 - Noisy And Pending-Aware qLogNEI
+
+This release starts the v2.2 noisy/pending-aware BO line with conservative
+single-objective qLogNEI support. It keeps CSV schemas unchanged and preserves
+existing LogEI, qLogEHVI, qMFKG, CLI, Streamlit, service, API, and notebook
+behavior outside the new supported path.
+
+- Adds `bo.acquisition: qlog_nei` for supported single-objective campaigns.
+- Adds `source=qlog_nei` for generated model-based rows.
+- Uses BoTorch `qLogNoisyExpectedImprovement` with observed rows as
+  `X_baseline` and accepted pending suggestions as `X_pending`.
+- Keeps review `pending` rows blocking; accepted review suggestions are active
+  pending experiments, while rejected and deferred suggestions stay auditable
+  but do not influence qLogNEI.
+- Allows v2.1 model profiles with qLogNEI for supported single-objective
+  configs.
+- Allows replicate-derived `train_Yvar` only when replicate campaigns use
+  `replicates.suggestion_policy: new_only`.
+- Rejects qLogNEI with multi-objective, multi-fidelity, structured,
+  contextual, cost-aware, or active-repeat replicate campaigns.
+- Adds `configs/18_noisy_pending_qlognei.yaml` and
+  `examples/18_noisy_pending_qlognei_campaign_log.csv`.
+- Keeps qLogNEHVI, cost-aware qLogNEI, contextual qLogNEI, structured qLogNEI,
+  and noisy multi-fidelity BO deferred.
+
 ## v2.1.3 - Model Profile Release Closeout
 
 This final v2.1.x hardening patch closes the model-profile line without adding

@@ -1,11 +1,11 @@
-# 🧪 BO Forge v2.1.3
+# 🧪 BO Forge v2.2.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.1.3 closes the curated v2.1 model-profile line with comparison hardening,
-roadmap closeout, and release-readiness polish. It preserves YAML/CSV
-compatibility, does not auto-select profiles, and avoids raw BoTorch kernel
-passthrough.
+v2.2.0 starts the noisy and pending-aware BO line with conservative
+single-objective qLogNEI support. It preserves YAML/CSV compatibility, keeps
+suggestion generation non-mutating, and lets qLogNEI account for accepted
+pending experiments through BoTorch `X_pending`.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -19,7 +19,7 @@ BO Forge deliberately supports only:
 - Sobol or random initial suggestions
 - BoTorch `SingleTaskGP` and `SingleTaskMultiFidelityGP`
 - optional single-objective model profiles: `default`, `smooth`, `rough`, and `robust`
-- LogEI/qLogEI for standard single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
+- LogEI/qLogEI and qLogNEI for supported single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
 - optional cost-aware ranking and human review
@@ -35,7 +35,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEHVI, cost-aware qLogNEI, contextual qLogNEI, structured qLogNEI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -161,6 +161,10 @@ posterior-vs-observed diagnostics with `bo-forge plot --kind model-diagnostics`
 and profile comparison diagnostics with `bo-forge plot --kind model-comparison`.
 The notebook walkthrough is `notebooks/17_model_profile_logei_campaign.ipynb`.
 
+The bundled qLogNEI example is `configs/18_noisy_pending_qlognei.yaml` with
+seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates
+accepted pending review suggestions being passed to qLogNEI as `X_pending`.
+
 ---
 
 ## 🗂️ Repository Structure
@@ -205,7 +209,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.1.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.2.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

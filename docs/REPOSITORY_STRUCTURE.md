@@ -153,7 +153,8 @@ The repository also includes:
 - `configs/14_structured_campaign_tutorial.yaml` as a staged screening/refinement tutorial paired with `notebooks/14_structured_campaign_tutorial.ipynb`,
 - `configs/15_multi_fidelity_qmfkg.yaml` as a single-objective continuous-fidelity qMFKG example paired with `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`,
 - `configs/16_contextual_logei.yaml` as a single-objective contextual LogEI example with `feedstock_acidity` fixed at suggestion time, paired with `notebooks/16_contextual_logei_campaign.ipynb`,
-- and `configs/17_model_profile_logei.yaml` as a single-objective model-profile example paired with `notebooks/17_model_profile_logei_campaign.ipynb`.
+- `configs/17_model_profile_logei.yaml` as a single-objective model-profile example paired with `notebooks/17_model_profile_logei_campaign.ipynb`,
+- and `configs/18_noisy_pending_qlognei.yaml` as a single-objective qLogNEI example with accepted pending review suggestions.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

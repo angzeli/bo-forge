@@ -1,0 +1,6 @@
+row_id,iteration,status,source,review_status,review_note,catalyst_loading,reaction_temperature,activity,predicted_mean,predicted_std,acquisition
+nei_seed_0,0,observed,manual,accepted,,0.12,55,0.48,,,
+nei_seed_1,0,observed,manual,accepted,,0.35,78,0.76,,,
+nei_seed_2,0,observed,manual,accepted,,0.70,110,0.93,,,
+nei_seed_3,0,observed,manual,accepted,,0.92,132,0.80,,,
+nei_pending_0,1,suggested,qlog_nei,accepted,,0.58,96,,0.86,0.12,0.041

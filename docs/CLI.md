@@ -86,6 +86,22 @@ bo-forge suggest \
 
 The same commands work for mixed-variable and constrained configs such as `configs/05_simple_mixed_logei.yaml` and `configs/06_mixed_constrained_logei.yaml`. Constraint violations fail during `validate`; generated suggestions are filtered to satisfy configured constraints.
 
+For noisy or pending-aware single-objective configs, use `bo.acquisition:
+qlog_nei`. Accepted review suggestions are treated as active pending
+experiments and passed to qLogNEI as `X_pending`; review rows that are still
+`pending` must be accepted, rejected, or deferred first:
+
+```bash
+bo-forge validate \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/18_noisy_pending_qlognei.yaml \
+  --log examples/18_noisy_pending_qlognei_campaign_log.csv \
+  --batch-size 1
+```
+
 For contextual configs, context variables are normal CSV variable columns but
 are fixed at suggestion time. Provide every context value with repeatable
 `--context NAME=VALUE`, or define `context.default_values` in the YAML:

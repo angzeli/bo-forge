@@ -6,7 +6,7 @@ import torch
 from botorch.acquisition import LogExpectedImprovement, PosteriorMean
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition.knowledge_gradient import qMultiFidelityKnowledgeGradient
-from botorch.acquisition.logei import qLogExpectedImprovement
+from botorch.acquisition.logei import qLogExpectedImprovement, qLogNoisyExpectedImprovement
 from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
 from botorch.models.model import Model
 from botorch.optim import optimize_acqf, optimize_acqf_mixed
@@ -70,6 +70,50 @@ def optimize_log_ei(
     else:
         candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
     return candidates.detach(), acquisition_value.detach(), source
+
+
+def optimize_qlog_nei(
+    config: CampaignConfig,
+    model: Model,
+    x_baseline: torch.Tensor,
+    batch_size: int,
+    *,
+    model_dim: int | None = None,
+    x_pending: torch.Tensor | None = None,
+    fixed_features_list: list[dict[int, float]] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, str]:
+    """Optimize qLogNEI in unit-cube model space."""
+    dimension = model_dim if model_dim is not None else len(config.variables)
+    bounds = torch.tensor(
+        [[0.0] * dimension, [1.0] * dimension],
+        dtype=torch.double,
+    )
+    sampler = SobolQMCNormalSampler(
+        sample_shape=torch.Size([config.bo.mc_samples]),
+        seed=config.bo.random_seed,
+    )
+    acquisition = qLogNoisyExpectedImprovement(
+        model=model,
+        X_baseline=x_baseline,
+        X_pending=x_pending,
+        sampler=sampler,
+    )
+    optimize_kwargs = {
+        "acq_function": acquisition,
+        "bounds": bounds,
+        "q": batch_size,
+        "num_restarts": config.bo.num_restarts,
+        "raw_samples": config.bo.raw_samples,
+        "options": {"batch_limit": 5, "maxiter": 200},
+    }
+    if fixed_features_list:
+        candidates, acquisition_value = optimize_acqf_mixed(
+            **optimize_kwargs,
+            fixed_features_list=fixed_features_list,
+        )
+    else:
+        candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
+    return candidates.detach(), acquisition_value.detach(), "qlog_nei"
 
 
 def optimize_qlog_ehvi(

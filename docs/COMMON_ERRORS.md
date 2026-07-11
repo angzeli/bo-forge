@@ -141,12 +141,21 @@ deferred.
 
 ### `Non-default model profiles ...`
 
-v2.1.3 model profiles are deliberately conservative.
+v2.2.0 model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
-single-objective campaigns configured with `bo.acquisition: log_ei`. Use
+single-objective campaigns configured with `bo.acquisition: log_ei` or
+`qlog_nei`. Use
 `model.profile: default` for multi-objective, multi-fidelity, and structured
 campaigns.
+
+### `bo.acquisition='qlog_nei' cannot be combined with ...`
+
+v2.2.0 qLogNEI support is deliberately conservative.
+
+Fix: use `bo.acquisition: qlog_nei` only for single-objective, non-structured,
+non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
+`replicates.suggestion_policy: new_only`.
 
 ### `model_profile_comparison() does not support ...`
 
@@ -343,7 +352,9 @@ sobol
 random
 log_ei
 qlog_ei
+qlog_nei
 cost_log_ei
+qmf_kg
 qlog_ehvi
 cost_qlog_ehvi
 ```
@@ -431,7 +442,7 @@ Fix: run that experiment and call `mark_observed()`, or use review decisions whe
 
 The row is structurally valid, but the configured feasibility rules reject its variable values.
 
-Fix: change the row values or update the constraint if the campaign definition is wrong. Constraints apply to all rows, including `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, and `cost_log_ei`.
+Fix: change the row values or update the constraint if the campaign definition is wrong. Constraints apply to all rows, including `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, and `cost_log_ei`.
 
 ### `Could not generate enough feasible, non-duplicate suggestions`
 

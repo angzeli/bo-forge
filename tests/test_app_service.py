@@ -5,11 +5,14 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import torch
 from matplotlib import pyplot as plt
 
+import bo_forge.suggestions as suggestions_module
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import LogWriteError
 from bo_forge.session import CampaignSession
+from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
 from bo_forge_app.service import CampaignAppService, CampaignViewData
 from bo_forge_app.streamlit_helpers import make_staged_suggestion_bundle
@@ -592,6 +595,31 @@ def test_app_service_model_summary_and_diagnostics_plot_routing(tmp_path: Path) 
     assert comparison_path.exists()
     assert comparison_result.written_path == comparison_path
     plt.close(comparison_result.figure)
+
+
+def test_app_service_qlog_nei_dry_run_handles_active_pending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = copy_example_log(tmp_path, "18_noisy_pending_qlognei_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "18_noisy_pending_qlognei.yaml",
+        log_path,
+    )
+    candidate = values_to_unit_cube(service.config, [(0.45, 610.0)])
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        x_pending = kwargs["x_pending"]
+        assert isinstance(x_pending, torch.Tensor)
+        assert x_pending.shape == (1, 2)
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    result = service.suggest_dry_run(batch_size=1)
+
+    assert result.suggestions.loc[0, "source"] == "qlog_nei"
+    assert result.bundle["suggestions_fingerprint"]
 
 
 def test_app_service_context_summary_handles_pending_only_log(tmp_path: Path) -> None:

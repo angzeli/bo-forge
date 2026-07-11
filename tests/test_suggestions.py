@@ -1,4 +1,5 @@
 import math
+from dataclasses import replace
 
 import pandas as pd
 import pytest
@@ -47,6 +48,54 @@ def config(batch_size: int = 2, initial_design_size: int = 3) -> CampaignConfig:
             mc_samples=16,
         ),
     )
+
+
+def qlog_nei_config(*, review: bool = False, initial_design_size: int = 3) -> CampaignConfig:
+    base = config(batch_size=1, initial_design_size=initial_design_size)
+    return CampaignConfig(
+        campaign_name="qlog_nei_test",
+        objective=base.objective,
+        variables=base.variables,
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            acquisition="qlog_nei",
+            random_seed=3,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+        review=ReviewConfig(enabled=review),
+    )
+
+
+def qlog_nei_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (x_value, temperature, activity) in enumerate(
+        [
+            (0.1, 350.0, 0.5),
+            (0.3, 500.0, 1.1),
+            (0.6, 650.0, 1.8),
+            (0.9, 780.0, 1.2),
+        ]
+    ):
+        row = {
+            "row_id": f"obs_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "x": x_value,
+            "temperature": temperature,
+            "activity": activity,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+        if cfg.review.enabled:
+            row["review_status"] = "accepted"
+            row["review_note"] = ""
+        rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
 def structured_config() -> CampaignConfig:
@@ -1197,6 +1246,266 @@ def test_suggest_next_supports_non_default_model_profile_without_mutating() -> N
     assert suggestions.loc[0, "source"] == "log_ei"
     assert math.isfinite(float(suggestions.loc[0, "predicted_mean"]))
     assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
+
+
+def test_qlog_nei_suggestions_are_non_mutating_and_use_qlog_nei_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nei_config()
+    df = qlog_nei_log(cfg)
+    before = df.copy(deep=True)
+    candidate = values_to_unit_cube(cfg, [(0.45, 610.0)])
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        assert kwargs["x_baseline"].shape[0] == 4
+        assert kwargs["x_pending"] is None
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "qlog_nei"
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean"]))
+    assert float(suggestions.loc[0, "predicted_std"]) >= 0.0
+    assert float(suggestions.loc[0, "acquisition"]) == pytest.approx(0.25)
+
+
+def test_qlog_nei_passes_accepted_review_suggestions_as_x_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nei_config(review=True)
+    df = qlog_nei_log(cfg)
+    pending = {
+        "row_id": "pending_0",
+        "iteration": 4,
+        "status": "suggested",
+        "source": "qlog_nei",
+        "review_status": "accepted",
+        "review_note": "",
+        "x": 0.75,
+        "temperature": 700.0,
+        "activity": "",
+        "predicted_mean": 1.4,
+        "predicted_std": 0.2,
+        "acquisition": 0.1,
+    }
+    df = pd.concat([df, pd.DataFrame([pending], columns=canonical_columns(cfg))], ignore_index=True)
+    candidate = values_to_unit_cube(cfg, [(0.45, 610.0)])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    x_pending = captured["x_pending"]
+    assert isinstance(x_pending, torch.Tensor)
+    assert x_pending.shape == (1, 2)
+    assert suggestions.loc[0, "source"] == "qlog_nei"
+
+
+def test_qlog_nei_review_pending_rows_block_suggestions() -> None:
+    cfg = qlog_nei_config(review=True)
+    df = qlog_nei_log(cfg)
+    pending = {
+        "row_id": "review_pending",
+        "iteration": 4,
+        "status": "suggested",
+        "source": "qlog_nei",
+        "review_status": "pending",
+        "review_note": "",
+        "x": 0.75,
+        "temperature": 700.0,
+        "activity": "",
+        "predicted_mean": 1.4,
+        "predicted_std": 0.2,
+        "acquisition": 0.1,
+    }
+    df = pd.concat([df, pd.DataFrame([pending], columns=canonical_columns(cfg))], ignore_index=True)
+
+    with pytest.raises(SuggestionError, match="review_status='pending'"):
+        suggest_next(cfg, df, batch_size=1)
+
+
+@pytest.mark.parametrize("review_status", ["rejected", "deferred"])
+def test_qlog_nei_rejected_and_deferred_review_rows_do_not_enter_x_pending(
+    review_status: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nei_config(review=True)
+    df = qlog_nei_log(cfg)
+    ignored = {
+        "row_id": f"review_{review_status}",
+        "iteration": 4,
+        "status": "suggested",
+        "source": "qlog_nei",
+        "review_status": review_status,
+        "review_note": "",
+        "x": 0.75,
+        "temperature": 700.0,
+        "activity": "",
+        "predicted_mean": 1.4,
+        "predicted_std": 0.2,
+        "acquisition": 0.1,
+    }
+    df = pd.concat([df, pd.DataFrame([ignored], columns=canonical_columns(cfg))], ignore_index=True)
+    candidate = values_to_unit_cube(cfg, [(0.45, 610.0)])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    assert captured["x_pending"] is None
+    assert suggestions.loc[0, "source"] == "qlog_nei"
+
+
+def test_qlog_nei_waits_for_pending_initial_design_rows() -> None:
+    cfg = qlog_nei_config(review=True, initial_design_size=4)
+    df = qlog_nei_log(cfg).iloc[:3].copy()
+    pending_initial = {
+        "row_id": "initial_pending",
+        "iteration": 3,
+        "status": "suggested",
+        "source": "sobol",
+        "review_status": "accepted",
+        "review_note": "",
+        "x": 0.75,
+        "temperature": 700.0,
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.concat(
+        [df, pd.DataFrame([pending_initial], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+
+    with pytest.raises(SuggestionError, match="observe accepted pending initial suggestions"):
+        suggest_next(cfg, df, batch_size=1)
+
+
+def test_qlog_nei_can_fill_remaining_initial_design_with_pending_initial_rows() -> None:
+    cfg = qlog_nei_config(review=True, initial_design_size=4)
+    df = qlog_nei_log(cfg).iloc[:2].copy()
+    pending_initial = {
+        "row_id": "initial_pending",
+        "iteration": 2,
+        "status": "suggested",
+        "source": "sobol",
+        "review_status": "accepted",
+        "review_note": "",
+        "x": 0.75,
+        "temperature": 700.0,
+        "activity": "",
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.concat(
+        [df, pd.DataFrame([pending_initial], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "sobol"
+
+
+def test_qlog_nei_mixed_variables_use_fixed_feature_assignments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = mixed_config(batch_size=1, initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(
+            base.bo,
+            acquisition="qlog_nei",
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+    )
+    df = mixed_observed_log(cfg)
+    candidate = values_to_unit_cube(cfg, [(0.45, 2, 0.2, "EtOH")])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["model_dim"] = kwargs["model_dim"]
+        captured["fixed_features_list"] = kwargs["fixed_features_list"]
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    assert captured["model_dim"] == 5
+    fixed_features = captured["fixed_features_list"]
+    assert isinstance(fixed_features, list)
+    assert len(fixed_features) == 2
+    assert suggestions.loc[0, "source"] == "qlog_nei"
+    assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
+    assert int(suggestions.loc[0, "repeats"]) in {1, 2, 3}
+    assert float(suggestions.loc[0, "dose"]) in {0.1, 0.2, 0.5}
+
+
+def test_qlog_nei_replicate_new_only_uses_replicate_train_yvar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = replicate_config(initial_design_size=3, suggestion_policy="new_only")
+    cfg = replace(
+        base,
+        bo=replace(
+            base.bo,
+            acquisition="qlog_nei",
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+    )
+    df = replicate_observed_log(cfg)
+    candidate = values_to_unit_cube(cfg, [(0.55, 600.0)])
+    captured: dict[str, object] = {}
+
+    class FakePosterior:
+        def __init__(self, x_unit: torch.Tensor) -> None:
+            self.mean = torch.full((x_unit.shape[0], 1), 1.25, dtype=torch.double)
+            self.variance = torch.full((x_unit.shape[0], 1), 0.04, dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, x_unit: torch.Tensor) -> FakePosterior:
+            return FakePosterior(x_unit)
+
+    def fake_fit_gp_model(config: CampaignConfig, observed_df: pd.DataFrame) -> FakeModel:
+        training = suggestions_module.dataframe_to_training_tensors(config, observed_df)
+        captured["train_yvar_used"] = training.train_yvar is not None
+        return FakeModel()
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        assert kwargs["x_pending"] is None
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", fake_fit_gp_model)
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    assert captured["train_yvar_used"] is True
+    assert suggestions.loc[0, "source"] == "qlog_nei"
+    assert suggestions.loc[0, "replicate_group"] == suggestions.loc[0, "row_id"]
+    assert int(suggestions.loc[0, "replicate_index"]) == 0
 
 
 def test_multi_fidelity_qmfkg_returns_one_valid_non_mutating_suggestion() -> None:

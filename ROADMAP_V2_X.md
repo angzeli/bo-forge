@@ -4,11 +4,11 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.1.3`. The v2.1.3 release closes the v2.1 model-profile
-line with summary hardening, a tutorial, read-only profile comparison
-diagnostics, and final closeout polish while preserving v1 YAML/CSV/session,
-CLI, notebook, Streamlit, service, and experimental API probe behavior. The
-next planned line is v2.2.x for noisy and pending-aware BO.
+Current baseline: `v2.2.0`. The v2.2.0 release starts the v2.2 noisy and
+pending-aware BO line with conservative single-objective qLogNEI support while
+preserving v1 YAML/CSV/session, CLI, notebook, Streamlit, service, and
+experimental API probe behavior. The next planned v2.2 patches focus on
+tutorials, diagnostics, and noisy multi-objective feasibility review.
 
 ## Roadmap So Far
 
@@ -20,20 +20,25 @@ flowchart LR
     v211["v2.1.1<br/>Summary hardening + tutorial"]
     v212["v2.1.2<br/>Comparison diagnostics"]
     v213["v2.1.3<br/>Model-profile closeout"]
+    v220["v2.2.0<br/>qLogNEI + X_pending"]
 
     v21 -.-> v210
     v21 -.-> v211
     v21 -.-> v212
     v21 -.-> v213
+    v22 -.-> v220
 
     class v10,v20,v21 majorDone
-    class v22,v23,v24,v25 majorFuture
+    class v22 majorActive
+    class v23,v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
+    class v220 patchActive
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
+    classDef patchActive fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
 ```
 
 ## v2.0.x - Stable v2 Baseline
@@ -74,10 +79,15 @@ Status: completed
 
 ## v2.2.x - Noisy And Pending-Aware BO
 
-Status: planned
+Status: active
 
-- Start with qLogNEI for noisy or pending-aware single-objective workflows.
-- Consider qLogNEHVI only after the single-objective noisy path is stable.
+- `v2.2.0` adds `bo.acquisition: qlog_nei` for supported single-objective
+  workflows and passes accepted pending suggestions as BoTorch `X_pending`.
+- `v2.2.1` is reserved for a qLogNEI tutorial, diagnostics, and app/CLI wording
+  polish after feedback on v2.2.0.
+- `v2.2.2` reviews qLogNEHVI feasibility after the single-objective noisy path
+  is stable.
+- `v2.2.3` is reserved for closeout hardening.
 - Keep learned-noise and replicate-derived variance semantics clear.
 - Avoid adding noisy multi-objective scope before the data-safety model is
   explicit.
