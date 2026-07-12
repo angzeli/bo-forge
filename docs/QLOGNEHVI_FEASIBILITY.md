@@ -1,12 +1,13 @@
-# qLogNEHVI Feasibility Review
+# qLogNEHVI Feasibility And Implementation Scope
 
-BO Forge v2.2.2 keeps noisy multi-objective BO under feasibility review.
-`bo.acquisition: qlog_nehvi` is not a public acquisition yet, and
-`source=qlog_nehvi` is not a valid CSV source.
+BO Forge v2.2.3 implements the conservative qLogNEHVI scope reviewed in
+v2.2.2. Public configs may use `bo.acquisition: qlog_nehvi` only for coupled
+multi-objective campaigns with `2 <= m <= 4`, and generated model-based rows
+use `source=qlog_nehvi`.
 
-The review result is: conservative qLogNEHVI looks feasible for a narrow
-future scope, but it should not be exposed until pending-state semantics,
-duplicate protection, and unsupported combinations are locked down in tests.
+The review result is: conservative qLogNEHVI is feasible for a narrow coupled
+multi-objective scope when pending-state semantics, duplicate protection, and
+unsupported combinations are locked down in tests.
 
 ## Acquisition Shape
 
@@ -15,7 +16,7 @@ multi-output `SingleTaskGP` with shared `train_X` and `train_Y`. That shape is
 compatible with the expected qLogNEHVI model shape if BO Forge keeps coupled
 objectives only.
 
-The safe future shape is:
+The implemented shape is:
 
 - use the same encoded decision space and objective direction transforms as
   qLogEHVI;
@@ -26,13 +27,13 @@ The safe future shape is:
   review state allows it;
 - keep `m >= 2`, with `2 <= m <= 4` as the tested range.
 
-Open implementation risk: qLogNEHVI must use the same objective-order contract
-as `pareto_front`, `hypervolume`, and qLogEHVI so reported objective order,
+Implementation boundary: qLogNEHVI uses the same objective-order contract as
+`pareto_front`, `hypervolume`, and qLogEHVI so reported objective order,
 reference points, and model-space transforms cannot drift.
 
 ## Pending Semantics
 
-The recommended future semantics are:
+The implemented pending semantics are:
 
 - without review, all `status=suggested` rows are active pending designs and
   should become `X_pending`;
@@ -45,9 +46,9 @@ The recommended future semantics are:
 This mirrors the single-objective qLogNEI safety model and avoids silently
 treating unapproved review rows as experiments in flight.
 
-## Recommended v2.2.3 Scope
+## Implemented v2.2.3 Scope
 
-If implemented in v2.2.3, qLogNEHVI should start with this narrow scope:
+qLogNEHVI starts with this narrow scope:
 
 - coupled multi-objective campaigns only;
 - `2 <= m <= 4`;
@@ -60,15 +61,12 @@ If implemented in v2.2.3, qLogNEHVI should start with this narrow scope:
 - no structured-stage, contextual, or multi-fidelity qLogNEHVI;
 - no Streamlit creation controls beyond loading valid backend configs.
 
-If this scope proves unstable, v2.2.3 should close the v2.2 line with
-qLogNEHVI explicitly deferred.
+## Rejected Combinations
 
-## Rejected Combinations For First Implementation
-
-| Combination | v2.2.2 decision | Reason |
+| Combination | v2.2.3 decision | Reason |
 | --- | --- | --- |
-| Multi-objective + review | Feasible candidate | Needs explicit pending and accepted semantics. |
-| Multi-objective without review | Feasible candidate | Suggested rows can map directly to `X_pending`. |
+| Multi-objective + review | Supported | Accepted suggestions become `X_pending`; review-pending rows block. |
+| Multi-objective without review | Supported | Suggested rows map directly to `X_pending`. |
 | Multi-objective + cost | Defer | Cost-aware qLogNEHVI needs utility and budget semantics. |
 | Multi-objective + replicates | Defer | Group means plus noisy pending baselines need separate validation. |
 | Structured + qLogNEHVI | Defer | Stage-specific noisy MOBO is a separate design. |
@@ -76,13 +74,14 @@ qLogNEHVI explicitly deferred.
 | Multi-fidelity + qLogNEHVI | Defer | No noisy multi-fidelity multi-objective design exists yet. |
 | Decoupled objectives | Defer | BO Forge requires coupled objective rows for current MOBO. |
 
-## v2.2.2 Guardrails
+## v2.2.3 Guardrails
 
-v2.2.2 intentionally enforces:
+v2.2.3 intentionally enforces:
 
-- `bo.acquisition: qlog_nehvi` raises a clear `ConfigError`;
-- `source=qlog_nehvi` remains invalid in CSV logs;
+- `bo.acquisition: qlog_nehvi` fails clearly outside the supported coupled
+  multi-objective scope;
+- `source=qlog_nehvi` is valid only for qLogNEHVI configs;
 - qLogEHVI examples continue to validate unchanged;
 - qLogNEI examples continue to validate unchanged;
-- no public helper, CLI command, notebook, Streamlit control, or API endpoint
-  exposes qLogNEHVI.
+- no public helper, CLI command, notebook, Streamlit creation control, or API
+  endpoint is added specifically for qLogNEHVI.

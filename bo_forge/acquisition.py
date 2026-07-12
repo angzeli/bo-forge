@@ -7,7 +7,10 @@ from botorch.acquisition import LogExpectedImprovement, PosteriorMean
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from botorch.acquisition.knowledge_gradient import qMultiFidelityKnowledgeGradient
 from botorch.acquisition.logei import qLogExpectedImprovement, qLogNoisyExpectedImprovement
-from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.logei import (
+    qLogExpectedHypervolumeImprovement,
+    qLogNoisyExpectedHypervolumeImprovement,
+)
 from botorch.models.model import Model
 from botorch.optim import optimize_acqf, optimize_acqf_mixed
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
@@ -156,6 +159,48 @@ def optimize_qlog_ehvi(
     return candidates.detach(), acquisition_value.detach(), "qlog_ehvi"
 
 
+def optimize_qlog_nehvi(
+    config: CampaignConfig,
+    model: Model,
+    x_baseline: torch.Tensor,
+    ref_point: torch.Tensor,
+    batch_size: int,
+    *,
+    model_dim: int,
+    x_pending: torch.Tensor | None = None,
+    fixed_features_list: list[dict[int, float]] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor, str]:
+    """Optimize qLogNEHVI in unit-cube model space."""
+    bounds = torch.tensor(
+        [[0.0] * model_dim, [1.0] * model_dim],
+        dtype=torch.double,
+    )
+    acquisition = build_qlog_nehvi_acquisition(
+        config=config,
+        model=model,
+        x_baseline=x_baseline,
+        ref_point=ref_point,
+        x_pending=x_pending,
+    )
+
+    optimize_kwargs = {
+        "acq_function": acquisition,
+        "bounds": bounds,
+        "q": batch_size,
+        "num_restarts": config.bo.num_restarts,
+        "raw_samples": config.bo.raw_samples,
+        "options": {"batch_limit": 5, "maxiter": 200},
+    }
+    if fixed_features_list:
+        candidates, acquisition_value = optimize_acqf_mixed(
+            **optimize_kwargs,
+            fixed_features_list=fixed_features_list,
+        )
+    else:
+        candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
+    return candidates.detach(), acquisition_value.detach(), "qlog_nehvi"
+
+
 def optimize_posterior_mean_at_target_fidelity(
     config: CampaignConfig,
     model: Model,
@@ -284,4 +329,26 @@ def build_qlog_ehvi_acquisition(
         ref_point=ref_point,
         partitioning=partitioning,
         sampler=sampler,
+    )
+
+
+def build_qlog_nehvi_acquisition(
+    config: CampaignConfig,
+    model: Model,
+    x_baseline: torch.Tensor,
+    ref_point: torch.Tensor,
+    x_pending: torch.Tensor | None = None,
+) -> qLogNoisyExpectedHypervolumeImprovement:
+    """Construct the qLogNEHVI acquisition for observed and pending designs."""
+    sampler = SobolQMCNormalSampler(
+        sample_shape=torch.Size([config.bo.mc_samples]),
+        seed=config.bo.random_seed,
+    )
+    return qLogNoisyExpectedHypervolumeImprovement(
+        model=model,
+        ref_point=ref_point,
+        X_baseline=x_baseline,
+        X_pending=x_pending,
+        sampler=sampler,
+        prune_baseline=False,
     )

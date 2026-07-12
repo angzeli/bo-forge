@@ -14,9 +14,11 @@ from torch.quasirandom import SobolEngine
 
 from bo_forge.acquisition import (
     build_qlog_ehvi_acquisition,
+    build_qlog_nehvi_acquisition,
     optimize_log_ei,
     optimize_posterior_mean_at_target_fidelity,
     optimize_qlog_ehvi,
+    optimize_qlog_nehvi,
     optimize_qlog_nei,
     optimize_qmf_kg,
 )
@@ -57,9 +59,11 @@ from bo_forge.validation import (
     design_key_for_values,
     design_tuples,
     get_observed_data,
+    has_blocking_qlog_nehvi_review_suggestions,
     has_blocking_qlog_nei_review_suggestions,
     has_pending_suggestions,
     next_iteration,
+    qlog_nehvi_active_pending_suggestions,
     qlog_nei_active_pending_suggestions,
     validate_campaign_data,
 )
@@ -107,11 +111,19 @@ def suggest_next(
     if stage is not None:
         raise SuggestionError("--stage is only valid for structured campaign configs.")
     uses_qlog_nei = config.bo.acquisition == "qlog_nei"
+    uses_qlog_nehvi = config.bo.acquisition == "qlog_nehvi"
     if uses_qlog_nei:
         if has_blocking_qlog_nei_review_suggestions(df, config):
             raise SuggestionError(
                 "Cannot generate qLogNEI suggestions while review_status='pending' "
                 "rows await review; accept, reject, or defer them first."
+            )
+    elif uses_qlog_nehvi:
+        if has_blocking_qlog_nehvi_review_suggestions(df, config):
+            raise SuggestionError(
+                "Cannot generate qLogNEHVI suggestions while review_status='pending' "
+                "rows await review; accept, reject, or defer them first. Accepted "
+                "suggestions are allowed as X_pending."
             )
     elif has_pending_suggestions(df, config):
         raise SuggestionError(
@@ -125,18 +137,19 @@ def suggest_next(
 
     observed_df = get_observed_data(config, df)
     training_observed_df = modeling_observed_data(config, observed_df)
-    active_pending_df = (
-        qlog_nei_active_pending_suggestions(df, config)
-        if uses_qlog_nei
-        else df.iloc[0:0].copy()
-    )
+    if uses_qlog_nei:
+        active_pending_df = qlog_nei_active_pending_suggestions(df, config)
+    elif uses_qlog_nehvi:
+        active_pending_df = qlog_nehvi_active_pending_suggestions(df, config)
+    else:
+        active_pending_df = df.iloc[0:0].copy()
     pending_initial_count = (
         int(active_pending_df["source"].isin({"sobol", "random"}).sum())
-        if uses_qlog_nei and not active_pending_df.empty
+        if (uses_qlog_nei or uses_qlog_nehvi) and not active_pending_df.empty
         else 0
     )
     remaining_initial = config.bo.initial_design_size - len(training_observed_df)
-    if uses_qlog_nei:
+    if uses_qlog_nei or uses_qlog_nehvi:
         remaining_initial -= pending_initial_count
     if remaining_initial > 0:
         return _suggest_initial_design(
@@ -150,6 +163,11 @@ def suggest_next(
             "qLogNEI requires observed initial-design rows before model-based "
             "suggestions; observe accepted pending initial suggestions first."
         )
+    if uses_qlog_nehvi and len(training_observed_df) < config.bo.initial_design_size:
+        raise SuggestionError(
+            "qLogNEHVI requires observed initial-design rows before model-based "
+            "suggestions; observe accepted pending initial suggestions first."
+        )
 
     if config.fidelity is not None:
         return _suggest_multi_fidelity_model_based(
@@ -160,6 +178,14 @@ def suggest_next(
         )
 
     if config.is_multi_objective:
+        if uses_qlog_nehvi:
+            return _suggest_qlog_nehvi_model_based(
+                config=config,
+                df=df,
+                observed_df=observed_df,
+                active_pending_df=active_pending_df,
+                batch_size=requested_batch_size,
+            )
         if config.cost is not None:
             return _suggest_cost_aware_multi_objective_model_based(
                 config=config,
@@ -515,6 +541,102 @@ def _suggest_multi_objective_model_based(
     return pd.DataFrame(rows, columns=canonical_columns(config))
 
 
+def _suggest_qlog_nehvi_model_based(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    observed_df: pd.DataFrame,
+    active_pending_df: pd.DataFrame,
+    batch_size: int,
+) -> pd.DataFrame:
+    torch.manual_seed(config.bo.random_seed)
+    combination_count = categorical_combination_count(config)
+    if combination_count > MAX_CATEGORICAL_COMBINATIONS:
+        raise SuggestionError(
+            "qLogNEHVI mixed-variable suggestions support at most "
+            f"{MAX_CATEGORICAL_COMBINATIONS} categorical combinations: "
+            f"configured={combination_count}."
+        )
+
+    model = fit_gp_model(config, observed_df)
+    x_baseline, _ = dataframe_to_tensors(config, observed_df)
+    x_pending = _x_pending_for_qlog_nehvi(config, active_pending_df)
+    fixed_features_list = categorical_feature_assignments(config)
+    ref_point = reference_point_to_model_space(config)
+    user_candidates: list[tuple[object, ...]] | None = None
+    acquisition_value: torch.Tensor | None = None
+    rejection_message = "no candidate was decoded"
+    for attempt in range(MAX_DECODE_RETRIES):
+        torch.manual_seed(config.bo.random_seed + attempt)
+        x_unit_raw, acquisition_value, _ = optimize_qlog_nehvi(
+            config=config,
+            model=model,
+            x_baseline=x_baseline,
+            ref_point=ref_point,
+            batch_size=batch_size,
+            model_dim=encoded_dimension(config),
+            x_pending=x_pending,
+            fixed_features_list=fixed_features_list,
+        )
+        decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
+        rejection_message = _candidate_batch_rejection_message(config, df, decoded_candidates)
+        if rejection_message is None:
+            user_candidates = decoded_candidates
+            break
+
+    if user_candidates is None or acquisition_value is None:
+        user_candidates, acquisition_value = _fallback_qlog_nehvi_candidate_batch(
+            config=config,
+            df=df,
+            model=model,
+            x_baseline=x_baseline,
+            ref_point=ref_point,
+            x_pending=x_pending,
+            batch_size=batch_size,
+            fixed_features_list=fixed_features_list,
+            rejection_message=rejection_message,
+        )
+
+    x_unit_repaired = values_to_unit_cube(config, user_candidates)
+    with torch.no_grad():
+        posterior = model.posterior(x_unit_repaired)
+        mean_user = objectives_from_model_space(config, posterior.mean)
+        std = posterior.variance.clamp_min(0.0).sqrt()
+
+    rows = []
+    iteration = next_iteration(df)
+    acquisition_scalar = float(acquisition_value.reshape(-1)[0])
+    for index in range(batch_size):
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = "qlog_nehvi"
+        _populate_replicate_fields(config, row)
+        _populate_review_fields(config, row)
+        for name, value in zip(config.variable_names, user_candidates[index], strict=True):
+            row[name] = value
+        for objective_index, objective in enumerate(config.objectives):
+            row[f"predicted_mean_{objective.name}"] = float(mean_user[index, objective_index])
+            row[f"predicted_std_{objective.name}"] = float(std[index, objective_index])
+        row["acquisition"] = acquisition_scalar
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _x_pending_for_qlog_nehvi(
+    config: CampaignConfig,
+    active_pending_df: pd.DataFrame,
+) -> torch.Tensor | None:
+    if active_pending_df.empty:
+        return None
+    pending_candidates = [
+        tuple(row[variable.name] for variable in config.variables)
+        for _, row in active_pending_df.iterrows()
+    ]
+    return values_to_unit_cube(config, pending_candidates)
+
+
 def _suggest_cost_aware_multi_objective_model_based(
     config: CampaignConfig,
     df: pd.DataFrame,
@@ -770,6 +892,67 @@ def _fallback_qlog_ehvi_candidate_batch(
     if best_candidates is None or best_value is None:
         raise SuggestionError(
             "Could not generate enough feasible, non-duplicate multi-objective "
+            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
+            f"Last rejection: {rejection_message}"
+        )
+    return best_candidates, best_value
+
+
+def _fallback_qlog_nehvi_candidate_batch(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    model,
+    x_baseline: torch.Tensor,
+    ref_point: torch.Tensor,
+    x_pending: torch.Tensor | None,
+    batch_size: int,
+    fixed_features_list: list[dict[int, float]],
+    rejection_message: str,
+) -> tuple[list[tuple[object, ...]], torch.Tensor]:
+    acquisition = build_qlog_nehvi_acquisition(
+        config=config,
+        model=model,
+        x_baseline=x_baseline,
+        ref_point=ref_point,
+        x_pending=x_pending,
+    )
+    assignments = fixed_features_list or [{}]
+    best_candidates: list[tuple[object, ...]] | None = None
+    best_value: torch.Tensor | None = None
+    best_scalar = -math.inf
+    model_dim = encoded_dimension(config)
+    pool_size = max(config.bo.raw_samples, 64)
+
+    for attempt in range(MAX_DECODE_RETRIES):
+        for assignment_index, fixed_features in enumerate(assignments):
+            engine = SobolEngine(
+                dimension=model_dim,
+                scramble=True,
+                seed=config.bo.random_seed + 130363 + attempt * 101 + assignment_index,
+            )
+            unit = engine.draw(pool_size * batch_size).to(dtype=torch.double)
+            candidate_batches = unit.reshape(pool_size, batch_size, model_dim)
+            for candidate_batch in candidate_batches:
+                for feature_index, value in fixed_features.items():
+                    candidate_batch[:, feature_index] = value
+                decoded_candidates = unit_cube_to_user_values(config, candidate_batch)
+                rejection = _candidate_batch_rejection_message(config, df, decoded_candidates)
+                if rejection is not None:
+                    rejection_message = rejection
+                    continue
+                repaired = values_to_unit_cube(config, decoded_candidates)
+                with torch.no_grad():
+                    value = acquisition(repaired).reshape(-1)[0]
+                scalar = float(value)
+                if math.isfinite(scalar) and scalar > best_scalar:
+                    best_candidates = decoded_candidates
+                    best_value = value.detach().reshape(1)
+                    best_scalar = scalar
+
+    if best_candidates is None or best_value is None:
+        raise SuggestionError(
+            "Could not generate enough feasible, non-duplicate qLogNEHVI "
             f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
             f"Last rejection: {rejection_message}"
         )

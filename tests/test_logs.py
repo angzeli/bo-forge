@@ -168,6 +168,50 @@ def qmfkg_suggestion(row_id: str = "qmfkg_1") -> pd.DataFrame:
     )
 
 
+def qlog_nehvi_config() -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="qlog_nehvi_test",
+        objective=ObjectiveConfig("yield_score", "maximize", 40.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 40.0),
+            ObjectiveConfig("waste_score", "minimize", 25.0),
+        ),
+        variables=(
+            VariableConfig("temperature", "continuous", 20.0, 100.0),
+            VariableConfig("solvent", "categorical", values=("MeCN", "Water")),
+        ),
+        bo=BOConfig(batch_size=1, initial_design_size=1, acquisition="qlog_nehvi"),
+    )
+
+
+def qlog_nehvi_suggestion(
+    row_id: str = "qlog_nehvi_1",
+    *,
+    source: str = "qlog_nehvi",
+) -> pd.DataFrame:
+    cfg = qlog_nehvi_config()
+    return pd.DataFrame(
+        [
+            {
+                "row_id": row_id,
+                "iteration": 1,
+                "status": "suggested",
+                "source": source,
+                "temperature": 72.0,
+                "solvent": "MeCN",
+                "yield_score": "",
+                "waste_score": "",
+                "predicted_mean_yield_score": 65.0,
+                "predicted_std_yield_score": 1.5,
+                "predicted_mean_waste_score": 16.0,
+                "predicted_std_waste_score": 0.8,
+                "acquisition": 0.01,
+            }
+        ],
+        columns=canonical_columns(cfg),
+    )
+
+
 def test_append_suggestions_and_mark_observed_round_trip(tmp_path: Path) -> None:
     cfg = config()
     log_path = tmp_path / "campaign.csv"
@@ -421,6 +465,19 @@ def test_append_suggestions_requires_config_for_qmfkg_logs_without_mutation(
 
     with pytest.raises(LogWriteError, match="qMFKG append requires config-aware validation"):
         append_suggestions(log_path, qmfkg_suggestion())
+
+    assert log_path.read_bytes() == before
+
+
+def test_append_suggestions_requires_config_for_qlog_nehvi_rows_without_mutation(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    qlog_nehvi_suggestion("existing", source="sobol").to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match="qLogNEHVI append requires config-aware validation"):
+        append_suggestions(log_path, qlog_nehvi_suggestion())
 
     assert log_path.read_bytes() == before
 

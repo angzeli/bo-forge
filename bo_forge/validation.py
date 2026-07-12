@@ -30,7 +30,14 @@ VALID_SOURCES = {
     "cost_log_ei",
     "qmf_kg",
 }
-VALID_MULTI_OBJECTIVE_SOURCES = {"manual", "random", "sobol", "qlog_ehvi", "cost_qlog_ehvi"}
+VALID_MULTI_OBJECTIVE_SOURCES = {
+    "manual",
+    "random",
+    "sobol",
+    "qlog_ehvi",
+    "cost_qlog_ehvi",
+    "qlog_nehvi",
+}
 VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
 
@@ -125,11 +132,38 @@ def has_blocking_qlog_nei_review_suggestions(
     )
 
 
+def has_blocking_qlog_nehvi_review_suggestions(
+    df: pd.DataFrame,
+    config: CampaignConfig,
+) -> bool:
+    """Return True when review-pending rows must block qLogNEHVI suggestions."""
+    if not config.review.enabled or "review_status" not in df.columns:
+        return False
+    if "status" not in df.columns or df.empty:
+        return False
+    return bool(
+        ((df["status"] == "suggested") & (df["review_status"] == "pending")).any()
+    )
+
+
 def qlog_nei_active_pending_suggestions(
     df: pd.DataFrame,
     config: CampaignConfig,
 ) -> pd.DataFrame:
     """Return pending design rows encoded as qLogNEI X_pending."""
+    if "status" not in df.columns or df.empty:
+        return df.iloc[0:0].copy()
+    suggested = df["status"] == "suggested"
+    if config.review.enabled:
+        suggested = suggested & (df["review_status"] == "accepted")
+    return df.loc[suggested].copy()
+
+
+def qlog_nehvi_active_pending_suggestions(
+    df: pd.DataFrame,
+    config: CampaignConfig,
+) -> pd.DataFrame:
+    """Return pending design rows encoded as qLogNEHVI X_pending."""
     if "status" not in df.columns or df.empty:
         return df.iloc[0:0].copy()
     suggested = df["status"] == "suggested"
@@ -220,7 +254,13 @@ def _validate_status(df: pd.DataFrame) -> None:
 
 def _validate_source(config: CampaignConfig, df: pd.DataFrame) -> None:
     if config.is_multi_objective:
-        valid_sources = VALID_MULTI_OBJECTIVE_SOURCES
+        valid_sources = {"manual", "random", "sobol"}
+        if config.bo.acquisition == "qlog_nehvi":
+            valid_sources.update({"qlog_ehvi", "qlog_nehvi"})
+        else:
+            valid_sources.add("qlog_ehvi")
+            if config.cost is not None:
+                valid_sources.add("cost_qlog_ehvi")
     elif config.fidelity is not None:
         valid_sources = {"manual", "random", "sobol", "qmf_kg"}
     else:

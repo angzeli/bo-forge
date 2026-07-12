@@ -1,0 +1,26 @@
+campaign_name: multi_objective_qlognehvi
+objectives:
+  - name: yield_score
+    direction: maximize
+    reference_point: 40
+  - name: waste_score
+    direction: minimize
+    reference_point: 25
+variables:
+  - name: temperature
+    type: continuous
+    lower: 20
+    upper: 100
+  - name: solvent
+    type: categorical
+    values: [MeCN, Water]
+review:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: qlog_nehvi
+  random_seed: 19
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16

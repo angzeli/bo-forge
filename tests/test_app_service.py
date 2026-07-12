@@ -622,6 +622,33 @@ def test_app_service_qlog_nei_dry_run_handles_active_pending(
     assert result.bundle["suggestions_fingerprint"]
 
 
+def test_app_service_qlog_nehvi_dry_run_handles_active_pending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = copy_example_log(tmp_path, "19_multi_objective_qlognehvi_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "19_multi_objective_qlognehvi.yaml",
+        log_path,
+    )
+    candidate = values_to_unit_cube(service.config, [(72.0, "MeCN")])
+    before = log_path.read_bytes()
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        x_pending = kwargs["x_pending"]
+        assert isinstance(x_pending, torch.Tensor)
+        assert x_pending.shape == (1, candidate.shape[1])
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+
+    result = service.suggest_dry_run(batch_size=1)
+
+    assert log_path.read_bytes() == before
+    assert result.suggestions.loc[0, "source"] == "qlog_nehvi"
+    assert result.bundle["suggestions_fingerprint"]
+
+
 def test_app_service_qlog_nei_summary_and_diagnostics_plot_routing(
     tmp_path: Path,
 ) -> None:

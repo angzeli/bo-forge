@@ -112,6 +112,22 @@ bo-forge plot \
   --output /tmp/bo_forge_qlog_nei_diagnostics.png
 ```
 
+For noisy or pending-aware coupled multi-objective configs, use
+`bo.acquisition: qlog_nehvi`. Accepted review suggestions are treated as active
+pending designs and passed to qLogNEHVI as `X_pending`; review rows that are
+still `pending` must be resolved first:
+
+```bash
+bo-forge validate \
+  --config configs/19_multi_objective_qlognehvi.yaml \
+  --log examples/19_multi_objective_qlognehvi_campaign_log.csv
+
+bo-forge suggest \
+  --config configs/19_multi_objective_qlognehvi.yaml \
+  --log examples/19_multi_objective_qlognehvi_campaign_log.csv \
+  --batch-size 1
+```
+
 For contextual configs, context variables are normal CSV variable columns but
 are fixed at suggestion time. Provide every context value with repeatable
 `--context NAME=VALUE`, or define `context.default_values` in the YAML:
@@ -242,7 +258,7 @@ bo-forge replicate-summary \
   --log examples/08_replicate_aware_working_log.csv
 ```
 
-For multi-objective campaigns, `summary` includes Pareto and hypervolume fields, and `suggest` uses qLogEHVI after the initial design:
+For deterministic multi-objective campaigns, `summary` includes Pareto and hypervolume fields, and `suggest` uses qLogEHVI after the initial design:
 
 ```bash
 cp examples/10_multi_objective_mixed_constrained_campaign_log.csv \

@@ -1,12 +1,12 @@
-# 🧪 BO Forge v2.2.2
+# 🧪 BO Forge v2.2.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.2.2 continues the noisy and pending-aware BO line by keeping conservative
-single-objective qLogNEI support stable and adding a qLogNEHVI feasibility
-review. qLogNEHVI remains deferred in v2.2.2; public configs using
-`bo.acquisition: qlog_nehvi` fail clearly instead of exposing a partial noisy
-multi-objective path.
+v2.2.3 continues the noisy and pending-aware BO line by keeping conservative
+single-objective qLogNEI support stable and adding narrow coupled
+multi-objective qLogNEHVI support. qLogNEHVI is supported only for coupled
+`2 <= m <= 4` objective campaigns without cost, replicates, structured stages,
+context, or multi-fidelity.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -20,7 +20,7 @@ BO Forge deliberately supports only:
 - Sobol or random initial suggestions
 - BoTorch `SingleTaskGP` and `SingleTaskMultiFidelityGP`
 - optional single-objective model profiles: `default`, `smooth`, `rough`, and `robust`
-- LogEI/qLogEI and qLogNEI for supported single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI for coupled multi-objective campaigns
+- LogEI/qLogEI and qLogNEI for supported single-objective campaigns, qMFKG for conservative single-objective multi-fidelity campaigns, and qLogEHVI/qLogNEHVI for coupled multi-objective campaigns
 - CSV campaign logs
 - optional feasibility constraints
 - optional cost-aware ranking and human review
@@ -36,7 +36,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, qLogNEHVI, cost-aware qLogNEI, contextual qLogNEI, structured qLogNEI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, contextual qLogNEI/qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -167,9 +167,12 @@ seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates
 accepted pending review suggestions being passed to qLogNEI as `X_pending`.
 The tutorial walkthrough is `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
 
-The qLogNEHVI feasibility review is documented in
-`docs/QLOGNEHVI_FEASIBILITY.md`. It keeps noisy multi-objective BO deferred in
-v2.2.2 while defining the narrow candidate scope for a future implementation.
+The bundled qLogNEHVI example is `configs/19_multi_objective_qlognehvi.yaml`
+with seed log `examples/19_multi_objective_qlognehvi_campaign_log.csv`. It
+demonstrates `bo.acquisition: qlog_nehvi` for coupled noisy multi-objective
+suggestions with accepted pending review rows passed as `X_pending`. The
+implementation scope and deferred combinations are documented in
+`docs/QLOGNEHVI_FEASIBILITY.md`.
 
 ---
 
@@ -215,7 +218,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.2.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.2.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

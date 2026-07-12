@@ -1527,6 +1527,30 @@ def test_qlog_nei_accepted_pending_suggestions_are_ready_for_bo(tmp_path: Path) 
     assert "X_pending" in action.loc[0, "reason"]
 
 
+def test_qlog_nehvi_accepted_pending_suggestions_are_ready_for_bo(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "qlog_nehvi.csv"
+    log_path.write_text(
+        Path("examples/19_multi_objective_qlognehvi_campaign_log.csv").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    campaign = CampaignSession.from_files(
+        "configs/19_multi_objective_qlognehvi.yaml",
+        log_path,
+    )
+
+    action = campaign.next_action()
+
+    assert campaign.campaign_status() == "ready_for_bo"
+    assert action.loc[0, "campaign_status"] == "ready_for_bo"
+    assert action.loc[0, "action"] == "suggest_bo"
+    assert "qLogNEHVI" in action.loc[0, "reason"]
+    assert "X_pending" in action.loc[0, "reason"]
+
+
 def test_qlog_nei_summary_counts_accepted_pending_initial_rows(
     tmp_path: Path,
 ) -> None:

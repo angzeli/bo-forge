@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -79,6 +80,32 @@ def multi_config(
         else None,
         review=ReviewConfig(enabled=review),
         replicates=ReplicateConfig(enabled=replicates),
+    )
+
+
+def qlog_nehvi_config(
+    batch_size: int = 1,
+    initial_design_size: int = 3,
+    *,
+    review: bool = False,
+) -> CampaignConfig:
+    cfg = multi_config(
+        batch_size=batch_size,
+        initial_design_size=initial_design_size,
+        review=review,
+    )
+    return replace(
+        cfg,
+        campaign_name="qlog_nehvi_multi",
+        bo=BOConfig(
+            batch_size=batch_size,
+            initial_design_size=initial_design_size,
+            acquisition="qlog_nehvi",
+            random_seed=9,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
     )
 
 
@@ -483,6 +510,22 @@ def test_multi_objective_log_rejects_qlog_nehvi_source() -> None:
         validate_campaign_data(cfg, df)
 
 
+def test_qlog_nehvi_multi_objective_log_accepts_qlog_nehvi_source() -> None:
+    cfg = qlog_nehvi_config()
+    df = observed_multi_log(cfg)
+    df.loc[0, "source"] = "qlog_nehvi"
+
+    validate_campaign_data(cfg, df)
+
+
+def test_qlog_nehvi_multi_objective_log_accepts_historical_qlog_ehvi_source() -> None:
+    cfg = qlog_nehvi_config()
+    df = observed_multi_log(cfg)
+    df.loc[0, "source"] = "qlog_ehvi"
+
+    validate_campaign_data(cfg, df)
+
+
 def test_multi_objective_review_and_replicate_canonical_schema() -> None:
     cfg = multi_config(review=True, replicates=True)
     df = observed_multi_log(cfg)
@@ -580,6 +623,20 @@ def test_cost_aware_multi_objective_example_config_and_log_validate() -> None:
     assert cfg.is_multi_objective
     assert cfg.cost is not None
     assert cfg.objective_names == ["yield", "selectivity", "waste"]
+    assert list(df.columns) == canonical_columns(cfg)
+    validate_campaign_data(cfg, df)
+
+
+def test_qlog_nehvi_example_config_and_log_validate() -> None:
+    cfg = CampaignConfig.from_yaml("configs/19_multi_objective_qlognehvi.yaml")
+    df = pd.read_csv(
+        "examples/19_multi_objective_qlognehvi_campaign_log.csv",
+        keep_default_na=False,
+    )
+
+    assert cfg.is_multi_objective
+    assert cfg.bo.acquisition == "qlog_nehvi"
+    assert cfg.review.enabled
     assert list(df.columns) == canonical_columns(cfg)
     validate_campaign_data(cfg, df)
 

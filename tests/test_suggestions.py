@@ -22,6 +22,7 @@ from bo_forge.config import (
 from bo_forge.errors import SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
+from bo_forge.multi_objective import reference_point_to_model_space
 from bo_forge.suggestions import (
     MAX_DECODE_RETRIES,
     suggest_next,
@@ -96,6 +97,93 @@ def qlog_nei_log(cfg: CampaignConfig) -> pd.DataFrame:
             row["review_note"] = ""
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def qlog_nehvi_config(*, review: bool = False, initial_design_size: int = 4) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="qlog_nehvi_test",
+        objective=ObjectiveConfig("yield_score", "maximize", 40.0),
+        objectives=(
+            ObjectiveConfig("yield_score", "maximize", 40.0),
+            ObjectiveConfig("waste_score", "minimize", 25.0),
+        ),
+        variables=(
+            VariableConfig("temperature", "continuous", 20.0, 100.0),
+            VariableConfig("solvent", "categorical", values=("MeCN", "Water")),
+        ),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=initial_design_size,
+            acquisition="qlog_nehvi",
+            random_seed=11,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+        review=ReviewConfig(enabled=review),
+    )
+
+
+def qlog_nehvi_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (temperature, solvent, yield_score, waste_score) in enumerate(
+        [
+            (30.0, "MeCN", 51.0, 22.0),
+            (45.0, "Water", 62.0, 19.0),
+            (65.0, "MeCN", 66.0, 15.0),
+            (82.0, "Water", 70.0, 17.0),
+        ]
+    ):
+        row = {
+            "row_id": f"obs_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "temperature": temperature,
+            "solvent": solvent,
+            "yield_score": yield_score,
+            "waste_score": waste_score,
+            "predicted_mean_yield_score": "",
+            "predicted_std_yield_score": "",
+            "predicted_mean_waste_score": "",
+            "predicted_std_waste_score": "",
+            "acquisition": "",
+        }
+        if cfg.review.enabled:
+            row["review_status"] = "accepted"
+            row["review_note"] = ""
+        rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def qlog_nehvi_pending_row(
+    cfg: CampaignConfig,
+    *,
+    row_id: str,
+    review_status: str | None,
+    temperature: float = 55.0,
+    solvent: str = "Water",
+    source: str = "qlog_nehvi",
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "row_id": row_id,
+        "iteration": 5,
+        "status": "suggested",
+        "source": source,
+        "temperature": temperature,
+        "solvent": solvent,
+        "yield_score": "",
+        "waste_score": "",
+        "predicted_mean_yield_score": "",
+        "predicted_std_yield_score": "",
+        "predicted_mean_waste_score": "",
+        "predicted_std_waste_score": "",
+        "acquisition": "",
+    }
+    if cfg.review.enabled:
+        row["review_status"] = review_status
+        row["review_note"] = ""
+    return row
 
 
 def structured_config() -> CampaignConfig:
@@ -1422,6 +1510,159 @@ def test_qlog_nei_can_fill_remaining_initial_design_with_pending_initial_rows() 
 
     assert len(suggestions) == 1
     assert suggestions.loc[0, "source"] == "sobol"
+
+
+def test_qlog_nehvi_suggestions_are_non_mutating_and_use_design_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nehvi_config()
+    df = qlog_nehvi_log(cfg)
+    before = df.copy(deep=True)
+    candidate = values_to_unit_cube(cfg, [(72.0, "MeCN")])
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        assert kwargs["x_baseline"].shape == (4, candidate.shape[1])
+        assert kwargs["x_pending"] is None
+        assert torch.equal(kwargs["ref_point"], reference_point_to_model_space(cfg))
+        return candidate, torch.tensor(0.35, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "qlog_nehvi"
+    assert suggestions[cfg.objective_names].map(lambda value: value == "").all().all()
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean_yield_score"]))
+    assert math.isfinite(float(suggestions.loc[0, "predicted_mean_waste_score"]))
+    assert float(suggestions.loc[0, "acquisition"]) == pytest.approx(0.35)
+
+
+def test_qlog_nehvi_non_review_pending_rows_enter_x_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nehvi_config(review=False)
+    df = qlog_nehvi_log(cfg)
+    pending = qlog_nehvi_pending_row(
+        cfg,
+        row_id="pending_no_review",
+        review_status=None,
+        temperature=58.0,
+        solvent="Water",
+    )
+    df = pd.concat([df, pd.DataFrame([pending], columns=canonical_columns(cfg))], ignore_index=True)
+    candidate = values_to_unit_cube(cfg, [(72.0, "MeCN")])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.35, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    x_pending = captured["x_pending"]
+    assert isinstance(x_pending, torch.Tensor)
+    assert x_pending.shape == (1, candidate.shape[1])
+    assert suggestions.loc[0, "source"] == "qlog_nehvi"
+
+
+def test_qlog_nehvi_review_accepted_rows_enter_x_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nehvi_config(review=True)
+    df = qlog_nehvi_log(cfg)
+    pending = qlog_nehvi_pending_row(
+        cfg,
+        row_id="accepted_pending",
+        review_status="accepted",
+        temperature=58.0,
+        solvent="Water",
+    )
+    df = pd.concat([df, pd.DataFrame([pending], columns=canonical_columns(cfg))], ignore_index=True)
+    candidate = values_to_unit_cube(cfg, [(72.0, "MeCN")])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.35, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    x_pending = captured["x_pending"]
+    assert isinstance(x_pending, torch.Tensor)
+    assert x_pending.shape == (1, candidate.shape[1])
+    assert suggestions.loc[0, "source"] == "qlog_nehvi"
+
+
+def test_qlog_nehvi_review_pending_rows_block_suggestions() -> None:
+    cfg = qlog_nehvi_config(review=True)
+    df = qlog_nehvi_log(cfg)
+    pending = qlog_nehvi_pending_row(
+        cfg,
+        row_id="review_pending",
+        review_status="pending",
+        temperature=58.0,
+        solvent="Water",
+    )
+    df = pd.concat([df, pd.DataFrame([pending], columns=canonical_columns(cfg))], ignore_index=True)
+
+    with pytest.raises(SuggestionError, match="review_status='pending'"):
+        suggest_next(cfg, df, batch_size=1)
+
+
+@pytest.mark.parametrize("review_status", ["rejected", "deferred"])
+def test_qlog_nehvi_rejected_and_deferred_rows_do_not_enter_x_pending(
+    review_status: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = qlog_nehvi_config(review=True)
+    df = qlog_nehvi_log(cfg)
+    ignored = qlog_nehvi_pending_row(
+        cfg,
+        row_id=f"review_{review_status}",
+        review_status=review_status,
+        temperature=58.0,
+        solvent="Water",
+    )
+    df = pd.concat([df, pd.DataFrame([ignored], columns=canonical_columns(cfg))], ignore_index=True)
+    candidate = values_to_unit_cube(cfg, [(72.0, "MeCN")])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.35, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=1)
+
+    assert captured["x_pending"] is None
+    assert suggestions.loc[0, "source"] == "qlog_nehvi"
+
+
+def test_qlog_nehvi_waits_for_pending_initial_design_rows() -> None:
+    cfg = qlog_nehvi_config(review=True, initial_design_size=4)
+    df = qlog_nehvi_log(cfg).iloc[:3].copy()
+    pending_initial = qlog_nehvi_pending_row(
+        cfg,
+        row_id="initial_pending",
+        review_status="accepted",
+        source="sobol",
+        temperature=58.0,
+        solvent="Water",
+    )
+    df = pd.concat(
+        [df, pd.DataFrame([pending_initial], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+
+    with pytest.raises(SuggestionError, match="observe accepted pending initial suggestions"):
+        suggest_next(cfg, df, batch_size=1)
 
 
 def test_qlog_nei_mixed_variables_use_fixed_feature_assignments(

@@ -157,14 +157,16 @@ Fix: use `bo.acquisition: qlog_nei` only for single-objective, non-structured,
 non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 `replicates.suggestion_policy: new_only`.
 
-### `bo.acquisition='qlog_nehvi' is under feasibility review`
+### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.2.2 does not expose public qLogNEHVI support. No YAML config should use
-`bo.acquisition: qlog_nehvi`, and no CSV row should use `source=qlog_nehvi`.
+v2.2.3 qLogNEHVI support is deliberately narrow. It is only supported for
+coupled multi-objective campaigns with `2 <= m <= 4`.
 
-Fix: use `bo.acquisition: qlog_ehvi` for supported coupled multi-objective
-campaigns, or wait for a future qLogNEHVI patch if the feasibility review
-passes. See [QLOGNEHVI_FEASIBILITY.md](QLOGNEHVI_FEASIBILITY.md).
+Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
+from qLogNEHVI configs, or use `bo.acquisition: qlog_ehvi` for deterministic
+coupled multi-objective campaigns. `source=qlog_nehvi` is valid only for
+qLogNEHVI configs. See
+[QLOGNEHVI_FEASIBILITY.md](QLOGNEHVI_FEASIBILITY.md).
 
 ### `model_profile_comparison() does not support ...`
 

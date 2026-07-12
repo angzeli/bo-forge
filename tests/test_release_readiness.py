@@ -160,18 +160,25 @@ def test_qlog_nei_assets_are_tracked_release_files() -> None:
     assert completed.returncode == 0, completed.stderr
 
 
-def test_qlog_nehvi_feasibility_doc_exists_and_defers_public_surface() -> None:
-    release_asset = "docs/QLOGNEHVI_FEASIBILITY.md"
-    path = PROJECT_ROOT / release_asset
+def test_qlog_nehvi_assets_and_scope_doc_are_release_files() -> None:
+    release_assets = [
+        "docs/QLOGNEHVI_FEASIBILITY.md",
+        "configs/19_multi_objective_qlognehvi.yaml",
+        "examples/19_multi_objective_qlognehvi_campaign_log.csv",
+    ]
+    for release_asset in release_assets:
+        assert (PROJECT_ROOT / release_asset).is_file()
+
+    path = PROJECT_ROOT / "docs/QLOGNEHVI_FEASIBILITY.md"
     assert path.is_file()
 
     content = path.read_text(encoding="utf-8")
     required_phrases = [
         "bo.acquisition: qlog_nehvi",
         "source=qlog_nehvi",
-        "not a public acquisition yet",
-        "v2.2.2",
-        "Recommended v2.2.3 Scope",
+        "implements the conservative qLogNEHVI scope",
+        "v2.2.3",
+        "Implemented v2.2.3 Scope",
         "Multi-objective + review",
         "Multi-objective + cost",
         "replicates",
@@ -185,9 +192,10 @@ def test_qlog_nehvi_feasibility_doc_exists_and_defers_public_surface() -> None:
     for phrase in required_phrases:
         assert phrase in content
     assert "observed objective values as `X_baseline`" not in content
+    assert "not a public acquisition yet" not in content
 
     completed = subprocess.run(
-        ["git", "ls-files", "--error-unmatch", release_asset],
+        ["git", "ls-files", "--error-unmatch", *release_assets],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -217,12 +225,14 @@ def test_v2_2_docs_describe_qlog_nei_release_scope() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.2.2" in readme
-    assert "v2.2.2 continues the noisy and pending-aware BO line" in readme
+    assert "# 🧪 BO Forge v2.2.3" in readme
+    assert "v2.2.3 continues the noisy and pending-aware BO line" in readme
     assert "single-objective qLogNEI support" in readme
+    assert "multi-objective qLogNEHVI support" in readme
     assert "notebooks/18_noisy_pending_qlognei_campaign.ipynb" in readme
     assert "docs/QLOGNEHVI_FEASIBILITY.md" in readme
     assert "bo.acquisition: qlog_nehvi" in readme
+    assert "configs/19_multi_objective_qlognehvi.yaml" in readme
     assert "cost-aware qLogNEI" in readme
     assert "configs/17_model_profile_logei.yaml" in readme
     assert "bo-forge model-summary" in readme
@@ -237,10 +247,12 @@ def test_v2_2_docs_describe_qlog_nei_release_scope() -> None:
     assert "configs/16_contextual_logei.yaml" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.2.2 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.2.3 provides a local Streamlit workbench" in streamlit_app_docs
     assert "v2.2.1 adds Streamlit-facing qLogNEI diagnostics" in streamlit_app_docs
     assert "qLogNEI Summary" in streamlit_app_docs
     assert "qLogNEI Diagnostics" in streamlit_app_docs
+    assert "v2.2.3 adds backend qLogNEHVI support" in streamlit_app_docs
+    assert "qLogNEHVI as `X_pending`" in streamlit_app_docs
     assert "The v2.2 line includes model-profile visibility" in streamlit_app_docs
     assert "bo.acquisition: log_ei" in streamlit_app_docs
     assert "qlog_nei" in streamlit_app_docs
@@ -282,7 +294,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.2.2",
+        "BO Forge v2.2.3",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -291,9 +303,12 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
         "Single-objective model profiles",
         "qLogNEI + deterministic cost",
         "qLogNEI + replicate active repeats",
-        "`bo.acquisition: qlog_nehvi`",
-        "docs/QLOGNEHVI_FEASIBILITY.md",
-        "qLogNEHVI remains under feasibility review",
+        "Coupled multi-objective qLogNEHVI",
+        "qLogNEHVI + deterministic cost",
+        "qLogNEHVI + replicates",
+        "qLogNEHVI + structured stages",
+        "qLogNEHVI + contextual",
+        "qLogNEHVI + multi-fidelity",
         "Non-default model profile + multi-objective",
         "Multi-objective + deterministic cost",
         "Structured + contextual",
@@ -425,8 +440,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.2.2`" in roadmap
-    assert "v2.2.2 release keeps the v2.2 noisy" in roadmap
+    assert "Current baseline: `v2.2.3`" in roadmap
+    assert "v2.2.3 release keeps the v2.2 noisy" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -436,12 +451,13 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v220["v2.2.0<br/>qLogNEI + X_pending"]' in roadmap
     assert 'v221["v2.2.1<br/>qLogNEI diagnostics + tutorial"]' in roadmap
     assert 'v222["v2.2.2<br/>qLogNEHVI feasibility review"]' in roadmap
+    assert 'v223["v2.2.3<br/>Conservative qLogNEHVI"]' in roadmap
     assert "class v10,v20,v21 majorDone" in roadmap
     assert "class v22 majorActive" in roadmap
     assert "class v23,v24,v25 majorFuture" in roadmap
     assert "class v210,v211,v212,v213 patchDone" in roadmap
-    assert "class v220,v221 patchDone" in roadmap
-    assert "class v222 patchActive" in roadmap
+    assert "class v220,v221,v222 patchDone" in roadmap
+    assert "class v223 patchActive" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorFuture" in roadmap
     assert "classDef patchDone" in roadmap
@@ -459,7 +475,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "`v2.2.0` adds `bo.acquisition: qlog_nei`" in roadmap
     assert "`v2.2.1` adds `qlog_nei_summary`" in roadmap
     assert "`v2.2.2` adds [docs/QLOGNEHVI_FEASIBILITY.md]" in roadmap
-    assert "`bo.acquisition: qlog_nehvi` plus `source=qlog_nehvi` unsupported" in roadmap
+    assert "`v2.2.3` implements conservative coupled multi-objective qLogNEHVI" in roadmap
+    assert "cost-aware, replicate-aware, structured, contextual, multi-fidelity" in roadmap
     assert "v2.3.x - Controlled Feature Combinations" in roadmap
     assert "v2.4.x - Multi-Fidelity Expansion" in roadmap
     assert "v2.5.x - App/API Operational Hardening" in roadmap
@@ -509,6 +526,8 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "qlog-nei-summary --config configs/18_noisy_pending_qlognei.yaml" in checklist
     assert "--kind qlog-nei-diagnostics" in checklist
     assert "docs/QLOGNEHVI_FEASIBILITY.md" in checklist
+    assert "configs/19_multi_objective_qlognehvi.yaml" in checklist
+    assert "examples/19_multi_objective_qlognehvi_campaign_log.csv" in checklist
 
 
 def test_requirements_lock_matches_current_release_snapshot() -> None:
@@ -516,7 +535,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.2.2" in requirements_lock
+    assert "BO Forge v2.2.3" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -527,8 +546,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install "bo-forge[api]"' in tutorial
     assert 'pip install -e ".[dev]"' in tutorial
-    assert "dist/bo_forge-2.2.2-py3-none-any.whl" in tutorial
-    assert "dist/bo_forge-2.2.2.tar.gz" in tutorial
+    assert "dist/bo_forge-2.2.3-py3-none-any.whl" in tutorial
+    assert "dist/bo_forge-2.2.3.tar.gz" in tutorial
     assert "pip check" in tutorial
 
 
@@ -805,10 +824,10 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         check=True,
         text=True,
     )
-    wheels = sorted(dist_dir.glob("bo_forge-2.2.2-*.whl"))
-    sdists = sorted(dist_dir.glob("bo_forge-2.2.2.tar.gz"))
-    assert wheels, "No v2.2.2 wheel was built."
-    assert sdists, "No v2.2.2 sdist was built."
+    wheels = sorted(dist_dir.glob("bo_forge-2.2.3-*.whl"))
+    sdists = sorted(dist_dir.glob("bo_forge-2.2.3.tar.gz"))
+    assert wheels, "No v2.2.3 wheel was built."
+    assert sdists, "No v2.2.3 sdist was built."
 
     _assert_wheel_package_boundaries(wheels[0])
     _assert_sdist_contains_release_assets(sdists[0])
@@ -851,7 +870,7 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
 def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
-        metadata = wheel.read("bo_forge-2.2.2.dist-info/METADATA").decode("utf-8")
+        metadata = wheel.read("bo_forge-2.2.3.dist-info/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
     assert "bo_forge/contextual.py" in names
@@ -863,8 +882,8 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge_app/api.py" in names
     assert "bo_forge_app/api_cli.py" in names
     assert "bo_forge_app/__main__.py" in names
-    assert "bo_forge-2.2.2.dist-info/entry_points.txt" in names
-    assert "bo_forge-2.2.2.dist-info/licenses/LICENSE" in names
+    assert "bo_forge-2.2.3.dist-info/entry_points.txt" in names
+    assert "bo_forge-2.2.3.dist-info/licenses/LICENSE" in names
     excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
@@ -880,52 +899,54 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
-    assert "bo_forge-2.2.2/README.md" in names
-    assert "bo_forge-2.2.2/LICENSE" in names
-    assert "bo_forge-2.2.2/requirements-lock.txt" in names
-    assert "bo_forge-2.2.2/ROADMAP_V0_TO_V1.md" in names
-    assert "bo_forge-2.2.2/ROADMAP_V1_X.md" in names
-    assert "bo_forge-2.2.2/ROADMAP_V2_X.md" in names
-    assert "bo_forge-2.2.2/docs/PUBLIC_API.md" in names
-    assert "bo_forge-2.2.2/docs/STREAMLIT_DEPLOYMENT.md" in names
-    assert "bo_forge-2.2.2/docs/API_PROBE.md" in names
-    assert "bo_forge-2.2.2/docs/CAPABILITY_MATRIX.md" in names
-    assert "bo_forge-2.2.2/docs/QLOGNEHVI_FEASIBILITY.md" in names
-    assert "bo_forge-2.2.2/examples/quickstart.py" in names
-    assert "bo_forge-2.2.2/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/README.md" in names
+    assert "bo_forge-2.2.3/LICENSE" in names
+    assert "bo_forge-2.2.3/requirements-lock.txt" in names
+    assert "bo_forge-2.2.3/ROADMAP_V0_TO_V1.md" in names
+    assert "bo_forge-2.2.3/ROADMAP_V1_X.md" in names
+    assert "bo_forge-2.2.3/ROADMAP_V2_X.md" in names
+    assert "bo_forge-2.2.3/docs/PUBLIC_API.md" in names
+    assert "bo_forge-2.2.3/docs/STREAMLIT_DEPLOYMENT.md" in names
+    assert "bo_forge-2.2.3/docs/API_PROBE.md" in names
+    assert "bo_forge-2.2.3/docs/CAPABILITY_MATRIX.md" in names
+    assert "bo_forge-2.2.3/docs/QLOGNEHVI_FEASIBILITY.md" in names
+    assert "bo_forge-2.2.3/examples/quickstart.py" in names
+    assert "bo_forge-2.2.3/examples/01_simple_2d_maximise_logei_campaign_log.csv" in names
     assert (
-        "bo_forge-2.2.2/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-2.2.3/examples/10_multi_objective_mixed_constrained_campaign_log.csv"
         in names
     )
     assert (
-        "bo_forge-2.2.2/examples/11_four_objective_mixed_constrained_campaign_log.csv"
+        "bo_forge-2.2.3/examples/11_four_objective_mixed_constrained_campaign_log.csv"
         in names
     )
-    assert "bo_forge-2.2.2/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/13_structured_campaign_core_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/16_contextual_logei_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/17_model_profile_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/examples/18_noisy_pending_qlognei_campaign_log.csv" in names
-    assert "bo_forge-2.2.2/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-2.2.2/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
-    assert "bo_forge-2.2.2/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
-    assert "bo_forge-2.2.2/configs/13_structured_campaign_core.yaml" in names
-    assert "bo_forge-2.2.2/configs/14_structured_campaign_tutorial.yaml" in names
-    assert "bo_forge-2.2.2/configs/15_multi_fidelity_qmfkg.yaml" in names
-    assert "bo_forge-2.2.2/configs/16_contextual_logei.yaml" in names
-    assert "bo_forge-2.2.2/configs/17_model_profile_logei.yaml" in names
-    assert "bo_forge-2.2.2/configs/18_noisy_pending_qlognei.yaml" in names
-    assert "bo_forge-2.2.2/notebooks/01_maximisation_logei_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/14_structured_campaign_tutorial.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/16_contextual_logei_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/17_model_profile_logei_campaign.ipynb" in names
-    assert "bo_forge-2.2.2/notebooks/18_noisy_pending_qlognei_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/examples/12_cost_aware_multi_objective_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/13_structured_campaign_core_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/14_structured_campaign_tutorial_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/15_multi_fidelity_qmfkg_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/16_contextual_logei_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/17_model_profile_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/18_noisy_pending_qlognei_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/examples/19_multi_objective_qlognehvi_campaign_log.csv" in names
+    assert "bo_forge-2.2.3/configs/10_multi_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-2.2.3/configs/11_four_objective_mixed_constrained_qlogehvi.yaml" in names
+    assert "bo_forge-2.2.3/configs/12_cost_aware_multi_objective_qlogehvi.yaml" in names
+    assert "bo_forge-2.2.3/configs/13_structured_campaign_core.yaml" in names
+    assert "bo_forge-2.2.3/configs/14_structured_campaign_tutorial.yaml" in names
+    assert "bo_forge-2.2.3/configs/15_multi_fidelity_qmfkg.yaml" in names
+    assert "bo_forge-2.2.3/configs/16_contextual_logei.yaml" in names
+    assert "bo_forge-2.2.3/configs/17_model_profile_logei.yaml" in names
+    assert "bo_forge-2.2.3/configs/18_noisy_pending_qlognei.yaml" in names
+    assert "bo_forge-2.2.3/configs/19_multi_objective_qlognehvi.yaml" in names
+    assert "bo_forge-2.2.3/notebooks/01_maximisation_logei_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/10_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/11_four_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/14_structured_campaign_tutorial.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/16_contextual_logei_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/17_model_profile_logei_campaign.ipynb" in names
+    assert "bo_forge-2.2.3/notebooks/18_noisy_pending_qlognei_campaign.ipynb" in names
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -967,7 +988,7 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
-    assert completed.stdout == "bo-forge 2.2.2\n"
+    assert completed.stdout == "bo-forge 2.2.3\n"
     subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
         cwd=probe_dir,
@@ -992,7 +1013,7 @@ assert scripts["bo-forge-api"] == "bo_forge_app.api_cli:main"
 for module in (bo_forge, bo_forge_app):
     module_path = Path(module.__file__).resolve()
     assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == "2.2.2"
+assert bo_forge.__version__ == "2.2.3"
 
 real_import = builtins.__import__
 def block_optional_app_deps(name, *args, **kwargs):

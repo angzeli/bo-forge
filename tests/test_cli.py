@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.2.2\n"
+    assert captured.out == "bo-forge 2.2.3\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.2.2\n"
+    assert completed.stdout == "bo-forge 2.2.3\n"
     assert completed.stderr == ""
 
 
@@ -1060,6 +1060,57 @@ def test_qlog_nei_cli_suggest_hint_for_pending_initial_design_rows(
     captured = capsys.readouterr()
     assert "observe accepted pending initial suggestions" in captured.err
     assert "requires observed initial-design rows" in captured.err
+    assert log_path.read_bytes() == before
+
+
+def test_qlog_nehvi_cli_suggest_works_with_accepted_pending_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/19_multi_objective_qlognehvi.yaml")
+    log_path = tmp_path / "qlog_nehvi.csv"
+    output_path = tmp_path / "qlog_nehvi_suggestions.csv"
+    pd.read_csv(
+        "examples/19_multi_objective_qlognehvi_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(
+        [
+            "suggest",
+            *base_args(config_path, log_path),
+            "--batch-size",
+            "1",
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "Generated 1 suggestion(s)." in captured.out
+    suggestions = pd.read_csv(output_path, keep_default_na=False)
+    assert suggestions.loc[0, "source"] == "qlog_nehvi"
+
+
+def test_qlog_nehvi_cli_suggest_hint_for_review_pending_rows(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/19_multi_objective_qlognehvi.yaml")
+    log_path = tmp_path / "qlog_nehvi.csv"
+    df = pd.read_csv(
+        "examples/19_multi_objective_qlognehvi_campaign_log.csv",
+        keep_default_na=False,
+    )
+    df.loc[df["row_id"] == "accepted_pending_000", "review_status"] = "pending"
+    df.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "1"]) == 1
+
+    captured = capsys.readouterr()
+    assert "review_status='pending'" in captured.err
+    assert "Accepted suggestions are allowed as X_pending" in captured.err
     assert log_path.read_bytes() == before
 
 
@@ -1485,17 +1536,17 @@ def test_validate_failure_returns_error(tmp_path: Path, capsys: pytest.CaptureFi
     )
 
 
-def test_validate_rejects_qlog_nehvi_config_with_feasibility_hint(
+def test_validate_rejects_single_objective_qlog_nehvi_config(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    config_path = write_multi_objective_config(tmp_path / "multi.yaml")
+    config_path = write_config(tmp_path / "campaign.yaml")
     config_path.write_text(
-        config_path.read_text(encoding="utf-8").replace("qlog_ehvi", "qlog_nehvi"),
+        config_path.read_text(encoding="utf-8").replace("log_ei", "qlog_nehvi"),
         encoding="utf-8",
     )
-    cfg = multi_objective_config()
-    log_path = write_log(tmp_path / "multi.csv", cfg, multi_objective_log(cfg))
+    cfg = config()
+    log_path = write_log(tmp_path / "campaign.csv", cfg, observed_log(cfg))
 
     assert run(["validate", *base_args(config_path, log_path)]) == 1
 
@@ -1503,10 +1554,7 @@ def test_validate_rejects_qlog_nehvi_config_with_feasibility_hint(
     assert captured.out == ""
     assert "Error:" in captured.err
     assert "qlog_nehvi" in captured.err
-    assert "feasibility review" in captured.err
-    assert "unsupported in v2.2.2" in captured.err
-    assert "qlog_ehvi" in captured.err
-    assert "qlog_nei" in captured.err
+    assert "only supported for coupled multi-objective campaigns" in captured.err
 
 
 def test_suggest_with_pending_suggestions_returns_hint_without_mutating_csv(

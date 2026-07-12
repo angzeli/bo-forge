@@ -56,8 +56,10 @@ from bo_forge.suggestions import (
 from bo_forge.validation import (
     canonical_columns,
     get_observed_data,
+    has_blocking_qlog_nehvi_review_suggestions,
     has_blocking_qlog_nei_review_suggestions,
     next_iteration,
+    qlog_nehvi_active_pending_suggestions,
     qlog_nei_active_pending_suggestions,
     validate_campaign_data,
 )
@@ -186,8 +188,12 @@ class CampaignSession:
 
     def _initial_design_remaining(self, training_observed_count: int) -> int:
         remaining = self.config.bo.initial_design_size - training_observed_count
-        if self.config.bo.acquisition == "qlog_nei":
-            active_pending = qlog_nei_active_pending_suggestions(self.df, self.config)
+        if self.config.bo.acquisition in {"qlog_nei", "qlog_nehvi"}:
+            active_pending = (
+                qlog_nei_active_pending_suggestions(self.df, self.config)
+                if self.config.bo.acquisition == "qlog_nei"
+                else qlog_nehvi_active_pending_suggestions(self.df, self.config)
+            )
             if not active_pending.empty:
                 pending_initial_count = int(
                     active_pending["source"].isin({"sobol", "random"}).sum()
@@ -384,10 +390,20 @@ class CampaignSession:
     def campaign_status(self) -> str:
         """Return the current campaign status without mutating session state."""
         self.validate()
-        if self.config.bo.acquisition == "qlog_nei":
-            if has_blocking_qlog_nei_review_suggestions(self.df, self.config):
+        pending_aware = self.config.bo.acquisition in {"qlog_nei", "qlog_nehvi"}
+        if pending_aware:
+            has_blocking_review = (
+                has_blocking_qlog_nei_review_suggestions(self.df, self.config)
+                if self.config.bo.acquisition == "qlog_nei"
+                else has_blocking_qlog_nehvi_review_suggestions(self.df, self.config)
+            )
+            if has_blocking_review:
                 return "has_pending_suggestions"
-            active_pending = qlog_nei_active_pending_suggestions(self.df, self.config)
+            active_pending = (
+                qlog_nei_active_pending_suggestions(self.df, self.config)
+                if self.config.bo.acquisition == "qlog_nei"
+                else qlog_nehvi_active_pending_suggestions(self.df, self.config)
+            )
             active_pending_initial = (
                 active_pending["source"].isin({"sobol", "random"})
                 if not active_pending.empty
@@ -407,14 +423,14 @@ class CampaignSession:
         observed_count = len(modeling_observed_data(self.config, observed))
         if observed_count < self.config.bo.initial_design_size:
             if (
-                self.config.bo.acquisition == "qlog_nei"
+                pending_aware
                 and observed_count + pending_count < self.config.bo.initial_design_size
             ):
                 return "ready_for_initial_design"
             if pending_count > 0:
                 return "has_pending_suggestions"
             return "ready_for_initial_design"
-        if self.config.bo.acquisition != "qlog_nei" and pending_count > 0:
+        if not pending_aware and pending_count > 0:
             return "has_pending_suggestions"
         return "ready_for_bo"
 
@@ -505,13 +521,17 @@ class CampaignSession:
                 )
         else:
             action = "suggest_bo"
+            pending_aware_label = {
+                "qlog_nei": "qLogNEI",
+                "qlog_nehvi": "qLogNEHVI",
+            }.get(self.config.bo.acquisition)
             if (
-                self.config.bo.acquisition == "qlog_nei"
+                pending_aware_label is not None
                 and not self.pending_suggestions().empty
             ):
                 reason = (
-                    "Initial design is complete; qLogNEI can account for accepted "
-                    "pending suggestions as X_pending."
+                    f"Initial design is complete; {pending_aware_label} can account "
+                    "for accepted pending suggestions as X_pending."
                 )
             else:
                 reason = "Initial design is complete and no pending suggestions remain."

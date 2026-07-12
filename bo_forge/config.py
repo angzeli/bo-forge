@@ -230,6 +230,21 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         multi_objective=bool(objectives),
     )
     model = _parse_model(raw.get("model"))
+    bo = _parse_bo(
+        raw.get("bo", {}),
+        multi_objective=bool(objectives),
+        has_fidelity=fidelity is not None,
+    )
+    _validate_qlog_nehvi_combinations(
+        bo=bo,
+        multi_objective=bool(objectives),
+        objective_count=len(objectives) if objectives else 1,
+        fidelity=fidelity,
+        stages=stages,
+        context=context,
+        cost=cost,
+        replicates=replicates,
+    )
     _validate_context_combinations(
         context=context,
         multi_objective=bool(objectives),
@@ -245,11 +260,6 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
         stages=stages,
         cost=cost,
         replicates=replicates,
-    )
-    bo = _parse_bo(
-        raw.get("bo", {}),
-        multi_objective=bool(objectives),
-        has_fidelity=fidelity is not None,
     )
     _validate_model_combinations(
         model=model,
@@ -461,22 +471,15 @@ def _parse_bo(
     else:
         default_acquisition = "log_ei"
     acquisition = str(raw.get("acquisition", default_acquisition))
-    if acquisition == "qlog_nehvi":
-        raise ConfigError(
-            "bo.acquisition='qlog_nehvi' is under feasibility review and remains "
-            "unsupported in v2.2.2. Use bo.acquisition: qlog_ehvi for coupled "
-            "multi-objective campaigns, or bo.acquisition: qlog_nei for supported "
-            "single-objective noisy campaigns."
-        )
     if acquisition == "qmf_kg" and not has_fidelity:
         raise ConfigError("bo.acquisition='qmf_kg' requires a 'fidelity' config section.")
     if has_fidelity:
         supported = {"qmf_kg"}
     elif multi_objective:
-        supported = {"qlog_ehvi"}
+        supported = {"qlog_ehvi", "qlog_nehvi"}
     else:
         supported = {"log_ei", "qlog_nei"}
-    if acquisition not in supported and acquisition != "qlog_nei":
+    if acquisition not in supported and acquisition not in {"qlog_nei", "qlog_nehvi"}:
         raise ConfigError(
             f"Unsupported acquisition '{acquisition}'. "
             f"Expected one of {sorted(supported)}."
@@ -765,6 +768,54 @@ def _validate_qlog_nei_combinations(
         raise ConfigError(
             "bo.acquisition='qlog_nei' supports replicate campaigns only with "
             "replicates.suggestion_policy: new_only in v2.2.x."
+        )
+
+
+def _validate_qlog_nehvi_combinations(
+    *,
+    bo: BOConfig,
+    multi_objective: bool,
+    objective_count: int,
+    fidelity: FidelityConfig | None,
+    stages: list[StageConfig],
+    context: ContextConfig | None,
+    cost: CostConfig | None,
+    replicates: ReplicateConfig,
+) -> None:
+    if bo.acquisition != "qlog_nehvi":
+        return
+    if not multi_objective:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' is only supported for coupled "
+            "multi-objective campaigns in v2.2.3."
+        )
+    if objective_count > 4:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.2.3: "
+            f"configured={objective_count}."
+        )
+    if fidelity is not None:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.2.3."
+        )
+    if stages:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' cannot be combined with structured stages "
+            "in v2.2.3."
+        )
+    if context is not None:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.2.3."
+        )
+    if cost is not None:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' cannot be combined with cost-aware campaigns "
+            "in v2.2.3."
+        )
+    if replicates.enabled:
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' cannot be combined with replicate campaigns "
+            "in v2.2.3."
         )
 
 

@@ -85,6 +85,11 @@ def append_suggestions(
             "qMFKG append requires config-aware validation; use "
             "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
         )
+    elif _has_qlog_nehvi_source(combined):
+        raise LogWriteError(
+            "qLogNEHVI append requires config-aware validation; use "
+            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+        )
     _atomic_write_and_validate(path, combined)
 
 
@@ -732,6 +737,10 @@ def _has_replicate_columns(columns: pd.Index | list[str]) -> bool:
 
 def _has_qmfkg_source(df: pd.DataFrame) -> bool:
     return "source" in df.columns and df["source"].astype(str).eq("qmf_kg").any()
+
+
+def _has_qlog_nehvi_source(df: pd.DataFrame) -> bool:
+    return "source" in df.columns and df["source"].astype(str).eq("qlog_nehvi").any()
 
 
 def _has_stage_column(columns: pd.Index | list[str]) -> bool:

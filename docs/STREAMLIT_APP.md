@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.2.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.2.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -49,6 +49,14 @@ qLogNEI Diagnostics in `Reports`, and can create a conservative `Campaign kind =
 Single-objective qLogNEI` config. Review rows still marked `pending` block
 new suggestions; accepted review rows are active pending experiments that the
 backend can pass to qLogNEI as `X_pending`.
+
+v2.2.3 adds backend qLogNEHVI support for loaded coupled multi-objective
+configs with `bo.acquisition: qlog_nehvi`. Existing multi-objective Resolve,
+Pareto, hypervolume, report, and plot panels continue to apply because the CSV
+schema is unchanged. Review rows still marked `pending` block new suggestions;
+accepted review rows are active pending designs that the backend can pass to
+qLogNEHVI as `X_pending`. The app does not add qLogNEHVI campaign creation
+controls in this patch.
 
 ## 🧩 Structured Campaigns
 

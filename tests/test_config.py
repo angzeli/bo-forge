@@ -1516,7 +1516,7 @@ bo:
     assert config.model.profile == "robust"
 
 
-def test_config_rejects_qlog_nehvi_with_feasibility_review_message(
+def test_config_accepts_supported_qlog_nehvi_multi_objective_config(
     tmp_path: Path,
 ) -> None:
     path = write_yaml(
@@ -1540,9 +1540,192 @@ bo:
 """,
     )
 
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.is_multi_objective
+    assert config.bo.acquisition == "qlog_nehvi"
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "message"),
+    [
+        (
+            """
+campaign_name: bad_single
+objective:
+  name: score
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  acquisition: qlog_nehvi
+""",
+            "only supported for coupled multi-objective",
+        ),
+        (
+            """
+campaign_name: bad_cost
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+cost:
+  expression: "1.0 + x"
+bo:
+  acquisition: qlog_nehvi
+""",
+            "cannot be combined with cost-aware",
+        ),
+        (
+            """
+campaign_name: bad_replicates
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+replicates:
+  enabled: true
+  suggestion_policy: new_only
+bo:
+  acquisition: qlog_nehvi
+""",
+            "cannot be combined with replicate",
+        ),
+        (
+            """
+campaign_name: bad_stages
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+stages:
+  - name: screen
+    variables: [x]
+bo:
+  acquisition: qlog_nehvi
+""",
+            "cannot be combined with structured stages",
+        ),
+        (
+            """
+campaign_name: bad_context
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: lot
+    type: categorical
+    values: [A, B]
+context:
+  variables: [lot]
+bo:
+  acquisition: qlog_nehvi
+""",
+            "cannot be combined with context",
+        ),
+        (
+            """
+campaign_name: bad_fidelity
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.1
+    upper: 1
+fidelity:
+  variable: fidelity
+  target: 1
+bo:
+  acquisition: qlog_nehvi
+""",
+            "cannot be combined with fidelity",
+        ),
+        (
+            """
+campaign_name: bad_objective_count
+objectives:
+  - name: a
+    direction: maximize
+    reference_point: 0
+  - name: b
+    direction: maximize
+    reference_point: 0
+  - name: c
+    direction: minimize
+    reference_point: 10
+  - name: d
+    direction: minimize
+    reference_point: 10
+  - name: e
+    direction: maximize
+    reference_point: 0
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  acquisition: qlog_nehvi
+""",
+            "at most 4 objectives",
+        ),
+    ],
+)
+def test_config_rejects_unsupported_qlog_nehvi_combinations(
+    tmp_path: Path,
+    yaml_text: str,
+    message: str,
+) -> None:
+    path = write_yaml(tmp_path / "campaign.yaml", yaml_text)
+
     with pytest.raises(
         ConfigError,
-        match="qlog_nehvi.*feasibility review.*unsupported in v2.2.2",
+        match=message,
     ):
         CampaignConfig.from_yaml(path)
 

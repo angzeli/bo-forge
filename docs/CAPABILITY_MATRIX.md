@@ -1,10 +1,10 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.2.2 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v2.2.3 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while making supported and intentionally
 deferred combinations explicit. v2.2 starts the noisy and pending-aware BO line
-with conservative single-objective qLogNEI support. qLogNEHVI remains under
-feasibility review and is not exposed in v2.2.2.
+with conservative single-objective qLogNEI support and narrow coupled
+multi-objective qLogNEHVI support.
 
 Legend:
 
@@ -22,6 +22,7 @@ Legend:
 | Single-objective qLogNEI | supported | Noisy expected improvement for single-objective, non-structured, non-fidelity, non-contextual, non-cost campaigns; accepted review rows become `X_pending`. |
 | Single-objective model profiles | supported | `default`, `smooth`, `rough`, and `robust` profiles for configs with `bo.acquisition: log_ei` or `qlog_nei`. |
 | Coupled multi-objective qLogEHVI | supported | Primary tested range is `2 <= m <= 4`. |
+| Coupled multi-objective qLogNEHVI | supported | Noisy/pending-aware coupled MOBO for `2 <= m <= 4`; accepted review rows become `X_pending`. |
 | Review metadata | supported | Works for single-objective and coupled multi-objective campaigns. |
 | Replicate metadata | supported | Includes group-mean summaries and replicate-derived `train_Yvar` where available. |
 | Single-objective active replicate repeats | supported | `uncertain_best` is single-objective only. |
@@ -41,7 +42,7 @@ Legend:
 | Multi-objective + review + replicates + cost | supported | Backend/session/CLI support through v1.1.x semantics. |
 | Structured + review | supported | Stage-aware rows and review metadata can coexist. |
 | Structured + replicates | supported | Stage summaries use replicate group means where needed. |
-| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.2.2. |
+| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.2.3. |
 | Structured + contextual | deferred | No contextual structured-stage suggestion path yet. |
 | Structured + multi-fidelity | deferred | No staged qMFKG or fidelity-by-stage workflow yet. |
 | Contextual + review | deferred | Planned as a controlled v2.x combination. |
@@ -52,16 +53,20 @@ Legend:
 | qLogNEI + deterministic cost | rejected | Cost-aware qLogNEI ranking is deferred. |
 | qLogNEI + contextual | rejected | Contextual qLogNEI is deferred. |
 | qLogNEI + structured stages | rejected | Stage-aware qLogNEI is deferred. |
-| qLogNEI + multi-fidelity | rejected | No noisy qMFKG path in v2.2.2. |
-| qLogNEI + multi-objective | rejected | qLogNEHVI remains under feasibility review and is deferred in v2.2.2. |
-| `bo.acquisition: qlog_nehvi` | rejected | Public qLogNEHVI config support is not exposed in v2.2.2. See `docs/QLOGNEHVI_FEASIBILITY.md`. |
+| qLogNEI + multi-fidelity | rejected | No noisy qMFKG path in v2.2.3. |
+| qLogNEI + multi-objective | rejected | Use `bo.acquisition: qlog_nehvi` for supported coupled noisy multi-objective campaigns. |
+| qLogNEHVI + deterministic cost | rejected | Cost-aware qLogNEHVI ranking is deferred. |
+| qLogNEHVI + replicates | rejected | Replicate-aware noisy MOBO is deferred. |
+| qLogNEHVI + structured stages | rejected | Stage-aware noisy MOBO is deferred. |
+| qLogNEHVI + contextual | rejected | Contextual noisy MOBO is deferred. |
+| qLogNEHVI + multi-fidelity | rejected | No noisy multi-fidelity multi-objective path exists. |
 | qLogNEI + replicate active repeats | rejected | Use `replicates.suggestion_policy: new_only` for replicate-derived variance. |
 | Multi-fidelity + review | supported | Conservative single-objective qMFKG can use review metadata. |
 | Multi-fidelity + cost | rejected | qMFKG fidelity cost is separate from BO Forge `cost:`. |
 | Multi-fidelity + replicates | rejected | Replicate-aware qMFKG is not implemented. |
 | Multi-fidelity + multi-objective | rejected | qMFKG support is single-objective only. |
 | Model-profile comparison diagnostics | supported | Read-only comparison of `default`, `smooth`, `rough`, and `robust` on current single-objective fitting rows; not automatic model selection. |
-| Non-default model profile + multi-objective | rejected | Non-default profiles require supported single-objective configs with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.2. |
+| Non-default model profile + multi-objective | rejected | Non-default profiles require supported single-objective configs with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.3. |
 | Non-default model profile + multi-fidelity | rejected | qMFKG keeps its existing multi-fidelity GP path. |
 | Non-default model profile + structured stages | rejected | Stage-specific model-profile support is deferred. |
 

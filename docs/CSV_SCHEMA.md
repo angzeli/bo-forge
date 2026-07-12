@@ -85,10 +85,10 @@ Suggested rows:
 - `status` must be `suggested`.
 - The objective cell must be blank.
 - Variable values must be filled and valid for the configured variable type, except inactive structured-campaign variables, which must be blank.
-- `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `qlog_ehvi`, or `cost_qlog_ehvi`.
+- `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `qlog_ehvi`, `qlog_nehvi`, or `cost_qlog_ehvi`.
 - For multi-fidelity qMFKG model suggestions, `source=qmf_kg`.
 - For single-objective noisy/pending-aware qLogNEI model suggestions, `source=qlog_nei`; accepted pending review rows may be passed to the acquisition as `X_pending`.
-- qLogNEHVI is under feasibility review in v2.2.2; `source=qlog_nehvi` is not a valid CSV source.
+- For coupled noisy/pending-aware qLogNEHVI model suggestions, `source=qlog_nehvi`; active pending designs may be passed to the acquisition as `X_pending`. qLogNEHVI configs also accept historical `source=qlog_ehvi` rows so existing deterministic multi-objective provenance remains valid when switching acquisitions.
 - For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
 - For single-objective cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
 - For multi-objective cost-aware model suggestions, `source=cost_qlog_ehvi`, `acquisition` stores the qLogEHVI batch acquisition value, and `utility = acquisition - cost.weight * total_batch_cost` is repeated on every row in the selected batch.
@@ -291,11 +291,11 @@ If a non-structured config defines `constraints`, every CSV row must satisfy eve
 
 This means manual historical rows, Sobol/random initial suggestions, and LogEI/qLogEI model suggestions all follow the same feasibility rules. A row that violates a constraint fails CSV validation with the row ID, constraint name, and expression.
 
-For multi-objective campaigns, constraints apply to every row in the same way. qLogEHVI suggestions are repaired and checked against configured variable domains, constraints, exact duplicates, and encoded-space near-duplicate thresholds.
+For multi-objective campaigns, constraints apply to every row in the same way. qLogEHVI and qLogNEHVI suggestions are repaired and checked against configured variable domains, constraints, exact duplicates, and encoded-space near-duplicate thresholds.
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.2.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -312,7 +312,8 @@ Review, replicate, and deterministic cost metadata are supported for multi-objec
 For review-enabled campaigns, blocking behavior is review-aware:
 
 - non-review campaigns: any `status=suggested` row blocks new suggestions;
-- review-enabled campaigns: `review_status=pending` and `review_status=accepted` suggestions block new suggestions;
+- review-enabled LogEI/qLogEI/qLogEHVI/qMFKG campaigns: `review_status=pending` and `review_status=accepted` suggestions block new suggestions;
+- review-enabled qLogNEI/qLogNEHVI campaigns: `review_status=pending` blocks, while `review_status=accepted` becomes an active pending design passed to the acquisition as `X_pending`;
 - `review_status=rejected` and `review_status=deferred` suggestions stay auditable and duplicate-protected, but do not block new suggestions.
 
 For cost-aware campaigns, budget accounting uses:
@@ -332,7 +333,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.2.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.2.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -364,7 +365,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.2.2.
+and structured campaigns in v2.2.3.
 
 ## 🧪 Variable Value Rules
 

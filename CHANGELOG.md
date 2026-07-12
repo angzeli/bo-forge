@@ -1,5 +1,26 @@
 # 📝 BO Forge Changelog
 
+## v2.2.3 - Conservative qLogNEHVI For Coupled Multi-Objective BO
+
+This patch implements the narrow qLogNEHVI scope validated in the v2.2.2
+feasibility review. It keeps CSV schemas unchanged and avoids cost, replicate,
+structured, contextual, multi-fidelity, decoupled, and asynchronous
+multi-objective scope.
+
+- Adds `bo.acquisition: qlog_nehvi` for coupled multi-objective campaigns with
+  `2 <= m <= 4`.
+- Adds `source=qlog_nehvi` for generated model-based rows in qLogNEHVI
+  configs.
+- Uses BoTorch `qLogNoisyExpectedHypervolumeImprovement` with observed encoded
+  design points as `X_baseline` and active pending designs as `X_pending`.
+- Supports review metadata: accepted suggestions become `X_pending`, pending
+  review rows block, and rejected/deferred rows remain auditable and
+  duplicate-protected.
+- Adds `configs/19_multi_objective_qlognehvi.yaml` and
+  `examples/19_multi_objective_qlognehvi_campaign_log.csv`.
+- Keeps cost-aware, replicate-aware, structured, contextual, multi-fidelity,
+  decoupled, and asynchronous qLogNEHVI workflows deferred.
+
 ## v2.2.2 - qLogNEHVI Feasibility Review
 
 This patch keeps noisy multi-objective BO deferred while documenting and

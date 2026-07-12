@@ -1,0 +1,6 @@
+row_id,iteration,status,source,review_status,review_note,temperature,solvent,yield_score,waste_score,predicted_mean_yield_score,predicted_std_yield_score,predicted_mean_waste_score,predicted_std_waste_score,acquisition
+obs_000,0,observed,manual,accepted,,30,MeCN,51,22,,,,,
+obs_001,0,observed,manual,accepted,,45,Water,62,19,,,,,
+obs_002,0,observed,manual,accepted,,65,MeCN,66,15,,,,,
+obs_003,0,observed,manual,accepted,,82,Water,70,17,,,,,
+accepted_pending_000,1,suggested,sobol,accepted,queued for evaluation,58,MeCN,,,,,,,

@@ -326,7 +326,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.2; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.3; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -392,6 +392,23 @@ Accepted review suggestions are treated as active pending experiments for
 qLogNEI; review rows still marked `pending` must be resolved first.
 The notebook walkthrough is
 `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
+
+For noisy or pending-aware coupled multi-objective BO, inspect the qLogNEHVI
+seed campaign:
+
+```bash
+python -m bo_forge validate \
+  --config configs/19_multi_objective_qlognehvi.yaml \
+  --log examples/19_multi_objective_qlognehvi_campaign_log.csv
+
+python -m bo_forge suggest \
+  --config configs/19_multi_objective_qlognehvi.yaml \
+  --log examples/19_multi_objective_qlognehvi_campaign_log.csv \
+  --batch-size 1
+```
+
+Accepted review suggestions are treated as active pending designs for
+qLogNEHVI; review rows still marked `pending` must be resolved first.
 
 ## 🔁 Session API
 
@@ -496,7 +513,7 @@ append_suggestions(log_path, suggestions, config=config)
 mark_observed(log_path, row_id=suggestions.loc[0, "row_id"], objective_value=1.95)
 ```
 
-Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config=config)` for production workflows. Passing the config lets BO Forge prevalidate the combined CSV log before writing. The backward-compatible `append_suggestions(log_path, suggestions)` form remains available for non-replicate logs, but replicate and structured logs require config-aware append validation. For structured logs, use `CampaignSession.mark_observed()` or pass `config=config` to low-level `mark_observed()`.
+Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config=config)` for production workflows. Passing the config lets BO Forge prevalidate the combined CSV log before writing. The backward-compatible `append_suggestions(log_path, suggestions)` form remains available for simple non-replicate logs, but replicate, structured, qMFKG, and qLogNEHVI generated rows require config-aware append validation. For structured logs, use `CampaignSession.mark_observed()` or pass `config=config` to low-level `mark_observed()`.
 
 ## ⚙️ Example Configs
 
@@ -517,10 +534,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/16_contextual_logei.yaml`: demonstrates single-objective contextual LogEI with a fixed feedstock context.
 - `configs/17_model_profile_logei.yaml`: demonstrates single-objective model-profile diagnostics.
 - `configs/18_noisy_pending_qlognei.yaml`: demonstrates single-objective qLogNEI with accepted pending review suggestions.
+- `configs/19_multi_objective_qlognehvi.yaml`: demonstrates coupled multi-objective qLogNEHVI with accepted pending review suggestions.
 
-## 🎯 Multi-Objective qLogEHVI Campaigns
+## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:
@@ -631,7 +649,7 @@ Initial Sobol/random suggestions fill `cost_estimate` and leave `utility` blank.
 
 When `cost_estimate` is filled, validation checks it against the deterministic cost expression. Use `cost_actual` for realised experiment costs that differ from the estimate.
 
-Review-enabled campaigns keep `status` as only `suggested` or `observed`; review decisions live in `review_status`. Pending and accepted suggestions block new suggestions. Rejected and deferred suggestions remain in the CSV for auditability and duplicate avoidance, but do not reserve budget and do not block new suggestions.
+Review-enabled campaigns keep `status` as only `suggested` or `observed`; review decisions live in `review_status`. Pending and accepted suggestions block new suggestions for LogEI/qLogEI/qLogEHVI/qMFKG workflows. For qLogNEI and qLogNEHVI, pending review rows block, while accepted suggestions are active pending designs passed to the acquisition as `X_pending`. Rejected and deferred suggestions remain in the CSV for auditability and duplicate avoidance, but do not reserve budget and do not block new suggestions.
 
 `campaign.next_action()` is review-aware: pending review rows point to `campaign.review_queue()` and `campaign.review_suggestion(...)`, while accepted rows point to `campaign.mark_observed(..., actual_cost=...)`.
 

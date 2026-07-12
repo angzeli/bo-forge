@@ -26,6 +26,8 @@ Use this checklist before publishing a GitHub release or PyPI package.
 ./.venv/bin/python -m bo_forge qlog-nei-summary --config configs/18_noisy_pending_qlognei.yaml --log examples/18_noisy_pending_qlognei_campaign_log.csv
 ./.venv/bin/python -m bo_forge suggest --config configs/18_noisy_pending_qlognei.yaml --log examples/18_noisy_pending_qlognei_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m bo_forge plot --config configs/18_noisy_pending_qlognei.yaml --log examples/18_noisy_pending_qlognei_campaign_log.csv --kind qlog-nei-diagnostics --output /tmp/bo_forge_qlog_nei_diagnostics.png
+./.venv/bin/python -m bo_forge validate --config configs/19_multi_objective_qlognehvi.yaml --log examples/19_multi_objective_qlognehvi_campaign_log.csv
+./.venv/bin/python -m bo_forge suggest --config configs/19_multi_objective_qlognehvi.yaml --log examples/19_multi_objective_qlognehvi_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m streamlit --version
 git diff --check
 ```
@@ -38,9 +40,13 @@ Confirm:
 - `docs/STREAMLIT_DEPLOYMENT.md` describes local-only, trusted-LAN, SSH/VPN, and authenticated reverse-proxy modes.
 - `docs/API_PROBE.md` describes the experimental API probe, root-bound paths, and no-auth safety model.
 - No tracked caches, working logs, latest-suggestion CSVs, notebook outputs, or runtime reports are present.
-- `docs/QLOGNEHVI_FEASIBILITY.md` states that qLogNEHVI remains deferred in
-  v2.2.2 and that `bo.acquisition: qlog_nehvi` plus `source=qlog_nehvi` remain
-  unsupported.
+- `docs/QLOGNEHVI_FEASIBILITY.md` states that qLogNEHVI is implemented only
+  for coupled `2 <= m <= 4` objective campaigns and that cost, replicates,
+  structured stages, context, multi-fidelity, decoupled, and asynchronous
+  qLogNEHVI remain deferred.
+- `configs/19_multi_objective_qlognehvi.yaml` and
+  `examples/19_multi_objective_qlognehvi_campaign_log.csv` validate and are
+  included in the source distribution.
 
 ## 📦 Build
 
@@ -66,7 +72,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.2.2-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.2.3-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -83,7 +89,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.2.2-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.2.3-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -100,7 +106,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.2.2-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.2.3-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -113,7 +119,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.2.2.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.2.3.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -175,8 +181,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.2.2`.
-- Tag the release as `v2.2.2`.
+  install paths, and the release tag all agree on `v2.2.3`.
+- Tag the release as `v2.2.3`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

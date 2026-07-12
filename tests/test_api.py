@@ -83,7 +83,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.2.2"
+    assert payload["version"] == "2.2.3"
     assert payload["experimental"] is True
 
 
@@ -203,6 +203,55 @@ def test_api_qlog_nei_dry_run_and_append_use_pending_bundle(
     assert x_pending.shape == (1, 2)
     assert payload["suggestions"]["records"][0]["source"] == "qlog_nei"
     assert payload["staged_bundle"]["suggestions"]["records"][0]["source"] == "qlog_nei"
+    assert log_path.read_bytes() == before
+
+    append = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": payload["staged_bundle"]},
+    )
+
+    assert append.status_code == 200, append.text
+    assert append.json()["validation"]["ok"] is True
+    assert log_path.read_bytes() != before
+
+
+def test_api_qlog_nehvi_dry_run_and_append_use_pending_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "19_multi_objective_qlognehvi.yaml",
+        "19_multi_objective_qlognehvi_campaign_log.csv",
+    )
+    cfg = CampaignConfig.from_yaml(tmp_path / ref["config_path"])
+    candidate = values_to_unit_cube(cfg, [(72.0, "MeCN")])
+    captured: dict[str, object] = {}
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["x_pending"] = kwargs["x_pending"]
+        return candidate, torch.tensor(0.25, dtype=torch.double), "qlog_nehvi"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nehvi", fake_optimizer)
+    api_client = client(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    dry_run = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 1},
+    )
+
+    assert dry_run.status_code == 200, dry_run.text
+    payload = dry_run.json()
+    x_pending = captured["x_pending"]
+    assert isinstance(x_pending, torch.Tensor)
+    assert x_pending.shape == (1, candidate.shape[1])
+    assert payload["suggestions"]["records"][0]["source"] == "qlog_nehvi"
+    assert (
+        payload["staged_bundle"]["suggestions"]["records"][0]["source"]
+        == "qlog_nehvi"
+    )
     assert log_path.read_bytes() == before
 
     append = api_client.post(
