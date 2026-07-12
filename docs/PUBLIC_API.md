@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.2.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.2.2.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -93,7 +93,7 @@ context combination.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.2.1 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.2.2 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect
@@ -112,6 +112,8 @@ or `CampaignSession.qlog_nei_summary()` on configs with
 `bo.acquisition: qlog_nei` to inspect observed baseline rows, active
 `X_pending` rows, review-pending blockers, initial-design readiness,
 replicate-derived `train_Yvar` availability, and the configured model profile.
+qLogNEHVI remains under feasibility review in v2.2.2 and has no public helper,
+session wrapper, CLI command, or CSV source value.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
 

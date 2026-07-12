@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.2.1\n"
+    assert captured.out == "bo-forge 2.2.2\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.2.1\n"
+    assert completed.stdout == "bo-forge 2.2.2\n"
     assert completed.stderr == ""
 
 
@@ -1483,6 +1483,30 @@ def test_validate_failure_returns_error(tmp_path: Path, capsys: pytest.CaptureFi
         "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
         in captured.err
     )
+
+
+def test_validate_rejects_qlog_nehvi_config_with_feasibility_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_multi_objective_config(tmp_path / "multi.yaml")
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace("qlog_ehvi", "qlog_nehvi"),
+        encoding="utf-8",
+    )
+    cfg = multi_objective_config()
+    log_path = write_log(tmp_path / "multi.csv", cfg, multi_objective_log(cfg))
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error:" in captured.err
+    assert "qlog_nehvi" in captured.err
+    assert "feasibility review" in captured.err
+    assert "unsupported in v2.2.2" in captured.err
+    assert "qlog_ehvi" in captured.err
+    assert "qlog_nei" in captured.err
 
 
 def test_suggest_with_pending_suggestions_returns_hint_without_mutating_csv(

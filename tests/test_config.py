@@ -1516,6 +1516,37 @@ bo:
     assert config.model.profile == "robust"
 
 
+def test_config_rejects_qlog_nehvi_with_feasibility_review_message(
+    tmp_path: Path,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: noisy_mobo_review
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+bo:
+  acquisition: qlog_nehvi
+""",
+    )
+
+    with pytest.raises(
+        ConfigError,
+        match="qlog_nehvi.*feasibility review.*unsupported in v2.2.2",
+    ):
+        CampaignConfig.from_yaml(path)
+
+
 @pytest.mark.parametrize(
     ("extra_yaml", "message"),
     [

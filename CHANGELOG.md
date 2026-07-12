@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v2.2.2 - qLogNEHVI Feasibility Review
+
+This patch keeps noisy multi-objective BO deferred while documenting and
+testing the feasibility boundary for a possible conservative qLogNEHVI path.
+
+- Adds `docs/QLOGNEHVI_FEASIBILITY.md`.
+- Keeps `bo.acquisition: qlog_nehvi` unsupported with an explicit feasibility
+  review `ConfigError`.
+- Keeps `source=qlog_nehvi` invalid in CSV logs.
+- Documents the recommended future scope for qLogNEHVI if it is implemented:
+  coupled multi-objective only, `2 <= m <= 4`, no new CSV columns, no cost,
+  replicates, structured stages, context, multi-fidelity, decoupled objectives,
+  or asynchronous objective rows.
+- Updates the roadmap and release checks so qLogNEHVI remains deferred in
+  v2.2.2.
+
 ## v2.2.1 - qLogNEI Diagnostics, Tutorial, And App Workflow
 
 This follow-up keeps qLogNEI behavior unchanged while adding read-only

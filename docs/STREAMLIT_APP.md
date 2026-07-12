@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.2.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.2.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -118,7 +118,7 @@ When a loaded config defines `context:`, the app:
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
 
-v2.2.1 app support is limited to single-objective contextual LogEI/qLogEI
+v2.2.x app support is limited to single-objective contextual LogEI/qLogEI
 campaigns. Contextual multi-objective BO, contextual structured campaigns,
 contextual multi-fidelity, contextual cost-aware, and contextual
 replicate-aware workflows remain deferred.
@@ -137,7 +137,7 @@ offers:
 - `robust`: default fitting path with explicit warning metadata.
 
 Non-default model profiles require supported single-objective configs with
-`bo.acquisition: log_ei` or `qlog_nei` in v2.2.1.
+`bo.acquisition: log_ei` or `qlog_nei` in v2.2.x.
 The app disables non-default profiles for multi-objective, multi-fidelity, and
 structured campaign creation.
 

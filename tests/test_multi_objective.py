@@ -474,6 +474,15 @@ def test_multi_objective_canonical_schema_and_validation() -> None:
     validate_campaign_data(cfg, df)
 
 
+def test_multi_objective_log_rejects_qlog_nehvi_source() -> None:
+    cfg = multi_config()
+    df = observed_multi_log(cfg)
+    df.loc[0, "source"] = "qlog_nehvi"
+
+    with pytest.raises(LogValidationError, match="invalid source 'qlog_nehvi'"):
+        validate_campaign_data(cfg, df)
+
+
 def test_multi_objective_review_and_replicate_canonical_schema() -> None:
     cfg = multi_config(review=True, replicates=True)
     df = observed_multi_log(cfg)

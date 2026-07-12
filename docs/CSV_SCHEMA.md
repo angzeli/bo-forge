@@ -88,6 +88,7 @@ Suggested rows:
 - `source` is usually `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `qlog_ehvi`, or `cost_qlog_ehvi`.
 - For multi-fidelity qMFKG model suggestions, `source=qmf_kg`.
 - For single-objective noisy/pending-aware qLogNEI model suggestions, `source=qlog_nei`; accepted pending review rows may be passed to the acquisition as `X_pending`.
+- qLogNEHVI is under feasibility review in v2.2.2; `source=qlog_nehvi` is not a valid CSV source.
 - For review-enabled campaigns, `review_status` can be `pending`, `accepted`, `rejected`, or `deferred`.
 - For single-objective cost-aware model suggestions, `source=cost_log_ei` and `utility = acquisition - cost.weight * cost_estimate`.
 - For multi-objective cost-aware model suggestions, `source=cost_qlog_ehvi`, `acquisition` stores the qLogEHVI batch acquisition value, and `utility = acquisition - cost.weight * total_batch_cost` is repeated on every row in the selected batch.
@@ -294,7 +295,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.2.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.2.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -331,7 +332,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.2.1, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.2.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -363,7 +364,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.2.1.
+and structured campaigns in v2.2.2.
 
 ## 🧪 Variable Value Rules
 

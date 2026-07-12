@@ -461,6 +461,13 @@ def _parse_bo(
     else:
         default_acquisition = "log_ei"
     acquisition = str(raw.get("acquisition", default_acquisition))
+    if acquisition == "qlog_nehvi":
+        raise ConfigError(
+            "bo.acquisition='qlog_nehvi' is under feasibility review and remains "
+            "unsupported in v2.2.2. Use bo.acquisition: qlog_ehvi for coupled "
+            "multi-objective campaigns, or bo.acquisition: qlog_nei for supported "
+            "single-objective noisy campaigns."
+        )
     if acquisition == "qmf_kg" and not has_fidelity:
         raise ConfigError("bo.acquisition='qmf_kg' requires a 'fidelity' config section.")
     if has_fidelity:

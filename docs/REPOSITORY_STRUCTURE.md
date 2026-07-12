@@ -20,6 +20,7 @@ bo-forge/
 │   ├── STREAMLIT_DEPLOYMENT.md
 │   ├── API_PROBE.md
 │   ├── CAPABILITY_MATRIX.md
+│   ├── QLOGNEHVI_FEASIBILITY.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
 │   ├── CSV_SCHEMA.md

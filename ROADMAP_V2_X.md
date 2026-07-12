@@ -4,11 +4,11 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.2.1`. The v2.2.1 release keeps the v2.2 noisy and
+Current baseline: `v2.2.2`. The v2.2.2 release keeps the v2.2 noisy and
 pending-aware BO line focused on conservative single-objective qLogNEI support
-while adding read-only qLogNEI summaries, diagnostics, a tutorial notebook, and
-Streamlit/CLI polish. The next planned v2.2 patches focus on noisy
-multi-objective feasibility review and closeout hardening.
+while documenting qLogNEHVI feasibility and keeping noisy multi-objective BO
+explicitly deferred. The next v2.2 patch should either implement conservative
+qLogNEHVI within the reviewed scope or close v2.2 with qLogNEHVI deferred.
 
 ## Roadmap So Far
 
@@ -22,6 +22,7 @@ flowchart LR
     v213["v2.1.3<br/>Model-profile closeout"]
     v220["v2.2.0<br/>qLogNEI + X_pending"]
     v221["v2.2.1<br/>qLogNEI diagnostics + tutorial"]
+    v222["v2.2.2<br/>qLogNEHVI feasibility review"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -29,13 +30,14 @@ flowchart LR
     v21 -.-> v213
     v22 -.-> v220
     v22 -.-> v221
+    v22 -.-> v222
 
     class v10,v20,v21 majorDone
     class v22 majorActive
     class v23,v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
-    class v220 patchDone
-    class v221 patchActive
+    class v220,v221 patchDone
+    class v222 patchActive
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -89,9 +91,11 @@ Status: active
 - `v2.2.1` adds `qlog_nei_summary`, `bo-forge qlog-nei-summary`,
   `plot --kind qlog-nei-diagnostics`, a qLogNEI tutorial notebook, and
   Streamlit workflow polish.
-- `v2.2.2` reviews qLogNEHVI feasibility after the single-objective noisy path
-  is stable.
-- `v2.2.3` is reserved for closeout hardening.
+- `v2.2.2` adds [docs/QLOGNEHVI_FEASIBILITY.md](docs/QLOGNEHVI_FEASIBILITY.md)
+  and keeps `bo.acquisition: qlog_nehvi` plus `source=qlog_nehvi` unsupported
+  while noisy multi-objective semantics are reviewed.
+- `v2.2.3` is either conservative qLogNEHVI implementation within the reviewed
+  scope or v2.2 closeout with qLogNEHVI explicitly deferred.
 - Keep learned-noise and replicate-derived variance semantics clear.
 - Avoid adding noisy multi-objective scope before the data-safety model is
   explicit.

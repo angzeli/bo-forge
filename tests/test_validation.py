@@ -836,6 +836,14 @@ def test_validate_campaign_data_rejects_invalid_source() -> None:
         validate_campaign_data(config(), df)
 
 
+def test_validate_campaign_data_rejects_qlog_nehvi_source() -> None:
+    df = valid_df()
+    df.loc[0, "source"] = "qlog_nehvi"
+
+    with pytest.raises(LogValidationError, match="invalid source 'qlog_nehvi'"):
+        validate_campaign_data(config(), df)
+
+
 def test_validate_campaign_data_accepts_random_source() -> None:
     df = valid_df()
     df.loc[0, "source"] = "random"
