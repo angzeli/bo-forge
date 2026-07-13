@@ -14,7 +14,7 @@ replicates, structured stages, context, or multi-fidelity.
 
 ```mermaid
 flowchart LR
-    v10["v1.x<br/>Stable local BO Forge baseline"] --> v20["v2.0<br/>Hardening + capability matrix"] --> v21["v2.1<br/>Model profiles"] --> v22["v2.2<br/>Noisy + pending-aware BO"] --> v23["v2.3<br/>Controlled combinations"] --> v24["v2.4<br/>Multi-fidelity expansion"] --> v25["v2.5<br/>App/API operational hardening"]
+    v20["v2.0<br/>Hardening + capability matrix"] --> v21["v2.1<br/>Model profiles"] --> v22["v2.2<br/>Noisy + pending-aware BO"] --> v23["v2.3<br/>Controlled combinations"] --> v24["v2.4<br/>Multi-fidelity expansion"] --> v25["v2.5<br/>App/API operational hardening"]
 
     v210["v2.1.0<br/>Model profiles + diagnostics"]
     v211["v2.1.1<br/>Summary hardening + tutorial"]
