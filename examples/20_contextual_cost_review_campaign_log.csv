@@ -1,0 +1,5 @@
+row_id,iteration,status,source,review_status,review_note,catalyst_loading,reaction_temperature,solvent,feedstock_acidity,yield_score,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
+ctx_cost_seed_0,0,observed,manual,accepted,,0.20,70,MeCN,0.25,0.64,3.3,3.4,,,,
+ctx_cost_seed_1,0,observed,manual,accepted,,0.55,90,EtOH,0.25,0.83,3.9,3.8,,,,
+ctx_cost_seed_2,0,observed,manual,accepted,,0.35,100,Water,0.65,0.60,6.02,6.1,,,,
+ctx_cost_seed_3,0,observed,manual,accepted,,0.75,110,MeCN,0.65,0.78,4.82,4.9,,,,

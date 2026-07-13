@@ -321,6 +321,39 @@ def test_build_campaign_yaml_text_supports_contextual_logei() -> None:
     assert list(empty_log.columns) == canonical_columns(config)
 
 
+def test_build_campaign_yaml_text_supports_contextual_review_cost_logei() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_contextual_cost_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "feedstock_acidity", "type": "continuous", "lower": 0.0, "upper": 1.0},
+        ],
+        batch_size=1,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        review_enabled=True,
+        cost={"expression": "1.0 + feedstock_acidity", "weight": 0.5, "budget": 25.0},
+        context={
+            "variables": ["feedstock_acidity"],
+            "default_values": {"feedstock_acidity": 0.25},
+        },
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.context is not None
+    assert config.context.default_values == {"feedstock_acidity": 0.25}
+    assert config.review.enabled
+    assert config.cost is not None
+    assert config.cost.expression == "1.0 + feedstock_acidity"
+    assert config.bo.acquisition == "log_ei"
+    assert list(empty_log.columns) == canonical_columns(config)
+
+
 def test_format_dataframe_for_display_stringifies_mixed_type_columns() -> None:
     df = pd.DataFrame({"field": ["a", "b"], "value": ["text", 3]})
 
@@ -2773,6 +2806,167 @@ def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> N
     observed = reloaded.observed_data()
     assert observed["status"].tolist() == ["observed"]
     assert observed["activity"].astype(float).tolist() == [pytest.approx(0.42)]
+    assert observed["x2"].astype(float).tolist() == [pytest.approx(0.0)]
+
+
+def test_streamlit_app_can_create_contextual_review_cost_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "contextual_cost_review.yaml"
+    log_path = tmp_path / "logs" / "contextual_cost_review.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Contextual LogEI"
+    )
+    app.run(timeout=10)
+
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.key == "new_campaign_review_enabled_contextual"
+    ).check()
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.key == "new_campaign_cost_enabled_contextual"
+    ).check()
+    app.run(timeout=10)
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.key == "new_campaign_contextual_cost_expression"
+    ).set_value("1.0 + x2")
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.context is not None
+    assert config.review.enabled
+    assert config.cost is not None
+    assert config.cost.expression == "1.0 + x2"
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+    assert any(subheader.value == "Context Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
+    app.run(timeout=10)
+    assert any(subheader.value == "Cost Summary" for subheader in app.subheader)
+
+
+def test_streamlit_contextual_review_cost_suggest_review_observe_round_trip(
+    tmp_path: Path,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "contextual_cost_review_round_trip.yaml"
+    log_path = tmp_path / "logs" / "contextual_cost_review_round_trip.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Contextual LogEI"
+    )
+    app.run(timeout=10)
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.key == "new_campaign_review_enabled_contextual"
+    ).check()
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.key == "new_campaign_cost_enabled_contextual"
+    ).check()
+    app.run(timeout=10)
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.key == "new_campaign_contextual_cost_expression"
+    ).set_value("1.0 + x2")
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+    bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+    assert bundle["context_values"] == {"x2": 0.0}
+
+    next(button for button in app.button if button.label == "Append staged suggestions").click()
+    app.run(timeout=10)
+    appended = pd.read_csv(log_path, keep_default_na=False)
+    row_id = str(appended.loc[appended["status"] == "suggested", "row_id"].iloc[0])
+    assert appended.loc[appended["row_id"] == row_id, "review_status"].iloc[0] == "pending"
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        str(config_path)
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Resolve")
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Apply review decision").click()
+    app.run(timeout=10)
+
+    next(
+        input_ for input_ in app.number_input if input_.label == "Observed activity"
+    ).set_value(0.42)
+    next(
+        input_ for input_ in app.text_input if input_.label == "Actual cost (optional)"
+    ).set_value("2.5")
+    next(button for button in app.button if button.label == "Mark row observed").click()
+    app.run(timeout=10)
+
+    reloaded = CampaignSession.from_files(config_path, log_path)
+    reloaded.validate()
+    observed = reloaded.observed_data()
+    assert len(app.exception) == 0
+    assert observed["row_id"].tolist() == [row_id]
+    assert observed["review_status"].tolist() == ["accepted"]
+    assert observed["activity"].astype(float).tolist() == [pytest.approx(0.42)]
+    assert observed["cost_actual"].astype(float).tolist() == [pytest.approx(2.5)]
     assert observed["x2"].astype(float).tolist() == [pytest.approx(0.0)]
 
 

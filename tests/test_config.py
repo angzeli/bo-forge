@@ -152,6 +152,199 @@ review:
     assert evaluate_cost(config, (20, "Water")) == pytest.approx(3.8)
 
 
+@pytest.mark.parametrize(
+    ("extra", "expect_cost", "expect_review"),
+    [
+        ("review:\n  enabled: true\n", False, True),
+        (
+            'cost:\n  expression: "1.0 + 0.04 * reaction_time + 0.5 * acidity"\n',
+            True,
+            False,
+        ),
+        (
+            'cost:\n  expression: "1.0 + 0.04 * reaction_time + 0.5 * acidity"\n'
+            "review:\n  enabled: true\n",
+            True,
+            True,
+        ),
+    ],
+)
+def test_config_accepts_contextual_review_cost_combinations(
+    tmp_path: Path,
+    extra: str,
+    expect_cost: bool,
+    expect_review: bool,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: contextual_combo
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+context:
+  variables: [acidity]
+  default_values:
+    acidity: 0.5
+{extra}bo:
+  acquisition: log_ei
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.context is not None
+    assert (config.cost is not None) is expect_cost
+    assert config.review.enabled is expect_review
+    if config.cost is not None:
+        assert evaluate_cost(config, (20, 0.5)) == pytest.approx(2.05)
+
+
+@pytest.mark.parametrize(
+    ("yaml_text", "message"),
+    [
+        (
+            """
+campaign_name: contextual_qlog_nei
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+context:
+  variables: [acidity]
+bo:
+  acquisition: qlog_nei
+""",
+            "cannot be combined with context",
+        ),
+        (
+            """
+campaign_name: contextual_multi
+objectives:
+  - name: yield
+    direction: maximize
+    reference_point: 0
+  - name: waste
+    direction: minimize
+    reference_point: 10
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+context:
+  variables: [acidity]
+""",
+            "single-objective",
+        ),
+        (
+            """
+campaign_name: contextual_structured
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+context:
+  variables: [acidity]
+stages:
+  - name: screen
+    variables: [reaction_time]
+""",
+            "structured campaign stages",
+        ),
+        (
+            """
+campaign_name: contextual_fidelity
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: continuous
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.1
+    upper: 1
+context:
+  variables: [acidity]
+fidelity:
+  variable: fidelity
+  target: 1
+bo:
+  acquisition: qmf_kg
+""",
+            "fidelity campaigns",
+        ),
+        (
+            """
+campaign_name: contextual_replicates
+objective:
+  name: yield
+  direction: maximize
+variables:
+  - name: reaction_time
+    type: integer
+    lower: 10
+    upper: 60
+  - name: acidity
+    type: continuous
+    lower: 0
+    upper: 1
+context:
+  variables: [acidity]
+replicates:
+  enabled: true
+""",
+            "replicate campaigns",
+        ),
+    ],
+)
+def test_config_rejects_unsupported_contextual_combinations(
+    tmp_path: Path,
+    yaml_text: str,
+    message: str,
+) -> None:
+    path = write_yaml(tmp_path / "campaign.yaml", yaml_text)
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
 def test_config_from_yaml_parses_replicates(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",

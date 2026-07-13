@@ -154,6 +154,26 @@ bo-forge plot \
   --output /tmp/bo_forge_context_diagnostics.png
 ```
 
+Contextual LogEI campaigns may also use review metadata, deterministic cost,
+or both. Cost expressions are evaluated on the full candidate, including fixed
+context values, and budget accounting is campaign-global across all contexts:
+
+```bash
+bo-forge suggest \
+  --config configs/20_contextual_cost_review_logei.yaml \
+  --log examples/20_contextual_cost_review_campaign_log.csv \
+  --context feedstock_acidity=0.5 \
+  --batch-size 1
+
+bo-forge context-summary \
+  --config configs/20_contextual_cost_review_logei.yaml \
+  --log examples/20_contextual_cost_review_campaign_log.csv
+
+bo-forge cost-summary \
+  --config configs/20_contextual_cost_review_logei.yaml \
+  --log examples/20_contextual_cost_review_campaign_log.csv
+```
+
 For single-objective model profiles, the CSV schema is unchanged. Inspect the
 configured profile and fitting inputs, compare profiles read-only, then export
 model diagnostics. The `last_fit_*` fields are process-local and show

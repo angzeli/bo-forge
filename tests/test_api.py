@@ -83,7 +83,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.2.3"
+    assert payload["version"] == "2.3.0"
     assert payload["experimental"] is True
 
 
@@ -289,6 +289,74 @@ def test_api_contextual_dry_run_accepts_context_values_without_mutating(
     assert payload["staged_bundle"]["context_values"] == {"feedstock_acidity": 0.25}
     assert payload["suggestions"]["records"][0]["feedstock_acidity"] == 0.25
     assert log_path.read_bytes() == before
+
+
+def test_api_contextual_cost_review_round_trip_with_actual_cost(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "20_contextual_cost_review_logei.yaml",
+        "20_contextual_cost_review_campaign_log.csv",
+    )
+    api_client = client(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    dry_run = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={
+            **ref,
+            "batch_size": 1,
+            "context_values": {"feedstock_acidity": 0.5},
+        },
+    )
+    assert dry_run.status_code == 200, dry_run.text
+    payload = dry_run.json()
+    suggestion = payload["suggestions"]["records"][0]
+    assert suggestion["source"] == "cost_log_ei"
+    assert suggestion["review_status"] == "pending"
+    assert suggestion["feedstock_acidity"] == 0.5
+    assert suggestion["cost_estimate"] > 0
+    assert log_path.read_bytes() == before
+
+    append = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": payload["staged_bundle"]},
+    )
+    assert append.status_code == 200, append.text
+    row_id = str(suggestion["row_id"])
+
+    review = api_client.post(
+        "/campaign/review",
+        json={
+            **ref,
+            "row_id": row_id,
+            "decision": "accept",
+            "note": "approved",
+            "expected_log_fingerprint": append.json()["log_fingerprint"],
+        },
+    )
+    assert review.status_code == 200, review.text
+
+    observed = api_client.post(
+        "/campaign/observations",
+        json={
+            **ref,
+            "row_id": row_id,
+            "objective_value": 0.84,
+            "actual_cost": 4.2,
+            "expected_log_fingerprint": review.json()["log_fingerprint"],
+        },
+    )
+    assert observed.status_code == 200, observed.text
+
+    df = pd.read_csv(log_path, keep_default_na=False)
+    row = df.loc[df["row_id"] == row_id].iloc[0]
+    assert row["status"] == "observed"
+    assert row["review_note"] == "approved"
+    assert float(row["yield_score"]) == pytest.approx(0.84)
+    assert float(row["cost_actual"]) == pytest.approx(4.2)
 
 
 def test_api_append_valid_bundle_mutates_through_service(tmp_path: Path) -> None:

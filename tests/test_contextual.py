@@ -164,7 +164,6 @@ def test_context_config_rejects_invalid_definitions(
         ),
         ("stages: [{name: screen, variables: [x]}]", "structured"),
         ("fidelity: {variable: x, target: 1.0}", "fidelity"),
-        ("cost: {expression: '1.0 + x'}", "cost-aware"),
         ("replicates: {enabled: true}", "replicate"),
     ],
 )

@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.2.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.3.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -27,6 +27,12 @@ renders one input per context variable, passes those values to
 `CampaignSession.suggest_next(context_values=...)`, and records the values in
 the staged suggestion bundle before explicit append. Contextual campaigns also
 show Context Summary tables and expose Context Diagnostics in `Reports`.
+
+v2.3.0 extends the contextual Streamlit path to app-created or loaded
+single-objective contextual LogEI configs with optional review metadata,
+deterministic cost, or both. Cost estimates are computed from the full
+candidate, including fixed context values, and the existing cost summary,
+actual-cost entry, cost-progress plot, and review queue controls apply.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -110,7 +116,8 @@ When `Create Campaign` uses `Campaign kind = Contextual LogEI`, the app:
 - writes a top-level `context:` block with `context.variables`;
 - writes `context.default_values` only for defaults enabled in the form;
 - sets `bo.acquisition: log_ei`;
-- leaves multi-objective, structured, multi-fidelity, cost-aware, and
+- optionally writes `review.enabled: true`, deterministic `cost:`, or both;
+- leaves multi-objective, structured, multi-fidelity, qLogNEI/qLogNEHVI, and
   replicate-aware contextual workflows out of scope.
 
 When a loaded config defines `context:`, the app:
@@ -126,10 +133,11 @@ When a loaded config defines `context:`, the app:
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
 
-v2.2.x app support is limited to single-objective contextual LogEI/qLogEI
-campaigns. Contextual multi-objective BO, contextual structured campaigns,
-contextual multi-fidelity, contextual cost-aware, and contextual
-replicate-aware workflows remain deferred.
+v2.3.x app support is limited to single-objective contextual LogEI/qLogEI
+campaigns, with optional review and deterministic cost for LogEI configs.
+Contextual multi-objective BO, contextual structured campaigns, contextual
+multi-fidelity, contextual qLogNEI/qLogNEHVI, and contextual replicate-aware
+workflows remain deferred.
 
 ## 🧠 Model Profiles
 
@@ -145,7 +153,7 @@ offers:
 - `robust`: default fitting path with explicit warning metadata.
 
 Non-default model profiles require supported single-objective configs with
-`bo.acquisition: log_ei` or `qlog_nei` in v2.2.x.
+`bo.acquisition: log_ei` or `qlog_nei` in v2.3.x.
 The app disables non-default profiles for multi-objective, multi-fidelity, and
 structured campaign creation.
 

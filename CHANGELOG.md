@@ -1,5 +1,27 @@
 # 📝 BO Forge Changelog
 
+## v2.3.0 - Contextual Cost, Review, And Tutorial
+
+This patch starts the v2.3 controlled-combinations line by allowing
+single-objective contextual LogEI campaigns to combine with review metadata,
+deterministic cost tracking, or both. It keeps CSV schemas unchanged and
+preserves the v2.2.3 qLogNEI/qLogNEHVI behavior.
+
+- Allows `context:` with `review.enabled: true`, deterministic `cost:`, or
+  both for single-objective `bo.acquisition: log_ei` campaigns.
+- Keeps contextual qLogNEI, contextual qLogNEHVI, contextual multi-objective,
+  structured, multi-fidelity, and replicate-aware workflows rejected.
+- Evaluates deterministic cost on the full candidate, including fixed context
+  variables, and uses campaign-global budget accounting across contexts.
+- Uses `source=cost_log_ei` for model-based contextual cost suggestions.
+- Keeps duplicate detection based on the full design tuple, including context
+  variables.
+- Adds `configs/20_contextual_cost_review_logei.yaml`,
+  `examples/20_contextual_cost_review_campaign_log.csv`, and
+  `notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
+- Updates CLI, session, service, API, and Streamlit coverage for contextual
+  review/cost workflows through existing methods and commands.
+
 ## v2.2.3 - Conservative qLogNEHVI For Coupled Multi-Objective BO
 
 This patch implements the narrow qLogNEHVI scope validated in the v2.2.2

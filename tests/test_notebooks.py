@@ -22,6 +22,9 @@ MULTI_FIDELITY_NOTEBOOK = Path("notebooks/15_multi_fidelity_qmfkg_campaign.ipynb
 CONTEXTUAL_NOTEBOOK = Path("notebooks/16_contextual_logei_campaign.ipynb")
 MODEL_PROFILE_NOTEBOOK = Path("notebooks/17_model_profile_logei_campaign.ipynb")
 QLOG_NEI_NOTEBOOK = Path("notebooks/18_noisy_pending_qlognei_campaign.ipynb")
+CONTEXTUAL_COST_REVIEW_NOTEBOOK = Path(
+    "notebooks/20_contextual_cost_review_logei_campaign.ipynb"
+)
 
 assert NOTEBOOKS, "No notebooks found under notebooks/*.ipynb"
 
@@ -138,6 +141,8 @@ def test_contextual_notebook_uses_existing_logei_assets() -> None:
     assert "TARGET_OBSERVED_ROWS = 15" in source
     assert "CampaignSession.from_files" in source
     assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+    assert "Contextual cost/review support is covered by notebook 20" in source
+    assert "cost-aware, and replicate-aware workflows remain deferred" not in source
 
 
 def test_contextual_tutorial_loop_reaches_target_with_committed_config(
@@ -204,6 +209,89 @@ def test_qlog_nei_notebook_uses_existing_pending_aware_assets() -> None:
     assert "CampaignSession.from_files" in source
     assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
     assert "X_pending" in source
+
+
+def test_contextual_cost_review_notebook_uses_existing_assets() -> None:
+    source = notebook_source(CONTEXTUAL_COST_REVIEW_NOTEBOOK)
+
+    assert "context_summary()" in source
+    assert "cost_summary()" in source
+    assert "plot_context_diagnostics" in source
+    assert "plot_cost_progress" in source
+    assert "configs\" / \"20_contextual_cost_review_logei.yaml" in source
+    assert "examples\" / \"20_contextual_cost_review_campaign_log.csv" in source
+    assert "TARGET_OBSERVED_ROWS = 15" in source
+    assert "CampaignSession.from_files" in source
+    assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+
+
+def test_contextual_cost_review_tutorial_workflow_smoke(tmp_path: Path) -> None:
+    log_path = tmp_path / "20_contextual_cost_review_working_log.csv"
+    latest_path = tmp_path / "20_contextual_cost_review_latest_suggestions.csv"
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    shutil.copyfile("examples/20_contextual_cost_review_campaign_log.csv", log_path)
+    campaign = CampaignSession.from_files(
+        "configs/20_contextual_cost_review_logei.yaml",
+        log_path,
+    )
+
+    def simulate_yield(row: object) -> float:
+        loading = float(row["catalyst_loading"])
+        temperature = float(row["reaction_temperature"])
+        acidity = float(row["feedstock_acidity"])
+        solvent_bonus = {"MeCN": 0.08, "EtOH": 0.03, "Water": -0.04}[str(row["solvent"])]
+        loading_term = 0.95 + 0.75 * loading - 1.10 * (loading - 0.55) ** 2
+        temperature_term = -0.00009 * (temperature - 92.0) ** 2
+        context_term = 0.22 * acidity - 0.35 * (acidity - 0.55) ** 2
+        return round(loading_term + temperature_term + context_term + solvent_bonus, 6)
+
+    def simulate_actual_cost(row: object) -> float:
+        solvent_surcharge = 1.5 if str(row["solvent"]) == "Water" else 0.0
+        return round(
+            1.0
+            + 0.03 * float(row["reaction_temperature"])
+            + solvent_surcharge
+            + 0.8 * float(row["feedstock_acidity"]),
+            6,
+        )
+
+    before = log_path.read_bytes()
+    suggestions = campaign.suggest_next(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.5},
+    )
+    assert log_path.read_bytes() == before
+    suggestions.to_csv(latest_path, index=False)
+    campaign.append_suggestions(suggestions)
+    row_id = str(suggestions.loc[0, "row_id"])
+    campaign.review_suggestion(row_id, "accept", note="tutorial approval")
+    row = campaign.df.loc[campaign.df["row_id"] == row_id].iloc[0]
+    campaign.mark_observed(
+        row_id=row_id,
+        objective_value=simulate_yield(row),
+        actual_cost=simulate_actual_cost(row),
+    )
+
+    campaign = CampaignSession.from_files(
+        "configs/20_contextual_cost_review_logei.yaml",
+        log_path,
+    )
+    campaign.validate()
+    campaign.context_summary()
+    campaign.cost_summary()
+    campaign.plot_context_diagnostics(
+        save_path=report_dir / "20_contextual_cost_review_context.png"
+    )
+    campaign.plot_cost_progress(save_path=report_dir / "20_contextual_cost_review_cost.png")
+    campaign.export_report(report_dir / "20_contextual_cost_review_report.md")
+
+    assert len(campaign.observed_data()) == 5
+    assert latest_path.exists()
+    assert (report_dir / "20_contextual_cost_review_context.png").exists()
+    assert (report_dir / "20_contextual_cost_review_cost.png").exists()
+    assert (report_dir / "20_contextual_cost_review_report.md").exists()
+    plt.close("all")
 
 
 def test_model_profile_tutorial_workflow_smoke(tmp_path: Path) -> None:

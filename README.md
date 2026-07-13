@@ -1,12 +1,13 @@
-# 🧪 BO Forge v2.2.3
+# 🧪 BO Forge v2.3.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.2.3 continues the noisy and pending-aware BO line by keeping conservative
-single-objective qLogNEI support stable and adding narrow coupled
-multi-objective qLogNEHVI support. qLogNEHVI is supported only for coupled
-`2 <= m <= 4` objective campaigns without cost, replicates, structured stages,
-context, or multi-fidelity.
+v2.3.0 starts the controlled feature-combination line by allowing
+single-objective contextual LogEI campaigns to combine with review metadata,
+deterministic cost, or both. Context variables remain ordinary CSV columns,
+cost is evaluated on the full fixed-context candidate, and contextual
+qLogNEI/qLogNEHVI, multi-objective, structured, multi-fidelity, and replicate
+combinations remain deferred.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -36,7 +37,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, cost-aware, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, contextual qLogNEI/qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, qLogNEI/qLogNEHVI, or replicate-aware workflows, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -174,6 +175,14 @@ suggestions with accepted pending review rows passed as `X_pending`. The
 implementation scope and deferred combinations are documented in
 `docs/QLOGNEHVI_FEASIBILITY.md`.
 
+The bundled contextual cost-review example is
+`configs/20_contextual_cost_review_logei.yaml` with seed log
+`examples/20_contextual_cost_review_campaign_log.csv`. It demonstrates
+single-objective contextual LogEI with optional review, deterministic cost,
+campaign-global budget accounting across contexts, and `source=cost_log_ei`
+model-based suggestions. The tutorial walkthrough is
+`notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
+
 ---
 
 ## 🗂️ Repository Structure
@@ -218,7 +227,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.2.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.3.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

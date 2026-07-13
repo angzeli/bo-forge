@@ -10,6 +10,7 @@ from bo_forge.config import (
     BOConfig,
     CampaignConfig,
     ConstraintConfig,
+    ContextConfig,
     CostConfig,
     FidelityConfig,
     ModelConfig,
@@ -19,6 +20,7 @@ from bo_forge.config import (
     StageConfig,
     VariableConfig,
 )
+from bo_forge.costs import evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed
@@ -323,6 +325,48 @@ def cost_review_mixed_config(
     )
 
 
+def contextual_cost_review_config(
+    *,
+    batch_size: int = 1,
+    initial_design_size: int = 4,
+    budget: float | None = 90.0,
+) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="contextual_cost_review",
+        objective=ObjectiveConfig(name="yield_score", direction="maximize"),
+        variables=(
+            VariableConfig("catalyst_loading", "continuous", 0.0, 1.0),
+            VariableConfig("reaction_temperature", "integer", 60, 120),
+            VariableConfig("solvent", "categorical", values=("MeCN", "EtOH", "Water")),
+            VariableConfig("feedstock_acidity", "continuous", 0.0, 1.0),
+        ),
+        bo=BOConfig(
+            batch_size=batch_size,
+            initial_design_size=initial_design_size,
+            acquisition="log_ei",
+            random_seed=23,
+            raw_samples=8,
+            num_restarts=1,
+            mc_samples=8,
+        ),
+        cost=CostConfig(
+            expression=(
+                "1.0 + 0.03 * reaction_temperature + "
+                "1.5 * (solvent == 'Water') + 0.8 * feedstock_acidity"
+            ),
+            weight=0.35,
+            budget=budget,
+            candidate_pool_size=12,
+            top_k=6,
+        ),
+        review=ReviewConfig(enabled=True),
+        context=ContextConfig(
+            variables=("feedstock_acidity",),
+            default_values={"feedstock_acidity": 0.5},
+        ),
+    )
+
+
 def replicate_config(
     initial_design_size: int = 3,
     *,
@@ -460,6 +504,48 @@ def cost_review_mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
                 "dose": dose,
                 "solvent": solvent,
                 "score": score,
+                "cost_estimate": cost_estimate,
+                "cost_actual": cost_actual,
+                "predicted_mean": "",
+                "predicted_std": "",
+                "acquisition": "",
+                "utility": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+def contextual_cost_review_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
+    rows = []
+    for index, (
+        loading,
+        temperature,
+        solvent,
+        acidity,
+        yield_score,
+        cost_estimate,
+        cost_actual,
+    ) in enumerate(
+        [
+            (0.20, 70, "MeCN", 0.25, 0.64, 3.3, 3.4),
+            (0.55, 90, "EtOH", 0.25, 0.83, 3.9, 3.8),
+            (0.35, 100, "Water", 0.65, 0.60, 6.02, 6.1),
+            (0.75, 110, "MeCN", 0.65, 0.78, 4.82, 4.9),
+        ]
+    ):
+        rows.append(
+            {
+                "row_id": f"ctx_cost_obs_{index}",
+                "iteration": 0,
+                "status": "observed",
+                "source": "manual",
+                "review_status": "accepted",
+                "review_note": "",
+                "catalyst_loading": loading,
+                "reaction_temperature": temperature,
+                "solvent": solvent,
+                "feedstock_acidity": acidity,
+                "yield_score": yield_score,
                 "cost_estimate": cost_estimate,
                 "cost_actual": cost_actual,
                 "predicted_mean": "",
@@ -1931,6 +2017,28 @@ def test_cost_aware_initial_suggestions_fill_cost_but_not_utility() -> None:
     assert suggestions["utility"].astype(str).eq("").all()
 
 
+def test_contextual_cost_review_initial_suggestion_fills_context_cost_and_review() -> None:
+    cfg = contextual_cost_review_config(initial_design_size=4)
+    df = empty_campaign_log(cfg)
+
+    suggestions = suggest_next(
+        cfg,
+        df,
+        context_values={"feedstock_acidity": 0.75},
+    )
+
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "sobol"
+    assert suggestions.loc[0, "review_status"] == "pending"
+    assert float(suggestions.loc[0, "feedstock_acidity"]) == pytest.approx(0.75)
+    candidate = tuple(suggestions.loc[0, cfg.variable_names])
+    assert float(suggestions.loc[0, "cost_estimate"]) == pytest.approx(
+        evaluate_cost(cfg, candidate)
+    )
+    assert suggestions.loc[0, "cost_actual"] == ""
+    assert suggestions.loc[0, "utility"] == ""
+
+
 def test_cost_aware_model_suggestions_fill_cost_and_utility() -> None:
     cfg = cost_review_mixed_config(batch_size=1, initial_design_size=3)
     df = cost_review_mixed_observed_log(cfg)
@@ -1944,6 +2052,46 @@ def test_cost_aware_model_suggestions_fill_cost_and_utility() -> None:
     cost_estimate = float(suggestions.loc[0, "cost_estimate"])
     utility = float(suggestions.loc[0, "utility"])
     assert utility == pytest.approx(acquisition - cfg.cost.weight * cost_estimate)
+
+
+def test_contextual_cost_review_model_suggestion_uses_fixed_context_and_cost() -> None:
+    cfg = contextual_cost_review_config(initial_design_size=4)
+    df = contextual_cost_review_observed_log(cfg)
+    before = df.copy(deep=True)
+
+    suggestions = suggest_next(
+        cfg,
+        df,
+        context_values={"feedstock_acidity": 0.5},
+    )
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == 1
+    assert suggestions.loc[0, "source"] == "cost_log_ei"
+    assert suggestions.loc[0, "review_status"] == "pending"
+    assert float(suggestions.loc[0, "feedstock_acidity"]) == pytest.approx(0.5)
+    candidate = tuple(suggestions.loc[0, cfg.variable_names])
+    cost_estimate = float(suggestions.loc[0, "cost_estimate"])
+    acquisition = float(suggestions.loc[0, "acquisition"])
+    utility = float(suggestions.loc[0, "utility"])
+    assert cost_estimate == pytest.approx(evaluate_cost(cfg, candidate))
+    assert utility == pytest.approx(acquisition - cfg.cost.weight * cost_estimate)
+
+
+def test_contextual_cost_aware_model_path_requires_resolved_context_values() -> None:
+    cfg = contextual_cost_review_config(initial_design_size=4)
+    df = contextual_cost_review_observed_log(cfg)
+
+    with pytest.raises(
+        SuggestionError,
+        match="Contextual cost-aware suggestions require resolved context values",
+    ):
+        suggestions_module._suggest_cost_aware_model_based(
+            config=cfg,
+            df=df,
+            observed_df=df,
+            batch_size=1,
+        )
 
 
 def test_cost_aware_candidate_pool_falls_back_to_sobol_when_optimizer_fails(
@@ -1964,6 +2112,41 @@ def test_cost_aware_candidate_pool_falls_back_to_sobol_when_optimizer_fails(
     assert suggestions.loc[0, "review_status"] == "pending"
     assert float(suggestions.loc[0, "cost_estimate"]) > 0
     assert suggestions.loc[0, "solvent"] in {"MeCN", "EtOH"}
+
+
+def test_contextual_cost_duplicate_detection_uses_full_context_tuple(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = contextual_cost_review_config(initial_design_size=4)
+    df = contextual_cost_review_observed_log(cfg)
+    same_decision_different_context = (0.20, 70, "MeCN", 0.75)
+
+    def candidate_pool(*args, **kwargs):
+        return [
+            (0.20, 70, "MeCN", 0.25),
+            same_decision_different_context,
+        ]
+
+    def score_candidate(*, config, model, acquisition, candidate, cost_estimate):
+        return {
+            "candidate": candidate,
+            "cost_estimate": cost_estimate,
+            "acquisition": 2.0,
+            "utility": 2.0 - config.cost.weight * cost_estimate,
+            "predicted_mean": 0.8,
+            "predicted_std": 0.1,
+        }
+
+    monkeypatch.setattr(suggestions_module, "_cost_aware_candidate_pool", candidate_pool)
+    monkeypatch.setattr(suggestions_module, "_score_cost_aware_candidate", score_candidate)
+
+    suggestions = suggest_next(
+        cfg,
+        df,
+        context_values={"feedstock_acidity": 0.75},
+    )
+
+    assert tuple(suggestions.loc[0, cfg.variable_names]) == same_decision_different_context
 
 
 @pytest.mark.parametrize(

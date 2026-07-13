@@ -156,7 +156,8 @@ The repository also includes:
 - `configs/16_contextual_logei.yaml` as a single-objective contextual LogEI example with `feedstock_acidity` fixed at suggestion time, paired with `notebooks/16_contextual_logei_campaign.ipynb`,
 - `configs/17_model_profile_logei.yaml` as a single-objective model-profile example paired with `notebooks/17_model_profile_logei_campaign.ipynb`,
 - `configs/18_noisy_pending_qlognei.yaml` as a single-objective qLogNEI example with accepted pending review suggestions, paired with `notebooks/18_noisy_pending_qlognei_campaign.ipynb`,
-- and `configs/19_multi_objective_qlognehvi.yaml` as a coupled multi-objective qLogNEHVI example with accepted pending review suggestions.
+- `configs/19_multi_objective_qlognehvi.yaml` as a coupled multi-objective qLogNEHVI example with accepted pending review suggestions,
+- and `configs/20_contextual_cost_review_logei.yaml` as a contextual cost-review LogEI example paired with `notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

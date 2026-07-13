@@ -579,12 +579,56 @@ def _render_create_new_campaign(st: Any) -> None:
         elif is_contextual:
             _render_section_label(st, "Context")
             context_settings = _collect_new_campaign_context_settings(st, variables)
+            _render_section_label(st, "Contextual review and cost")
+            review_enabled = st.checkbox(
+                "Enable review",
+                value=False,
+                key="new_campaign_review_enabled_contextual",
+                help="Optional review metadata is supported for contextual LogEI campaigns.",
+            )
+            cost_enabled = st.checkbox(
+                "Enable deterministic cost",
+                value=False,
+                key="new_campaign_cost_enabled_contextual",
+                help=(
+                    "Optional deterministic cost uses the full candidate, including "
+                    "fixed context values, and keeps a campaign-global budget."
+                ),
+            )
+            if cost_enabled:
+                cost_col_1, cost_col_2, cost_col_3 = st.columns(3)
+                with cost_col_1:
+                    cost_expression = st.text_input(
+                        "Cost expression",
+                        value="1.0",
+                        key="new_campaign_contextual_cost_expression",
+                    )
+                with cost_col_2:
+                    cost_weight = st.number_input(
+                        "Cost weight",
+                        min_value=0.0,
+                        value=1.0,
+                        key="new_campaign_contextual_cost_weight",
+                    )
+                with cost_col_3:
+                    cost_budget = st.number_input(
+                        "Budget",
+                        min_value=0.0,
+                        value=100.0,
+                        key="new_campaign_contextual_cost_budget",
+                    )
+                cost_settings = {
+                    "expression": cost_expression,
+                    "weight": float(cost_weight),
+                    "budget": float(cost_budget),
+                }
             _render_artifact_note(
                 st,
                 "Contextual scope",
-                "Generated YAML uses bo.acquisition=log_ei. Contextual multi-objective, "
-                "structured, multi-fidelity, cost-aware, and replicate-aware workflows "
-                "remain out of scope.",
+                "Generated YAML uses bo.acquisition=log_ei. Contextual review, "
+                "deterministic cost, or both are supported. Contextual multi-objective, "
+                "structured, multi-fidelity, qLogNEI/qLogNEHVI, and replicate-aware "
+                "workflows remain out of scope.",
             )
         generated_yaml = build_campaign_yaml_text(
             campaign_name=campaign_name,

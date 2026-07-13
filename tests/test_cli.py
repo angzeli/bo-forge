@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.2.3\n"
+    assert captured.out == "bo-forge 2.3.0\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.2.3\n"
+    assert completed.stdout == "bo-forge 2.3.0\n"
     assert completed.stderr == ""
 
 
@@ -1142,6 +1142,84 @@ def test_contextual_suggest_accepts_context_value(
     assert "Generated 1 suggestion(s)." in captured.out
     suggestions = pd.read_csv(output_path, keep_default_na=False)
     assert suggestions["feedstock_acidity"].astype(float).tolist() == [pytest.approx(0.25)]
+
+
+def test_contextual_cost_review_cli_round_trip_with_actual_cost(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/20_contextual_cost_review_logei.yaml")
+    cfg = CampaignConfig.from_yaml(config_path)
+    log_path = tmp_path / "contextual_cost_review.csv"
+    pd.read_csv(
+        "examples/20_contextual_cost_review_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert (
+        run(
+            [
+                "suggest",
+                *base_args(config_path, log_path),
+                "--context",
+                "feedstock_acidity=0.5",
+                "--append",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert f"Appended suggestions to campaign log: {log_path}" in captured.out
+    pending = pd.read_csv(log_path, keep_default_na=False)
+    suggested = pending.loc[pending["status"] == "suggested"].iloc[0]
+    row_id = str(suggested["row_id"])
+    assert suggested["source"] == "cost_log_ei"
+    assert suggested["review_status"] == "pending"
+    assert float(suggested["feedstock_acidity"]) == pytest.approx(0.5)
+    assert float(suggested["cost_estimate"]) > 0
+
+    assert (
+        run(
+            [
+                "review",
+                *base_args(config_path, log_path),
+                "--row-id",
+                row_id,
+                "--decision",
+                "accept",
+                "--note",
+                "approved",
+            ]
+        )
+        == 0
+    )
+    assert (
+        run(
+            [
+                "mark-observed",
+                *base_args(config_path, log_path),
+                "--row-id",
+                row_id,
+                "--objective-value",
+                "0.84",
+                "--actual-cost",
+                "4.2",
+            ]
+        )
+        == 0
+    )
+
+    df = load_campaign_log(log_path, cfg)
+    observed = df.loc[df["row_id"] == row_id].iloc[0]
+    assert observed["status"] == "observed"
+    assert observed["review_note"] == "approved"
+    assert float(observed["yield_score"]) == pytest.approx(0.84)
+    assert float(observed["cost_actual"]) == pytest.approx(4.2)
+
+    assert run(["context-summary", *base_args(config_path, log_path)]) == 0
+    assert "feedstock_acidity=0.5" in capsys.readouterr().out
+    assert run(["cost-summary", *base_args(config_path, log_path)]) == 0
+    assert "budget_remaining" in capsys.readouterr().out
 
 
 def test_contextual_suggest_missing_context_does_not_append(

@@ -309,8 +309,16 @@ their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
 `notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
 create `Campaign kind = Contextual LogEI` configs with selected context
-variables and optional defaults. In v1.5.x, `context:` cannot be combined with
-`objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates.enabled: true`.
+variables and optional defaults. In v2.3.0, single-objective contextual
+`bo.acquisition: log_ei` campaigns can combine `context:` with review metadata,
+deterministic `cost:`, or both. Contextual qLogNEI/qLogNEHVI,
+multi-objective, structured, multi-fidelity, and replicate-aware workflows
+remain deferred.
+
+The contextual cost-review example is
+`configs/20_contextual_cost_review_logei.yaml` with seed log
+`examples/20_contextual_cost_review_campaign_log.csv` and tutorial notebook
+`notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
 
 ## 🧠 Model Profiles
 
@@ -326,7 +334,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.2.3; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.0; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -535,10 +543,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/17_model_profile_logei.yaml`: demonstrates single-objective model-profile diagnostics.
 - `configs/18_noisy_pending_qlognei.yaml`: demonstrates single-objective qLogNEI with accepted pending review suggestions.
 - `configs/19_multi_objective_qlognehvi.yaml`: demonstrates coupled multi-objective qLogNEHVI with accepted pending review suggestions.
+- `configs/20_contextual_cost_review_logei.yaml`: demonstrates contextual LogEI with review metadata, deterministic cost, and campaign-global budget accounting.
 
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

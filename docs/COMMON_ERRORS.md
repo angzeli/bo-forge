@@ -132,16 +132,19 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v1.5.x contextual BO support is deliberately conservative.
+v2.3.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
+campaigns to combine `context:` with `review.enabled: true`, deterministic
+`cost:`, or both.
 
 Fix: do not combine `context:` with `objectives:`, `stages:`, `fidelity:`,
-`cost:`, or `replicates.enabled: true`. Contextual multi-objective,
-structured, multi-fidelity, cost-aware, and replicate-aware workflows remain
+`replicates.enabled: true`, `bo.acquisition: qlog_nei`, or
+`bo.acquisition: qlog_nehvi`. Contextual multi-objective, structured,
+multi-fidelity, replicate-aware, qLogNEI, and qLogNEHVI workflows remain
 deferred.
 
 ### `Non-default model profiles ...`
 
-v2.2.x model profiles are deliberately conservative.
+v2.3.x model profiles are deliberately conservative.
 
 Fix: use `model.profile: smooth`, `rough`, or `robust` only for
 single-objective campaigns configured with `bo.acquisition: log_ei` or
@@ -151,7 +154,7 @@ campaigns.
 
 ### `bo.acquisition='qlog_nei' cannot be combined with ...`
 
-v2.2.x qLogNEI support is deliberately conservative.
+v2.3.x qLogNEI support is deliberately conservative.
 
 Fix: use `bo.acquisition: qlog_nei` only for single-objective, non-structured,
 non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
@@ -159,7 +162,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.2.3 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.3.0 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`

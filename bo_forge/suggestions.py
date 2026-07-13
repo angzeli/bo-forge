@@ -227,6 +227,7 @@ def suggest_next(
             df=df,
             observed_df=observed_df,
             batch_size=requested_batch_size,
+            context_values=resolved_context,
         )
 
     if uses_qlog_nei:
@@ -1286,9 +1287,18 @@ def _suggest_cost_aware_model_based(
     df: pd.DataFrame,
     observed_df: pd.DataFrame,
     batch_size: int,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame:
+    if config.context is not None and context_values is None:
+        raise SuggestionError(
+            "Contextual cost-aware suggestions require resolved context values."
+        )
     torch.manual_seed(config.bo.random_seed)
-    combination_count = categorical_combination_count(config)
+    combination_count = (
+        contextual_categorical_combination_count(config)
+        if config.context is not None
+        else categorical_combination_count(config)
+    )
     if combination_count > MAX_CATEGORICAL_COMBINATIONS:
         raise SuggestionError(
             "Cost-aware mixed-variable suggestions support at most "
@@ -1299,7 +1309,11 @@ def _suggest_cost_aware_model_based(
     model = fit_gp_model(config, observed_df)
     _, train_y_model = dataframe_to_tensors(config, observed_df)
     acquisition = LogExpectedImprovement(model=model, best_f=train_y_model.max())
-    fixed_features_list = categorical_feature_assignments(config)
+    fixed_features_list = (
+        contextual_fixed_feature_assignments(config, context_values or {})
+        if config.context is not None
+        else categorical_feature_assignments(config)
+    )
     remaining_budget = budget_remaining(config, df)
     selected: list[tuple[object, ...]] = []
     rows = []
@@ -1316,6 +1330,7 @@ def _suggest_cost_aware_model_based(
             selected=selected,
             remaining_budget=remaining_budget,
             attempt_offset=batch_index,
+            context_values=context_values,
         )
         if remaining_budget is not None:
             remaining_budget -= chosen["cost_estimate"]
@@ -1351,6 +1366,7 @@ def _choose_cost_aware_candidate(
     selected: list[tuple[object, ...]],
     remaining_budget: float | None,
     attempt_offset: int,
+    context_values: dict[str, object] | None = None,
 ) -> dict[str, object]:
     rejection_message = "no cost-aware candidates were evaluated"
     for attempt in range(MAX_DECODE_RETRIES):
@@ -1361,6 +1377,7 @@ def _choose_cost_aware_candidate(
             train_y_model=train_y_model,
             fixed_features_list=fixed_features_list,
             attempt=attempt_offset * 101 + attempt,
+            context_values=context_values,
         )
         seen: set[tuple[object, ...]] = set()
         scored_candidates: list[dict[str, object]] = []
@@ -1419,6 +1436,7 @@ def _cost_aware_candidate_pool(
     train_y_model: torch.Tensor,
     fixed_features_list: list[dict[int, float]],
     attempt: int,
+    context_values: dict[str, object] | None = None,
 ) -> list[tuple[object, ...]]:
     candidates: list[tuple[object, ...]] = []
     try:
@@ -1433,7 +1451,13 @@ def _cost_aware_candidate_pool(
     except (BotorchError, RuntimeError, ValueError):
         pass
     else:
-        candidates.extend(unit_cube_to_user_values(config, x_unit_raw))
+        candidates.extend(
+            _apply_context_to_candidates(
+                config,
+                unit_cube_to_user_values(config, x_unit_raw),
+                context_values,
+            )
+        )
 
     assert config.cost is not None
     pool_size = config.cost.candidate_pool_size
@@ -1443,8 +1467,27 @@ def _cost_aware_candidate_pool(
         seed=config.bo.random_seed + 7919 + attempt,
     )
     sobol = engine.draw(pool_size).to(dtype=torch.double)
-    candidates.extend(unit_cube_to_user_values(config, sobol))
+    candidates.extend(
+        _apply_context_to_candidates(
+            config,
+            unit_cube_to_user_values(config, sobol),
+            context_values,
+        )
+    )
     return candidates
+
+
+def _apply_context_to_candidates(
+    config: CampaignConfig,
+    candidates: list[tuple[object, ...]],
+    context_values: dict[str, object] | None,
+) -> list[tuple[object, ...]]:
+    if not context_values:
+        return candidates
+    return [
+        apply_context_to_candidate(config, candidate, context_values)
+        for candidate in candidates
+    ]
 
 
 def _score_cost_aware_candidate(

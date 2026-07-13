@@ -15,8 +15,10 @@ When `review.enabled: true`, add `review_status,review_note` immediately after `
 When `replicates.enabled: true`, add `replicate_group,replicate_index` immediately after `source`, after `stage`, or after the review columns when review is also enabled.
 
 When `cost` is configured, add `cost_estimate,cost_actual` immediately after
-the objective column and add `utility` immediately after `acquisition`. In
-v1.5.0, `stages:` cannot be combined with `cost:`.
+the objective column and add `utility` immediately after `acquisition`.
+Contextual cost campaigns use the same columns; context variables remain normal
+variable columns and cost is evaluated on the full candidate, including fixed
+context values. `stages:` cannot be combined with `cost:` in v2.3.0.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -57,7 +59,7 @@ row_id,iteration,status,source,precursor_ratio,annealing_temperature,activity,pr
 | `row_id` | Yes | Unique row identifier. Suggestions keep the same `row_id` when marked observed. |
 | `iteration` | Yes | Non-negative integer campaign iteration. New suggestions use the next iteration. |
 | `status` | Yes | Either `suggested` or `observed`. |
-| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `cost_log_ei`, `qmf_kg`, `qlog_ehvi`, or `cost_qlog_ehvi` where supported by the config. |
+| `source` | Yes | One of `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `cost_log_ei`, `qmf_kg`, `qlog_ehvi`, `qlog_nehvi`, or `cost_qlog_ehvi` where supported by the config. |
 | `stage` | If `stages:` configured | One configured stage name. Structured logs place this column immediately after `source`. |
 | `review_status` | If review enabled | One of `pending`, `accepted`, `rejected`, or `deferred`. |
 | `review_note` | If review enabled | Optional one-line human note. Newlines are rejected. |
@@ -127,7 +129,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v1.5.0.
+- `stages:` cannot be combined with `cost:` in v2.3.0.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -184,7 +186,7 @@ with `objectives:`, `stages:`, `cost:`, or `replicates.enabled: true`.
 
 ## 🌐 Contextual BO Rules
 
-v1.5.x adds a conservative single-objective contextual LogEI/qLogEI workflow:
+v2.3.0 supports a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -207,12 +209,17 @@ Rules:
   different context is a distinct design;
 - constraints are evaluated against the full candidate, including fixed context
   values.
+- single-objective contextual `bo.acquisition: log_ei` campaigns may combine
+  `context:` with review metadata, deterministic `cost:`, or both;
+- contextual cost suggestions evaluate cost on the full candidate, including
+  fixed context variables, and use campaign-global budget accounting;
 - `context_summary()`, `bo-forge context-summary`, and
   `bo-forge plot --kind context-diagnostics` inspect the same CSV rows and do
   not add schema columns.
 
-Unsupported v1.5.x combinations are intentional: `context:` cannot be combined
-with `objectives:`, `stages:`, `fidelity:`, `cost:`, or `replicates:`.
+Unsupported contextual combinations remain intentional: `context:` cannot be
+combined with `objectives:`, `stages:`, `fidelity:`, `replicates:`,
+`bo.acquisition: qlog_nei`, or `bo.acquisition: qlog_nehvi`.
 
 ## 🔁 Suggested To Observed Transition
 
@@ -295,7 +302,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.2.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.3.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -333,7 +340,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.2.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.3.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -365,7 +372,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.2.3.
+and structured campaigns in v2.3.0.
 
 ## 🧪 Variable Value Rules
 

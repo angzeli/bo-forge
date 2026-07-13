@@ -832,6 +832,73 @@ def test_context_summary_and_report_include_context_section() -> None:
     assert "feedstock_acidity=0.3" in text
 
 
+def test_contextual_cost_review_report_includes_context_and_cost_sections() -> None:
+    campaign = CampaignSession.from_files(
+        "configs/20_contextual_cost_review_logei.yaml",
+        "examples/20_contextual_cost_review_campaign_log.csv",
+    )
+
+    context = campaign.context_summary()
+    cost = campaign.cost_summary()
+    report = campaign.report()
+    text = session_module._format_campaign_report(report)
+
+    assert "context_summary" in report
+    assert "cost_summary" in report
+    assert context["context_key"].tolist() == [
+        "feedstock_acidity=0.25",
+        "feedstock_acidity=0.65",
+    ]
+    assert summary_value(cost, "budget") == pytest.approx(90.0)
+    assert "Context Summary\n---------------" in text
+    assert "Cost Summary\n------------" in text
+
+
+def test_contextual_cost_review_cost_summary_reserves_accepted_pending_cost(
+    tmp_path: Path,
+) -> None:
+    config_path = Path("configs/20_contextual_cost_review_logei.yaml")
+    log_path = tmp_path / "contextual_cost_review.csv"
+    df = pd.read_csv(
+        "examples/20_contextual_cost_review_campaign_log.csv",
+        keep_default_na=False,
+    )
+    accepted_pending = {
+        "row_id": "ctx_cost_pending_0",
+        "iteration": 1,
+        "status": "suggested",
+        "source": "cost_log_ei",
+        "review_status": "accepted",
+        "review_note": "approved",
+        "catalyst_loading": 0.4,
+        "reaction_temperature": 80,
+        "solvent": "EtOH",
+        "feedstock_acidity": 0.5,
+        "yield_score": "",
+        "cost_estimate": 3.8,
+        "cost_actual": "",
+        "predicted_mean": 0.7,
+        "predicted_std": 0.05,
+        "acquisition": 0.1,
+        "utility": -1.23,
+    }
+    df = pd.concat([df, pd.DataFrame([accepted_pending])], ignore_index=True)
+    df.to_csv(log_path, index=False)
+    campaign = CampaignSession.from_files(config_path, log_path)
+
+    values = dict(
+        zip(
+            campaign.cost_summary()["field"],
+            campaign.cost_summary()["value"],
+            strict=True,
+        )
+    )
+
+    assert values["total_observed_cost"] == pytest.approx(18.2)
+    assert values["accepted_pending_cost"] == pytest.approx(3.8)
+    assert values["budget_remaining"] == pytest.approx(68.0)
+
+
 def test_contextual_report_handles_pending_only_log(tmp_path: Path) -> None:
     cfg = CampaignConfig.from_yaml("configs/16_contextual_logei.yaml")
     pending = {

@@ -47,6 +47,10 @@ Confirm:
 - `configs/19_multi_objective_qlognehvi.yaml` and
   `examples/19_multi_objective_qlognehvi_campaign_log.csv` validate and are
   included in the source distribution.
+- `configs/20_contextual_cost_review_logei.yaml`,
+  `examples/20_contextual_cost_review_campaign_log.csv`, and
+  `notebooks/20_contextual_cost_review_logei_campaign.ipynb` validate and are
+  included in the source distribution.
 
 ## 📦 Build
 
@@ -72,7 +76,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.2.3-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.3.0-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -89,7 +93,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.2.3-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.3.0-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -106,7 +110,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.2.3-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.3.0-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -119,7 +123,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.2.3.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.3.0.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -171,6 +175,10 @@ Confirm the full local loop still works:
 - load `configs/16_contextual_logei.yaml`, generate a dry-run contextual
   suggestion with `feedstock_acidity`, and confirm append is blocked if the
   context value changes after staging;
+- load `configs/20_contextual_cost_review_logei.yaml`, generate a contextual
+  cost-aware dry-run suggestion, review/observe it with `actual_cost`, and
+  confirm Context Summary, Cost Summary, Context Diagnostics, and Cost Progress
+  remain available;
 - generate staged suggestions;
 - append;
 - mark observed;
@@ -181,8 +189,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.2.3`.
-- Tag the release as `v2.2.3`.
+  install paths, and the release tag all agree on `v2.3.0`.
+- Tag the release as `v2.3.0`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

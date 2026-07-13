@@ -569,6 +569,44 @@ def test_app_service_context_summary_and_diagnostics_plot_routing(tmp_path: Path
     plt.close(result.figure)
 
 
+def test_app_service_contextual_cost_review_round_trip(tmp_path: Path) -> None:
+    log_path = copy_example_log(tmp_path, "20_contextual_cost_review_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "20_contextual_cost_review_logei.yaml",
+        log_path,
+    )
+    context_values = {"feedstock_acidity": 0.5}
+    before = log_path.read_bytes()
+
+    result = service.suggest_dry_run(batch_size=1, context_values=context_values)
+
+    assert log_path.read_bytes() == before
+    assert result.suggestions.loc[0, "source"] == "cost_log_ei"
+    assert result.suggestions.loc[0, "review_status"] == "pending"
+    assert float(result.suggestions.loc[0, "feedstock_acidity"]) == pytest.approx(0.5)
+    assert float(result.suggestions.loc[0, "cost_estimate"]) > 0
+    assert result.bundle["context_values"] == context_values
+
+    append = service.append_staged(result.bundle, context_values=context_values)
+    row_id = str(result.suggestions.loc[0, "row_id"])
+    append.service.review(row_id, "accept", "approved")
+    append.service.mark_observed(row_id, objective_value=0.84, actual_cost=4.2)
+    refreshed = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "20_contextual_cost_review_logei.yaml",
+        log_path,
+    )
+    row = refreshed.df.loc[refreshed.df["row_id"] == row_id].iloc[0]
+
+    assert row["status"] == "observed"
+    assert row["review_note"] == "approved"
+    assert float(row["yield_score"]) == pytest.approx(0.84)
+    assert float(row["cost_actual"]) == pytest.approx(4.2)
+    assert "context_diagnostics" in refreshed.available_plot_kinds()
+    assert "cost_progress" in refreshed.available_plot_kinds()
+    assert refreshed.collect_view_data("Overview").context_summary is not None
+    assert refreshed.collect_view_data("Overview").cost_summary is not None
+
+
 def test_app_service_model_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:
     log_path = copy_example_log(tmp_path, "17_model_profile_campaign_log.csv")
     service = CampaignAppService.load(

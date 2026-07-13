@@ -1,0 +1,45 @@
+campaign_name: contextual_cost_review_logei
+objective:
+  name: yield_score
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+  - name: reaction_temperature
+    type: integer
+    lower: 60
+    upper: 120
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH, Water]
+  - name: feedstock_acidity
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.5
+constraints:
+  - name: acidity_loading_window
+    expression: catalyst_loading + feedstock_acidity <= 1.55
+cost:
+  expression: "1.0 + 0.03 * reaction_temperature + 1.5 * (solvent == 'Water') + 0.8 * feedstock_acidity"
+  weight: 0.35
+  budget: 90.0
+  candidate_pool_size: 96
+  top_k: 16
+review:
+  enabled: true
+bo:
+  batch_size: 1
+  initial_design_size: 4
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 23
+  raw_samples: 32
+  num_restarts: 2
+  mc_samples: 32
+  min_normalized_distance: 0.0
