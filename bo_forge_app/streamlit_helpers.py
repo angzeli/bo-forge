@@ -100,6 +100,7 @@ def build_campaign_yaml_text(
     objectives: list[dict[str, object]] | None = None,
     review_enabled: bool = False,
     replicates_enabled: bool = False,
+    replicates: dict[str, object] | None = None,
     cost: dict[str, object] | None = None,
     fidelity: dict[str, object] | None = None,
     context: dict[str, object] | None = None,
@@ -140,7 +141,9 @@ def build_campaign_yaml_text(
         raw["bo"].update(bo_overrides)
     if review_enabled:
         raw["review"] = {"enabled": True}
-    if replicates_enabled:
+    if replicates is not None:
+        raw["replicates"] = replicates
+    elif replicates_enabled:
         raw["replicates"] = {"enabled": True}
     if cost is not None:
         raw["cost"] = cost

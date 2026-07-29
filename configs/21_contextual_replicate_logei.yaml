@@ -1,0 +1,52 @@
+campaign_name: contextual_replicate_logei
+objective:
+  name: yield_score
+  direction: maximize
+variables:
+  - name: catalyst_loading
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+  - name: reaction_temperature
+    type: integer
+    lower: 60
+    upper: 120
+  - name: solvent
+    type: categorical
+    values: [MeCN, EtOH, Water]
+  - name: feedstock_acidity
+    type: continuous
+    lower: 0.0
+    upper: 1.0
+context:
+  variables: [feedstock_acidity]
+  default_values:
+    feedstock_acidity: 0.25
+constraints:
+  - name: acidity_loading_window
+    expression: catalyst_loading + feedstock_acidity <= 1.55
+cost:
+  expression: "1.0 + 0.03 * reaction_temperature + 1.5 * (solvent == 'Water') + 0.8 * feedstock_acidity"
+  weight: 0.35
+  budget: 90.0
+  candidate_pool_size: 32
+  top_k: 8
+review:
+  enabled: true
+replicates:
+  enabled: true
+  suggestion_policy: uncertain_best
+  replicate_threshold: 0.10
+  min_repeats_at_best: 3
+  max_repeats_per_group: 5
+  noise_floor: 1.0e-8
+bo:
+  batch_size: 2
+  initial_design_size: 4
+  acquisition: log_ei
+  initial_design_method: sobol
+  random_seed: 23
+  raw_samples: 16
+  num_restarts: 2
+  mc_samples: 16
+  min_normalized_distance: 0.0

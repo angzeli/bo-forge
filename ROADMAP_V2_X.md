@@ -4,11 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.3.1`. The v2.3.1 release hardens the contextual review
-and deterministic-cost combinations introduced in v2.3.0, with stronger
-stale-state safety, app state isolation, diagnostics polish, and regression
-coverage. Contextual qLogNEI, qLogNEHVI, multi-objective, structured,
-multi-fidelity, and replicate-aware workflows remain deferred.
+Current baseline: `v2.3.2`. The v2.3.2 release adds contextual replicate-aware
+LogEI, including group-mean fitting, replicate-derived variance, and
+context-matched active repeats. Contextual qLogNEI, qLogNEHVI,
+multi-objective, structured, and multi-fidelity workflows remain deferred.
 
 ## Roadmap So Far
 
@@ -26,6 +25,7 @@ flowchart LR
     v223["v2.2.3<br/>Conservative qLogNEHVI"]
     v230["v2.3.0<br/>Contextual review + cost"]
     v231["v2.3.1<br/>Combination hardening"]
+    v232["v2.3.2<br/>Contextual replicates"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -37,14 +37,14 @@ flowchart LR
     v22 -.-> v223
     v23 -.-> v230
     v23 -.-> v231
+    v23 -.-> v232
 
     class v10,v20,v21,v22 majorDone
     class v23 majorActive
     class v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
-    class v230 patchDone
-    class v231 patchActive
+    class v230,v231,v232 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -116,8 +116,9 @@ Status: active
   deterministic cost, and review + cost together.
 - `v2.3.1` hardens contextual combination staging, no-mutation guarantees,
   Streamlit campaign state isolation, and release-readiness coverage.
-- Candidate future combinations include contextual + replicates and structured
-  + cost.
+- `v2.3.2` adds contextual replicate-aware group-mean fitting and restricts
+  active repeats to groups matching the requested context.
+- Candidate future combinations include structured + cost.
 - Keep unsupported combinations documented in the capability matrix.
 
 ## v2.4.x - Multi-Fidelity Expansion

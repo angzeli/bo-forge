@@ -130,6 +130,21 @@ print("ok")
             "Suggest",
             ["cost_summary"],
         ),
+        (
+            "21_contextual_replicate_logei.yaml",
+            "21_contextual_replicate_campaign_log.csv",
+            "Data",
+            [
+                "summary",
+                "next_action",
+                "model_summary",
+                "observed",
+                "pending",
+                "cost_summary",
+                "replicate_summary",
+                "context_summary",
+            ],
+        ),
     ],
 )
 def test_app_service_loads_validates_and_collects_view_data(
@@ -656,6 +671,52 @@ def test_app_service_contextual_cost_review_round_trip(tmp_path: Path) -> None:
     assert "cost_progress" in refreshed.available_plot_kinds()
     assert refreshed.collect_view_data("Overview").context_summary is not None
     assert refreshed.collect_view_data("Overview").cost_summary is not None
+
+
+def test_app_service_contextual_replicate_round_trip_and_stale_context_are_atomic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = copy_example_log(tmp_path, "21_contextual_replicate_campaign_log.csv")
+    service = CampaignAppService.load(
+        PROJECT_ROOT / "configs" / "21_contextual_replicate_logei.yaml",
+        log_path,
+    )
+
+    class FakePosterior:
+        mean = torch.tensor([[2.0], [1.0], [10.0], [0.0]], dtype=torch.double)
+        variance = torch.full((4, 1), 0.04, dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    context_values = {"feedstock_acidity": 0.25}
+    result = service.suggest_dry_run(batch_size=1, context_values=context_values)
+    before_stale_append = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Context values changed after suggestions were staged"):
+        service.append_staged(
+            result.bundle,
+            context_values={"feedstock_acidity": 0.75},
+        )
+
+    assert log_path.read_bytes() == before_stale_append
+    append = service.append_staged(result.bundle, context_values=context_values)
+    row_id = str(result.suggestions.loc[0, "row_id"])
+    append.service.review(row_id, "accept", "approved")
+    append.service.mark_observed(row_id, objective_value=0.91, actual_cost=4.0)
+
+    row = service.df.loc[service.df["row_id"] == row_id].iloc[0]
+    view = service.collect_view_data("Overview")
+    assert row["status"] == "observed"
+    assert row["replicate_group"] == "group_acid25_best"
+    assert int(row["replicate_index"]) == 2
+    assert float(row["cost_actual"]) == pytest.approx(4.0)
+    assert view.context_summary is not None
+    assert view.replicate_summary is not None
+    assert view.cost_summary is not None
 
 
 @pytest.mark.parametrize(

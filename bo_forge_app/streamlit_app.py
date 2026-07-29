@@ -358,7 +358,7 @@ def _render_create_new_campaign(st: Any) -> None:
             disabled=True,
             help=(
                 "Non-default model profiles require a single-objective config with "
-                "bo.acquisition: log_ei or qlog_nei in v2.2.1."
+                "bo.acquisition: log_ei or qlog_nei."
             ),
         )
     else:
@@ -412,7 +412,7 @@ def _render_create_new_campaign(st: Any) -> None:
                 value=1,
                 key="new_bo_batch_size_multi_fidelity",
                 disabled=True,
-                help="qMFKG model-based suggestions are sequential in v1.4.",
+                help="qMFKG model-based suggestions are sequential.",
             )
         else:
             batch_size = st.number_input(
@@ -459,6 +459,7 @@ def _render_create_new_campaign(st: Any) -> None:
         )
         review_enabled = False
         replicates_enabled = False
+        replicate_settings = None
         cost_settings = None
         fidelity_settings = None
         context_settings = None
@@ -550,7 +551,7 @@ def _render_create_new_campaign(st: Any) -> None:
         elif is_contextual:
             _render_section_label(st, "Context")
             context_settings = _collect_new_campaign_context_settings(st, variables)
-            _render_section_label(st, "Contextual review and cost")
+            _render_section_label(st, "Contextual review, cost, and replicates")
             review_enabled = st.checkbox(
                 "Enable review",
                 value=False,
@@ -593,13 +594,69 @@ def _render_create_new_campaign(st: Any) -> None:
                     "weight": float(cost_weight),
                     "budget": float(cost_budget),
                 }
+            replicates_enabled = st.checkbox(
+                "Enable replicates",
+                value=False,
+                key="new_campaign_replicates_enabled_contextual",
+                help=(
+                    "Replicate groups retain their context. Active uncertain-best "
+                    "repeats only target groups matching the suggestion context."
+                ),
+            )
+            if replicates_enabled:
+                policy_col, threshold_col = st.columns(2)
+                with policy_col:
+                    replicate_policy = st.selectbox(
+                        "Replicate suggestion policy",
+                        ["uncertain_best", "new_only"],
+                        key="new_campaign_contextual_replicate_policy",
+                    )
+                with threshold_col:
+                    replicate_threshold = st.number_input(
+                        "Replicate uncertainty threshold",
+                        min_value=1.0e-12,
+                        value=0.1,
+                        key="new_campaign_contextual_replicate_threshold",
+                    )
+                repeat_col, max_repeat_col = st.columns(2)
+                with repeat_col:
+                    min_repeats = st.number_input(
+                        "Minimum repeats at best",
+                        min_value=1,
+                        value=2,
+                        step=1,
+                        key="new_campaign_contextual_min_repeats",
+                    )
+                with max_repeat_col:
+                    max_repeats = st.number_input(
+                        "Maximum repeats per group",
+                        min_value=1,
+                        value=5,
+                        step=1,
+                        key="new_campaign_contextual_max_repeats",
+                    )
+                noise_floor = st.number_input(
+                    "Replicate noise floor",
+                    min_value=1.0e-12,
+                    value=1.0e-8,
+                    format="%.2e",
+                    key="new_campaign_contextual_noise_floor",
+                )
+                replicate_settings = {
+                    "enabled": True,
+                    "suggestion_policy": str(replicate_policy),
+                    "replicate_threshold": float(replicate_threshold),
+                    "min_repeats_at_best": int(min_repeats),
+                    "max_repeats_per_group": int(max_repeats),
+                    "noise_floor": float(noise_floor),
+                }
             _render_artifact_note(
                 st,
                 "Contextual scope",
                 "Generated YAML uses bo.acquisition=log_ei. Contextual review, "
-                "deterministic cost, or both are supported. Contextual multi-objective, "
-                "structured, multi-fidelity, qLogNEI/qLogNEHVI, and replicate-aware "
-                "workflows remain out of scope.",
+                "deterministic cost, replicates, and their combinations are supported. "
+                "Contextual multi-objective, structured, multi-fidelity, and "
+                "qLogNEI/qLogNEHVI workflows remain out of scope.",
             )
         generated_yaml = build_campaign_yaml_text(
             campaign_name=campaign_name,
@@ -613,6 +670,7 @@ def _render_create_new_campaign(st: Any) -> None:
             objectives=objectives,
             review_enabled=review_enabled,
             replicates_enabled=replicates_enabled,
+            replicates=replicate_settings,
             cost=cost_settings,
             fidelity=fidelity_settings,
             context=context_settings,
@@ -1408,12 +1466,21 @@ def _render_suggest(
             context_values=context_values,
             cost_summary=contextual_cost_summary,
         )
+        if campaign.config.replicates.enabled:
+            policy = campaign.config.replicates.suggestion_policy
+            detail = (
+                "Uncertain-best repeats are restricted to replicate groups matching "
+                "every active suggestion context value."
+                if policy == "uncertain_best"
+                else "New-only mode models replicate-derived variance but proposes new designs."
+            )
+            _render_artifact_note(st, f"Context-matched replicates: {policy}", detail)
     is_multi_fidelity = campaign.config.fidelity is not None
     if is_multi_fidelity:
         _render_artifact_note(
             st,
             "qMFKG suggestions",
-            "Multi-fidelity qMFKG suggestions are sequential in v1.4, so the "
+            "Multi-fidelity qMFKG suggestions are sequential, so the "
             "dry-run batch size is capped at 1.",
         )
     if campaign.config.bo.acquisition == "qlog_nei":

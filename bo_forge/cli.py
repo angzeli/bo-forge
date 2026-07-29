@@ -439,6 +439,8 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
         context_values=context_values,
     )
 
+    _print_contextual_replicate_fallback_note(campaign, suggestions)
+
     print(f"Generated {len(suggestions)} suggestion(s).")
     if args.output is None:
         _print_table(suggestions)
@@ -450,6 +452,29 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
         campaign.append_suggestions(suggestions)
         print(f"Appended suggestions to campaign log: {args.log}")
     return 0
+
+
+def _print_contextual_replicate_fallback_note(
+    campaign: CampaignSession,
+    suggestions: pd.DataFrame,
+) -> None:
+    config = campaign.config
+    if (
+        config.context is None
+        or not config.replicates.enabled
+        or config.replicates.suggestion_policy != "uncertain_best"
+        or suggestions.empty
+        or suggestions["source"].isin({"sobol", "random"}).any()
+    ):
+        return
+    existing_groups = set(campaign.df["replicate_group"].astype(str))
+    selected_repeat = suggestions["replicate_group"].astype(str).isin(existing_groups).any()
+    if not selected_repeat:
+        print(
+            "Note: No active repeat was selected for the requested context; "
+            "BO Forge returned context-fixed exploration suggestions.",
+            file=sys.stderr,
+        )
 
 
 def _parse_context_values(items: Sequence[str]) -> dict[str, str] | None:

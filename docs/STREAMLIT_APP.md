@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.3.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.3.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -28,13 +28,13 @@ renders one input per context variable, passes those values to
 the staged suggestion bundle before explicit append. Contextual campaigns also
 show Context Summary tables and expose Context Diagnostics in `Reports`.
 
-v2.3.1 hardens the contextual Streamlit path for app-created or loaded
+v2.3.2 extends the contextual Streamlit path for app-created or loaded
 single-objective contextual LogEI configs with optional review metadata,
-deterministic cost, or both. The Suggest and Resolve panels surface active
-context, budget, estimated cost, and review state; campaign-scoped observation
-inputs and staged-bundle fingerprints prevent state from leaking across
-campaign or context changes. Cost estimates are still computed from the full
-candidate, including fixed context values.
+deterministic cost, replicates, or their combinations. The Suggest and Resolve
+panels surface active context, budget, estimated cost, and review state;
+campaign-scoped observation inputs and staged-bundle fingerprints prevent state
+from leaking across campaign or context changes. Cost estimates are still
+computed from the full candidate, including fixed context values.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -118,9 +118,12 @@ When `Create Campaign` uses `Campaign kind = Contextual LogEI`, the app:
 - writes a top-level `context:` block with `context.variables`;
 - writes `context.default_values` only for defaults enabled in the form;
 - sets `bo.acquisition: log_ei`;
-- optionally writes `review.enabled: true`, deterministic `cost:`, or both;
-- leaves multi-objective, structured, multi-fidelity, qLogNEI/qLogNEHVI, and
-  replicate-aware contextual workflows out of scope.
+- optionally writes `review.enabled: true`, deterministic `cost:`, replicates,
+  or all three;
+- exposes `new_only` and `uncertain_best` replicate policies plus the existing
+  repeat thresholds and limits;
+- leaves multi-objective, structured, multi-fidelity, and qLogNEI/qLogNEHVI
+  contextual workflows out of scope.
 
 When a loaded config defines `context:`, the app:
 
@@ -134,12 +137,13 @@ When a loaded config defines `context:`, the app:
 - shows Context Summary tables in `Overview` and `Data`;
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
   `Reports`.
+- shows replicate metadata and summaries when replicates are enabled and also
+  exposes Replicate Diagnostics (`replicates`) in `Reports`.
 
 v2.3.x app support is limited to single-objective contextual LogEI/qLogEI
-campaigns, with optional review and deterministic cost for LogEI configs.
+campaigns, with optional review, deterministic cost, and replicates for LogEI configs.
 Contextual multi-objective BO, contextual structured campaigns, contextual
-multi-fidelity, contextual qLogNEI/qLogNEHVI, and contextual replicate-aware
-workflows remain deferred.
+multi-fidelity, and contextual qLogNEI/qLogNEHVI workflows remain deferred.
 
 ## 🧠 Model Profiles
 

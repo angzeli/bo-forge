@@ -1,10 +1,9 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.3.1 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v2.3.2 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while making supported and intentionally
-deferred combinations explicit. v2.3.1 hardens the contextual review and
-deterministic cost combinations introduced in v2.3.0 for single-objective
-LogEI campaigns without changing their supported status.
+deferred combinations explicit. v2.3.2 adds contextual replicate-aware LogEI
+with context-matched active repeats and no CSV schema changes.
 
 Legend:
 
@@ -42,19 +41,20 @@ Legend:
 | Multi-objective + review + replicates + cost | supported | Backend/session/CLI support through v1.1.x semantics. |
 | Structured + review | supported | Stage-aware rows and review metadata can coexist. |
 | Structured + replicates | supported | Stage summaries use replicate group means where needed. |
-| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.3.1. |
+| Structured + cost | deferred | Cost-aware structured workflows are not implemented in v2.3.2. |
 | Structured + contextual | deferred | No contextual structured-stage suggestion path yet. |
 | Structured + multi-fidelity | deferred | No staged qMFKG or fidelity-by-stage workflow yet. |
 | Contextual + review | supported | Single-objective contextual LogEI campaigns may use review metadata. |
 | Contextual + deterministic cost | supported | Deterministic cost is evaluated on the full candidate, including fixed context values, with campaign-global budget accounting. |
 | Contextual + review + deterministic cost | supported | Supported for single-objective contextual `bo.acquisition: log_ei` campaigns. |
-| Contextual + replicates | deferred | Contextual replicate-aware BO is not implemented. |
+| Contextual + replicates | supported | Single-objective LogEI fits group means across contexts; active repeats only target groups matching the requested context. |
+| Contextual + review + deterministic cost + replicates | supported | Uses the same row-level review and campaign-global budget semantics with context-matched active repeats. |
 | Contextual + multi-objective | deferred | No contextual qLogEHVI path yet. |
 | Contextual + multi-fidelity | deferred | No contextual qMFKG path yet. |
 | qLogNEI + deterministic cost | rejected | Cost-aware qLogNEI ranking is deferred. |
 | qLogNEI + contextual | rejected | Contextual qLogNEI is deferred. |
 | qLogNEI + structured stages | rejected | Stage-aware qLogNEI is deferred. |
-| qLogNEI + multi-fidelity | rejected | No noisy qMFKG path in v2.3.1. |
+| qLogNEI + multi-fidelity | rejected | No noisy qMFKG path in v2.3.2. |
 | qLogNEI + multi-objective | rejected | Use `bo.acquisition: qlog_nehvi` for supported coupled noisy multi-objective campaigns. |
 | qLogNEHVI + deterministic cost | rejected | Cost-aware qLogNEHVI ranking is deferred. |
 | qLogNEHVI + replicates | rejected | Replicate-aware noisy MOBO is deferred. |
@@ -67,7 +67,7 @@ Legend:
 | Multi-fidelity + replicates | rejected | Replicate-aware qMFKG is not implemented. |
 | Multi-fidelity + multi-objective | rejected | qMFKG support is single-objective only. |
 | Model-profile comparison diagnostics | supported | Read-only comparison of `default`, `smooth`, `rough`, and `robust` on current single-objective fitting rows; not automatic model selection. |
-| Non-default model profile + multi-objective | rejected | Non-default profiles require supported single-objective configs with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.1. |
+| Non-default model profile + multi-objective | rejected | Non-default profiles require supported single-objective configs with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.2. |
 | Non-default model profile + multi-fidelity | rejected | qMFKG keeps its existing multi-fidelity GP path. |
 | Non-default model profile + structured stages | rejected | Stage-specific model-profile support is deferred. |
 

@@ -309,16 +309,22 @@ their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
 `notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
 create `Campaign kind = Contextual LogEI` configs with selected context
-variables and optional defaults. In v2.3.1, single-objective contextual
+variables and optional defaults. In v2.3.2, single-objective contextual
 `bo.acquisition: log_ei` campaigns can combine `context:` with review metadata,
-deterministic `cost:`, or both. Contextual qLogNEI/qLogNEHVI,
-multi-objective, structured, multi-fidelity, and replicate-aware workflows
-remain deferred.
+deterministic `cost:`, replicates, or all three. Contextual active repeats only
+target replicate groups matching the requested context; fitting still uses
+group means from every context. Contextual qLogNEI/qLogNEHVI,
+multi-objective, structured, and multi-fidelity workflows remain deferred.
 
 The contextual cost-review example is
 `configs/20_contextual_cost_review_logei.yaml` with seed log
 `examples/20_contextual_cost_review_campaign_log.csv` and tutorial notebook
 `notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
+
+The contextual replicate example is
+`configs/21_contextual_replicate_logei.yaml` with seed log
+`examples/21_contextual_replicate_campaign_log.csv`. Use repeatable CLI
+`--context NAME=VALUE` arguments exactly as for other contextual campaigns.
 
 ## 🧠 Model Profiles
 
@@ -334,7 +340,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.1; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.2; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -544,10 +550,11 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/18_noisy_pending_qlognei.yaml`: demonstrates single-objective qLogNEI with accepted pending review suggestions.
 - `configs/19_multi_objective_qlognehvi.yaml`: demonstrates coupled multi-objective qLogNEHVI with accepted pending review suggestions.
 - `configs/20_contextual_cost_review_logei.yaml`: demonstrates contextual LogEI with review metadata, deterministic cost, and campaign-global budget accounting.
+- `configs/21_contextual_replicate_logei.yaml`: demonstrates contextual LogEI with review, deterministic cost, replicate-derived variance, and context-matched active repeats.
 
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.3.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.3.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

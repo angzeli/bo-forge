@@ -221,7 +221,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     context = _parse_context(raw.get("context"), variables)
     if stages and cost is not None:
         raise ConfigError(
-            "Structured campaigns with cost are not supported in v1.4.0; "
+            "Structured campaigns with cost are currently unsupported; "
             "remove either 'stages' or 'cost'."
         )
     review = _parse_review(raw.get("review"))
@@ -787,35 +787,35 @@ def _validate_qlog_nehvi_combinations(
     if not multi_objective:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' is only supported for coupled "
-            "multi-objective campaigns in v2.3.1."
+            "multi-objective campaigns in v2.3.2."
         )
     if objective_count > 4:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.3.1: "
+            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.3.2: "
             f"configured={objective_count}."
         )
     if fidelity is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.3.1."
+            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.3.2."
         )
     if stages:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with structured stages "
-            "in v2.3.1."
+            "in v2.3.2."
         )
     if context is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.3.1."
+            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.3.2."
         )
     if cost is not None:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with cost-aware campaigns "
-            "in v2.3.1."
+            "in v2.3.2."
         )
     if replicates.enabled:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with replicate campaigns "
-            "in v2.3.1."
+            "in v2.3.2."
         )
 
 
@@ -831,13 +831,11 @@ def _validate_context_combinations(
     if context is None:
         return
     if multi_objective:
-        raise ConfigError("context is only supported for single-objective campaigns in v2.3.1.")
+        raise ConfigError("context is only supported for single-objective campaigns in v2.3.2.")
     if stages:
-        raise ConfigError("context cannot be combined with structured campaign stages in v2.3.1.")
+        raise ConfigError("context cannot be combined with structured campaign stages in v2.3.2.")
     if fidelity is not None:
-        raise ConfigError("context cannot be combined with fidelity campaigns in v2.3.1.")
-    if replicates.enabled:
-        raise ConfigError("context cannot be combined with replicate campaigns in v2.3.1.")
+        raise ConfigError("context cannot be combined with fidelity campaigns in v2.3.2.")
 
 
 def _validate_fidelity_combinations(
@@ -852,17 +850,17 @@ def _validate_fidelity_combinations(
     if fidelity is None:
         return
     if multi_objective:
-        raise ConfigError("fidelity is only supported for single-objective campaigns in v1.4.0.")
+        raise ConfigError("fidelity is only supported for single-objective campaigns.")
     if stages:
-        raise ConfigError("fidelity cannot be combined with structured campaign stages in v1.4.0.")
+        raise ConfigError("fidelity cannot be combined with structured campaign stages.")
     if cost is not None:
-        raise ConfigError("fidelity cannot be combined with cost-aware campaigns in v1.4.0.")
+        raise ConfigError("fidelity cannot be combined with cost-aware campaigns.")
     if replicates.enabled:
-        raise ConfigError("fidelity cannot be combined with replicate campaigns in v1.4.0.")
+        raise ConfigError("fidelity cannot be combined with replicate campaigns.")
     unsupported = [variable.name for variable in variables if variable.type != "continuous"]
     if unsupported:
         raise ConfigError(
-            "fidelity campaigns only support continuous variables in v1.4.0: "
+            "fidelity campaigns only support continuous variables: "
             f"non_continuous={unsupported}."
         )
 
@@ -962,7 +960,7 @@ def _parse_replicates(raw: Any, *, multi_objective: bool = False) -> ReplicateCo
     if multi_objective and enabled and suggestion_policy == "uncertain_best":
         raise ConfigError(
             "replicates.suggestion_policy='uncertain_best' is only supported for "
-            "single-objective campaigns in v1.1.2; use 'new_only' for "
+            "single-objective campaigns; use 'new_only' for "
             "multi-objective replicate campaigns."
         )
     replicate_threshold = _positive_float(

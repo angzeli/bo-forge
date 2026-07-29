@@ -5,8 +5,10 @@ from pathlib import Path
 import matplotlib
 import pandas as pd
 import pytest
+import torch
 
 import bo_forge.cli as cli
+import bo_forge.suggestions as suggestions_module
 from bo_forge.cli import run
 from bo_forge.config import (
     BOConfig,
@@ -674,7 +676,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.3.1\n"
+    assert captured.out == "bo-forge 2.3.2\n"
     assert captured.err == ""
 
 
@@ -683,7 +685,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.3.1\n"
+    assert completed.stdout == "bo-forge 2.3.2\n"
     assert completed.stderr == ""
 
 
@@ -1264,6 +1266,138 @@ def test_contextual_cost_review_cli_round_trip_with_actual_cost(
     assert report_path.exists()
     assert context_plot_path.exists()
     assert cost_plot_path.exists()
+
+
+def test_contextual_replicate_cli_round_trip_with_actual_cost(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = Path("configs/21_contextual_replicate_logei.yaml")
+    cfg = CampaignConfig.from_yaml(config_path)
+    log_path = tmp_path / "contextual_replicates.csv"
+    pd.read_csv(
+        "examples/21_contextual_replicate_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    class FakePosterior:
+        mean = torch.tensor([[2.0], [1.0], [10.0], [0.0]], dtype=torch.double)
+        variance = torch.full((4, 1), 0.04, dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    assert (
+        run(
+            [
+                "suggest",
+                *base_args(config_path, log_path),
+                "--context",
+                "feedstock_acidity=0.25",
+                "--batch-size",
+                "1",
+                "--append",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert "No active repeat was selected" not in captured.err
+    pending = load_campaign_log(log_path, cfg)
+    suggestion = pending.loc[pending["status"] == "suggested"].iloc[0]
+    row_id = str(suggestion["row_id"])
+    assert suggestion["replicate_group"] == "group_acid25_best"
+    assert int(suggestion["replicate_index"]) == 2
+    assert float(suggestion["feedstock_acidity"]) == pytest.approx(0.25)
+    assert float(suggestion["cost_estimate"]) == pytest.approx(3.9)
+
+    assert run(
+        [
+            "review",
+            *base_args(config_path, log_path),
+            "--row-id",
+            row_id,
+            "--decision",
+            "accept",
+            "--note",
+            "approved",
+        ]
+    ) == 0
+    assert run(
+        [
+            "mark-observed",
+            *base_args(config_path, log_path),
+            "--row-id",
+            row_id,
+            "--objective-value",
+            "0.91",
+            "--actual-cost",
+            "4.0",
+        ]
+    ) == 0
+    assert run(["context-summary", *base_args(config_path, log_path)]) == 0
+    assert run(["replicate-summary", *base_args(config_path, log_path)]) == 0
+    assert run(["cost-summary", *base_args(config_path, log_path)]) == 0
+
+    report_path = tmp_path / "contextual_replicate_report.md"
+    context_plot_path = tmp_path / "context_diagnostics.png"
+    replicate_plot_path = tmp_path / "replicate_diagnostics.png"
+    assert run(
+        ["report", *base_args(config_path, log_path), "--output", str(report_path)]
+    ) == 0
+    assert run(
+        [
+            "plot",
+            *base_args(config_path, log_path),
+            "--kind",
+            "context-diagnostics",
+            "--output",
+            str(context_plot_path),
+        ]
+    ) == 0
+    assert run(
+        [
+            "plot",
+            *base_args(config_path, log_path),
+            "--kind",
+            "replicates",
+            "--output",
+            str(replicate_plot_path),
+        ]
+    ) == 0
+    assert report_path.exists()
+    assert context_plot_path.exists()
+    assert replicate_plot_path.exists()
+
+
+def test_contextual_replicate_cli_exploration_fallback_is_explained(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = Path("configs/21_contextual_replicate_logei.yaml")
+    log_path = tmp_path / "contextual_replicates.csv"
+    pd.read_csv(
+        "examples/21_contextual_replicate_campaign_log.csv",
+        keep_default_na=False,
+    ).to_csv(log_path, index=False)
+
+    assert run(
+        [
+            "suggest",
+            *base_args(config_path, log_path),
+            "--context",
+            "feedstock_acidity=0.5",
+            "--batch-size",
+            "1",
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "No active repeat was selected for the requested context" in captured.err
+    assert "Generated 1 suggestion(s)." in captured.out
 
 
 def test_contextual_suggest_missing_context_does_not_append(

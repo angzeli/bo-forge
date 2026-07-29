@@ -210,6 +210,7 @@ def suggest_next(
             df=df,
             observed_df=observed_df,
             batch_size=requested_batch_size,
+            context_values=resolved_context,
         )
         if repeat_suggestions is not None:
             if len(repeat_suggestions) >= requested_batch_size:
@@ -220,6 +221,7 @@ def suggest_next(
                 observed_df=observed_df,
                 repeat_suggestions=repeat_suggestions,
                 batch_size=requested_batch_size,
+                context_values=resolved_context,
             )
 
     if config.cost is not None:
@@ -259,7 +261,7 @@ def _suggest_structured_stage(
     stage_name = _resolve_structured_stage(config, stage)
     if config.cost is not None:
         raise SuggestionError(
-            "Structured campaign suggestions with cost are not supported in v1.4.0."
+            "Structured campaign suggestions with cost are currently unsupported."
         )
     if has_pending_suggestions(df, config):
         raise SuggestionError(
@@ -394,7 +396,7 @@ def _suggest_multi_fidelity_model_based(
 ) -> pd.DataFrame:
     if batch_size != 1:
         raise SuggestionError(
-            "qMFKG model-based suggestions support batch_size=1 in v1.4.0: "
+            "qMFKG model-based suggestions support batch_size=1: "
             f"requested={batch_size}."
         )
     try:
@@ -967,18 +969,22 @@ def _suggest_uncertain_best_replicate(
     df: pd.DataFrame,
     observed_df: pd.DataFrame,
     batch_size: int,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame | None:
-    aggregate = aggregate_observed_replicates(config, observed_df)
+    aggregate = aggregate_observed_replicates(config, observed_df).reset_index(drop=True)
     if aggregate.empty:
         return None
 
+    eligible = _rows_matching_context(config, aggregate, context_values)
+    if eligible.empty:
+        return None
+
     model = fit_gp_model(config, observed_df)
-    model_df = modeling_observed_data(config, observed_df)
     x_unit = values_to_unit_cube(
         config,
         [
             tuple(row[variable.name] for variable in config.variables)
-            for _, row in model_df.iterrows()
+            for _, row in aggregate.iterrows()
         ],
     )
     with torch.no_grad():
@@ -986,7 +992,9 @@ def _suggest_uncertain_best_replicate(
         mean_model = posterior.mean.squeeze(-1)
         std = posterior.variance.clamp_min(0.0).sqrt().squeeze(-1)
 
-    best_index = int(torch.argmax(mean_model).item())
+    eligible_positions = torch.tensor(eligible.index.tolist(), dtype=torch.long)
+    eligible_best = int(torch.argmax(mean_model[eligible_positions]).item())
+    best_index = int(eligible_positions[eligible_best].item())
     best_group = aggregate.iloc[best_index]
     n_replicates = int(best_group["n_replicates"])
     posterior_std = float(std[best_index])
@@ -999,6 +1007,8 @@ def _suggest_uncertain_best_replicate(
         return None
 
     candidate = tuple(best_group[variable.name] for variable in config.variables)
+    if context_values:
+        candidate = apply_context_to_candidate(config, candidate, context_values)
     repeat_count = 1
     if n_replicates < config.replicates.min_repeats_at_best:
         repeat_count = config.replicates.min_repeats_at_best - n_replicates
@@ -1058,6 +1068,7 @@ def _fill_replicate_batch_with_exploration(
     observed_df: pd.DataFrame,
     repeat_suggestions: pd.DataFrame,
     batch_size: int,
+    context_values: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     remaining = batch_size - len(repeat_suggestions)
     if remaining <= 0:
@@ -1072,6 +1083,7 @@ def _fill_replicate_batch_with_exploration(
                 df=df_with_repeats,
                 observed_df=observed_df,
                 batch_size=remaining,
+                context_values=context_values,
             )
         else:
             filler = _suggest_model_based(
@@ -1079,6 +1091,7 @@ def _fill_replicate_batch_with_exploration(
                 df=df_with_repeats,
                 observed_df=observed_df,
                 batch_size=remaining,
+                context_values=context_values,
             )
     except _CandidateGenerationExhausted:
         return repeat_suggestions

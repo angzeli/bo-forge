@@ -155,8 +155,10 @@ bo-forge plot \
 ```
 
 Contextual LogEI campaigns may also use review metadata, deterministic cost,
-or both. Cost expressions are evaluated on the full candidate, including fixed
-context values, and budget accounting is campaign-global across all contexts:
+replicates, or their combinations. Cost expressions are evaluated on the full
+candidate, including fixed context values, and budget accounting is
+campaign-global across all contexts. Active repeats only target replicate
+groups matching the requested context:
 
 ```bash
 bo-forge suggest \
@@ -172,6 +174,16 @@ bo-forge context-summary \
 bo-forge cost-summary \
   --config configs/20_contextual_cost_review_logei.yaml \
   --log examples/20_contextual_cost_review_campaign_log.csv
+```
+
+The combined contextual replicate example uses the same interface:
+
+```bash
+bo-forge suggest \
+  --config configs/21_contextual_replicate_logei.yaml \
+  --log examples/21_contextual_replicate_campaign_log.csv \
+  --context feedstock_acidity=0.25 \
+  --batch-size 2
 ```
 
 For single-objective model profiles, the CSV schema is unchanged. Inspect the

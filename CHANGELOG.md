@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v2.3.2 - Contextual Replicate-Aware BO
+
+This patch extends single-objective contextual LogEI campaigns with existing
+replicate-aware model fitting and context-matched active repeat selection while
+keeping config keys and canonical CSV columns unchanged.
+
+- Allows contextual LogEI with replicates, review, deterministic cost, or all
+  three sections together.
+- Fits one group-mean row per replicate group across all contexts and passes
+  replicate-derived `train_Yvar` when repeated observations provide variance.
+- Restricts `uncertain_best` repeat candidates to groups matching every resolved
+  context value after normal type normalization.
+- Falls back to context-fixed exploration when no matching group is eligible and
+  fills mixed repeat/exploration batches at one requested context.
+- Adds `configs/21_contextual_replicate_logei.yaml` and
+  `examples/21_contextual_replicate_campaign_log.csv`.
+- Adds Streamlit contextual replicate creation controls without changing
+  session, CLI, service, or API request shapes.
+
 ## v2.3.1 - Contextual Combination Workflow Hardening
 
 This stabilization patch hardens the v2.3.0 contextual review and deterministic

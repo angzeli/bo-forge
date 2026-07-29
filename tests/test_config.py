@@ -310,28 +310,6 @@ bo:
 """,
             "fidelity campaigns",
         ),
-        (
-            """
-campaign_name: contextual_replicates
-objective:
-  name: yield
-  direction: maximize
-variables:
-  - name: reaction_time
-    type: integer
-    lower: 10
-    upper: 60
-  - name: acidity
-    type: continuous
-    lower: 0
-    upper: 1
-context:
-  variables: [acidity]
-replicates:
-  enabled: true
-""",
-            "replicate campaigns",
-        ),
     ],
 )
 def test_config_rejects_unsupported_contextual_combinations(
@@ -677,7 +655,7 @@ stages:
 
     with pytest.raises(
         ConfigError,
-        match="Structured campaigns with cost are not supported in v1.4.0",
+        match="Structured campaigns with cost are currently unsupported",
     ):
         CampaignConfig.from_yaml(path)
 

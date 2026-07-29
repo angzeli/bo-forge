@@ -4,8 +4,10 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+import torch
 from matplotlib import pyplot as plt
 
+import bo_forge.suggestions as suggestions_module
 from bo_forge.config import BOConfig, CampaignConfig, CostConfig, ObjectiveConfig, VariableConfig
 from bo_forge.io import empty_campaign_log
 from bo_forge.session import CampaignSession
@@ -239,6 +241,40 @@ def test_build_campaign_yaml_text_supports_advanced_multi_objective_sections() -
     assert config.review.enabled
     assert config.replicates.enabled
     assert config.cost is not None
+
+
+def test_build_campaign_yaml_text_supports_contextual_replicate_settings() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="contextual_replicate_app_campaign",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "feedstock", "type": "categorical", "values": ["A", "B"]},
+        ],
+        batch_size=2,
+        initial_design_size=4,
+        initial_design_method="sobol",
+        random_seed=7,
+        context={"variables": ["feedstock"], "default_values": {"feedstock": "A"}},
+        replicates={
+            "enabled": True,
+            "suggestion_policy": "uncertain_best",
+            "replicate_threshold": 0.2,
+            "min_repeats_at_best": 2,
+            "max_repeats_per_group": 4,
+            "noise_floor": 1.0e-8,
+        },
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.context is not None
+    assert config.replicates.enabled
+    assert config.replicates.suggestion_policy == "uncertain_best"
+    assert config.replicates.replicate_threshold == pytest.approx(0.2)
+    assert list(empty_log.columns) == canonical_columns(config)
 
 
 def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
@@ -2980,6 +3016,127 @@ def test_streamlit_app_can_create_contextual_review_cost_campaign(tmp_path: Path
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
     app.run(timeout=10)
     assert any(subheader.value == "Cost Summary" for subheader in app.subheader)
+
+
+def test_streamlit_app_can_create_contextual_replicate_campaign(tmp_path: Path) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "configs" / "contextual_replicates.yaml"
+    log_path = tmp_path / "logs" / "contextual_replicates.csv"
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+
+    next(radio for radio in app.radio if radio.label == "Campaign file action").set_value(
+        "Create Campaign"
+    )
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Campaign kind").set_value(
+        "Contextual LogEI"
+    )
+    app.run(timeout=10)
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.key == "new_campaign_replicates_enabled_contextual"
+    ).check()
+    app.run(timeout=10)
+    next(
+        selectbox
+        for selectbox in app.selectbox
+        if selectbox.label == "Replicate suggestion policy"
+    ).set_value("new_only")
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New YAML config output path"
+    ).set_value(str(config_path))
+    next(
+        input_
+        for input_ in app.text_input
+        if input_.label == "New CSV log output path"
+    ).set_value(str(log_path))
+    next(button for button in app.button if button.label == "Update YAML preview from form").click()
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Create campaign").click()
+    app.run(timeout=10)
+
+    config = CampaignConfig.from_yaml(config_path)
+    assert len(app.exception) == 0
+    assert config.context is not None
+    assert config.replicates.enabled
+    assert config.replicates.suggestion_policy == "new_only"
+    assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
+    assert any(subheader.value == "Context Summary" for subheader in app.subheader)
+    assert any(subheader.value == "Replicate Summary" for subheader in app.subheader)
+
+
+def test_streamlit_loaded_contextual_replicate_campaign_stages_context_matched_repeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    log_path = copy_example_log(tmp_path, "21_contextual_replicate_campaign_log.csv")
+    before = log_path.read_bytes()
+
+    class FakePosterior:
+        mean = torch.tensor([[2.0], [1.0], [10.0], [0.0]], dtype=torch.double)
+        variance = torch.full((4, 1), 0.04, dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x):
+            return FakePosterior()
+
+    monkeypatch.setattr(suggestions_module, "fit_gp_model", lambda *_args: FakeModel())
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/21_contextual_replicate_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(log_path)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+
+    assert any(subheader.value == "Context Summary" for subheader in app.subheader)
+    assert any(subheader.value == "Replicate Summary" for subheader in app.subheader)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
+    app.run(timeout=10)
+    assert any(subheader.value == "Cost Summary" for subheader in app.subheader)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
+    app.run(timeout=10)
+    next(input_ for input_ in app.number_input if input_.label == "Batch size").set_value(1)
+    app.run(timeout=10)
+    next(
+        button for button in app.button if button.label == "Generate suggestions (dry run)"
+    ).click()
+    app.run(timeout=20)
+
+    bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+    suggestions = bundle["suggestions"]
+    assert bundle["context_values"] == {"feedstock_acidity": 0.25}
+    assert suggestions.loc[0, "replicate_group"] == "group_acid25_best"
+    assert int(suggestions.loc[0, "replicate_index"]) == 2
+    assert log_path.read_bytes() == before
+
+    context_input = next(
+        input_
+        for input_ in app.number_input
+        if input_.label == "Suggestion context: feedstock_acidity"
+    )
+    context_input.set_value(0.75)
+    app.run(timeout=10)
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in app.session_state
+    assert log_path.read_bytes() == before
+    assert len(app.exception) == 0
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
+    app.run(timeout=10)
+    plot_select = next(selectbox for selectbox in app.selectbox if selectbox.label == "Plot kind")
+    assert "Context Diagnostics" in list(plot_select.options)
+    assert "Replicates" in list(plot_select.options)
+    assert "Cost Progress" in list(plot_select.options)
 
 
 def test_streamlit_contextual_review_cost_suggest_review_observe_round_trip(

@@ -1,0 +1,6 @@
+row_id,iteration,status,source,review_status,review_note,replicate_group,replicate_index,catalyst_loading,reaction_temperature,solvent,feedstock_acidity,yield_score,cost_estimate,cost_actual,predicted_mean,predicted_std,acquisition,utility
+ctx_rep_0a,0,observed,manual,accepted,,group_acid25_best,0,0.55,90,EtOH,0.25,0.83,3.9,3.8,,,,
+ctx_rep_0b,0,observed,manual,accepted,,group_acid25_best,1,0.55,90,EtOH,0.25,0.89,3.9,3.9,,,,
+ctx_rep_1,0,observed,manual,accepted,,group_acid25_other,0,0.20,70,MeCN,0.25,0.64,3.3,3.4,,,,
+ctx_rep_2,0,observed,manual,accepted,,group_acid75_best,0,0.35,100,Water,0.75,0.95,6.1,6.2,,,,
+ctx_rep_3,0,observed,manual,accepted,,group_acid75_other,0,0.75,110,MeCN,0.75,0.78,4.9,4.8,,,,

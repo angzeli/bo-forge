@@ -655,7 +655,7 @@ def test_structured_suggest_with_cost_fails_with_current_version_message() -> No
 
     with pytest.raises(
         SuggestionError,
-        match="Structured campaign suggestions with cost are not supported in v1.4.0",
+        match="Structured campaign suggestions with cost are currently unsupported",
     ):
         suggest_next(cfg, df, stage="screen")
 
