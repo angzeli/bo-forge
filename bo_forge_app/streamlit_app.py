@@ -11,6 +11,8 @@ from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import pandas as pd
+
 from bo_forge.errors import BOForgeError
 from bo_forge_app.service import CampaignAppService
 from bo_forge_app.streamlit_helpers import (
@@ -202,7 +204,7 @@ def _render_active_workflow_panel(
     view_data = _collect_panel_view_data(campaign, panel)
     renderers = {
         "Overview": lambda: _render_overview(st, campaign, view_data),
-        "Suggest": lambda: _render_suggest(st, campaign),
+        "Suggest": lambda: _render_suggest(st, campaign, view_data),
         "Resolve": lambda: _render_resolve(st, campaign, flags, view_data),
         "Reports": lambda: _render_reports(st, campaign, flags, view_data),
         "Data": lambda: _render_data(st, campaign, flags, view_data),
@@ -211,42 +213,11 @@ def _render_active_workflow_panel(
 
 
 def _collect_panel_view_data(campaign: Any, panel: str) -> ViewDataLike:
-    if hasattr(campaign, "collect_view_data"):
-        return campaign.collect_view_data(panel)
-    view_data: dict[str, Any] = {}
+    collector = getattr(campaign, "collect_view_data", None)
+    if not callable(collector):
+        raise TypeError("Streamlit campaigns must provide collect_view_data(panel).")
     with _TimedBlock(f"collect:{panel}"):
-        if panel in {"Overview", "Data", "Reports"}:
-            view_data["summary"] = campaign.summary()
-            view_data["next_action"] = campaign.next_action()
-            view_data["model_summary"] = campaign.model_summary()
-        if panel in {"Overview", "Data"}:
-            view_data["observed"] = campaign.observed_data()
-            view_data["pending"] = campaign.pending_suggestions()
-        if panel == "Resolve":
-            view_data["pending"] = campaign.pending_suggestions()
-            view_data["observable"] = observable_rows(campaign.config, campaign.df)
-            if campaign.config.review.enabled:
-                view_data["review_queue"] = campaign.review_queue()
-        if panel in {"Overview", "Data"} and campaign.config.is_multi_objective:
-            view_data["pareto_summary"] = campaign.pareto_summary()
-            if panel == "Data":
-                view_data["pareto_front"] = campaign.pareto_front()
-        if panel in {"Overview", "Data"} and campaign.config.cost is not None:
-            view_data["cost_summary"] = campaign.cost_summary()
-        if panel in {"Overview", "Data"} and campaign.config.replicates.enabled:
-            view_data["replicate_summary"] = campaign.replicate_summary()
-        if panel in {"Overview", "Data", "Reports"} and campaign.config.is_structured_campaign:
-            view_data["stage_summary"] = campaign.stage_summary()
-        if panel in {"Overview", "Data", "Reports"} and campaign.config.fidelity is not None:
-            view_data["fidelity_summary"] = campaign.fidelity_summary()
-        if panel in {"Overview", "Data", "Reports"} and campaign.config.context is not None:
-            view_data["context_summary"] = campaign.context_summary()
-        if (
-            panel in {"Overview", "Data", "Reports"}
-            and campaign.config.bo.acquisition == "qlog_nei"
-        ):
-            view_data["qlog_nei_summary"] = campaign.qlog_nei_summary()
-    return view_data
+        return collector(panel)
 
 
 def _view_data_value(view_data: ViewDataLike, key: str, fallback: Any) -> Any:
@@ -1024,6 +995,7 @@ def _create_campaign_from_inputs(
     campaign = CampaignAppService.from_session(session)
     st.session_state[SESSION_KEY] = campaign
     _clear_staged_suggestions(st)
+    _clear_observation_inputs(st)
     _clear_report_preview(st)
     _refresh_validation_cache(st, campaign, config_path, log_path)
     _flash_and_rerun(
@@ -1065,6 +1037,7 @@ def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> No
     st.session_state[LOG_PATH_KEY] = str(log_path)
     st.session_state[SESSION_KEY] = campaign
     _clear_staged_suggestions(st)
+    _clear_observation_inputs(st)
     _clear_report_preview(st)
     _refresh_validation_cache(st, campaign, config_path, log_path)
     _flash_and_rerun(st, "Campaign loaded.")
@@ -1375,7 +1348,11 @@ def _render_campaign_state_blocks(
         )
 
 
-def _render_suggest(st: Any, campaign: Any) -> None:
+def _render_suggest(
+    st: Any,
+    campaign: Any,
+    view_data: ViewDataLike | None = None,
+) -> None:
     _render_panel_intro(
         st,
         "Suggest",
@@ -1416,6 +1393,21 @@ def _render_suggest(st: Any, campaign: Any) -> None:
         config_path=config_path,
         log_path=log_path,
     )
+    view_data = view_data or {}
+    contextual_cost_summary = None
+    if campaign.config.context is not None:
+        if campaign.config.cost is not None:
+            contextual_cost_summary = _view_data_value(
+                view_data,
+                "cost_summary",
+                campaign.cost_summary,
+            )
+        _render_contextual_workflow_state(
+            st,
+            campaign,
+            context_values=context_values,
+            cost_summary=contextual_cost_summary,
+        )
     is_multi_fidelity = campaign.config.fidelity is not None
     if is_multi_fidelity:
         _render_artifact_note(
@@ -1514,13 +1506,19 @@ def _render_suggest(st: Any, campaign: Any) -> None:
             )
             return
 
-    _render_metric_grid(
-        st,
-        [
-            ("Staged rows", len(suggestions)),
-            ("Status", "Ready" if disabled_reason is None else "Blocked"),
-        ],
-    )
+    staged_metrics: list[tuple[str, object]] = [
+        ("Staged rows", len(suggestions)),
+        ("Status", "Ready" if disabled_reason is None else "Blocked"),
+    ]
+    if campaign.config.cost is not None and "cost_estimate" in suggestions.columns:
+        estimates = pd.to_numeric(suggestions["cost_estimate"], errors="coerce")
+        staged_metrics.append(
+            ("Staged estimated cost", float(estimates.fillna(0.0).sum()))
+        )
+    if campaign.config.review.enabled and "review_status" in suggestions.columns:
+        states = sorted(set(suggestions["review_status"].astype(str)))
+        staged_metrics.append(("Review state", ", ".join(states)))
+    _render_metric_grid(st, staged_metrics)
     _render_table_section(
         st,
         "Staged Suggestions",
@@ -1728,6 +1726,12 @@ def _render_resolve(
         "Review suggested rows and record experimental outcomes.",
     )
     view_data = view_data or {}
+    if flags["has_cost"]:
+        _render_cost_metric_cards(
+            st,
+            campaign,
+            _view_data_value(view_data, "cost_summary", campaign.cost_summary),
+        )
     pending = _view_data_value(view_data, "pending", campaign.pending_suggestions)
     with st.expander("Pending Suggestions", expanded=False):
         if pending.empty:
@@ -1794,6 +1798,19 @@ def _render_resolve(
         "Record Coupled Objectives" if campaign.config.is_multi_objective else "Mark Observed"
     )
     option_map = observable_row_options(campaign.config, campaign.df)
+    config_path = st.session_state.get(
+        CONFIG_PATH_KEY,
+        getattr(campaign, "config_path", ""),
+    )
+    log_path = st.session_state.get(
+        LOG_PATH_KEY,
+        getattr(campaign, "log_path", ""),
+    )
+    input_scope = _campaign_widget_key_scope(
+        campaign.config,
+        config_path=config_path,
+        log_path=log_path,
+    )
     with st.form("mark_observed_form"):
         selected_label = st.selectbox("Observed suggestion", list(option_map))
         observed_row_id = option_map[selected_label]
@@ -1807,6 +1824,7 @@ def _render_resolve(
                     value="",
                     key=_stable_widget_key(
                         "observed_objective",
+                        input_scope,
                         observed_row_id,
                         objective.name,
                     ),
@@ -1817,7 +1835,7 @@ def _render_resolve(
             actual_cost_text = _render_actual_cost_input(
                 st,
                 flags,
-                key_suffix=observed_row_id,
+                key_suffix=f"{input_scope}|{observed_row_id}",
             )
             mark_clicked = st.form_submit_button("Record coupled objectives")
         else:
@@ -1826,12 +1844,17 @@ def _render_resolve(
                 f"Observed {objective_name}",
                 value=0.0,
                 format="%.8f",
-                key=_stable_widget_key("observed_objective", observed_row_id, objective_name),
+                key=_stable_widget_key(
+                    "observed_objective",
+                    input_scope,
+                    observed_row_id,
+                    objective_name,
+                ),
             )
             actual_cost_text = _render_actual_cost_input(
                 st,
                 flags,
-                key_suffix=observed_row_id,
+                key_suffix=f"{input_scope}|{observed_row_id}",
             )
             mark_clicked = st.form_submit_button("Mark row observed")
 
@@ -1936,6 +1959,22 @@ def _stable_widget_key(namespace: str, *parts: object) -> str:
     raw = "|".join(str(part) for part in (namespace, *parts))
     digest = sha1(raw.encode("utf-8")).hexdigest()[:12]
     return f"{namespace}_{digest}"
+
+
+def _campaign_widget_key_scope(
+    config: Any,
+    *,
+    config_path: object,
+    log_path: object,
+) -> str:
+    """Return a stable campaign identity for row-scoped mutation widgets."""
+    payload = {
+        "config_path": str(Path(str(config_path)).expanduser().resolve(strict=False)),
+        "log_path": str(Path(str(log_path)).expanduser().resolve(strict=False)),
+        "campaign_name": getattr(config, "campaign_name", ""),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return sha1(encoded.encode("utf-8")).hexdigest()[:10]
 
 
 def _render_reports(
@@ -2315,9 +2354,38 @@ def _render_selected_row_preview(st: Any, campaign: Any, row: Any) -> None:
                 for variable in campaign.config.variables
                 if variable.name in active_names
             )
+    context_names = set(getattr(campaign.config, "context_variable_names", []))
+    variables = tuple(
+        variable for variable in variables if variable.name in context_names
+    ) + tuple(variable for variable in variables if variable.name not in context_names)
     for variable in variables[:6]:
         metrics.append((variable.name, row.get(variable.name, "")))
+    if campaign.config.review.enabled:
+        metrics.append(("Review state", row.get("review_status", "")))
+    if campaign.config.cost is not None:
+        metrics.append(("Estimated cost", row.get("cost_estimate", "")))
     _render_metric_grid(st, metrics)
+
+
+def _render_contextual_workflow_state(
+    st: Any,
+    campaign: Any,
+    *,
+    context_values: dict[str, object] | None,
+    cost_summary: Any | None = None,
+) -> None:
+    """Render compact context, budget, and review state for one dry run."""
+    metrics = [
+        (f"Context: {name}", value)
+        for name, value in (context_values or {}).items()
+    ]
+    if campaign.config.cost is not None:
+        summary = cost_summary if cost_summary is not None else campaign.cost_summary()
+        metrics.append(("Remaining budget", _summary_value(summary, "budget_remaining")))
+    if campaign.config.review.enabled:
+        metrics.append(("Review state", "Required before observation"))
+    if metrics:
+        _render_metric_grid(st, metrics)
 
 
 def _render_variable_type_badge(st: Any, variable_type: str) -> None:
@@ -2499,6 +2567,14 @@ def _should_clear_staged_bundle(reason: str) -> bool:
 def _clear_staged_suggestions(st: Any) -> None:
     st.session_state.pop(STAGED_SUGGESTION_BUNDLE_KEY, None)
     st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
+
+
+def _clear_observation_inputs(st: Any) -> None:
+    """Clear row-scoped observation values when the loaded campaign changes."""
+    prefixes = ("observed_objective_", "actual_cost_")
+    for key in list(st.session_state):
+        if str(key).startswith(prefixes):
+            st.session_state.pop(key, None)
 
 
 def _clear_report_preview(st: Any) -> None:

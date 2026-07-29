@@ -185,6 +185,10 @@ class CampaignAppService:
             data.observable = observable_rows(self.config, self.df)
             if self.config.review.enabled:
                 data.review_queue = self.session.review_queue()
+            if self.config.cost is not None:
+                data.cost_summary = self.session.cost_summary()
+        if panel == "Suggest" and self.config.context is not None and self.config.cost is not None:
+            data.cost_summary = self.session.cost_summary()
         if panel in {"Overview", "Data"} and self.config.is_multi_objective:
             data.pareto_summary = self.session.pareto_summary()
             if panel == "Data":

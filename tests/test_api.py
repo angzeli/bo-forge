@@ -29,13 +29,6 @@ def copy_campaign(root: Path, config_name: str, log_name: str) -> dict[str, str]
     return {"config_path": f"configs/{config_name}", "log_path": f"examples/{log_name}"}
 
 
-def copy_suggestions(root: Path, name: str) -> pd.DataFrame:
-    source = PROJECT_ROOT / "examples" / name
-    destination = root / "examples" / name
-    shutil.copyfile(source, destination)
-    return pd.read_csv(destination, keep_default_na=False)
-
-
 def client(root: Path) -> TestClient:
     return TestClient(create_app(root))
 
@@ -83,7 +76,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.3.0"
+    assert payload["version"] == "2.3.1"
     assert payload["experimental"] is True
 
 
@@ -445,6 +438,44 @@ def test_api_append_tampered_context_metadata_fails_without_mutation(
     assert log_path.read_bytes() == before
 
 
+def test_api_contextual_cost_append_rejects_changed_budget_log_without_mutation(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "20_contextual_cost_review_logei.yaml",
+        "20_contextual_cost_review_campaign_log.csv",
+    )
+    api_client = client(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    dry_run_response = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={
+            **ref,
+            "batch_size": 1,
+            "context_values": {"feedstock_acidity": 0.5},
+        },
+    )
+    assert dry_run_response.status_code == 200, dry_run_response.text
+    dry_run = dry_run_response.json()
+
+    changed = pd.read_csv(log_path, keep_default_na=False)
+    changed.loc[changed["row_id"] == "ctx_cost_seed_0", "cost_actual"] = 80.0
+    changed.to_csv(log_path, index=False)
+    before_failed_append = log_path.read_bytes()
+
+    response = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": dry_run["staged_bundle"]},
+    )
+
+    assert response.status_code == 400
+    assert "Log file changed after suggestions were staged" in response.json()["error"][
+        "message"
+    ]
+    assert log_path.read_bytes() == before_failed_append
+
+
 @pytest.mark.parametrize("path_field", ["config_path", "log_path"])
 def test_api_append_staged_bundle_path_escape_fails_without_mutation(
     tmp_path: Path,
@@ -474,13 +505,16 @@ def test_api_append_staged_bundle_path_escape_fails_without_mutation(
     assert log_path.read_bytes() == before
 
 
-def test_api_review_works_and_stale_fingerprint_fails(tmp_path: Path) -> None:
+def test_api_review_works_and_stale_fingerprint_fails(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     ref = copy_campaign(
         tmp_path,
         "07_cost_aware_human_review_logei.yaml",
         "07_cost_aware_human_review_campaign_log.csv",
     )
-    suggestions = copy_suggestions(tmp_path, "07_cost_aware_human_review_latest_suggestions.csv")
+    suggestions = suggestion_fixture("07_cost_aware_human_review_latest_suggestions.csv")
     bundle = staged_bundle_payload(tmp_path, ref, suggestions.head(1))
     api_client = client(tmp_path)
     append_payload(api_client, ref, bundle)
@@ -536,13 +570,16 @@ def test_api_mutation_endpoints_require_expected_log_fingerprint(tmp_path: Path)
         assert "expected_log_fingerprint" in response.text
 
 
-def test_api_mark_observed_single_objective_with_actual_cost(tmp_path: Path) -> None:
+def test_api_mark_observed_single_objective_with_actual_cost(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     ref = copy_campaign(
         tmp_path,
         "07_cost_aware_human_review_logei.yaml",
         "07_cost_aware_human_review_campaign_log.csv",
     )
-    suggestions = copy_suggestions(tmp_path, "07_cost_aware_human_review_latest_suggestions.csv")
+    suggestions = suggestion_fixture("07_cost_aware_human_review_latest_suggestions.csv")
     bundle = staged_bundle_payload(tmp_path, ref, suggestions.head(1))
     api_client = client(tmp_path)
     append_payload(api_client, ref, bundle)
@@ -579,15 +616,15 @@ def test_api_mark_observed_single_objective_with_actual_cost(tmp_path: Path) -> 
 
 def test_api_mark_observed_multi_objective_and_partial_failure(
     tmp_path: Path,
+    suggestion_fixture,
 ) -> None:
     ref = copy_campaign(
         tmp_path,
         "10_multi_objective_mixed_constrained_qlogehvi.yaml",
         "10_multi_objective_mixed_constrained_campaign_log.csv",
     )
-    suggestions = copy_suggestions(
-        tmp_path,
-        "10_multi_objective_mixed_constrained_latest_suggestions.csv",
+    suggestions = suggestion_fixture(
+        "10_multi_objective_mixed_constrained_latest_suggestions.csv"
     )
     bundle = staged_bundle_payload(tmp_path, ref, suggestions.head(1))
     api_client = client(tmp_path)
@@ -626,13 +663,16 @@ def test_api_mark_observed_multi_objective_and_partial_failure(
     assert float(row["waste_score"]) == pytest.approx(15.0)
 
 
-def test_api_mark_observed_multi_objective_actual_cost(tmp_path: Path) -> None:
+def test_api_mark_observed_multi_objective_actual_cost(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     ref = copy_campaign(
         tmp_path,
         "12_cost_aware_multi_objective_qlogehvi.yaml",
         "12_cost_aware_multi_objective_campaign_log.csv",
     )
-    suggestions = copy_suggestions(tmp_path, "12_cost_aware_multi_objective_latest_suggestions.csv")
+    suggestions = suggestion_fixture("12_cost_aware_multi_objective_latest_suggestions.csv")
     bundle = staged_bundle_payload(tmp_path, ref, suggestions.head(1))
     api_client = client(tmp_path)
     append_payload(api_client, ref, bundle)
@@ -666,15 +706,17 @@ def test_api_mark_observed_multi_objective_actual_cost(tmp_path: Path) -> None:
     assert float(row["cost_actual"]) == pytest.approx(2.1)
 
 
-def test_api_observation_stale_fingerprint_fails_without_mutation(tmp_path: Path) -> None:
+def test_api_observation_stale_fingerprint_fails_without_mutation(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     ref = copy_campaign(
         tmp_path,
         "10_multi_objective_mixed_constrained_qlogehvi.yaml",
         "10_multi_objective_mixed_constrained_campaign_log.csv",
     )
-    suggestions = copy_suggestions(
-        tmp_path,
-        "10_multi_objective_mixed_constrained_latest_suggestions.csv",
+    suggestions = suggestion_fixture(
+        "10_multi_objective_mixed_constrained_latest_suggestions.csv"
     )
     bundle = staged_bundle_payload(tmp_path, ref, suggestions.head(1))
     api_client = client(tmp_path)

@@ -70,6 +70,7 @@ from bo_forge.validation import (
 
 MAX_CATEGORICAL_COMBINATIONS = 64
 MAX_DECODE_RETRIES = 8
+MAX_INITIAL_DESIGN_BATCHES = 1000
 _GENERATION_FAILURE_HINT = (
     "The feasible design space may be exhausted, constraints may be too restrictive, "
     "or bo.min_normalized_distance may be too large."
@@ -1291,7 +1292,9 @@ def _suggest_cost_aware_model_based(
 ) -> pd.DataFrame:
     if config.context is not None and context_values is None:
         raise SuggestionError(
-            "Contextual cost-aware suggestions require resolved context values."
+            "Contextual cost-aware suggestions require resolved context values. "
+            "Provide every required context value through context defaults, "
+            "context_values=..., or CLI --context NAME=VALUE."
         )
     torch.manual_seed(config.bo.random_seed)
     combination_count = (
@@ -1560,6 +1563,7 @@ def _initial_user_candidates(
     selected: list[tuple[object, ...]] = []
     seen = set(existing)
     batches_drawn = 0
+    minimum_rejected_candidate_cost: float | None = None
     initial_remaining_budget = budget_remaining(config, df)
     if (
         config.cost is not None
@@ -1568,7 +1572,7 @@ def _initial_user_candidates(
     ):
         raise SuggestionError(
             "Could not generate enough budget-feasible initial suggestions. "
-            "The remaining budget may be too small."
+            f"remaining_budget={initial_remaining_budget:.6g}."
         )
 
     while len(selected) < count:
@@ -1592,6 +1596,12 @@ def _initial_user_candidates(
                 selected_cost = sum(evaluate_cost(config, item) for item in selected)
                 candidate_cost = evaluate_cost(config, candidate)
                 if candidate_cost > initial_remaining_budget - selected_cost:
+                    minimum_rejected_candidate_cost = min(
+                        candidate_cost,
+                        minimum_rejected_candidate_cost
+                        if minimum_rejected_candidate_cost is not None
+                        else candidate_cost,
+                    )
                     continue
             selected.append(candidate)
             candidate_key = design_key_for_values(config, candidate)
@@ -1599,12 +1609,22 @@ def _initial_user_candidates(
             if len(selected) == count:
                 break
         batches_drawn += 1
-        if batches_drawn > 1000 or len(seen) > 100_000:
+        if batches_drawn > MAX_INITIAL_DESIGN_BATCHES or len(seen) > 100_000:
             if config.cost is not None and initial_remaining_budget is not None:
+                selected_cost = sum(evaluate_cost(config, item) for item in selected)
+                available_for_next = initial_remaining_budget - selected_cost
+                cost_detail = (
+                    ""
+                    if minimum_rejected_candidate_cost is None
+                    else ", minimum_rejected_candidate_cost="
+                    f"{minimum_rejected_candidate_cost:.6g}, "
+                    f"available_for_next_candidate={available_for_next:.6g}"
+                )
                 raise SuggestionError(
                     "Could not generate enough budget-feasible initial suggestions. "
                     "The feasible design space may be exhausted or the remaining "
-                    "budget may be too small."
+                    "budget may be too small: "
+                    f"remaining_budget={initial_remaining_budget:.6g}{cost_detail}."
                 )
             raise SuggestionError(
                 "Could not generate enough feasible, non-duplicate suggestions after "

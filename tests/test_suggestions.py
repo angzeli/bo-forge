@@ -2237,7 +2237,27 @@ def test_initial_cost_budget_exhaustion_raises_clear_error() -> None:
     cfg = cost_review_mixed_config(batch_size=1, initial_design_size=2, budget=0.0)
     df = empty_campaign_log(cfg)
 
-    with pytest.raises(SuggestionError, match="budget-feasible initial suggestions"):
+    with pytest.raises(
+        SuggestionError,
+        match=r"budget-feasible initial suggestions.*remaining_budget=0",
+    ):
+        suggest_next(cfg, df)
+
+
+def test_initial_cost_budget_failure_reports_rejected_candidate_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = cost_review_mixed_config(batch_size=1, initial_design_size=2, budget=0.5)
+    df = empty_campaign_log(cfg)
+    monkeypatch.setattr(suggestions_module, "MAX_INITIAL_DESIGN_BATCHES", 0)
+
+    with pytest.raises(
+        SuggestionError,
+        match=(
+            r"remaining_budget=0\.5, minimum_rejected_candidate_cost="
+            r"[0-9.]+, available_for_next_candidate=0\.5"
+        ),
+    ):
         suggest_next(cfg, df)
 
 

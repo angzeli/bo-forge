@@ -1414,6 +1414,11 @@ def test_active_panel_dispatch_renders_only_selected_panel(monkeypatch: pytest.M
     assert calls == ["collect:Resolve", "Resolve"]
 
 
+def test_collect_panel_view_data_requires_service_boundary() -> None:
+    with pytest.raises(TypeError, match="must provide collect_view_data"):
+        streamlit_app._collect_panel_view_data(object(), "Overview")
+
+
 def test_source_bar_does_not_fingerprint_staged_bundle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2190,17 +2195,27 @@ def test_multi_objective_observation_keys_are_row_scoped(tmp_path: Path) -> None
         config=cfg,
         df=df,
     )
+    input_scope = streamlit_app._campaign_widget_key_scope(
+        cfg,
+        config_path=campaign.config_path,
+        log_path=campaign.log_path,
+    )
     first_yield_key = streamlit_app._stable_widget_key(
         "observed_objective",
+        input_scope,
         "suggested_1",
         "yield_score",
     )
     first_waste_key = streamlit_app._stable_widget_key(
         "observed_objective",
+        input_scope,
         "suggested_1",
         "waste_score",
     )
-    first_cost_key = streamlit_app._stable_widget_key("actual_cost", "suggested_1")
+    first_cost_key = streamlit_app._stable_widget_key(
+        "actual_cost",
+        f"{input_scope}|suggested_1",
+    )
 
     class _Context:
         def __enter__(self) -> "_Context":
@@ -2273,6 +2288,102 @@ def test_streamlit_app_smoke_runs_without_exceptions() -> None:
     assert len(app.exception) == 0
     assert any(radio.label == "Campaign file action" for radio in app.radio)
     assert any("Nothing loaded yet" in markdown.value for markdown in app.markdown)
+
+
+def test_campaign_scoped_observation_keys_do_not_cross_campaigns() -> None:
+    config = CampaignConfig.from_yaml("configs/20_contextual_cost_review_logei.yaml")
+    first_scope = streamlit_app._campaign_widget_key_scope(
+        config,
+        config_path="configs/first.yaml",
+        log_path="logs/first.csv",
+    )
+    second_scope = streamlit_app._campaign_widget_key_scope(
+        config,
+        config_path="configs/second.yaml",
+        log_path="logs/second.csv",
+    )
+
+    first_key = streamlit_app._stable_widget_key(
+        "observed_objective",
+        first_scope,
+        "shared_row_id",
+        "yield_score",
+    )
+    second_key = streamlit_app._stable_widget_key(
+        "observed_objective",
+        second_scope,
+        "shared_row_id",
+        "yield_score",
+    )
+
+    assert first_scope != second_scope
+    assert first_key != second_key
+
+
+def test_clear_observation_inputs_removes_only_row_scoped_values() -> None:
+    state = {
+        "observed_objective_abc": 0.8,
+        "actual_cost_def": "2.5",
+        streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY: {"suggestions": "keep"},
+        "unrelated": "keep",
+    }
+    fake_streamlit = SimpleNamespace(session_state=state)
+
+    streamlit_app._clear_observation_inputs(fake_streamlit)
+
+    assert "observed_objective_abc" not in state
+    assert "actual_cost_def" not in state
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY in state
+    assert state["unrelated"] == "keep"
+
+
+def test_loading_campaign_clears_previous_observation_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign_name: placeholder\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+    loaded_service = SimpleNamespace(config_path=config_path, log_path=log_path)
+
+    class FakeStreamlit:
+        session_state = {
+            "observed_objective_old": 0.7,
+            "actual_cost_old": "4.2",
+            "unrelated": "keep",
+        }
+
+        @staticmethod
+        def error(message: str) -> None:
+            raise AssertionError(message)
+
+    monkeypatch.setattr(
+        streamlit_app.CampaignAppService,
+        "load",
+        lambda *_args, **_kwargs: loaded_service,
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_refresh_validation_cache",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_flash_and_rerun",
+        lambda *_args, **_kwargs: None,
+    )
+
+    streamlit_app._load_campaign_from_inputs(
+        FakeStreamlit,
+        str(config_path),
+        str(log_path),
+    )
+
+    assert "observed_objective_old" not in FakeStreamlit.session_state
+    assert "actual_cost_old" not in FakeStreamlit.session_state
+    assert FakeStreamlit.session_state["unrelated"] == "keep"
+    assert FakeStreamlit.session_state[streamlit_app.SESSION_KEY] is loaded_service
 
 
 def test_streamlit_load_refreshes_source_bar_and_does_not_leak_metric_html() -> None:
@@ -2928,6 +3039,11 @@ def test_streamlit_contextual_review_cost_suggest_review_observe_round_trip(
     app.run(timeout=20)
     bundle = app.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
     assert bundle["context_values"] == {"x2": 0.0}
+    suggest_markdown = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Context: x2" in suggest_markdown
+    assert "Remaining budget" in suggest_markdown
+    assert "Staged estimated cost" in suggest_markdown
+    assert "Review state" in suggest_markdown
 
     next(button for button in app.button if button.label == "Append staged suggestions").click()
     app.run(timeout=10)
@@ -2947,8 +3063,13 @@ def test_streamlit_contextual_review_cost_suggest_review_observe_round_trip(
     app.run(timeout=10)
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Resolve")
     app.run(timeout=10)
+    resolve_markdown = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Remaining" in resolve_markdown
     next(button for button in app.button if button.label == "Apply review decision").click()
     app.run(timeout=10)
+    observable_markdown = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Review state" in observable_markdown
+    assert "Estimated cost" in observable_markdown
 
     next(
         input_ for input_ in app.number_input if input_.label == "Observed activity"

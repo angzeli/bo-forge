@@ -787,35 +787,35 @@ def _validate_qlog_nehvi_combinations(
     if not multi_objective:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' is only supported for coupled "
-            "multi-objective campaigns in v2.3.0."
+            "multi-objective campaigns in v2.3.1."
         )
     if objective_count > 4:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.3.0: "
+            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.3.1: "
             f"configured={objective_count}."
         )
     if fidelity is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.3.0."
+            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.3.1."
         )
     if stages:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with structured stages "
-            "in v2.3.0."
+            "in v2.3.1."
         )
     if context is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.3.0."
+            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.3.1."
         )
     if cost is not None:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with cost-aware campaigns "
-            "in v2.3.0."
+            "in v2.3.1."
         )
     if replicates.enabled:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' cannot be combined with replicate campaigns "
-            "in v2.3.0."
+            "in v2.3.1."
         )
 
 
@@ -831,13 +831,13 @@ def _validate_context_combinations(
     if context is None:
         return
     if multi_objective:
-        raise ConfigError("context is only supported for single-objective campaigns in v2.3.0.")
+        raise ConfigError("context is only supported for single-objective campaigns in v2.3.1.")
     if stages:
-        raise ConfigError("context cannot be combined with structured campaign stages in v2.3.0.")
+        raise ConfigError("context cannot be combined with structured campaign stages in v2.3.1.")
     if fidelity is not None:
-        raise ConfigError("context cannot be combined with fidelity campaigns in v2.3.0.")
+        raise ConfigError("context cannot be combined with fidelity campaigns in v2.3.1.")
     if replicates.enabled:
-        raise ConfigError("context cannot be combined with replicate campaigns in v2.3.0.")
+        raise ConfigError("context cannot be combined with replicate campaigns in v2.3.1.")
 
 
 def _validate_fidelity_combinations(

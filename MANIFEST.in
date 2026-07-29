@@ -10,3 +10,4 @@ recursive-include docs *.md
 include examples/quickstart.py
 recursive-include examples *_campaign_log.csv
 recursive-include notebooks *.ipynb
+include tests/conftest.py

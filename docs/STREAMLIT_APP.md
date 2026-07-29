@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.3.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.3.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -28,11 +28,13 @@ renders one input per context variable, passes those values to
 the staged suggestion bundle before explicit append. Contextual campaigns also
 show Context Summary tables and expose Context Diagnostics in `Reports`.
 
-v2.3.0 extends the contextual Streamlit path to app-created or loaded
+v2.3.1 hardens the contextual Streamlit path for app-created or loaded
 single-objective contextual LogEI configs with optional review metadata,
-deterministic cost, or both. Cost estimates are computed from the full
-candidate, including fixed context values, and the existing cost summary,
-actual-cost entry, cost-progress plot, and review queue controls apply.
+deterministic cost, or both. The Suggest and Resolve panels surface active
+context, budget, estimated cost, and review state; campaign-scoped observation
+inputs and staged-bundle fingerprints prevent state from leaking across
+campaign or context changes. Cost estimates are still computed from the full
+candidate, including fixed context values.
 
 The optional FastAPI probe added in v1.2.3 is documented separately in
 [API_PROBE.md](API_PROBE.md). It is experimental and does not replace the
@@ -260,7 +262,7 @@ The app keeps file selection in the source bar, followed by five practical campa
 
 - `Overview`: validation, campaign status, next action, compact metrics, best-observation or Pareto summary, and compact cost/replicate/fidelity summaries.
 - `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
-- `Resolve`: review queue, observable suggestions, single-objective mark-observed, coupled multi-objective objective entry, and actual-cost input when configured.
+- `Resolve`: review queue, observable suggestions, single-objective mark-observed, coupled multi-objective objective entry, and actual-cost entry when configured.
 - `Reports`: report preview/export and supported plot controls. Report text and figures are generated only after explicit actions.
 - `Data`: raw summary and next-action tables, observed rows, pending rows, Pareto tables, cost/replicate/fidelity summaries, and the full raw log.
 

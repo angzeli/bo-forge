@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.3.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.3.1 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, or both.
 
@@ -162,7 +162,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.3.0 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.3.1 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -469,6 +469,9 @@ Fix: check whether constraints are too restrictive, whether the feasible design 
 The cost-aware suggestion loop could not find enough feasible candidates within the remaining budget.
 
 Fix: check `campaign.cost_summary()`, the configured `cost.budget`, and the cost expression. Observed rows consume actual cost when present; accepted pending suggestions reserve estimated cost.
+
+Initial-design failures also report `minimum_rejected_candidate_cost` and
+`available_for_next_candidate` when candidates were rejected by the budget.
 
 ## 🔢 Numeric And Bounds Errors
 

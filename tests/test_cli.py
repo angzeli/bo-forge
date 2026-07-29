@@ -674,7 +674,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.3.0\n"
+    assert captured.out == "bo-forge 2.3.1\n"
     assert captured.err == ""
 
 
@@ -683,7 +683,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.3.0\n"
+    assert completed.stdout == "bo-forge 2.3.1\n"
     assert completed.stderr == ""
 
 
@@ -1220,6 +1220,50 @@ def test_contextual_cost_review_cli_round_trip_with_actual_cost(
     assert "feedstock_acidity=0.5" in capsys.readouterr().out
     assert run(["cost-summary", *base_args(config_path, log_path)]) == 0
     assert "budget_remaining" in capsys.readouterr().out
+
+    report_path = tmp_path / "contextual_cost_review_report.md"
+    context_plot_path = tmp_path / "context_diagnostics.png"
+    cost_plot_path = tmp_path / "cost_progress.png"
+    assert (
+        run(
+            [
+                "report",
+                *base_args(config_path, log_path),
+                "--output",
+                str(report_path),
+            ]
+        )
+        == 0
+    )
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "context-diagnostics",
+                "--output",
+                str(context_plot_path),
+            ]
+        )
+        == 0
+    )
+    assert (
+        run(
+            [
+                "plot",
+                *base_args(config_path, log_path),
+                "--kind",
+                "cost-progress",
+                "--output",
+                str(cost_plot_path),
+            ]
+        )
+        == 0
+    )
+    assert report_path.exists()
+    assert context_plot_path.exists()
+    assert cost_plot_path.exists()
 
 
 def test_contextual_suggest_missing_context_does_not_append(

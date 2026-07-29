@@ -1,13 +1,13 @@
-# 🧪 BO Forge v2.3.0
+# 🧪 BO Forge v2.3.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.3.0 starts the controlled feature-combination line by allowing
-single-objective contextual LogEI campaigns to combine with review metadata,
-deterministic cost, or both. Context variables remain ordinary CSV columns,
-cost is evaluated on the full fixed-context candidate, and contextual
-qLogNEI/qLogNEHVI, multi-objective, structured, multi-fidelity, and replicate
-combinations remain deferred.
+v2.3.1 hardens the controlled feature combinations introduced in v2.3.0:
+single-objective contextual LogEI campaigns with review metadata,
+deterministic cost, or both. It strengthens staged-state safety and app clarity
+while context variables remain ordinary CSV columns, cost is evaluated on the
+full fixed-context candidate, and broader contextual combinations remain
+deferred.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -227,7 +227,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.3.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.3.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 
 import bo_forge.suggestions as suggestions_module
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import LogWriteError
+from bo_forge.errors import LogWriteError, SuggestionError
 from bo_forge.session import CampaignSession
 from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
@@ -84,7 +84,7 @@ print("ok")
             "07_cost_aware_human_review_logei.yaml",
             "07_cost_aware_human_review_campaign_log.csv",
             "Resolve",
-            ["pending", "observable", "review_queue"],
+            ["pending", "observable", "review_queue", "cost_summary"],
         ),
         (
             "08_replicate_aware_logei.yaml",
@@ -123,6 +123,12 @@ print("ok")
             "16_contextual_logei_campaign_log.csv",
             "Overview",
             ["summary", "next_action", "model_summary", "observed", "pending", "context_summary"],
+        ),
+        (
+            "20_contextual_cost_review_logei.yaml",
+            "20_contextual_cost_review_campaign_log.csv",
+            "Suggest",
+            ["cost_summary"],
         ),
     ],
 )
@@ -230,6 +236,55 @@ def test_app_service_contextual_append_rejects_tampered_context_metadata(
 
     with pytest.raises(ValueError, match="Context values changed after suggestions were staged"):
         service.append_staged(result.bundle)
+    assert log_path.read_bytes() == before
+
+
+def test_app_service_contextual_cost_append_rejects_budget_log_change_without_mutation(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "20_contextual_cost_review_logei.yaml")
+    log_path = copy_example_log(tmp_path, "20_contextual_cost_review_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    result = service.suggest_dry_run(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.5},
+    )
+
+    changed = pd.read_csv(log_path, keep_default_na=False)
+    changed.loc[changed["row_id"] == "ctx_cost_seed_0", "cost_actual"] = 80.0
+    changed.to_csv(log_path, index=False)
+    before_failed_append = log_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Log file changed after suggestions were staged"):
+        service.append_staged(
+            result.bundle,
+            context_values={"feedstock_acidity": 0.5},
+        )
+
+    assert log_path.read_bytes() == before_failed_append
+
+
+@pytest.mark.parametrize(
+    ("context_values", "message"),
+    [
+        ({"feedstock_acidity": float("nan")}, "must be finite"),
+        ({"feedstock_acidity": 1.5}, "outside variable 'feedstock_acidity' bounds"),
+        ({"unknown_context": 0.5}, "Unknown context variable"),
+    ],
+)
+def test_app_service_contextual_cost_invalid_context_is_non_mutating(
+    tmp_path: Path,
+    context_values: dict[str, object],
+    message: str,
+) -> None:
+    config_path = copy_example_config(tmp_path, "20_contextual_cost_review_logei.yaml")
+    log_path = copy_example_log(tmp_path, "20_contextual_cost_review_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    before = log_path.read_bytes()
+
+    with pytest.raises(SuggestionError, match=message):
+        service.suggest_dry_run(batch_size=1, context_values=context_values)
+
     assert log_path.read_bytes() == before
 
 
@@ -381,14 +436,14 @@ def test_app_service_append_staged_rejects_mutated_payload_without_mutation(
     assert log_path.read_bytes() == before
 
 
-def test_app_service_review_and_single_objective_mark_observed(tmp_path: Path) -> None:
+def test_app_service_review_and_single_objective_mark_observed(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     config_path = PROJECT_ROOT / "configs" / "07_cost_aware_human_review_logei.yaml"
     log_path = copy_example_log(tmp_path, "07_cost_aware_human_review_campaign_log.csv")
     service = CampaignAppService.load(config_path, log_path)
-    suggestions = pd.read_csv(
-        PROJECT_ROOT / "examples" / "07_cost_aware_human_review_latest_suggestions.csv",
-        keep_default_na=False,
-    ).head(1)
+    suggestions = suggestion_fixture("07_cost_aware_human_review_latest_suggestions.csv")
     bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
 
     service.append_staged(bundle)
@@ -406,14 +461,12 @@ def test_app_service_review_and_single_objective_mark_observed(tmp_path: Path) -
 
 def test_app_service_multi_objective_mark_observed_with_actual_cost(
     tmp_path: Path,
+    suggestion_fixture,
 ) -> None:
     config_path = PROJECT_ROOT / "configs" / "12_cost_aware_multi_objective_qlogehvi.yaml"
     log_path = copy_example_log(tmp_path, "12_cost_aware_multi_objective_campaign_log.csv")
     service = CampaignAppService.load(config_path, log_path)
-    suggestions = pd.read_csv(
-        PROJECT_ROOT / "examples" / "12_cost_aware_multi_objective_latest_suggestions.csv",
-        keep_default_na=False,
-    ).head(1)
+    suggestions = suggestion_fixture("12_cost_aware_multi_objective_latest_suggestions.csv")
     bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
 
     service.append_staged(bundle)
@@ -436,14 +489,12 @@ def test_app_service_multi_objective_mark_observed_with_actual_cost(
 
 def test_app_service_multi_objective_partial_values_do_not_mutate(
     tmp_path: Path,
+    suggestion_fixture,
 ) -> None:
     config_path = PROJECT_ROOT / "configs" / "10_multi_objective_mixed_constrained_qlogehvi.yaml"
     log_path = copy_example_log(tmp_path, "10_multi_objective_mixed_constrained_campaign_log.csv")
     service = CampaignAppService.load(config_path, log_path)
-    suggestions = pd.read_csv(
-        PROJECT_ROOT / "examples" / "10_multi_objective_mixed_constrained_latest_suggestions.csv",
-        keep_default_na=False,
-    ).head(1)
+    suggestions = suggestion_fixture("10_multi_objective_mixed_constrained_latest_suggestions.csv")
     service.append_staged(make_staged_suggestion_bundle(suggestions, config_path, log_path))
     row_id = str(suggestions.loc[0, "row_id"])
     before = log_path.read_bytes()
@@ -454,14 +505,14 @@ def test_app_service_multi_objective_partial_values_do_not_mutate(
     assert log_path.read_bytes() == before
 
 
-def test_app_service_nonfinite_actual_cost_does_not_mutate(tmp_path: Path) -> None:
+def test_app_service_nonfinite_actual_cost_does_not_mutate(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     config_path = PROJECT_ROOT / "configs" / "07_cost_aware_human_review_logei.yaml"
     log_path = copy_example_log(tmp_path, "07_cost_aware_human_review_campaign_log.csv")
     service = CampaignAppService.load(config_path, log_path)
-    suggestions = pd.read_csv(
-        PROJECT_ROOT / "examples" / "07_cost_aware_human_review_latest_suggestions.csv",
-        keep_default_na=False,
-    ).head(1)
+    suggestions = suggestion_fixture("07_cost_aware_human_review_latest_suggestions.csv")
     service.append_staged(make_staged_suggestion_bundle(suggestions, config_path, log_path))
     row_id = str(suggestions.loc[0, "row_id"])
     service.review(row_id, "accept", "ready")
@@ -473,14 +524,14 @@ def test_app_service_nonfinite_actual_cost_does_not_mutate(tmp_path: Path) -> No
     assert log_path.read_bytes() == before
 
 
-def test_app_service_invalid_review_decision_does_not_mutate(tmp_path: Path) -> None:
+def test_app_service_invalid_review_decision_does_not_mutate(
+    tmp_path: Path,
+    suggestion_fixture,
+) -> None:
     config_path = PROJECT_ROOT / "configs" / "07_cost_aware_human_review_logei.yaml"
     log_path = copy_example_log(tmp_path, "07_cost_aware_human_review_campaign_log.csv")
     service = CampaignAppService.load(config_path, log_path)
-    suggestions = pd.read_csv(
-        PROJECT_ROOT / "examples" / "07_cost_aware_human_review_latest_suggestions.csv",
-        keep_default_na=False,
-    ).head(1)
+    suggestions = suggestion_fixture("07_cost_aware_human_review_latest_suggestions.csv")
     service.append_staged(make_staged_suggestion_bundle(suggestions, config_path, log_path))
     row_id = str(suggestions.loc[0, "row_id"])
     before = log_path.read_bytes()
@@ -605,6 +656,44 @@ def test_app_service_contextual_cost_review_round_trip(tmp_path: Path) -> None:
     assert "cost_progress" in refreshed.available_plot_kinds()
     assert refreshed.collect_view_data("Overview").context_summary is not None
     assert refreshed.collect_view_data("Overview").cost_summary is not None
+
+
+@pytest.mark.parametrize(
+    ("objective_value", "actual_cost", "message"),
+    [
+        (float("nan"), 4.2, "Objective value.*finite"),
+        (0.84, float("inf"), "actual_cost.*finite and >= 0"),
+    ],
+)
+def test_app_service_contextual_cost_invalid_observation_is_non_mutating(
+    tmp_path: Path,
+    objective_value: float,
+    actual_cost: float,
+    message: str,
+) -> None:
+    config_path = copy_example_config(tmp_path, "20_contextual_cost_review_logei.yaml")
+    log_path = copy_example_log(tmp_path, "20_contextual_cost_review_campaign_log.csv")
+    service = CampaignAppService.load(config_path, log_path)
+    result = service.suggest_dry_run(
+        batch_size=1,
+        context_values={"feedstock_acidity": 0.5},
+    )
+    service.append_staged(
+        result.bundle,
+        context_values={"feedstock_acidity": 0.5},
+    )
+    row_id = str(result.suggestions.loc[0, "row_id"])
+    service.review(row_id, "accept", "approved")
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogWriteError, match=message):
+        service.mark_observed(
+            row_id,
+            objective_value=objective_value,
+            actual_cost=actual_cost,
+        )
+
+    assert log_path.read_bytes() == before
 
 
 def test_app_service_model_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:

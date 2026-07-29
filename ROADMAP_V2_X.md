@@ -4,11 +4,11 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.3.0`. The v2.3.0 release starts the controlled
-feature-combination line by allowing single-objective contextual LogEI
-campaigns to combine with review metadata, deterministic cost, or both while
-keeping contextual qLogNEI, qLogNEHVI, multi-objective, structured,
-multi-fidelity, and replicate-aware workflows deferred.
+Current baseline: `v2.3.1`. The v2.3.1 release hardens the contextual review
+and deterministic-cost combinations introduced in v2.3.0, with stronger
+stale-state safety, app state isolation, diagnostics polish, and regression
+coverage. Contextual qLogNEI, qLogNEHVI, multi-objective, structured,
+multi-fidelity, and replicate-aware workflows remain deferred.
 
 ## Roadmap So Far
 
@@ -25,6 +25,7 @@ flowchart LR
     v222["v2.2.2<br/>qLogNEHVI feasibility review"]
     v223["v2.2.3<br/>Conservative qLogNEHVI"]
     v230["v2.3.0<br/>Contextual review + cost"]
+    v231["v2.3.1<br/>Combination hardening"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -35,13 +36,15 @@ flowchart LR
     v22 -.-> v222
     v22 -.-> v223
     v23 -.-> v230
+    v23 -.-> v231
 
     class v10,v20,v21,v22 majorDone
     class v23 majorActive
     class v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
-    class v230 patchActive
+    class v230 patchDone
+    class v231 patchActive
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -111,6 +114,8 @@ Status: active
   feature cross-product.
 - `v2.3.0` adds single-objective contextual LogEI support for review metadata,
   deterministic cost, and review + cost together.
+- `v2.3.1` hardens contextual combination staging, no-mutation guarantees,
+  Streamlit campaign state isolation, and release-readiness coverage.
 - Candidate future combinations include contextual + replicates and structured
   + cost.
 - Keep unsupported combinations documented in the capability matrix.

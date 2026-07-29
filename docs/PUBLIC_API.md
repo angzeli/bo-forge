@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.3.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.3.1.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -83,7 +83,7 @@ Contextual campaigns expose `ContextConfig` and `context_summary` through the
 top-level package for config construction and read-only inspection.
 `CampaignConfig.context_variable_names` and
 `CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
-context variables and optimized decision variables. v2.3.0 contextual support
+context variables and optimized decision variables. v2.3.1 contextual support
 is single-objective LogEI/qLogEI only; `bo.acquisition: log_ei` may combine
 with `review.enabled: true`, deterministic `cost:`, or both. Use
 `suggest_next(config, df, context_values={...})` or
@@ -96,7 +96,7 @@ plotting APIs.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.3.0 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.3.1 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect

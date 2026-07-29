@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v2.3.1 - Contextual Combination Workflow Hardening
+
+This stabilization patch hardens the v2.3.0 contextual review and deterministic
+cost workflow without changing BO behavior, configuration keys, or CSV schemas.
+
+- Keeps staged contextual suggestions tied to their context values plus exact
+  config, log, and suggestion-payload fingerprints.
+- Adds combination-specific no-mutation coverage for changed budget state,
+  invalid context values, invalid objective values, and invalid actual cost.
+- Scopes Streamlit observation inputs to the loaded config/log identity so
+  campaign switches cannot reuse values from another campaign.
+- Shows active context values, remaining budget, staged cost, and review state
+  more clearly in the Streamlit Suggest and Resolve panels.
+- Expands CLI, service, API, and AppTest coverage for example `20` while keeping
+  API endpoint shapes and backend public interfaces unchanged.
+
 ## v2.3.0 - Contextual Cost, Review, And Tutorial
 
 This patch starts the v2.3 controlled-combinations line by allowing
