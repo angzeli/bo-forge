@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.3.2 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.3.3 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.3.2 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.3.3 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`

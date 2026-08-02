@@ -717,24 +717,23 @@ def _validate_model_combinations(
     if multi_objective:
         raise ConfigError(
             "Non-default model profiles are only supported for single-objective "
-            "campaigns configured with bo.acquisition: log_ei or qlog_nei "
-            "in v2.3.x; "
+            "campaigns configured with bo.acquisition: log_ei or qlog_nei; "
             "use model.profile: default for multi-objective campaigns."
         )
     if fidelity is not None:
         raise ConfigError(
             "Non-default model profiles cannot be combined with fidelity campaigns "
-            "in v2.3.x; use model.profile: default."
+            "because that model path requires model.profile: default."
         )
     if stages:
         raise ConfigError(
             "Non-default model profiles cannot be combined with structured campaign "
-            "stages in v2.3.x; use model.profile: default."
+            "stages; use model.profile: default."
         )
     if bo.acquisition not in {"log_ei", "qlog_nei"}:
         raise ConfigError(
             "Non-default model profiles require bo.acquisition: log_ei or "
-            "qlog_nei in v2.3.x."
+            "qlog_nei."
         )
 
 
@@ -751,23 +750,23 @@ def _validate_qlog_nei_combinations(
     if bo.acquisition != "qlog_nei":
         return
     if multi_objective:
-        raise ConfigError("bo.acquisition='qlog_nei' is single-objective only in v2.3.x.")
+        raise ConfigError("bo.acquisition='qlog_nei' is single-objective only.")
     if fidelity is not None:
-        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with fidelity in v2.3.x.")
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with fidelity.")
     if stages:
         raise ConfigError(
-            "bo.acquisition='qlog_nei' cannot be combined with structured stages in v2.3.x."
+            "bo.acquisition='qlog_nei' cannot be combined with structured stages."
         )
     if context is not None:
-        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with context in v2.3.x.")
+        raise ConfigError("bo.acquisition='qlog_nei' cannot be combined with context.")
     if cost is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nei' cannot be combined with cost-aware campaigns in v2.3.x."
+            "bo.acquisition='qlog_nei' cannot be combined with cost-aware campaigns."
         )
     if replicates.enabled and replicates.suggestion_policy == "uncertain_best":
         raise ConfigError(
             "bo.acquisition='qlog_nei' supports replicate campaigns only with "
-            "replicates.suggestion_policy: new_only in v2.3.x."
+            "replicates.suggestion_policy: new_only."
         )
 
 
@@ -787,35 +786,32 @@ def _validate_qlog_nehvi_combinations(
     if not multi_objective:
         raise ConfigError(
             "bo.acquisition='qlog_nehvi' is only supported for coupled "
-            "multi-objective campaigns in v2.3.2."
+            "multi-objective campaigns."
         )
     if objective_count > 4:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' supports at most 4 objectives in v2.3.2: "
+            "bo.acquisition='qlog_nehvi' supports at most 4 objectives: "
             f"configured={objective_count}."
         )
     if fidelity is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity in v2.3.2."
+            "bo.acquisition='qlog_nehvi' cannot be combined with fidelity."
         )
     if stages:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with structured stages "
-            "in v2.3.2."
+            "bo.acquisition='qlog_nehvi' cannot be combined with structured stages."
         )
     if context is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with context in v2.3.2."
+            "bo.acquisition='qlog_nehvi' cannot be combined with context."
         )
     if cost is not None:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with cost-aware campaigns "
-            "in v2.3.2."
+            "bo.acquisition='qlog_nehvi' cannot be combined with cost-aware campaigns."
         )
     if replicates.enabled:
         raise ConfigError(
-            "bo.acquisition='qlog_nehvi' cannot be combined with replicate campaigns "
-            "in v2.3.2."
+            "bo.acquisition='qlog_nehvi' cannot be combined with replicate campaigns."
         )
 
 
@@ -831,11 +827,11 @@ def _validate_context_combinations(
     if context is None:
         return
     if multi_objective:
-        raise ConfigError("context is only supported for single-objective campaigns in v2.3.2.")
+        raise ConfigError("context is only supported for single-objective campaigns.")
     if stages:
-        raise ConfigError("context cannot be combined with structured campaign stages in v2.3.2.")
+        raise ConfigError("context cannot be combined with structured campaign stages.")
     if fidelity is not None:
-        raise ConfigError("context cannot be combined with fidelity campaigns in v2.3.2.")
+        raise ConfigError("context cannot be combined with fidelity campaigns.")
 
 
 def _validate_fidelity_combinations(

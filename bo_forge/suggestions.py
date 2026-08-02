@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import uuid
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import pandas as pd
 import torch
@@ -91,6 +91,19 @@ class _CandidateGenerationExhausted(SuggestionError):
     """Internal signal for expected budget or design-space exhaustion."""
 
 
+@dataclass(frozen=True)
+class _SuggestionState:
+    """Validated inputs shared by initial-design and model-based routing."""
+
+    uses_qlog_nei: bool
+    uses_qlog_nehvi: bool
+    resolved_context: dict[str, object]
+    batch_size: int
+    observed_df: pd.DataFrame
+    training_observed_df: pd.DataFrame
+    active_pending_df: pd.DataFrame
+
+
 def suggest_next(
     config: CampaignConfig,
     df: pd.DataFrame,
@@ -111,6 +124,19 @@ def suggest_next(
         )
     if stage is not None:
         raise SuggestionError("--stage is only valid for structured campaign configs.")
+    state = _prepare_suggestion_state(config, df, batch_size, context_values)
+    initial_suggestions = _initial_design_suggestions(config, df, state)
+    if initial_suggestions is not None:
+        return initial_suggestions
+    return _dispatch_model_based_suggestions(config, df, state)
+
+
+def _prepare_suggestion_state(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    batch_size: int | None,
+    context_values: dict[str, object] | None,
+) -> _SuggestionState:
     uses_qlog_nei = config.bo.acquisition == "qlog_nei"
     uses_qlog_nehvi = config.bo.acquisition == "qlog_nehvi"
     if uses_qlog_nei:
@@ -138,116 +164,173 @@ def suggest_next(
 
     observed_df = get_observed_data(config, df)
     training_observed_df = modeling_observed_data(config, observed_df)
+    active_pending_df = _active_pending_suggestions(
+        config,
+        df,
+        uses_qlog_nei=uses_qlog_nei,
+        uses_qlog_nehvi=uses_qlog_nehvi,
+    )
+    return _SuggestionState(
+        uses_qlog_nei=uses_qlog_nei,
+        uses_qlog_nehvi=uses_qlog_nehvi,
+        resolved_context=resolved_context,
+        batch_size=requested_batch_size,
+        observed_df=observed_df,
+        training_observed_df=training_observed_df,
+        active_pending_df=active_pending_df,
+    )
+
+
+def _active_pending_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    uses_qlog_nei: bool,
+    uses_qlog_nehvi: bool,
+) -> pd.DataFrame:
     if uses_qlog_nei:
-        active_pending_df = qlog_nei_active_pending_suggestions(df, config)
-    elif uses_qlog_nehvi:
-        active_pending_df = qlog_nehvi_active_pending_suggestions(df, config)
-    else:
-        active_pending_df = df.iloc[0:0].copy()
+        return qlog_nei_active_pending_suggestions(df, config)
+    if uses_qlog_nehvi:
+        return qlog_nehvi_active_pending_suggestions(df, config)
+    return df.iloc[0:0].copy()
+
+
+def _initial_design_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    state: _SuggestionState,
+) -> pd.DataFrame | None:
     pending_initial_count = (
-        int(active_pending_df["source"].isin({"sobol", "random"}).sum())
-        if (uses_qlog_nei or uses_qlog_nehvi) and not active_pending_df.empty
+        int(state.active_pending_df["source"].isin({"sobol", "random"}).sum())
+        if (state.uses_qlog_nei or state.uses_qlog_nehvi)
+        and not state.active_pending_df.empty
         else 0
     )
-    remaining_initial = config.bo.initial_design_size - len(training_observed_df)
-    if uses_qlog_nei or uses_qlog_nehvi:
+    remaining_initial = config.bo.initial_design_size - len(state.training_observed_df)
+    if state.uses_qlog_nei or state.uses_qlog_nehvi:
         remaining_initial -= pending_initial_count
     if remaining_initial > 0:
         return _suggest_initial_design(
             config=config,
             df=df,
-            count=min(requested_batch_size, remaining_initial),
-            context_values=resolved_context,
+            count=min(state.batch_size, remaining_initial),
+            context_values=state.resolved_context,
         )
-    if uses_qlog_nei and len(training_observed_df) < config.bo.initial_design_size:
+    if state.uses_qlog_nei and len(state.training_observed_df) < config.bo.initial_design_size:
         raise SuggestionError(
             "qLogNEI requires observed initial-design rows before model-based "
             "suggestions; observe accepted pending initial suggestions first."
         )
-    if uses_qlog_nehvi and len(training_observed_df) < config.bo.initial_design_size:
+    if state.uses_qlog_nehvi and len(state.training_observed_df) < config.bo.initial_design_size:
         raise SuggestionError(
             "qLogNEHVI requires observed initial-design rows before model-based "
             "suggestions; observe accepted pending initial suggestions first."
         )
+    return None
+
+
+def _dispatch_model_based_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    state: _SuggestionState,
+) -> pd.DataFrame:
 
     if config.fidelity is not None:
         return _suggest_multi_fidelity_model_based(
             config=config,
             df=df,
-            observed_df=observed_df,
-            batch_size=requested_batch_size,
+            observed_df=state.observed_df,
+            batch_size=state.batch_size,
         )
 
     if config.is_multi_objective:
-        if uses_qlog_nehvi:
-            return _suggest_qlog_nehvi_model_based(
-                config=config,
-                df=df,
-                observed_df=observed_df,
-                active_pending_df=active_pending_df,
-                batch_size=requested_batch_size,
-            )
-        if config.cost is not None:
-            return _suggest_cost_aware_multi_objective_model_based(
-                config=config,
-                df=df,
-                observed_df=observed_df,
-                batch_size=requested_batch_size,
-            )
-        return _suggest_multi_objective_model_based(
-            config=config,
-            df=df,
-            observed_df=observed_df,
-            batch_size=requested_batch_size,
-        )
+        return _dispatch_multi_objective_suggestions(config, df, state)
 
-    if (
-        config.replicates.enabled
-        and config.replicates.suggestion_policy == "uncertain_best"
-    ):
-        repeat_suggestions = _suggest_uncertain_best_replicate(
-            config=config,
-            df=df,
-            observed_df=observed_df,
-            batch_size=requested_batch_size,
-            context_values=resolved_context,
-        )
-        if repeat_suggestions is not None:
-            if len(repeat_suggestions) >= requested_batch_size:
-                return repeat_suggestions
-            return _fill_replicate_batch_with_exploration(
-                config=config,
-                df=df,
-                observed_df=observed_df,
-                repeat_suggestions=repeat_suggestions,
-                batch_size=requested_batch_size,
-                context_values=resolved_context,
-            )
+    replicate_suggestions = _dispatch_replicate_suggestions(config, df, state)
+    if replicate_suggestions is not None:
+        return replicate_suggestions
 
     if config.cost is not None:
         return _suggest_cost_aware_model_based(
             config=config,
             df=df,
-            observed_df=observed_df,
-            batch_size=requested_batch_size,
-            context_values=resolved_context,
+            observed_df=state.observed_df,
+            batch_size=state.batch_size,
+            context_values=state.resolved_context,
         )
 
-    if uses_qlog_nei:
+    if state.uses_qlog_nei:
         return _suggest_qlog_nei_model_based(
             config=config,
             df=df,
-            observed_df=observed_df,
-            active_pending_df=active_pending_df,
-            batch_size=requested_batch_size,
+            observed_df=state.observed_df,
+            active_pending_df=state.active_pending_df,
+            batch_size=state.batch_size,
         )
 
     return _suggest_model_based(
         config=config,
         df=df,
-        observed_df=observed_df,
-        batch_size=requested_batch_size,
-        context_values=resolved_context,
+        observed_df=state.observed_df,
+        batch_size=state.batch_size,
+        context_values=state.resolved_context,
+    )
+
+
+def _dispatch_multi_objective_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    state: _SuggestionState,
+) -> pd.DataFrame:
+    if state.uses_qlog_nehvi:
+        return _suggest_qlog_nehvi_model_based(
+            config=config,
+            df=df,
+            observed_df=state.observed_df,
+            active_pending_df=state.active_pending_df,
+            batch_size=state.batch_size,
+        )
+    if config.cost is not None:
+        return _suggest_cost_aware_multi_objective_model_based(
+            config=config,
+            df=df,
+            observed_df=state.observed_df,
+            batch_size=state.batch_size,
+        )
+    return _suggest_multi_objective_model_based(
+        config=config,
+        df=df,
+        observed_df=state.observed_df,
+        batch_size=state.batch_size,
+    )
+
+
+def _dispatch_replicate_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    state: _SuggestionState,
+) -> pd.DataFrame | None:
+    if not (
+        config.replicates.enabled
+        and config.replicates.suggestion_policy == "uncertain_best"
+    ):
+        return None
+    repeat_suggestions = _suggest_uncertain_best_replicate(
+        config=config,
+        df=df,
+        observed_df=state.observed_df,
+        batch_size=state.batch_size,
+        context_values=state.resolved_context,
+    )
+    if repeat_suggestions is None or len(repeat_suggestions) >= state.batch_size:
+        return repeat_suggestions
+    return _fill_replicate_batch_with_exploration(
+        config=config,
+        df=df,
+        observed_df=state.observed_df,
+        repeat_suggestions=repeat_suggestions,
+        batch_size=state.batch_size,
+        context_values=state.resolved_context,
     )
 
 

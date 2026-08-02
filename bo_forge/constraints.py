@@ -119,49 +119,83 @@ def _evaluate_constraint(
 def _evaluate_node(node: ast.AST, context: Mapping[str, object]) -> object:
     if isinstance(node, ast.Constant):
         return node.value
-
     if isinstance(node, ast.Name):
         return context[node.id]
-
     if isinstance(node, ast.BoolOp):
-        if isinstance(node.op, ast.And):
-            for value in node.values:
-                if not bool(_evaluate_node(value, context)):
-                    return False
-            return True
-        if isinstance(node.op, ast.Or):
-            for value in node.values:
-                if bool(_evaluate_node(value, context)):
-                    return True
-            return False
-
+        return _evaluate_bool_operation(node, context)
     if isinstance(node, ast.UnaryOp):
-        operand = _evaluate_node(node.operand, context)
-        if isinstance(node.op, ast.Not):
-            return not bool(operand)
-        for operator_type, operation in _UNARY_OPERATORS.items():
-            if isinstance(node.op, operator_type):
-                return operation(operand)
-
+        return _evaluate_unary_operation(node, context)
     if isinstance(node, ast.BinOp):
-        left = _evaluate_node(node.left, context)
-        right = _evaluate_node(node.right, context)
-        for operator_type, operation in _BINARY_OPERATORS.items():
-            if isinstance(node.op, operator_type):
-                return operation(left, right)
-
+        return _evaluate_binary_operation(node, context)
     if isinstance(node, ast.Compare):
-        left = _evaluate_node(node.left, context)
-        for op, comparator in zip(node.ops, node.comparators, strict=True):
-            right = _evaluate_node(comparator, context)
-            for operator_type, operation in _COMPARISON_OPERATORS.items():
-                if isinstance(op, operator_type):
-                    if not operation(left, right):
-                        return False
-                    break
-            left = right
-        return True
+        return _evaluate_comparison(node, context)
+    _raise_unsupported_evaluation(node)
 
+
+def _evaluate_bool_operation(
+    node: ast.BoolOp,
+    context: Mapping[str, object],
+) -> bool:
+    if isinstance(node.op, ast.And):
+        for value in node.values:
+            if not bool(_evaluate_node(value, context)):
+                return False
+        return True
+    if isinstance(node.op, ast.Or):
+        for value in node.values:
+            if bool(_evaluate_node(value, context)):
+                return True
+        return False
+    _raise_unsupported_evaluation(node)
+
+
+def _evaluate_unary_operation(
+    node: ast.UnaryOp,
+    context: Mapping[str, object],
+) -> object:
+    operand = _evaluate_node(node.operand, context)
+    if isinstance(node.op, ast.Not):
+        return not bool(operand)
+    for operator_type, operation in _UNARY_OPERATORS.items():
+        if isinstance(node.op, operator_type):
+            return operation(operand)
+    _raise_unsupported_evaluation(node)
+
+
+def _evaluate_binary_operation(
+    node: ast.BinOp,
+    context: Mapping[str, object],
+) -> object:
+    left = _evaluate_node(node.left, context)
+    right = _evaluate_node(node.right, context)
+    for operator_type, operation in _BINARY_OPERATORS.items():
+        if isinstance(node.op, operator_type):
+            return operation(left, right)
+    _raise_unsupported_evaluation(node)
+
+
+def _evaluate_comparison(
+    node: ast.Compare,
+    context: Mapping[str, object],
+) -> bool:
+    left = _evaluate_node(node.left, context)
+    for comparison, comparator in zip(node.ops, node.comparators, strict=True):
+        right = _evaluate_node(comparator, context)
+        operation = _comparison_operation(comparison, node)
+        if not operation(left, right):
+            return False
+        left = right
+    return True
+
+
+def _comparison_operation(comparison: ast.cmpop, node: ast.AST):
+    for operator_type, operation in _COMPARISON_OPERATORS.items():
+        if isinstance(comparison, operator_type):
+            return operation
+    _raise_unsupported_evaluation(node)
+
+
+def _raise_unsupported_evaluation(node: ast.AST) -> None:
     raise LogValidationError(
         f"Constraint expression contains unsupported syntax: {type(node).__name__}."
     )

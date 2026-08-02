@@ -28,6 +28,7 @@ from bo_forge.errors import (
 )
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import load_campaign_log
+from bo_forge.plot_registry import _PLOT_ROUTES, _canonical_plot_kind
 from bo_forge.session import CampaignSession, _format_campaign_report
 
 
@@ -542,96 +543,56 @@ def _cmd_mark_observed(args: argparse.Namespace) -> int:
 def _cmd_plot(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     try:
-        if args.kind == "progress":
-            campaign.plot_progress(save_path=args.output)
-        elif args.kind == "cost-progress":
-            if campaign.config.cost is None:
-                raise ConfigError(
-                    "plot --kind cost-progress requires a config with a cost section."
-                )
-            campaign.plot_cost_progress(save_path=args.output)
-        elif args.kind == "replicates":
-            if not campaign.config.replicates.enabled:
-                raise ConfigError(
-                    "plot --kind replicates requires a config with replicates.enabled: true."
-                )
-            campaign.plot_replicates(save_path=args.output)
-        elif args.kind == "pareto":
-            if not campaign.config.is_multi_objective:
-                raise ConfigError("plot --kind pareto requires a multi-objective config.")
-            campaign.plot_pareto(save_path=args.output)
-        elif args.kind == "pareto-parallel":
-            if not campaign.config.is_multi_objective:
-                raise ConfigError(
-                    "plot --kind pareto-parallel requires a multi-objective config."
-                )
-            if len(campaign.config.objectives) < 3:
-                raise ConfigError(
-                    "plot --kind pareto-parallel requires at least three objectives."
-                )
-            campaign.plot_pareto_parallel(save_path=args.output)
-        elif args.kind == "hypervolume":
-            if not campaign.config.is_multi_objective:
-                raise ConfigError("plot --kind hypervolume requires a multi-objective config.")
-            campaign.plot_hypervolume(save_path=args.output)
-        elif args.kind == "stage-diagnostics":
-            if not campaign.config.is_structured_campaign:
-                raise ConfigError("plot --kind stage-diagnostics requires a structured config.")
-            campaign.plot_stage_diagnostics(save_path=args.output)
-        elif args.kind == "fidelity-diagnostics":
-            if campaign.config.fidelity is None:
-                raise ConfigError(
-                    "plot --kind fidelity-diagnostics requires a multi-fidelity config."
-                )
-            campaign.plot_fidelity_diagnostics(save_path=args.output)
-        elif args.kind == "context-diagnostics":
-            if campaign.config.context is None:
-                raise ConfigError(
-                    "plot --kind context-diagnostics requires a contextual config."
-                )
-            campaign.plot_context_diagnostics(save_path=args.output)
-        elif args.kind == "qlog-nei-diagnostics":
-            if campaign.config.bo.acquisition != "qlog_nei":
-                raise ConfigError(
-                    "plot --kind qlog-nei-diagnostics requires bo.acquisition: qlog_nei."
-                )
-            campaign.plot_qlog_nei_diagnostics(save_path=args.output)
-        elif args.kind == "model-diagnostics":
-            if campaign.config.is_multi_objective:
-                raise ConfigError(
-                    "plot --kind model-diagnostics requires a single-objective config."
-                )
-            if campaign.config.fidelity is not None:
-                raise ConfigError(
-                    "plot --kind model-diagnostics does not support multi-fidelity configs."
-                )
-            if campaign.config.is_structured_campaign:
-                raise ConfigError(
-                    "plot --kind model-diagnostics does not support structured configs."
-                )
-            campaign.plot_model_diagnostics(save_path=args.output)
-        elif args.kind == "model-comparison":
-            if campaign.config.is_multi_objective:
-                raise ConfigError(
-                    "plot --kind model-comparison requires a single-objective config."
-                )
-            if campaign.config.fidelity is not None:
-                raise ConfigError(
-                    "plot --kind model-comparison does not support multi-fidelity configs."
-                )
-            if campaign.config.is_structured_campaign:
-                raise ConfigError(
-                    "plot --kind model-comparison does not support structured configs."
-                )
-            campaign.plot_model_comparison(save_path=args.output)
-        else:
-            campaign.plot_diagnostics(save_path=args.output)
+        _validate_cli_plot_request(campaign.config, args.kind)
+        route = _PLOT_ROUTES[_canonical_plot_kind(args.kind)]
+        getattr(campaign, route.session_method)(save_path=args.output)
     except OSError as exc:
         raise _CLIOutputError(
             f"Could not write {args.kind} plot '{args.output}': {exc}"
         ) from exc
     print(f"Wrote {args.kind} plot: {args.output}")
     return 0
+
+
+def _validate_cli_plot_request(config: CampaignConfig, kind: str) -> None:
+    if kind == "cost-progress" and config.cost is None:
+        raise ConfigError("plot --kind cost-progress requires a config with a cost section.")
+    if kind == "replicates" and not config.replicates.enabled:
+        raise ConfigError(
+            "plot --kind replicates requires a config with replicates.enabled: true."
+        )
+    if kind in {"pareto", "pareto-parallel", "hypervolume"}:
+        _validate_multi_objective_plot_request(config, kind)
+    if kind == "stage-diagnostics" and not config.is_structured_campaign:
+        raise ConfigError("plot --kind stage-diagnostics requires a structured config.")
+    if kind == "fidelity-diagnostics" and config.fidelity is None:
+        raise ConfigError(
+            "plot --kind fidelity-diagnostics requires a multi-fidelity config."
+        )
+    if kind == "context-diagnostics" and config.context is None:
+        raise ConfigError("plot --kind context-diagnostics requires a contextual config.")
+    if kind == "qlog-nei-diagnostics" and config.bo.acquisition != "qlog_nei":
+        raise ConfigError(
+            "plot --kind qlog-nei-diagnostics requires bo.acquisition: qlog_nei."
+        )
+    if kind in {"model-diagnostics", "model-comparison"}:
+        _validate_model_plot_request(config, kind)
+
+
+def _validate_multi_objective_plot_request(config: CampaignConfig, kind: str) -> None:
+    if not config.is_multi_objective:
+        raise ConfigError(f"plot --kind {kind} requires a multi-objective config.")
+    if kind == "pareto-parallel" and len(config.objectives) < 3:
+        raise ConfigError("plot --kind pareto-parallel requires at least three objectives.")
+
+
+def _validate_model_plot_request(config: CampaignConfig, kind: str) -> None:
+    if config.is_multi_objective:
+        raise ConfigError(f"plot --kind {kind} requires a single-objective config.")
+    if config.fidelity is not None:
+        raise ConfigError(f"plot --kind {kind} does not support multi-fidelity configs.")
+    if config.is_structured_campaign:
+        raise ConfigError(f"plot --kind {kind} does not support structured configs.")
 
 
 def _print_table(df: pd.DataFrame) -> None:

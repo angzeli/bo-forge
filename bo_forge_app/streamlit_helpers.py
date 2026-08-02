@@ -184,6 +184,7 @@ def create_campaign_files(
         empty_log = empty_campaign_log(config)
         _write_dataframe_no_overwrite(resolved_log_path, empty_log)
     except Exception:
+        # Creation is transactional: every failure after the YAML write must roll it back.
         if config_written:
             resolved_config_path.unlink(missing_ok=True)
         raise

@@ -103,7 +103,14 @@ def modeling_observed_data_with_variance(
     config: CampaignConfig,
     observed_df: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
-    """Return model-fitting rows and optional replicate-derived observation variance."""
+    """Return one group-mean row and optional mean variance per replicate group.
+
+    For groups with repeats, each objective variance is ``sample_std**2 / n``.
+    Singleton groups use the pooled within-group variance from repeated groups.
+    Every returned variance is clamped to ``replicates.noise_floor``. The variance
+    table is in user objective units here and is aligned with the outcome columns
+    when model tensors are built.
+    """
     if not config.replicates.enabled:
         return observed_df.copy(), None
     aggregate = aggregate_observed_replicates(config, observed_df)

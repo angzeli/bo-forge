@@ -1,5 +1,22 @@
 # 📝 BO Forge Changelog
 
+## v2.3.3 - Code Quality And Error-Handling Refactor
+
+This patch closes v2.3.x with a behavior-preserving internal refactor. It adds
+no BO capability, config key, CSV column, public method, command, endpoint, or
+UI workflow.
+
+- Decomposes suggestion dispatch, structural CSV validation, observation
+  transitions, session next-action logic, and expression evaluation into
+  focused private stages.
+- Decomposes Streamlit campaign creation, Suggest, and Resolve workflows while
+  preserving widget labels, keys, order, reruns, and staged-state contracts.
+- Consolidates CLI, service, and Streamlit plot routing in an internal registry.
+- Documents tensor shapes, double precision, model-space conventions,
+  categorical encoding, and replicate-derived observation variance.
+- Enables Ruff `C901` for production modules with a maximum complexity of 15.
+- Derives built-distribution paths from project metadata in release tests.
+
 ## v2.3.2 - Contextual Replicate-Aware BO
 
 This patch extends single-objective contextual LogEI campaigns with existing

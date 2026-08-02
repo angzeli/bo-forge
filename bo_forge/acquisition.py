@@ -34,7 +34,13 @@ def optimize_log_ei(
     model_dim: int | None = None,
     fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
-    """Optimize LogEI/qLogEI in unit-cube model space."""
+    """Optimize LogEI/qLogEI and return ``(q, d)`` unit-cube candidates.
+
+    The objective is already in maximization model space. ``fixed_features_list``
+    maps encoded feature indices to unit-cube values, including one-hot categories
+    and fixed contextual values. Restarts, raw samples, Monte Carlo samples, and
+    the random seed come directly from ``config.bo``.
+    """
     dimension = model_dim if model_dim is not None else len(config.variables)
     bounds = torch.tensor(
         [[0.0] * dimension, [1.0] * dimension],
@@ -85,7 +91,7 @@ def optimize_qlog_nei(
     x_pending: torch.Tensor | None = None,
     fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
-    """Optimize qLogNEI in unit-cube model space."""
+    """Optimize qLogNEI over ``(n, d)`` baseline and optional pending inputs."""
     dimension = model_dim if model_dim is not None else len(config.variables)
     bounds = torch.tensor(
         [[0.0] * dimension, [1.0] * dimension],
@@ -129,7 +135,7 @@ def optimize_qlog_ehvi(
     model_dim: int,
     fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
-    """Optimize qLogEHVI in unit-cube model space."""
+    """Optimize qLogEHVI for ``(n, m)`` maximization-space outcomes."""
     bounds = torch.tensor(
         [[0.0] * model_dim, [1.0] * model_dim],
         dtype=torch.double,
@@ -170,7 +176,7 @@ def optimize_qlog_nehvi(
     x_pending: torch.Tensor | None = None,
     fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
-    """Optimize qLogNEHVI in unit-cube model space."""
+    """Optimize qLogNEHVI with optional ``(p, d)`` pending candidates."""
     bounds = torch.tensor(
         [[0.0] * model_dim, [1.0] * model_dim],
         dtype=torch.double,

@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.3.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.3.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 

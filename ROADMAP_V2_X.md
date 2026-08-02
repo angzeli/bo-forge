@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.3.2`. The v2.3.2 release adds contextual replicate-aware
-LogEI, including group-mean fitting, replicate-derived variance, and
-context-matched active repeats. Contextual qLogNEI, qLogNEHVI,
-multi-objective, structured, and multi-fidelity workflows remain deferred.
+Current baseline: `v2.3.3`. The v2.3.3 release closes the controlled
+combinations line with a behavior-preserving code-quality and error-handling
+refactor. Contextual qLogNEI, qLogNEHVI, multi-objective, structured, and
+multi-fidelity workflows remain deferred.
 
 ## Roadmap So Far
 
@@ -26,6 +26,7 @@ flowchart LR
     v230["v2.3.0<br/>Contextual review + cost"]
     v231["v2.3.1<br/>Combination hardening"]
     v232["v2.3.2<br/>Contextual replicates"]
+    v233["v2.3.3<br/>Code-quality closeout"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -38,13 +39,13 @@ flowchart LR
     v23 -.-> v230
     v23 -.-> v231
     v23 -.-> v232
+    v23 -.-> v233
 
-    class v10,v20,v21,v22 majorDone
-    class v23 majorActive
+    class v10,v20,v21,v22,v23 majorDone
     class v24,v25 majorFuture
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
-    class v230,v231,v232 patchDone
+    class v230,v231,v232,v233 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -108,7 +109,7 @@ Status: completed
 
 ## v2.3.x - Controlled Feature Combinations
 
-Status: active
+Status: completed
 
 - Add selected combinations deliberately rather than enabling an unrestricted
   feature cross-product.
@@ -118,6 +119,9 @@ Status: active
   Streamlit campaign state isolation, and release-readiness coverage.
 - `v2.3.2` adds contextual replicate-aware group-mean fitting and restricts
   active repeats to groups matching the requested context.
+- `v2.3.3` closes the line with behavior-preserving core/app decomposition,
+  capability-based runtime errors, scientific numerical documentation, and an
+  enforced production complexity limit.
 - Candidate future combinations include structured + cost.
 - Keep unsupported combinations documented in the capability matrix.
 

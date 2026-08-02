@@ -70,7 +70,11 @@ def encoded_dimension(config: CampaignConfig) -> int:
 
 
 def encoded_feature_indices(config: CampaignConfig) -> dict[str, tuple[int, ...]]:
-    """Map each user variable name to its model-space feature indices."""
+    """Map variables to model columns in configured variable order.
+
+    Numeric variables occupy one column. Each categorical variable occupies a
+    contiguous one-hot block ordered exactly as its configured values.
+    """
     indices: dict[str, tuple[int, ...]] = {}
     cursor = 0
     for variable in config.variables:
@@ -113,7 +117,7 @@ def categorical_feature_assignments(config: CampaignConfig) -> list[dict[int, fl
 
 
 def dataframe_to_unit_cube(config: CampaignConfig, df: pd.DataFrame) -> torch.Tensor:
-    """Encode user-facing campaign variables into latent unit-cube coordinates."""
+    """Encode campaign rows as a double tensor with shape ``(n, d)``."""
     rows = [
         [row[variable.name] for variable in config.variables]
         for _, row in df.iterrows()
@@ -125,7 +129,11 @@ def values_to_unit_cube(
     config: CampaignConfig,
     rows: Sequence[Sequence[object]],
 ) -> torch.Tensor:
-    """Encode user-facing variable values into latent unit-cube coordinates."""
+    """Encode rows to double-precision unit-cube model coordinates.
+
+    The output has shape ``(n, d)``. Numeric variables are scaled to one model
+    column; categorical variables are expanded into configured-order one-hot blocks.
+    """
     encoded_rows = [
         _encode_variable_values(config, row)
         for row in rows
@@ -137,7 +145,7 @@ def unit_cube_to_user_values(
     config: CampaignConfig,
     x_unit: torch.Tensor,
 ) -> list[tuple[object, ...]]:
-    """Decode model-space latent candidates into valid user-facing values."""
+    """Decode ``(q, d)`` model-space candidates to configured user-variable order."""
     if x_unit.ndim == 1:
         x_unit = x_unit.unsqueeze(0)
 

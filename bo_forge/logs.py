@@ -110,30 +110,57 @@ def mark_observed(
     if not isinstance(row_id, str) or not row_id.strip():
         raise LogWriteError("row_id must be a non-empty string.")
 
-    columns = _read_csv(path).columns
-    objective_columns = _variable_and_objective_columns(columns)[1]
+    df = _read_csv(path)
+    objective_columns = _variable_and_objective_columns(df.columns)[1]
     parsed_objective_values = _parse_mark_observed_objective_values(
         row_id=row_id,
         objective_columns=objective_columns,
         objective_value=objective_value,
         objective_values=objective_values,
     )
-    actual_cost_text = None
-    if actual_cost is not None:
-        try:
-            actual_cost_float = float(actual_cost)
-        except (TypeError, ValueError) as exc:
-            raise LogWriteError(
-                f"actual_cost for row '{row_id}' must be numeric: value={actual_cost!r}."
-            ) from exc
-        if not math.isfinite(actual_cost_float) or actual_cost_float < 0:
-            raise LogWriteError(
-                f"actual_cost for row '{row_id}' must be finite and >= 0: "
-                f"value={actual_cost!r}."
-            )
-        actual_cost_text = f"{actual_cost_float:.17g}"
+    actual_cost_text = _parse_actual_cost(row_id, actual_cost)
+    _validate_log_for_mark_observed(df, config)
+    index = _mark_observed_row_index(df, row_id)
+    _validate_mark_observed_transition(
+        df,
+        index=index,
+        row_id=row_id,
+        objective_columns=objective_columns,
+        actual_cost_text=actual_cost_text,
+    )
+    _apply_observation(
+        df,
+        index=index,
+        objective_values=parsed_objective_values,
+        actual_cost_text=actual_cost_text,
+    )
+    _validate_structural_log(df)
+    if config is not None:
+        validate_campaign_data(config, df)
+    _atomic_write_and_validate(path, df)
 
-    df = _read_csv(path)
+
+def _parse_actual_cost(row_id: str, actual_cost: float | None) -> str | None:
+    if actual_cost is None:
+        return None
+    try:
+        actual_cost_float = float(actual_cost)
+    except (TypeError, ValueError) as exc:
+        raise LogWriteError(
+            f"actual_cost for row '{row_id}' must be numeric: value={actual_cost!r}."
+        ) from exc
+    if not math.isfinite(actual_cost_float) or actual_cost_float < 0:
+        raise LogWriteError(
+            f"actual_cost for row '{row_id}' must be finite and >= 0: "
+            f"value={actual_cost!r}."
+        )
+    return f"{actual_cost_float:.17g}"
+
+
+def _validate_log_for_mark_observed(
+    df: pd.DataFrame,
+    config: CampaignConfig | None,
+) -> None:
     _validate_structural_log(df)
     if config is not None:
         validate_campaign_data(config, df)
@@ -148,13 +175,24 @@ def mark_observed(
             "mark_observed(..., config=config) or CampaignSession.mark_observed()."
         )
 
+
+def _mark_observed_row_index(df: pd.DataFrame, row_id: str) -> object:
     matches = df["row_id"].astype(str) == row_id
     if not matches.any():
         raise LogWriteError(f"Cannot mark row '{row_id}' observed because row_id was not found.")
     if matches.sum() > 1:
         raise LogWriteError(f"Cannot mark row '{row_id}' observed because row_id is duplicated.")
+    return matches[matches].index[0]
 
-    index = matches[matches].index[0]
+
+def _validate_mark_observed_transition(
+    df: pd.DataFrame,
+    *,
+    index: object,
+    row_id: str,
+    objective_columns: list[str],
+    actual_cost_text: str | None,
+) -> None:
     status = str(df.at[index, "status"])
     if status != "suggested":
         raise LogWriteError(
@@ -172,7 +210,6 @@ def mark_observed(
             f"Cannot record actual_cost for row '{row_id}' because the campaign log "
             "has no cost columns."
         )
-
     for objective in objective_columns:
         objective_cell = df.at[index, objective]
         if not _is_blank(objective_cell):
@@ -181,15 +218,19 @@ def mark_observed(
                 f"is already filled: value={objective_cell!r}."
             )
 
-    for objective, objective_float in parsed_objective_values.items():
+
+def _apply_observation(
+    df: pd.DataFrame,
+    *,
+    index: object,
+    objective_values: dict[str, float],
+    actual_cost_text: str | None,
+) -> None:
+    for objective, objective_float in objective_values.items():
         df.at[index, objective] = f"{objective_float:.17g}"
     df.at[index, "status"] = "observed"
     if actual_cost_text is not None:
         df.at[index, "cost_actual"] = actual_cost_text
-    _validate_structural_log(df)
-    if config is not None:
-        validate_campaign_data(config, df)
-    _atomic_write_and_validate(path, df)
 
 
 def _parse_mark_observed_objective_values(
@@ -399,6 +440,19 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
     if df.empty:
         return
 
+    _validate_structural_identifiers(df)
+    variable_columns, objective_columns = _variable_and_objective_columns(df.columns)
+    _validate_structural_variables(df, variable_columns)
+    observed = df["status"] == "observed"
+    suggested = df["status"] == "suggested"
+    _validate_structural_objectives(df, objective_columns, observed, suggested)
+    _validate_structural_review(df, observed)
+    _validate_structural_replicates(df)
+    _validate_structural_numeric_results(df)
+
+
+def _validate_structural_identifiers(df: pd.DataFrame) -> None:
+
     row_ids = df["row_id"].astype(str)
     blank = row_ids.str.strip() == ""
     if blank.any():
@@ -431,7 +485,11 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
         value = df.loc[invalid_source, "source"].iloc[0]
         raise LogValidationError(f"Row '{row_id}' has invalid source '{value}'.")
 
-    variable_columns, objective_columns = _variable_and_objective_columns(df.columns)
+
+def _validate_structural_variables(
+    df: pd.DataFrame,
+    variable_columns: list[str],
+) -> None:
     if not _has_stage_column(df.columns):
         for column in variable_columns:
             invalid = df[column].map(_is_blank)
@@ -442,8 +500,13 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
                     f"Row '{row_id}' has blank value for variable '{column}': value={value!r}."
                 )
 
-    observed = df["status"] == "observed"
-    suggested = df["status"] == "suggested"
+
+def _validate_structural_objectives(
+    df: pd.DataFrame,
+    objective_columns: list[str],
+    observed: pd.Series,
+    suggested: pd.Series,
+) -> None:
     for objective in objective_columns:
         objective_blank = df[objective].map(_is_blank)
         missing_observed = observed & objective_blank
@@ -470,6 +533,8 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
                 f"Row '{row_id}' has non-finite objective '{objective}': value={value!r}."
             )
 
+
+def _validate_structural_review(df: pd.DataFrame, observed: pd.Series) -> None:
     if _has_review_columns(df.columns):
         invalid_review = ~df["review_status"].isin(VALID_REVIEW_STATUSES)
         if invalid_review.any():
@@ -489,6 +554,8 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
             row_id = str(df.loc[review_newline, "row_id"].iloc[0])
             raise LogValidationError(f"Row '{row_id}' has review_note containing a newline.")
 
+
+def _validate_structural_replicates(df: pd.DataFrame) -> None:
     if _has_replicate_columns(df.columns):
         invalid_group = df["replicate_group"].map(
             lambda value: (
@@ -533,6 +600,8 @@ def _validate_structural_log(df: pd.DataFrame) -> None:
                 f"replicate_index={replicate}."
             )
 
+
+def _validate_structural_numeric_results(df: pd.DataFrame) -> None:
     numeric_columns = [*_result_columns_from_columns(df.columns)]
     if _has_cost_columns(df.columns):
         numeric_columns.extend([*COST_COLUMNS, *UTILITY_COLUMNS])
@@ -682,20 +751,8 @@ def _multi_objective_parts_from_columns(
         if result_start <= start:
             continue
         result_columns = column_list[result_start:acquisition_index]
-        objective_names: list[str] = []
-        valid_result_columns = True
-        for index in range(0, len(result_columns), 2):
-            mean_column = result_columns[index]
-            std_column = result_columns[index + 1]
-            if not mean_column.startswith("predicted_mean_"):
-                valid_result_columns = False
-                break
-            objective_name = mean_column.removeprefix("predicted_mean_")
-            if std_column != f"predicted_std_{objective_name}":
-                valid_result_columns = False
-                break
-            objective_names.append(objective_name)
-        if not valid_result_columns:
+        objective_names = _objective_names_from_result_columns(result_columns)
+        if objective_names is None:
             continue
 
         middle = column_list[start:result_start]
@@ -709,6 +766,22 @@ def _multi_objective_parts_from_columns(
             continue
         return middle[:-objective_count], objective_names, [*result_columns, "acquisition"]
     return None
+
+
+def _objective_names_from_result_columns(
+    result_columns: list[str],
+) -> list[str] | None:
+    objective_names: list[str] = []
+    for index in range(0, len(result_columns), 2):
+        mean_column = result_columns[index]
+        std_column = result_columns[index + 1]
+        if not mean_column.startswith("predicted_mean_"):
+            return None
+        objective_name = mean_column.removeprefix("predicted_mean_")
+        if std_column != f"predicted_std_{objective_name}":
+            return None
+        objective_names.append(objective_name)
+    return objective_names
 
 
 def _is_blank(value: object) -> bool:

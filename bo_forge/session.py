@@ -437,115 +437,16 @@ class CampaignSession:
     def next_action(self) -> pd.DataFrame:
         """Return the recommended next notebook action without mutating state."""
         campaign_status = self.campaign_status()
-        structured_stage_arg = ""
-        if self.config.is_structured_campaign:
-            if len(self.config.stage_names) == 1:
-                structured_stage_arg = f"stage={self.config.stage_names[0]!r}"
-            else:
-                structured_stage_arg = "stage='STAGE_NAME'"
-        context_arg = "context_values={...}" if self.config.context is not None else ""
-
-        def suggest_call_args(*, include_batch_size: bool = False) -> str:
-            args = []
-            if include_batch_size:
-                args.append("batch_size=...")
-            if structured_stage_arg:
-                args.append(structured_stage_arg)
-            if context_arg:
-                args.append(context_arg)
-            return ", ".join(args)
-
         if campaign_status == "has_pending_suggestions":
-            if self.config.review.enabled and not self.review_queue().empty:
-                action = "review_pending_suggestions"
-                reason = (
-                    "There are suggestions awaiting review; accept, reject, or defer "
-                    "them before requesting more."
-                )
-                suggested_call = (
-                    "campaign.review_queue(); "
-                    "campaign.review_suggestion(row_id, decision, note='')"
-                )
-            elif self.config.review.enabled:
-                action = "run_accepted_suggestions"
-                reason = "There are accepted suggestions awaiting experimental results."
-                if self.config.is_multi_objective:
-                    observed_call = (
-                        "campaign.mark_observed(row_id, objective_values={...}, actual_cost=...)"
-                        if self.config.cost is not None
-                        else "campaign.mark_observed(row_id, objective_values={...})"
-                    )
-                    suggested_call = (
-                        "campaign.pending_suggestions(); "
-                        f"{observed_call}"
-                    )
-                else:
-                    suggested_call = (
-                        "campaign.pending_suggestions(); "
-                        "campaign.mark_observed(row_id, objective_value, actual_cost=...)"
-                    )
-            else:
-                action = "resolve_pending_suggestions"
-                reason = (
-                    "There are unresolved suggested rows; record results before "
-                    "requesting more."
-                )
-                if self.config.is_multi_objective:
-                    observed_call = (
-                        "campaign.mark_observed(row_id, objective_values={...}, actual_cost=...)"
-                        if self.config.cost is not None
-                        else "campaign.mark_observed(row_id, objective_values={...})"
-                    )
-                    suggested_call = (
-                        "campaign.pending_suggestions(); "
-                        f"{observed_call}"
-                    )
-                else:
-                    suggested_call = (
-                        "campaign.pending_suggestions(); "
-                        "campaign.mark_observed(row_id, objective_value)"
-                    )
+            action, reason, suggested_call = _pending_next_action(self)
         elif campaign_status == "ready_for_initial_design":
             action = "suggest_initial_design"
             reason = "Observed rows are below initial_design_size; request Sobol suggestions."
-            args = suggest_call_args()
-            if args:
-                suggested_call = (
-                    f"suggestions = campaign.suggest_next({args}); "
-                    "campaign.append_suggestions(suggestions)"
-                )
-            else:
-                suggested_call = (
-                    "suggestions = campaign.suggest_next(); "
-                    "campaign.append_suggestions(suggestions)"
-                )
+            suggested_call = _suggest_and_append_call(self.config, include_batch_size=False)
         else:
             action = "suggest_bo"
-            pending_aware_label = {
-                "qlog_nei": "qLogNEI",
-                "qlog_nehvi": "qLogNEHVI",
-            }.get(self.config.bo.acquisition)
-            if (
-                pending_aware_label is not None
-                and not self.pending_suggestions().empty
-            ):
-                reason = (
-                    f"Initial design is complete; {pending_aware_label} can account "
-                    "for accepted pending suggestions as X_pending."
-                )
-            else:
-                reason = "Initial design is complete and no pending suggestions remain."
-            args = suggest_call_args(include_batch_size=True)
-            if args:
-                suggested_call = (
-                    f"suggestions = campaign.suggest_next({args}); "
-                    "campaign.append_suggestions(suggestions)"
-                )
-            else:
-                suggested_call = (
-                    "suggestions = campaign.suggest_next(batch_size=...); "
-                    "campaign.append_suggestions(suggestions)"
-                )
+            reason = _bo_suggestion_reason(self)
+            suggested_call = _suggest_and_append_call(self.config, include_batch_size=True)
 
         return pd.DataFrame(
             [
@@ -561,47 +462,9 @@ class CampaignSession:
 
     def report(self) -> dict[str, pd.DataFrame]:
         """Return read-only campaign report tables for notebook display."""
-        if self.config.is_multi_objective:
-            tables = {
-                "summary": self.summary(),
-                "next_action": self.next_action(),
-                "model_summary": self.model_summary(),
-                "pareto_summary": self.pareto_summary(),
-                "pareto_front": self.pareto_front(),
-                "pending_suggestions": self.pending_suggestions(),
-            }
-            if self.config.review.enabled:
-                tables["review_queue"] = self.review_queue()
-            if self.config.replicates.enabled:
-                tables["replicate_summary"] = self.replicate_summary()
-            if self.config.cost is not None:
-                tables["cost_summary"] = self.cost_summary()
-            if self.config.is_structured_campaign:
-                tables["stage_summary"] = self.stage_summary()
-            if self.config.context is not None:
-                tables["context_summary"] = self.context_summary()
-            if self.config.bo.acquisition == "qlog_nei":
-                tables["qlog_nei_summary"] = self.qlog_nei_summary()
-            return tables
-        tables = {
-            "summary": self.summary(),
-            "next_action": self.next_action(),
-            "model_summary": self.model_summary(),
-            "best_observation": self.best_observation(),
-            "best_replicate_group": self.best_replicate_group(),
-            "replicate_summary": self.replicate_summary(),
-            "pending_suggestions": self.pending_suggestions(),
-            "review_queue": self.review_queue(),
-            "cost_summary": self.cost_summary(),
-        }
-        if self.config.is_structured_campaign:
-            tables["stage_summary"] = self.stage_summary()
-        if self.config.fidelity is not None:
-            tables["fidelity_summary"] = self.fidelity_summary()
-        if self.config.context is not None:
-            tables["context_summary"] = self.context_summary()
-        if self.config.bo.acquisition == "qlog_nei":
-            tables["qlog_nei_summary"] = self.qlog_nei_summary()
+        tables = _base_report_tables(self)
+        for name, reader in _optional_report_readers(self):
+            tables[name] = reader()
         return tables
 
     def export_report(self, path: str | Path) -> Path:
@@ -817,6 +680,133 @@ class CampaignSession:
         )
 
         return _plot_qlog_nei_diagnostics(self.config, self.df, **kwargs)
+
+
+def _base_report_tables(session: CampaignSession) -> dict[str, pd.DataFrame]:
+    if session.config.is_multi_objective:
+        return {
+            "summary": session.summary(),
+            "next_action": session.next_action(),
+            "model_summary": session.model_summary(),
+            "pareto_summary": session.pareto_summary(),
+            "pareto_front": session.pareto_front(),
+            "pending_suggestions": session.pending_suggestions(),
+        }
+    return {
+        "summary": session.summary(),
+        "next_action": session.next_action(),
+        "model_summary": session.model_summary(),
+        "best_observation": session.best_observation(),
+        "best_replicate_group": session.best_replicate_group(),
+        "replicate_summary": session.replicate_summary(),
+        "pending_suggestions": session.pending_suggestions(),
+        "review_queue": session.review_queue(),
+        "cost_summary": session.cost_summary(),
+    }
+
+
+def _optional_report_readers(session: CampaignSession) -> list[tuple[str, Any]]:
+    config = session.config
+    if config.is_multi_objective:
+        options = [
+            (config.review.enabled, "review_queue", session.review_queue),
+            (config.replicates.enabled, "replicate_summary", session.replicate_summary),
+            (config.cost is not None, "cost_summary", session.cost_summary),
+            (config.is_structured_campaign, "stage_summary", session.stage_summary),
+            (config.context is not None, "context_summary", session.context_summary),
+            (
+                config.bo.acquisition == "qlog_nei",
+                "qlog_nei_summary",
+                session.qlog_nei_summary,
+            ),
+        ]
+    else:
+        options = [
+            (config.is_structured_campaign, "stage_summary", session.stage_summary),
+            (config.fidelity is not None, "fidelity_summary", session.fidelity_summary),
+            (config.context is not None, "context_summary", session.context_summary),
+            (
+                config.bo.acquisition == "qlog_nei",
+                "qlog_nei_summary",
+                session.qlog_nei_summary,
+            ),
+        ]
+    return [(name, reader) for enabled, name, reader in options if enabled]
+
+
+def _pending_next_action(session: CampaignSession) -> tuple[str, str, str]:
+    if session.config.review.enabled and not session.review_queue().empty:
+        return (
+            "review_pending_suggestions",
+            "There are suggestions awaiting review; accept, reject, or defer them before "
+            "requesting more.",
+            "campaign.review_queue(); "
+            "campaign.review_suggestion(row_id, decision, note='')",
+        )
+    if session.config.review.enabled:
+        return (
+            "run_accepted_suggestions",
+            "There are accepted suggestions awaiting experimental results.",
+            _pending_observation_call(session.config, reviewed=True),
+        )
+    return (
+        "resolve_pending_suggestions",
+        "There are unresolved suggested rows; record results before requesting more.",
+        _pending_observation_call(session.config, reviewed=False),
+    )
+
+
+def _pending_observation_call(config: CampaignConfig, *, reviewed: bool) -> str:
+    if config.is_multi_objective:
+        observed_call = (
+            "campaign.mark_observed(row_id, objective_values={...}, actual_cost=...)"
+            if config.cost is not None
+            else "campaign.mark_observed(row_id, objective_values={...})"
+        )
+    elif reviewed:
+        observed_call = "campaign.mark_observed(row_id, objective_value, actual_cost=...)"
+    else:
+        observed_call = "campaign.mark_observed(row_id, objective_value)"
+    return f"campaign.pending_suggestions(); {observed_call}"
+
+
+def _suggest_and_append_call(
+    config: CampaignConfig,
+    *,
+    include_batch_size: bool,
+) -> str:
+    args: list[str] = []
+    if include_batch_size:
+        args.append("batch_size=...")
+    if config.is_structured_campaign:
+        stage_arg = (
+            f"stage={config.stage_names[0]!r}"
+            if len(config.stage_names) == 1
+            else "stage='STAGE_NAME'"
+        )
+        args.append(stage_arg)
+    if config.context is not None:
+        args.append("context_values={...}")
+    call_args = ", ".join(args)
+    suggest_call = (
+        f"suggestions = campaign.suggest_next({call_args})"
+        if call_args
+        else "suggestions = campaign.suggest_next()"
+    )
+    return f"{suggest_call}; campaign.append_suggestions(suggestions)"
+
+
+def _bo_suggestion_reason(session: CampaignSession) -> str:
+    pending_aware_label = {
+        "qlog_nei": "qLogNEI",
+        "qlog_nehvi": "qLogNEHVI",
+    }.get(session.config.bo.acquisition)
+    if pending_aware_label is not None and not session.pending_suggestions().empty:
+        return (
+            f"Initial design is complete; {pending_aware_label} can account "
+            "for accepted pending suggestions as X_pending."
+        )
+    return "Initial design is complete and no pending suggestions remain."
 
 
 def _format_report_table(df: pd.DataFrame, empty_message: str) -> str:

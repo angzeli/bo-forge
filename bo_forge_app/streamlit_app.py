@@ -6,6 +6,7 @@ import json
 import math
 import os
 import time
+from dataclasses import dataclass
 from hashlib import sha1
 from html import escape
 from pathlib import Path
@@ -14,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 from bo_forge.errors import BOForgeError
+from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge_app.service import CampaignAppService
 from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
@@ -74,6 +76,34 @@ STAGED_FRESHNESS_MESSAGE_KEY = "bo_forge_staged_freshness_message"
 SUGGEST_STAGE_KEY = "bo_forge_suggest_stage"
 VALIDATION_CACHE_KEY = "bo_forge_validation_cache"
 WORKFLOW_PANELS = ["Overview", "Suggest", "Resolve", "Reports", "Data"]
+
+
+@dataclass(frozen=True)
+class _NewCampaignSections:
+    review_enabled: bool = False
+    replicates_enabled: bool = False
+    replicate_settings: dict[str, object] | None = None
+    cost_settings: dict[str, object] | None = None
+    fidelity_settings: dict[str, object] | None = None
+    context_settings: dict[str, object] | None = None
+    bo_overrides: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class _SuggestionRequestState:
+    config_path: Path
+    log_path: Path
+    selected_stage: str | None
+    context_values: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class _ObservationFormValues:
+    row_id: str
+    objective_inputs: dict[str, str] | None
+    objective_value: object | None
+    actual_cost_text: str | None
+    submitted: bool
 
 
 def main() -> None:
@@ -322,32 +352,10 @@ def _render_create_new_campaign(st: Any) -> None:
             "one or more fixed context variables."
         ),
     )
-    is_qlog_nei = campaign_kind == "Single-objective qLogNEI"
     is_multi_objective = campaign_kind == "Multi-objective"
     is_multi_fidelity = campaign_kind == "Multi-fidelity qMFKG"
     is_contextual = campaign_kind == "Contextual LogEI"
-    if is_qlog_nei:
-        _render_callout(
-            st,
-            "Single-objective qLogNEI",
-            "App-created qLogNEI campaigns support single-objective noisy/pending-aware "
-            "suggestions. Review rows marked pending block; accepted review rows become "
-            "active pending candidates.",
-        )
-    if is_multi_fidelity:
-        _render_callout(
-            st,
-            "Multi-fidelity qMFKG",
-            "App-created multi-fidelity campaigns are single-objective, continuous-variable "
-            "qMFKG campaigns. Advanced qMFKG defaults stay editable in the YAML preview.",
-        )
-    if is_contextual:
-        _render_callout(
-            st,
-            "Contextual LogEI",
-            "App-created contextual campaigns are single-objective LogEI campaigns. "
-            "Context variables stay ordinary CSV columns but are fixed at suggestion time.",
-        )
+    _render_new_campaign_kind_callout(st, campaign_kind)
 
     _render_section_label(st, "Model profile")
     if is_multi_objective or is_multi_fidelity:
@@ -457,207 +465,7 @@ def _render_create_new_campaign(st: Any) -> None:
             int(variable_count),
             continuous_only=is_multi_fidelity,
         )
-        review_enabled = False
-        replicates_enabled = False
-        replicate_settings = None
-        cost_settings = None
-        fidelity_settings = None
-        context_settings = None
-        bo_overrides = None
-        if is_multi_fidelity:
-            _render_section_label(st, "Fidelity")
-            fidelity_settings = _collect_new_campaign_fidelity_settings(st, variables)
-            bo_overrides = {
-                "acquisition": "qmf_kg",
-                "batch_size": 1,
-                "raw_samples": 8,
-                "num_restarts": 1,
-                "mc_samples": 16,
-                "min_normalized_distance": 0.0,
-            }
-            _render_artifact_note(
-                st,
-                "qMFKG defaults",
-                "Generated YAML uses num_fantasies=8, raw_samples=8, num_restarts=1, "
-                "mc_samples=16, and min_normalized_distance=0.0.",
-            )
-            review_enabled = st.checkbox(
-                "Enable review",
-                value=False,
-                key="new_campaign_review_enabled_multi_fidelity",
-            )
-        elif is_multi_objective:
-            _render_section_label(st, "Advanced sections")
-            review_enabled = st.checkbox(
-                "Enable review",
-                value=False,
-                key="new_campaign_review_enabled",
-            )
-            replicates_enabled = st.checkbox(
-                "Enable replicates",
-                value=False,
-                key="new_campaign_replicates_enabled",
-            )
-            cost_enabled = st.checkbox(
-                "Enable deterministic cost",
-                value=False,
-                key="new_campaign_cost_enabled",
-            )
-            if cost_enabled:
-                cost_col_1, cost_col_2, cost_col_3 = st.columns(3)
-                with cost_col_1:
-                    cost_expression = st.text_input(
-                        "Cost expression",
-                        value="1.0",
-                        key="new_campaign_cost_expression",
-                    )
-                with cost_col_2:
-                    cost_weight = st.number_input(
-                        "Cost weight",
-                        min_value=0.0,
-                        value=1.0,
-                        key="new_campaign_cost_weight",
-                    )
-                with cost_col_3:
-                    cost_budget = st.number_input(
-                        "Budget",
-                        min_value=0.0,
-                        value=100.0,
-                        key="new_campaign_cost_budget",
-                    )
-                cost_settings = {
-                    "expression": cost_expression,
-                    "weight": float(cost_weight),
-                    "budget": float(cost_budget),
-                }
-        elif is_qlog_nei:
-            _render_section_label(st, "qLogNEI review semantics")
-            review_enabled = st.checkbox(
-                "Enable review",
-                value=True,
-                key="new_campaign_review_enabled_qlog_nei",
-                help=(
-                    "Review-pending rows block qLogNEI. Accepted rows are treated as "
-                    "active pending experiments and passed as X_pending."
-                ),
-            )
-            bo_overrides = {"acquisition": "qlog_nei"}
-            _render_artifact_note(
-                st,
-                "qLogNEI scope",
-                "Generated YAML uses bo.acquisition=qlog_nei. Cost-aware, contextual, "
-                "structured, multi-fidelity, and multi-objective qLogNEI remain deferred.",
-            )
-        elif is_contextual:
-            _render_section_label(st, "Context")
-            context_settings = _collect_new_campaign_context_settings(st, variables)
-            _render_section_label(st, "Contextual review, cost, and replicates")
-            review_enabled = st.checkbox(
-                "Enable review",
-                value=False,
-                key="new_campaign_review_enabled_contextual",
-                help="Optional review metadata is supported for contextual LogEI campaigns.",
-            )
-            cost_enabled = st.checkbox(
-                "Enable deterministic cost",
-                value=False,
-                key="new_campaign_cost_enabled_contextual",
-                help=(
-                    "Optional deterministic cost uses the full candidate, including "
-                    "fixed context values, and keeps a campaign-global budget."
-                ),
-            )
-            if cost_enabled:
-                cost_col_1, cost_col_2, cost_col_3 = st.columns(3)
-                with cost_col_1:
-                    cost_expression = st.text_input(
-                        "Cost expression",
-                        value="1.0",
-                        key="new_campaign_contextual_cost_expression",
-                    )
-                with cost_col_2:
-                    cost_weight = st.number_input(
-                        "Cost weight",
-                        min_value=0.0,
-                        value=1.0,
-                        key="new_campaign_contextual_cost_weight",
-                    )
-                with cost_col_3:
-                    cost_budget = st.number_input(
-                        "Budget",
-                        min_value=0.0,
-                        value=100.0,
-                        key="new_campaign_contextual_cost_budget",
-                    )
-                cost_settings = {
-                    "expression": cost_expression,
-                    "weight": float(cost_weight),
-                    "budget": float(cost_budget),
-                }
-            replicates_enabled = st.checkbox(
-                "Enable replicates",
-                value=False,
-                key="new_campaign_replicates_enabled_contextual",
-                help=(
-                    "Replicate groups retain their context. Active uncertain-best "
-                    "repeats only target groups matching the suggestion context."
-                ),
-            )
-            if replicates_enabled:
-                policy_col, threshold_col = st.columns(2)
-                with policy_col:
-                    replicate_policy = st.selectbox(
-                        "Replicate suggestion policy",
-                        ["uncertain_best", "new_only"],
-                        key="new_campaign_contextual_replicate_policy",
-                    )
-                with threshold_col:
-                    replicate_threshold = st.number_input(
-                        "Replicate uncertainty threshold",
-                        min_value=1.0e-12,
-                        value=0.1,
-                        key="new_campaign_contextual_replicate_threshold",
-                    )
-                repeat_col, max_repeat_col = st.columns(2)
-                with repeat_col:
-                    min_repeats = st.number_input(
-                        "Minimum repeats at best",
-                        min_value=1,
-                        value=2,
-                        step=1,
-                        key="new_campaign_contextual_min_repeats",
-                    )
-                with max_repeat_col:
-                    max_repeats = st.number_input(
-                        "Maximum repeats per group",
-                        min_value=1,
-                        value=5,
-                        step=1,
-                        key="new_campaign_contextual_max_repeats",
-                    )
-                noise_floor = st.number_input(
-                    "Replicate noise floor",
-                    min_value=1.0e-12,
-                    value=1.0e-8,
-                    format="%.2e",
-                    key="new_campaign_contextual_noise_floor",
-                )
-                replicate_settings = {
-                    "enabled": True,
-                    "suggestion_policy": str(replicate_policy),
-                    "replicate_threshold": float(replicate_threshold),
-                    "min_repeats_at_best": int(min_repeats),
-                    "max_repeats_per_group": int(max_repeats),
-                    "noise_floor": float(noise_floor),
-                }
-            _render_artifact_note(
-                st,
-                "Contextual scope",
-                "Generated YAML uses bo.acquisition=log_ei. Contextual review, "
-                "deterministic cost, replicates, and their combinations are supported. "
-                "Contextual multi-objective, structured, multi-fidelity, and "
-                "qLogNEI/qLogNEHVI workflows remain out of scope.",
-            )
+        sections = _collect_new_campaign_sections(st, campaign_kind, variables)
         generated_yaml = build_campaign_yaml_text(
             campaign_name=campaign_name,
             objective_name=objective_name,
@@ -668,18 +476,303 @@ def _render_create_new_campaign(st: Any) -> None:
             initial_design_method=str(initial_design_method),
             random_seed=int(random_seed),
             objectives=objectives,
-            review_enabled=review_enabled,
-            replicates_enabled=replicates_enabled,
-            replicates=replicate_settings,
-            cost=cost_settings,
-            fidelity=fidelity_settings,
-            context=context_settings,
+            review_enabled=sections.review_enabled,
+            replicates_enabled=sections.replicates_enabled,
+            replicates=sections.replicate_settings,
+            cost=sections.cost_settings,
+            fidelity=sections.fidelity_settings,
+            context=sections.context_settings,
             model={"profile": str(model_profile)},
-            bo_overrides=bo_overrides,
+            bo_overrides=sections.bo_overrides,
         )
     except ValueError as exc:
         st.error(f"Could not build YAML preview: {exc}")
 
+    _render_new_campaign_preview(
+        st,
+        generated_yaml=generated_yaml,
+        config_output=config_output,
+        log_output=log_output,
+    )
+
+
+def _render_new_campaign_kind_callout(st: Any, campaign_kind: str) -> None:
+    callouts = {
+        "Single-objective qLogNEI": (
+            "Single-objective qLogNEI",
+            "App-created qLogNEI campaigns support single-objective noisy/pending-aware "
+            "suggestions. Review rows marked pending block; accepted review rows become "
+            "active pending candidates.",
+        ),
+        "Multi-fidelity qMFKG": (
+            "Multi-fidelity qMFKG",
+            "App-created multi-fidelity campaigns are single-objective, continuous-variable "
+            "qMFKG campaigns. Advanced qMFKG defaults stay editable in the YAML preview.",
+        ),
+        "Contextual LogEI": (
+            "Contextual LogEI",
+            "App-created contextual campaigns are single-objective LogEI campaigns. "
+            "Context variables stay ordinary CSV columns but are fixed at suggestion time.",
+        ),
+    }
+    callout = callouts.get(campaign_kind)
+    if callout is not None:
+        _render_callout(st, *callout)
+
+
+def _collect_new_campaign_sections(
+    st: Any,
+    campaign_kind: str,
+    variables: list[dict[str, object]],
+) -> _NewCampaignSections:
+    collectors = {
+        "Multi-fidelity qMFKG": _collect_multi_fidelity_sections,
+        "Multi-objective": _collect_multi_objective_sections,
+        "Single-objective qLogNEI": _collect_qlog_nei_sections,
+        "Contextual LogEI": _collect_contextual_sections,
+    }
+    collector = collectors.get(campaign_kind)
+    return collector(st, variables) if collector is not None else _NewCampaignSections()
+
+
+def _collect_multi_fidelity_sections(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> _NewCampaignSections:
+    _render_section_label(st, "Fidelity")
+    fidelity_settings = _collect_new_campaign_fidelity_settings(st, variables)
+    _render_artifact_note(
+        st,
+        "qMFKG defaults",
+        "Generated YAML uses num_fantasies=8, raw_samples=8, num_restarts=1, "
+        "mc_samples=16, and min_normalized_distance=0.0.",
+    )
+    review_enabled = st.checkbox(
+        "Enable review",
+        value=False,
+        key="new_campaign_review_enabled_multi_fidelity",
+    )
+    return _NewCampaignSections(
+        review_enabled=review_enabled,
+        fidelity_settings=fidelity_settings,
+        bo_overrides={
+            "acquisition": "qmf_kg",
+            "batch_size": 1,
+            "raw_samples": 8,
+            "num_restarts": 1,
+            "mc_samples": 16,
+            "min_normalized_distance": 0.0,
+        },
+    )
+
+
+def _collect_multi_objective_sections(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> _NewCampaignSections:
+    del variables
+    _render_section_label(st, "Advanced sections")
+    review_enabled = st.checkbox(
+        "Enable review",
+        value=False,
+        key="new_campaign_review_enabled",
+    )
+    replicates_enabled = st.checkbox(
+        "Enable replicates",
+        value=False,
+        key="new_campaign_replicates_enabled",
+    )
+    cost_enabled = st.checkbox(
+        "Enable deterministic cost",
+        value=False,
+        key="new_campaign_cost_enabled",
+    )
+    cost_settings = (
+        _collect_new_campaign_cost_settings(st, key_prefix="new_campaign")
+        if cost_enabled
+        else None
+    )
+    return _NewCampaignSections(
+        review_enabled=review_enabled,
+        replicates_enabled=replicates_enabled,
+        cost_settings=cost_settings,
+    )
+
+
+def _collect_qlog_nei_sections(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> _NewCampaignSections:
+    del variables
+    _render_section_label(st, "qLogNEI review semantics")
+    review_enabled = st.checkbox(
+        "Enable review",
+        value=True,
+        key="new_campaign_review_enabled_qlog_nei",
+        help=(
+            "Review-pending rows block qLogNEI. Accepted rows are treated as "
+            "active pending experiments and passed as X_pending."
+        ),
+    )
+    _render_artifact_note(
+        st,
+        "qLogNEI scope",
+        "Generated YAML uses bo.acquisition=qlog_nei. Cost-aware, contextual, "
+        "structured, multi-fidelity, and multi-objective qLogNEI remain deferred.",
+    )
+    return _NewCampaignSections(
+        review_enabled=review_enabled,
+        bo_overrides={"acquisition": "qlog_nei"},
+    )
+
+
+def _collect_contextual_sections(
+    st: Any,
+    variables: list[dict[str, object]],
+) -> _NewCampaignSections:
+    _render_section_label(st, "Context")
+    context_settings = _collect_new_campaign_context_settings(st, variables)
+    _render_section_label(st, "Contextual review, cost, and replicates")
+    review_enabled = st.checkbox(
+        "Enable review",
+        value=False,
+        key="new_campaign_review_enabled_contextual",
+        help="Optional review metadata is supported for contextual LogEI campaigns.",
+    )
+    cost_enabled = st.checkbox(
+        "Enable deterministic cost",
+        value=False,
+        key="new_campaign_cost_enabled_contextual",
+        help=(
+            "Optional deterministic cost uses the full candidate, including "
+            "fixed context values, and keeps a campaign-global budget."
+        ),
+    )
+    cost_settings = (
+        _collect_new_campaign_cost_settings(st, key_prefix="new_campaign_contextual")
+        if cost_enabled
+        else None
+    )
+    replicates_enabled = st.checkbox(
+        "Enable replicates",
+        value=False,
+        key="new_campaign_replicates_enabled_contextual",
+        help=(
+            "Replicate groups retain their context. Active uncertain-best "
+            "repeats only target groups matching the suggestion context."
+        ),
+    )
+    replicate_settings = (
+        _collect_new_campaign_contextual_replicates(st)
+        if replicates_enabled
+        else None
+    )
+    _render_artifact_note(
+        st,
+        "Contextual scope",
+        "Generated YAML uses bo.acquisition=log_ei. Contextual review, "
+        "deterministic cost, replicates, and their combinations are supported. "
+        "Contextual multi-objective, structured, multi-fidelity, and "
+        "qLogNEI/qLogNEHVI workflows remain out of scope.",
+    )
+    return _NewCampaignSections(
+        review_enabled=review_enabled,
+        replicates_enabled=replicates_enabled,
+        replicate_settings=replicate_settings,
+        cost_settings=cost_settings,
+        context_settings=context_settings,
+    )
+
+
+def _collect_new_campaign_cost_settings(
+    st: Any,
+    *,
+    key_prefix: str,
+) -> dict[str, object]:
+    cost_col_1, cost_col_2, cost_col_3 = st.columns(3)
+    with cost_col_1:
+        cost_expression = st.text_input(
+            "Cost expression",
+            value="1.0",
+            key=f"{key_prefix}_cost_expression",
+        )
+    with cost_col_2:
+        cost_weight = st.number_input(
+            "Cost weight",
+            min_value=0.0,
+            value=1.0,
+            key=f"{key_prefix}_cost_weight",
+        )
+    with cost_col_3:
+        cost_budget = st.number_input(
+            "Budget",
+            min_value=0.0,
+            value=100.0,
+            key=f"{key_prefix}_cost_budget",
+        )
+    return {
+        "expression": cost_expression,
+        "weight": float(cost_weight),
+        "budget": float(cost_budget),
+    }
+
+
+def _collect_new_campaign_contextual_replicates(st: Any) -> dict[str, object]:
+    policy_col, threshold_col = st.columns(2)
+    with policy_col:
+        replicate_policy = st.selectbox(
+            "Replicate suggestion policy",
+            ["uncertain_best", "new_only"],
+            key="new_campaign_contextual_replicate_policy",
+        )
+    with threshold_col:
+        replicate_threshold = st.number_input(
+            "Replicate uncertainty threshold",
+            min_value=1.0e-12,
+            value=0.1,
+            key="new_campaign_contextual_replicate_threshold",
+        )
+    repeat_col, max_repeat_col = st.columns(2)
+    with repeat_col:
+        min_repeats = st.number_input(
+            "Minimum repeats at best",
+            min_value=1,
+            value=2,
+            step=1,
+            key="new_campaign_contextual_min_repeats",
+        )
+    with max_repeat_col:
+        max_repeats = st.number_input(
+            "Maximum repeats per group",
+            min_value=1,
+            value=5,
+            step=1,
+            key="new_campaign_contextual_max_repeats",
+        )
+    noise_floor = st.number_input(
+        "Replicate noise floor",
+        min_value=1.0e-12,
+        value=1.0e-8,
+        format="%.2e",
+        key="new_campaign_contextual_noise_floor",
+    )
+    return {
+        "enabled": True,
+        "suggestion_policy": str(replicate_policy),
+        "replicate_threshold": float(replicate_threshold),
+        "min_repeats_at_best": int(min_repeats),
+        "max_repeats_per_group": int(max_repeats),
+        "noise_floor": float(noise_floor),
+    }
+
+
+def _render_new_campaign_preview(
+    st: Any,
+    *,
+    generated_yaml: str,
+    config_output: str,
+    log_output: str,
+) -> None:
     if NEW_CAMPAIGN_YAML_KEY not in st.session_state:
         st.session_state[NEW_CAMPAIGN_YAML_KEY] = generated_yaml
         st.session_state[NEW_CAMPAIGN_FORM_YAML_KEY] = generated_yaml
@@ -688,7 +781,6 @@ def _render_create_new_campaign(st: Any) -> None:
         st.session_state[NEW_CAMPAIGN_FORM_YAML_KEY] = generated_yaml
 
     preview_is_stale = st.session_state.get(NEW_CAMPAIGN_FORM_YAML_KEY) != generated_yaml
-
     _render_section_label(st, "Generated YAML Preview")
     _render_artifact_note(
         st,
@@ -696,11 +788,7 @@ def _render_create_new_campaign(st: Any) -> None:
         "Advanced edits are allowed, but the YAML must pass BO Forge config validation "
         "before files are written. Create campaign writes this editable YAML preview.",
     )
-    edited_yaml = st.text_area(
-        "Campaign YAML",
-        height=360,
-        key=NEW_CAMPAIGN_YAML_KEY,
-    )
+    edited_yaml = st.text_area("Campaign YAML", height=360, key=NEW_CAMPAIGN_YAML_KEY)
     if preview_is_stale:
         st.warning(
             "Structured form values changed after this YAML preview was generated. "
@@ -710,17 +798,7 @@ def _render_create_new_campaign(st: Any) -> None:
     validate_col, create_col = st.columns([1, 1])
     with validate_col:
         if st.button("Validate YAML"):
-            try:
-                parse_campaign_config_text(edited_yaml)
-            except BOForgeError as exc:
-                _render_result_card(st, "Could not validate YAML", str(exc), success=False)
-            else:
-                _render_result_card(
-                    st,
-                    "YAML is valid",
-                    "The preview passes BO Forge config validation.",
-                )
-
+            _validate_new_campaign_yaml(st, edited_yaml)
     _render_callout(
         st,
         "Creation safety checks",
@@ -733,6 +811,19 @@ def _render_create_new_campaign(st: Any) -> None:
                 st.error("Update YAML preview from form before creating the campaign.")
                 return
             _create_campaign_from_inputs(st, edited_yaml, config_output, log_output)
+
+
+def _validate_new_campaign_yaml(st: Any, edited_yaml: str) -> None:
+    try:
+        parse_campaign_config_text(edited_yaml)
+    except BOForgeError as exc:
+        _render_result_card(st, "Could not validate YAML", str(exc), success=False)
+    else:
+        _render_result_card(
+            st,
+            "YAML is valid",
+            "The preview passes BO Forge config validation.",
+        )
 
 
 def _render_file_cards(st: Any, config_path: str, log_path: str) -> None:
@@ -1420,6 +1511,48 @@ def _render_suggest(
         st,
         ["1. Generate dry-run suggestions", "2. Inspect quality", "3. Append explicitly"],
     )
+    request_state = _render_suggestion_request_controls(st, campaign, view_data)
+    batch_size, generate_clicked = _render_suggestion_dry_run_form(st, campaign)
+    if generate_clicked:
+        _generate_staged_suggestions(st, campaign, request_state, int(batch_size))
+
+    bundle = st.session_state.get(STAGED_SUGGESTION_BUNDLE_KEY)
+    suggestions = staged_suggestions_from_bundle(bundle)
+    if suggestions.empty:
+        _render_empty_state(st, *empty_state_message("staged_suggestions"))
+        return
+
+    disabled_reason, cleared = _resolve_staged_suggestion_state(
+        st,
+        bundle,
+        request_state,
+    )
+    if cleared:
+        return
+    _render_staged_suggestion_summary(st, campaign, suggestions, disabled_reason)
+    _render_staged_suggestion_export(
+        st,
+        campaign,
+        bundle,
+        suggestions,
+        request_state.log_path,
+    )
+    _render_suggestion_quality(st, campaign, suggestions)
+    _render_append_staged_suggestions(
+        st,
+        campaign,
+        bundle,
+        suggestions,
+        request_state,
+        disabled_reason,
+    )
+
+
+def _render_suggestion_request_controls(
+    st: Any,
+    campaign: Any,
+    view_data: ViewDataLike | None,
+) -> _SuggestionRequestState:
     config_path, log_path = _current_paths(st)
     stage_options = structured_stage_options(campaign.config)
     if stage_options:
@@ -1430,33 +1563,56 @@ def _render_suggest(
             empty_kind="report_preview",
             expanded_raw=False,
         )
-    selected_stage = None
-    if stage_options:
-        selected_stage = str(
-            st.selectbox(
-                "Suggestion stage",
-                stage_options,
-                key=SUGGEST_STAGE_KEY,
-                help="Structured campaigns require an explicit stage for suggestions.",
-            )
-        )
-        _render_artifact_note(
-            st,
-            "Active variables",
-            active_variables_display(campaign.config, selected_stage),
-        )
+    selected_stage = _render_suggestion_stage(st, campaign, stage_options)
     context_values = _render_context_inputs(
         st,
         campaign.config,
         config_path=config_path,
         log_path=log_path,
     )
-    view_data = view_data or {}
-    contextual_cost_summary = None
+    _render_suggestion_mode_notes(st, campaign, view_data, context_values)
+    return _SuggestionRequestState(
+        config_path=config_path,
+        log_path=log_path,
+        selected_stage=selected_stage,
+        context_values=context_values,
+    )
+
+
+def _render_suggestion_stage(
+    st: Any,
+    campaign: Any,
+    stage_options: list[str],
+) -> str | None:
+    if not stage_options:
+        return None
+    selected_stage = str(
+        st.selectbox(
+            "Suggestion stage",
+            stage_options,
+            key=SUGGEST_STAGE_KEY,
+            help="Structured campaigns require an explicit stage for suggestions.",
+        )
+    )
+    _render_artifact_note(
+        st,
+        "Active variables",
+        active_variables_display(campaign.config, selected_stage),
+    )
+    return selected_stage
+
+
+def _render_suggestion_mode_notes(
+    st: Any,
+    campaign: Any,
+    view_data: ViewDataLike | None,
+    context_values: dict[str, object] | None,
+) -> None:
     if campaign.config.context is not None:
+        contextual_cost_summary = None
         if campaign.config.cost is not None:
             contextual_cost_summary = _view_data_value(
-                view_data,
+                view_data or {},
                 "cost_summary",
                 campaign.cost_summary,
             )
@@ -1466,17 +1622,8 @@ def _render_suggest(
             context_values=context_values,
             cost_summary=contextual_cost_summary,
         )
-        if campaign.config.replicates.enabled:
-            policy = campaign.config.replicates.suggestion_policy
-            detail = (
-                "Uncertain-best repeats are restricted to replicate groups matching "
-                "every active suggestion context value."
-                if policy == "uncertain_best"
-                else "New-only mode models replicate-derived variance but proposes new designs."
-            )
-            _render_artifact_note(st, f"Context-matched replicates: {policy}", detail)
-    is_multi_fidelity = campaign.config.fidelity is not None
-    if is_multi_fidelity:
+        _render_contextual_replicate_note(st, campaign)
+    if campaign.config.fidelity is not None:
         _render_artifact_note(
             st,
             "qMFKG suggestions",
@@ -1490,6 +1637,23 @@ def _render_suggest(
             "Review-pending rows must be resolved first. Accepted pending suggestions "
             "can stay in the log and are accounted for as X_pending.",
         )
+
+
+def _render_contextual_replicate_note(st: Any, campaign: Any) -> None:
+    if not campaign.config.replicates.enabled:
+        return
+    policy = campaign.config.replicates.suggestion_policy
+    detail = (
+        "Uncertain-best repeats are restricted to replicate groups matching "
+        "every active suggestion context value."
+        if policy == "uncertain_best"
+        else "New-only mode models replicate-derived variance but proposes new designs."
+    )
+    _render_artifact_note(st, f"Context-matched replicates: {policy}", detail)
+
+
+def _render_suggestion_dry_run_form(st: Any, campaign: Any) -> tuple[object, bool]:
+    is_multi_fidelity = campaign.config.fidelity is not None
     with st.form("suggest_dry_run_form"):
         batch_size = st.number_input(
             "Batch size",
@@ -1503,85 +1667,93 @@ def _render_suggest(
             "Generate suggestions (dry run)",
             type="primary",
         )
+    return batch_size, bool(generate_clicked)
 
-    if generate_clicked:
-        try:
-            if hasattr(campaign, "suggest_dry_run"):
-                dry_run_kwargs: dict[str, object] = {}
-                if selected_stage is not None:
-                    dry_run_kwargs["stage"] = selected_stage
-                if context_values is not None:
-                    dry_run_kwargs["context_values"] = context_values
-                result = campaign.suggest_dry_run(int(batch_size), **dry_run_kwargs)
-                suggestions = result.suggestions
-                bundle = result.bundle
-            else:
-                suggest_kwargs: dict[str, object] = {"batch_size": int(batch_size)}
-                if selected_stage is not None:
-                    suggest_kwargs["stage"] = selected_stage
-                if context_values is not None:
-                    suggest_kwargs["context_values"] = context_values
-                suggestions = campaign.suggest_next(**suggest_kwargs)
-                bundle = make_staged_suggestion_bundle(
-                    suggestions,
-                    config_path,
-                    log_path,
-                    stage=selected_stage,
-                    context_values=context_values,
-                )
-        except (BOForgeError, OSError, ValueError) as exc:
-            st.error(str(exc))
+
+def _generate_staged_suggestions(
+    st: Any,
+    campaign: Any,
+    request_state: _SuggestionRequestState,
+    batch_size: int,
+) -> None:
+    try:
+        if hasattr(campaign, "suggest_dry_run"):
+            kwargs = _suggestion_request_kwargs(request_state)
+            result = campaign.suggest_dry_run(batch_size, **kwargs)
+            bundle = result.bundle
         else:
-            st.session_state[STAGED_SUGGESTION_BUNDLE_KEY] = bundle
-            st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
-            st.success("Suggestions staged. Review them before appending.")
-
-    bundle = st.session_state.get(STAGED_SUGGESTION_BUNDLE_KEY)
-    suggestions = staged_suggestions_from_bundle(bundle)
-    if suggestions.empty:
-        _render_empty_state(st, *empty_state_message("staged_suggestions"))
+            kwargs = _suggestion_request_kwargs(request_state)
+            suggestions = campaign.suggest_next(batch_size=batch_size, **kwargs)
+            bundle = make_staged_suggestion_bundle(
+                suggestions,
+                request_state.config_path,
+                request_state.log_path,
+                stage=request_state.selected_stage,
+                context_values=request_state.context_values,
+            )
+    except (BOForgeError, OSError, ValueError) as exc:
+        st.error(str(exc))
         return
+    st.session_state[STAGED_SUGGESTION_BUNDLE_KEY] = bundle
+    st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
+    st.success("Suggestions staged. Review them before appending.")
 
-    if selected_stage is None and context_values is None:
-        raw_reason = _current_invalidation_reason(st, bundle)
-    else:
-        raw_reason = _current_invalidation_reason(
-            st,
-            bundle,
-            stage=selected_stage,
-            context_values=context_values,
-        )
+
+def _suggestion_request_kwargs(
+    request_state: _SuggestionRequestState,
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {}
+    if request_state.selected_stage is not None:
+        kwargs["stage"] = request_state.selected_stage
+    if request_state.context_values is not None:
+        kwargs["context_values"] = request_state.context_values
+    return kwargs
+
+
+def _resolve_staged_suggestion_state(
+    st: Any,
+    bundle: Any,
+    request_state: _SuggestionRequestState,
+) -> tuple[str | None, bool]:
+    kwargs = _suggestion_request_kwargs(request_state)
+    raw_reason = _current_invalidation_reason(st, bundle, **kwargs)
     if raw_reason is None:
         st.session_state.pop(STAGED_FRESHNESS_MESSAGE_KEY, None)
     disabled_reason = append_disabled_reason(
         bundle,
-        config_path,
-        log_path,
+        request_state.config_path,
+        request_state.log_path,
         st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
-        stage=selected_stage,
-        context_values=context_values,
+        **kwargs,
     )
-    if raw_reason and raw_reason != "No staged suggestions.":
-        st.session_state[STAGED_FRESHNESS_MESSAGE_KEY] = raw_reason
-        _render_callout(st, "Append state", disabled_reason or raw_reason)
-        if _should_clear_staged_bundle(raw_reason):
-            _clear_staged_suggestions(st)
-            _render_empty_state(
-                st,
-                "Cleared stale staged suggestions.",
-                "Generate a fresh dry-run batch before appending.",
-            )
-            return
+    if not raw_reason or raw_reason == "No staged suggestions.":
+        return disabled_reason, False
+    st.session_state[STAGED_FRESHNESS_MESSAGE_KEY] = raw_reason
+    _render_callout(st, "Append state", disabled_reason or raw_reason)
+    if not _should_clear_staged_bundle(raw_reason):
+        return disabled_reason, False
+    _clear_staged_suggestions(st)
+    _render_empty_state(
+        st,
+        "Cleared stale staged suggestions.",
+        "Generate a fresh dry-run batch before appending.",
+    )
+    return disabled_reason, True
 
+
+def _render_staged_suggestion_summary(
+    st: Any,
+    campaign: Any,
+    suggestions: pd.DataFrame,
+    disabled_reason: str | None,
+) -> None:
     staged_metrics: list[tuple[str, object]] = [
         ("Staged rows", len(suggestions)),
         ("Status", "Ready" if disabled_reason is None else "Blocked"),
     ]
     if campaign.config.cost is not None and "cost_estimate" in suggestions.columns:
         estimates = pd.to_numeric(suggestions["cost_estimate"], errors="coerce")
-        staged_metrics.append(
-            ("Staged estimated cost", float(estimates.fillna(0.0).sum()))
-        )
+        staged_metrics.append(("Staged estimated cost", float(estimates.fillna(0.0).sum())))
     if campaign.config.review.enabled and "review_status" in suggestions.columns:
         states = sorted(set(suggestions["review_status"].astype(str)))
         staged_metrics.append(("Review state", ", ".join(states)))
@@ -1594,6 +1766,14 @@ def _render_suggest(
         expanded_raw=False,
     )
 
+
+def _render_staged_suggestion_export(
+    st: Any,
+    campaign: Any,
+    bundle: Any,
+    suggestions: pd.DataFrame,
+    log_path: Path,
+) -> None:
     with st.form("staged_suggestions_export_form"):
         export_path = Path(
             st.text_input(
@@ -1603,66 +1783,97 @@ def _render_suggest(
             )
         )
         export_clicked = st.form_submit_button("Export staged suggestions CSV")
-    if export_clicked:
-        try:
-            if hasattr(campaign, "export_staged_suggestions"):
-                written_path = campaign.export_staged_suggestions(bundle, export_path)
-            else:
-                written_path = export_staged_suggestions_csv(suggestions, export_path)
-        except OSError as exc:
-            st.error(str(exc))
-        else:
-            st.success(f"Wrote staged suggestions CSV: {written_path}")
+    if not export_clicked:
+        return
+    try:
+        written_path = (
+            campaign.export_staged_suggestions(bundle, export_path)
+            if hasattr(campaign, "export_staged_suggestions")
+            else export_staged_suggestions_csv(suggestions, export_path)
+        )
+    except OSError as exc:
+        st.error(str(exc))
+    else:
+        st.success(f"Wrote staged suggestions CSV: {written_path}")
 
+
+def _render_suggestion_quality(st: Any, campaign: Any, suggestions: pd.DataFrame) -> None:
     try:
         quality = campaign.suggestion_quality(suggestions)
     except BOForgeError as exc:
         st.warning(f"Could not compute suggestion quality: {exc}")
-    else:
-        _render_artifact_note(
-            st,
-            "Suggestion Quality",
-            "Read-only checks for feasibility, duplicates, and distance threshold.",
-        )
-        _render_table_section(
-            st,
-            "Suggestion Quality",
-            quality,
-            empty_kind="staged_suggestions",
-            expanded_raw=False,
-        )
+        return
+    _render_artifact_note(
+        st,
+        "Suggestion Quality",
+        "Read-only checks for feasibility, duplicates, and distance threshold.",
+    )
+    _render_table_section(
+        st,
+        "Suggestion Quality",
+        quality,
+        empty_kind="staged_suggestions",
+        expanded_raw=False,
+    )
 
+
+def _render_append_staged_suggestions(
+    st: Any,
+    campaign: Any,
+    bundle: Any,
+    suggestions: pd.DataFrame,
+    request_state: _SuggestionRequestState,
+    disabled_reason: str | None,
+) -> None:
     if disabled_reason is not None:
         _render_callout(st, "Append disabled", disabled_reason)
-
     with st.form("append_staged_suggestions_form"):
         append_clicked = st.form_submit_button(
             "Append staged suggestions",
             disabled=disabled_reason is not None,
         )
-    if append_clicked:
-        try:
-            if hasattr(campaign, "append_staged"):
-                result = campaign.append_staged(
-                    bundle,
-                    st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
-                    stage=selected_stage,
-                    context_values=context_values,
-                )
-                campaign = result.service
-                appended_fingerprint = result.appended_fingerprint
-            else:
-                campaign.append_suggestions(suggestions)
-                appended_fingerprint = str(bundle["suggestions_fingerprint"])
-        except (BOForgeError, ValueError) as exc:
-            st.error(str(exc))
-            return
-        st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = appended_fingerprint
-        _clear_staged_suggestions(st)
-        _clear_report_preview(st)
-        st.session_state[SESSION_KEY] = campaign
-        _refresh_validation_cache(st, campaign, config_path, log_path)
-        _flash_and_rerun(st, "Staged suggestions appended to the campaign log.")
+    if not append_clicked:
+        return
+    try:
+        campaign, appended_fingerprint = _append_staged_suggestion_bundle(
+            st,
+            campaign,
+            bundle,
+            suggestions,
+            request_state,
+        )
+    except (BOForgeError, ValueError) as exc:
+        st.error(str(exc))
+        return
+    st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = appended_fingerprint
+    _clear_staged_suggestions(st)
+    _clear_report_preview(st)
+    st.session_state[SESSION_KEY] = campaign
+    _refresh_validation_cache(
+        st,
+        campaign,
+        request_state.config_path,
+        request_state.log_path,
+    )
+    _flash_and_rerun(st, "Staged suggestions appended to the campaign log.")
+
+
+def _append_staged_suggestion_bundle(
+    st: Any,
+    campaign: Any,
+    bundle: Any,
+    suggestions: pd.DataFrame,
+    request_state: _SuggestionRequestState,
+) -> tuple[Any, str]:
+    if hasattr(campaign, "append_staged"):
+        result = campaign.append_staged(
+            bundle,
+            st.session_state.get(LAST_APPENDED_FINGERPRINT_KEY),
+            **_suggestion_request_kwargs(request_state),
+        )
+        return result.service, result.appended_fingerprint
+    campaign.append_suggestions(suggestions)
+    return campaign, str(bundle["suggestions_fingerprint"])
 
 
 def _render_context_inputs(
@@ -1800,56 +2011,13 @@ def _render_resolve(
             _view_data_value(view_data, "cost_summary", campaign.cost_summary),
         )
     pending = _view_data_value(view_data, "pending", campaign.pending_suggestions)
-    with st.expander("Pending Suggestions", expanded=False):
-        if pending.empty:
-            _render_empty_state(st, *empty_state_message("pending_suggestions"))
-        else:
-            st.dataframe(compact_dataframe(pending), width="stretch")
-            with st.expander("Show full raw pending suggestions", expanded=False):
-                st.dataframe(format_dataframe_for_display(pending), width="stretch")
+    _render_pending_suggestions(st, pending)
     observable = _view_data_value(
         view_data,
         "observable",
         lambda: observable_rows(campaign.config, campaign.df),
     )
-
-    if flags["has_review"]:
-        st.subheader("Review Queue")
-        review_queue = _view_data_value(view_data, "review_queue", campaign.review_queue)
-        if review_queue.empty:
-            _render_empty_state(st, *empty_state_message("review_queue"))
-        else:
-            st.dataframe(compact_dataframe(review_queue), width="stretch")
-            with st.expander("Show full raw review queue", expanded=False):
-                st.dataframe(format_dataframe_for_display(review_queue), width="stretch")
-        if not review_queue.empty:
-            with st.form("review_decision_form"):
-                row_id = st.selectbox("Review row_id", review_queue["row_id"].astype(str).tolist())
-                decision = st.selectbox("Decision", ["accept", "reject", "defer"])
-                note = st.text_input("Review note", value="")
-                review_clicked = st.form_submit_button("Apply review decision")
-            if review_clicked:
-                try:
-                    if hasattr(campaign, "review"):
-                        result = campaign.review(row_id, decision, note)
-                        campaign = result.service
-                    else:
-                        campaign.review_suggestion(row_id, decision, note)
-                except BOForgeError as exc:
-                    st.error(str(exc))
-                else:
-                    _clear_staged_suggestions(st)
-                    _clear_report_preview(st)
-                    st.session_state[SESSION_KEY] = campaign
-                    config_path, log_path = _current_paths(st)
-                    _refresh_validation_cache(st, campaign, config_path, log_path)
-                    _flash_and_rerun(st, "Review decision recorded.")
-    else:
-        _render_empty_state(
-            st,
-            "Review is not enabled.",
-            "This campaign can mark suggested rows observed without a review decision.",
-        )
+    _render_review_workflow(st, campaign, flags, view_data)
 
     _render_table_section(
         st,
@@ -1860,7 +2028,66 @@ def _render_resolve(
     )
     if observable.empty:
         return
+    form_values = _render_observation_form(st, campaign, flags, observable)
+    if form_values.submitted:
+        _record_observation(st, campaign, form_values)
 
+
+def _render_pending_suggestions(st: Any, pending: pd.DataFrame) -> None:
+    with st.expander("Pending Suggestions", expanded=False):
+        if pending.empty:
+            _render_empty_state(st, *empty_state_message("pending_suggestions"))
+            return
+        st.dataframe(compact_dataframe(pending), width="stretch")
+        with st.expander("Show full raw pending suggestions", expanded=False):
+            st.dataframe(format_dataframe_for_display(pending), width="stretch")
+
+
+def _render_review_workflow(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    view_data: ViewDataLike,
+) -> None:
+    if not flags["has_review"]:
+        _render_empty_state(
+            st,
+            "Review is not enabled.",
+            "This campaign can mark suggested rows observed without a review decision.",
+        )
+        return
+    st.subheader("Review Queue")
+    review_queue = _view_data_value(view_data, "review_queue", campaign.review_queue)
+    if review_queue.empty:
+        _render_empty_state(st, *empty_state_message("review_queue"))
+        return
+    st.dataframe(compact_dataframe(review_queue), width="stretch")
+    with st.expander("Show full raw review queue", expanded=False):
+        st.dataframe(format_dataframe_for_display(review_queue), width="stretch")
+    with st.form("review_decision_form"):
+        row_id = st.selectbox("Review row_id", review_queue["row_id"].astype(str).tolist())
+        decision = st.selectbox("Decision", ["accept", "reject", "defer"])
+        note = st.text_input("Review note", value="")
+        review_clicked = st.form_submit_button("Apply review decision")
+    if not review_clicked:
+        return
+    try:
+        if hasattr(campaign, "review"):
+            campaign = campaign.review(row_id, decision, note).service
+        else:
+            campaign.review_suggestion(row_id, decision, note)
+    except BOForgeError as exc:
+        st.error(str(exc))
+        return
+    _complete_resolve_mutation(st, campaign, "Review decision recorded.")
+
+
+def _render_observation_form(
+    st: Any,
+    campaign: Any,
+    flags: dict[str, bool],
+    observable: pd.DataFrame,
+) -> _ObservationFormValues:
     st.subheader(
         "Record Coupled Objectives" if campaign.config.is_multi_objective else "Mark Observed"
     )
@@ -1884,95 +2111,124 @@ def _render_resolve(
         selected_row = observable.loc[observable["row_id"].astype(str) == observed_row_id]
         if not selected_row.empty:
             _render_selected_row_preview(st, campaign, selected_row.iloc[0])
-        if campaign.config.is_multi_objective:
-            objective_inputs = {
-                objective.name: st.text_input(
-                    f"Observed {objective.name}",
-                    value="",
-                    key=_stable_widget_key(
-                        "observed_objective",
-                        input_scope,
-                        observed_row_id,
-                        objective.name,
-                    ),
-                    help="Required. Enter a finite numeric value.",
-                )
-                for objective in campaign.config.objectives
-            }
-            actual_cost_text = _render_actual_cost_input(
-                st,
-                flags,
-                key_suffix=f"{input_scope}|{observed_row_id}",
-            )
-            mark_clicked = st.form_submit_button("Record coupled objectives")
-        else:
-            objective_name = campaign.config.objective.name
-            objective_value = st.number_input(
-                f"Observed {objective_name}",
-                value=0.0,
-                format="%.8f",
+        objective_inputs, objective_value = _render_observation_objective_inputs(
+            st,
+            campaign,
+            input_scope,
+            observed_row_id,
+        )
+        actual_cost_text = _render_actual_cost_input(
+            st,
+            flags,
+            key_suffix=f"{input_scope}|{observed_row_id}",
+        )
+        button_label = (
+            "Record coupled objectives"
+            if campaign.config.is_multi_objective
+            else "Mark row observed"
+        )
+        submitted = st.form_submit_button(button_label)
+    return _ObservationFormValues(
+        row_id=observed_row_id,
+        objective_inputs=objective_inputs,
+        objective_value=objective_value,
+        actual_cost_text=actual_cost_text,
+        submitted=bool(submitted),
+    )
+
+
+def _render_observation_objective_inputs(
+    st: Any,
+    campaign: Any,
+    input_scope: str,
+    observed_row_id: str,
+) -> tuple[dict[str, str] | None, object | None]:
+    if campaign.config.is_multi_objective:
+        objective_inputs = {
+            objective.name: st.text_input(
+                f"Observed {objective.name}",
+                value="",
                 key=_stable_widget_key(
                     "observed_objective",
                     input_scope,
                     observed_row_id,
-                    objective_name,
+                    objective.name,
                 ),
+                help="Required. Enter a finite numeric value.",
             )
-            actual_cost_text = _render_actual_cost_input(
-                st,
-                flags,
-                key_suffix=f"{input_scope}|{observed_row_id}",
-            )
-            mark_clicked = st.form_submit_button("Mark row observed")
+            for objective in campaign.config.objectives
+        }
+        return objective_inputs, None
+    objective_name = campaign.config.objective.name
+    objective_value = st.number_input(
+        f"Observed {objective_name}",
+        value=0.0,
+        format="%.8f",
+        key=_stable_widget_key(
+            "observed_objective",
+            input_scope,
+            observed_row_id,
+            objective_name,
+        ),
+    )
+    return None, objective_value
 
-    if not mark_clicked:
-        return
 
-    selected_row = observable.loc[observable["row_id"].astype(str) == observed_row_id]
-    if campaign.config.is_multi_objective:
-        try:
-            objective_values = _parse_multi_objective_inputs(
-                objective_inputs,
-                campaign.config.objective_names,
-            )
-            actual_cost = _parse_actual_cost_input(actual_cost_text)
-            if hasattr(campaign, "mark_observed"):
-                result = campaign.mark_observed(
-                    row_id=observed_row_id,
-                    objective_values=objective_values,
-                    actual_cost=actual_cost,
-                )
-                if hasattr(result, "service"):
-                    campaign = result.service
-        except (BOForgeError, ValueError) as exc:
-            st.error(str(exc))
-        else:
-            _clear_staged_suggestions(st)
-            _clear_report_preview(st)
-            st.session_state[SESSION_KEY] = campaign
-            config_path, log_path = _current_paths(st)
-            _refresh_validation_cache(st, campaign, config_path, log_path)
-            _flash_and_rerun(st, "Coupled objective values recorded.")
-        return
-
+def _record_observation(
+    st: Any,
+    campaign: Any,
+    form_values: _ObservationFormValues,
+) -> None:
     try:
-        actual_cost = _parse_actual_cost_input(actual_cost_text)
-        result = campaign.mark_observed(
-            row_id=observed_row_id,
-            objective_value=float(objective_value),
-            actual_cost=None if actual_cost is None else float(actual_cost),
-        )
-        if hasattr(result, "service"):
-            campaign = result.service
+        if campaign.config.is_multi_objective:
+            campaign = _record_multi_objective_observation(campaign, form_values)
+            success_message = "Coupled objective values recorded."
+        else:
+            campaign = _record_single_objective_observation(campaign, form_values)
+            success_message = "Observation recorded."
     except (BOForgeError, ValueError) as exc:
         st.error(str(exc))
-    else:
-        _clear_staged_suggestions(st)
-        _clear_report_preview(st)
-        st.session_state[SESSION_KEY] = campaign
-        config_path, log_path = _current_paths(st)
-        _refresh_validation_cache(st, campaign, config_path, log_path)
-        _flash_and_rerun(st, "Observation recorded.")
+        return
+    _complete_resolve_mutation(st, campaign, success_message)
+
+
+def _record_multi_objective_observation(
+    campaign: Any,
+    form_values: _ObservationFormValues,
+) -> Any:
+    objective_values = _parse_multi_objective_inputs(
+        form_values.objective_inputs or {},
+        campaign.config.objective_names,
+    )
+    actual_cost = _parse_actual_cost_input(form_values.actual_cost_text)
+    result = campaign.mark_observed(
+        row_id=form_values.row_id,
+        objective_values=objective_values,
+        actual_cost=actual_cost,
+    )
+    return result.service if hasattr(result, "service") else campaign
+
+
+def _record_single_objective_observation(
+    campaign: Any,
+    form_values: _ObservationFormValues,
+) -> Any:
+    actual_cost = _parse_actual_cost_input(form_values.actual_cost_text)
+    result = campaign.mark_observed(
+        row_id=form_values.row_id,
+        objective_value=float(form_values.objective_value),
+        actual_cost=None if actual_cost is None else float(actual_cost),
+    )
+    return result.service if hasattr(result, "service") else campaign
+
+
+def _complete_resolve_mutation(st: Any, campaign: Any, message: str) -> None:
+    _clear_staged_suggestions(st)
+    _clear_report_preview(st)
+    st.session_state[SESSION_KEY] = campaign
+    config_path, log_path = _current_paths(st)
+    _refresh_validation_cache(st, campaign, config_path, log_path)
+    _flash_and_rerun(st, message)
 
 
 def _render_actual_cost_input(
@@ -2149,29 +2405,18 @@ def _available_plot_options(
         else available_plot_kinds(campaign.config)
     )
     options: list[dict[str, Any]] = []
-    mapping = {
-        "progress": ("Progress", "plot_progress"),
-        "diagnostics": ("Diagnostics", "plot_diagnostics"),
-        "pareto": ("Pareto", "plot_pareto"),
-        "pareto_parallel": ("Pareto Parallel", "plot_pareto_parallel"),
-        "hypervolume": ("Hypervolume", "plot_hypervolume"),
-        "stage_diagnostics": ("Stage Diagnostics", "plot_stage_diagnostics"),
-        "fidelity_diagnostics": ("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
-        "context_diagnostics": ("Context Diagnostics", "plot_context_diagnostics"),
-        "qlog_nei_diagnostics": ("qLogNEI Diagnostics", "plot_qlog_nei_diagnostics"),
-        "model_diagnostics": ("Model Diagnostics", "plot_model_diagnostics"),
-        "model_comparison": ("Model Comparison", "plot_model_comparison"),
-    }
-    for kind, (label, plotter_name) in mapping.items():
+    for kind, route in _PLOT_ROUTES.items():
+        if kind in {"cost_progress", "replicates"}:
+            continue
         if kind in plot_kinds:
             plotter = (
                 _service_plotter(campaign, kind)
                 if hasattr(campaign, "plot")
-                else getattr(campaign, plotter_name)
+                else getattr(campaign, route.session_method)
             )
             options.append(
                 {
-                    "label": label,
+                    "label": route.label,
                     "key": kind,
                     "plotter": plotter,
                     "path": default_export_path(log_path, kind, "png"),

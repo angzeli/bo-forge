@@ -67,6 +67,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `acquisition.py`: LogEI, qLogEI, qLogEHVI, and qMFKG acquisition optimisation.
 - `suggestions.py`: Sobol, LogEI/qLogEI, qLogEHVI, and qMFKG candidate generation.
 - `diagnostics.py`: user-facing diagnostic plots.
+- `plot_registry.py`: internal plot labels and `CampaignSession` method routing shared by adapters.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "2.3.2"
+version = "2.3.3"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -93,4 +93,10 @@ target-version = "py311"
 include = ["bo_forge/**/*.py", "bo_forge_app/**/*.py", "examples/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["C901"]

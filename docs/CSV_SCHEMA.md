@@ -18,7 +18,7 @@ When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`.
 Contextual cost campaigns use the same columns; context variables remain normal
 variable columns and cost is evaluated on the full candidate, including fixed
-context values. `stages:` cannot be combined with `cost:` in v2.3.2.
+context values. `stages:` cannot be combined with `cost:` in v2.3.3.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -129,7 +129,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v2.3.2.
+- `stages:` cannot be combined with `cost:` in v2.3.3.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -186,7 +186,7 @@ with `objectives:`, `stages:`, `cost:`, or `replicates.enabled: true`.
 
 ## 🌐 Contextual BO Rules
 
-v2.3.2 supports a conservative single-objective contextual LogEI/qLogEI workflow:
+v2.3.3 supports a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -309,7 +309,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.3.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.3.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -347,7 +347,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.3.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.3.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -379,7 +379,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.3.2.
+and structured campaigns in v2.3.3.
 
 ## 🧪 Variable Value Rules
 

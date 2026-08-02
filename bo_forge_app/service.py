@@ -10,6 +10,7 @@ import pandas as pd
 
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError
+from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge.session import CampaignSession, _format_campaign_report
 from bo_forge_app.streamlit_helpers import (
     available_plot_kinds,
@@ -42,6 +43,32 @@ _SESSION_READ_HELPERS = {
     "qlog_nei_summary",
     "model_summary",
     "model_profile_comparison",
+}
+
+_PANEL_BASE_READERS = {
+    "Overview": (
+        ("summary", "summary"),
+        ("next_action", "next_action"),
+        ("model_summary", "model_summary"),
+        ("observed", "observed_data"),
+        ("pending", "pending_suggestions"),
+    ),
+    "Data": (
+        ("summary", "summary"),
+        ("next_action", "next_action"),
+        ("model_summary", "model_summary"),
+        ("observed", "observed_data"),
+        ("pending", "pending_suggestions"),
+    ),
+    "Reports": (
+        ("summary", "summary"),
+        ("next_action", "next_action"),
+        ("model_summary", "model_summary"),
+    ),
+    "Resolve": (
+        ("pending", "pending_suggestions"),
+        ("observable", None),
+    ),
 }
 
 
@@ -173,41 +200,40 @@ class CampaignAppService:
     def collect_view_data(self, panel: str) -> CampaignViewData:
         """Collect only the read data needed by one active app panel."""
         data = CampaignViewData()
-        if panel in {"Overview", "Data", "Reports"}:
-            data.summary = self.session.summary()
-            data.next_action = self.session.next_action()
-            data.model_summary = self.session.model_summary()
-        if panel in {"Overview", "Data"}:
-            data.observed = self.session.observed_data()
-            data.pending = self.session.pending_suggestions()
+        readers = list(_PANEL_BASE_READERS.get(panel, ()))
         if panel == "Resolve":
-            data.pending = self.session.pending_suggestions()
-            data.observable = observable_rows(self.config, self.df)
             if self.config.review.enabled:
-                data.review_queue = self.session.review_queue()
+                readers.append(("review_queue", "review_queue"))
             if self.config.cost is not None:
-                data.cost_summary = self.session.cost_summary()
+                readers.append(("cost_summary", "cost_summary"))
         if panel == "Suggest" and self.config.context is not None and self.config.cost is not None:
-            data.cost_summary = self.session.cost_summary()
+            readers.append(("cost_summary", "cost_summary"))
         if panel in {"Overview", "Data"} and self.config.is_multi_objective:
-            data.pareto_summary = self.session.pareto_summary()
+            readers.append(("pareto_summary", "pareto_summary"))
             if panel == "Data":
-                data.pareto_front = self.session.pareto_front()
+                readers.append(("pareto_front", "pareto_front"))
         if panel in {"Overview", "Data"} and self.config.cost is not None:
-            data.cost_summary = self.session.cost_summary()
+            readers.append(("cost_summary", "cost_summary"))
         if panel in {"Overview", "Data"} and self.config.replicates.enabled:
-            data.replicate_summary = self.session.replicate_summary()
+            readers.append(("replicate_summary", "replicate_summary"))
         if panel in {"Overview", "Data", "Reports"} and self.config.is_structured_campaign:
-            data.stage_summary = self.session.stage_summary()
+            readers.append(("stage_summary", "stage_summary"))
         if panel in {"Overview", "Data", "Reports"} and self.config.fidelity is not None:
-            data.fidelity_summary = self.session.fidelity_summary()
+            readers.append(("fidelity_summary", "fidelity_summary"))
         if panel in {"Overview", "Data", "Reports"} and self.config.context is not None:
-            data.context_summary = self.session.context_summary()
+            readers.append(("context_summary", "context_summary"))
         if (
             panel in {"Overview", "Data", "Reports"}
             and self.config.bo.acquisition == "qlog_nei"
         ):
-            data.qlog_nei_summary = self.session.qlog_nei_summary()
+            readers.append(("qlog_nei_summary", "qlog_nei_summary"))
+        for field, reader in readers:
+            value = (
+                observable_rows(self.config, self.df)
+                if reader is None
+                else getattr(self.session, reader)()
+            )
+            setattr(data, field, value)
         return data
 
     def suggest_dry_run(
@@ -294,25 +320,11 @@ class CampaignAppService:
 
     def plot(self, kind: str, save_path: str | Path | None = None) -> PlotResult:
         """Render or export one supported plot kind."""
-        plotters = {
-            "progress": self.session.plot_progress,
-            "diagnostics": self.session.plot_diagnostics,
-            "pareto": self.session.plot_pareto,
-            "pareto_parallel": self.session.plot_pareto_parallel,
-            "hypervolume": self.session.plot_hypervolume,
-            "cost_progress": self.session.plot_cost_progress,
-            "replicates": self.session.plot_replicates,
-            "stage_diagnostics": self.session.plot_stage_diagnostics,
-            "fidelity_diagnostics": self.session.plot_fidelity_diagnostics,
-            "context_diagnostics": self.session.plot_context_diagnostics,
-            "qlog_nei_diagnostics": self.session.plot_qlog_nei_diagnostics,
-            "model_diagnostics": self.session.plot_model_diagnostics,
-            "model_comparison": self.session.plot_model_comparison,
-        }
-        if kind not in plotters:
+        route = _PLOT_ROUTES.get(kind)
+        if route is None:
             raise ValueError(f"Unsupported plot kind: {kind}")
         kwargs = {"save_path": save_path} if save_path is not None else {}
-        result = plotters[kind](**kwargs)
+        result = getattr(self.session, route.session_method)(**kwargs)
         return PlotResult(
             figure=extract_matplotlib_figure(result),
             written_path=Path(save_path) if save_path is not None else None,

@@ -47,6 +47,14 @@ _MODEL_PROFILE_COMPARISON_COLUMNS = [
 
 @dataclass(frozen=True)
 class TrainingTensors:
+    """Double-precision tensors in BO Forge's maximization model convention.
+
+    ``train_x`` has shape ``(n, d)`` after unit-cube encoding and categorical
+    one-hot expansion. ``train_y`` has shape ``(n, m)`` after minimization
+    objectives are sign-flipped. Optional ``train_yvar`` has shape ``(n, m)``
+    and stores observation variance in the same model space as ``train_y``.
+    """
+
     train_x: torch.Tensor
     train_y: torch.Tensor
     train_yvar: torch.Tensor | None = None
@@ -64,7 +72,13 @@ def dataframe_to_training_tensors(
     config: CampaignConfig,
     observed_df: pd.DataFrame,
 ) -> TrainingTensors:
-    """Convert observed rows to model-space tensors plus optional observation variance."""
+    """Build ``(n, d)`` inputs and ``(n, m)`` outcomes for model fitting.
+
+    Inputs and outcomes use ``torch.double``. Inputs follow configured variable
+    order in unit-cube model space; outcomes always use a maximization convention.
+    Replicate-enabled campaigns may also return ``train_yvar`` with one
+    replicate-derived variance per fitting row and objective.
+    """
     model_df, yvar_df = modeling_observed_data_with_variance(config, observed_df)
     if config.is_multi_objective:
         y_user = torch.tensor(
@@ -254,6 +268,7 @@ def model_profile_comparison(
                     )
                 )
             except Exception as exc:
+                # A comparison is diagnostic: one failed profile must not hide the others.
                 metadata = _comparison_fit_metadata(profile)
                 rows.append(
                     _comparison_row(
@@ -381,6 +396,7 @@ def _fit_mll_with_profile_metadata(
             fit_gpytorch_mll(mll)
             caught_warnings = [str(item.message) for item in caught]
     except Exception:
+        # Record robust-profile diagnostics for any fitter failure, then preserve its type.
         _record_fit_metadata(
             config,
             training,
