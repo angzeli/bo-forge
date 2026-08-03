@@ -220,29 +220,34 @@ bo-forge plot \
 ```
 
 For single-objective multi-fidelity configs, the fidelity variable is a normal
-CSV variable column. Once the initial design is complete, qMFKG model-based
-suggestions are one-at-a-time:
+CSV variable column. Continuous fidelity and ordered numeric levels use the
+same commands; qMFKG accepts batch sizes from one through four:
 
 ```bash
 bo-forge validate \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
 bo-forge suggest \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
-  --batch-size 1
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
+  --batch-size 2
 
 bo-forge fidelity-summary \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
 bo-forge plot \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
   --kind fidelity-diagnostics \
-  --output reports/15_multi_fidelity_diagnostics.png
+  --output reports/22_discrete_multi_fidelity_diagnostics.png
 ```
+
+Continuous-fidelity batches use joint one-shot optimization. Ordered
+discrete-fidelity batches are constructed greedily with BoTorch mixed
+fixed-feature optimization, then assigned one joint post-selection acquisition
+value.
 
 The generated model-based row uses `source=qmf_kg`. Use a copied working log
 before `--append`, as with the other examples.

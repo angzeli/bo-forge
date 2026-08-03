@@ -699,8 +699,8 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
                 "Hint: Use --context NAME=VALUE for each configured context "
                 "variable, or add context.default_values in the YAML config."
             )
-        if "qMFKG model-based suggestions support batch_size=1" in str(exc):
-            return "Hint: Use --batch-size 1 for model-based qMFKG suggestions."
+        if "qMFKG supports batch_size from 1 through 4" in str(exc):
+            return "Hint: Use --batch-size 1, 2, 3, or 4 for qMFKG suggestions."
         if (
             "Structured campaign suggestions require an explicit stage" in str(exc)
             or "Invalid structured campaign stage" in str(exc)

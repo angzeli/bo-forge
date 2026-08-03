@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "2.3.3"
+version = "2.4.0"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,7 +29,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "botorch>=0.17",
+    "botorch>=0.17,<0.18",
     "gpytorch>=1.14",
     "matplotlib>=3.8",
     "numpy>=1.26",

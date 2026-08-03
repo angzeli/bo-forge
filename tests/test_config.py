@@ -833,7 +833,119 @@ bo:
     assert config.fidelity.fixed_cost == 0.02
     assert config.fidelity.fidelity_cost_weight == 2.5
     assert config.fidelity.num_fantasies == 8
+    assert config.fidelity.levels is None
     assert config.bo.acquisition == "qmf_kg"
+
+
+def test_config_from_yaml_parses_discrete_fidelity_levels(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: discrete_fidelity
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+  levels: [0.25, 0.5, 0.75, 1.0]
+bo:
+  acquisition: qmf_kg
+  batch_size: 4
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.fidelity is not None
+    assert config.fidelity.levels == (0.25, 0.5, 0.75, 1.0)
+    assert config.bo.batch_size == 4
+
+
+@pytest.mark.parametrize(
+    ("levels", "target", "message"),
+    [
+        ("[1.0]", "1.0", "at least two"),
+        ("[0.25, bad, 1.0]", "1.0", "finite number"),
+        ("[0.25, .nan, 1.0]", "1.0", "finite number"),
+        ("[0.25, 0.25, 1.0]", "1.0", "strictly increasing"),
+        ("[0.5, 0.25, 1.0]", "1.0", "strictly increasing"),
+        ("[0.1, 0.5, 1.0]", "1.0", "within.*bounds"),
+        ("[0.25, 0.5, 0.75]", "1.0", "highest configured fidelity level"),
+    ],
+)
+def test_discrete_fidelity_rejects_invalid_levels(
+    tmp_path: Path,
+    levels: str,
+    target: str,
+    message: str,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: bad_discrete_fidelity
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: {target}
+  levels: {levels}
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
+def test_qmfkg_rejects_configured_batch_size_above_four(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: oversized_qmfkg_batch
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+bo:
+  acquisition: qmf_kg
+  batch_size: 5
+""",
+    )
+
+    with pytest.raises(ConfigError, match="batch_size from 1 through 4"):
+        CampaignConfig.from_yaml(path)
 
 
 def test_qmf_kg_requires_fidelity_config(tmp_path: Path) -> None:

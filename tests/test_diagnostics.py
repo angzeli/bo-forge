@@ -241,6 +241,28 @@ def fidelity_log() -> pd.DataFrame:
     )
 
 
+def discrete_fidelity_config() -> CampaignConfig:
+    cfg = fidelity_config()
+    return CampaignConfig(
+        campaign_name="discrete_fidelity_diagnostics",
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            levels=(0.25, 0.5, 0.75, 1.0),
+        ),
+    )
+
+
+def discrete_fidelity_log() -> pd.DataFrame:
+    cfg = discrete_fidelity_config()
+    df = fidelity_log()
+    df["fidelity"] = [0.25, 1.0]
+    return df.loc[:, canonical_columns(cfg)]
+
+
 def replicate_log() -> pd.DataFrame:
     cfg = replicate_config()
     return pd.DataFrame(
@@ -525,6 +547,30 @@ def test_plot_fidelity_diagnostics_handles_empty_observed_log() -> None:
     assert "No observed fidelity data yet." in axes[0].texts[0].get_text()
     assert axes[0].get_xlabel() == "fidelity"
     assert axes[1].get_ylabel() == "Observed rows"
+    plt.close(fig)
+
+
+def test_plot_discrete_fidelity_diagnostics_uses_level_ticks_and_zero_count_bars() -> None:
+    cfg = discrete_fidelity_config()
+
+    fig, axes = plot_fidelity_diagnostics(cfg, discrete_fidelity_log())
+
+    assert axes[1].get_title() == "Observed fidelity level counts"
+    assert axes[1].get_xticks().tolist() == pytest.approx([0.25, 0.5, 0.75, 1.0])
+    assert [bar.get_height() for bar in axes[1].patches] == pytest.approx([1, 0, 0, 1])
+    assert axes[1].get_legend_handles_labels()[1].count("target fidelity = 1") == 1
+    plt.close(fig)
+
+
+def test_plot_discrete_fidelity_diagnostics_handles_empty_observed_log() -> None:
+    cfg = discrete_fidelity_config()
+    empty = pd.DataFrame(columns=canonical_columns(cfg))
+
+    fig, axes = plot_fidelity_diagnostics(cfg, empty)
+
+    assert axes[1].get_xticks().tolist() == pytest.approx([0.25, 0.5, 0.75, 1.0])
+    assert [bar.get_height() for bar in axes[1].patches] == pytest.approx([0, 0, 0, 0])
+    assert "No observations yet." in [text.get_text() for text in axes[1].texts]
     plt.close(fig)
 
 

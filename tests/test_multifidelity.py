@@ -14,8 +14,11 @@ from bo_forge.config import (
 from bo_forge.multifidelity import (
     affine_fidelity_cost_model,
     fidelity_feature_index,
+    fidelity_level_fixed_features,
+    fidelity_level_unit_values,
     fidelity_summary,
     fidelity_variable_index,
+    map_initial_fidelity_to_levels,
     target_fidelities,
     target_fidelity_projection,
     target_fidelity_unit_value,
@@ -37,6 +40,23 @@ def config() -> CampaignConfig:
             target=1.0,
             fixed_cost=0.01,
             fidelity_cost_weight=2.0,
+        ),
+    )
+
+
+def discrete_config() -> CampaignConfig:
+    cfg = config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=BOConfig(batch_size=4, initial_design_size=4, acquisition="qmf_kg"),
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            fixed_cost=0.01,
+            fidelity_cost_weight=2.0,
+            levels=(0.25, 0.5, 0.75, 1.0),
         ),
     )
 
@@ -110,6 +130,33 @@ def test_fidelity_indices_and_target_mapping() -> None:
     assert target_fidelities(cfg) == {1: 1.0}
 
 
+def test_discrete_fidelity_levels_map_to_model_space_and_fixed_features() -> None:
+    cfg = discrete_config()
+
+    assert fidelity_level_unit_values(cfg) == pytest.approx(
+        (0.0625, 0.375, 0.6875, 1.0)
+    )
+    assert fidelity_level_fixed_features(cfg) == [
+        {1: pytest.approx(0.0625)},
+        {1: pytest.approx(0.375)},
+        {1: pytest.approx(0.6875)},
+        {1: pytest.approx(1.0)},
+    ]
+
+
+def test_initial_fidelity_coordinates_map_to_equal_width_level_bins() -> None:
+    cfg = discrete_config()
+    unit = torch.tensor(
+        [[0.1, 0.0], [0.2, 0.249], [0.3, 0.25], [0.4, 0.999]],
+        dtype=torch.double,
+    )
+
+    mapped = map_initial_fidelity_to_levels(cfg, unit)
+
+    assert torch.equal(mapped[:, 0], unit[:, 0])
+    assert mapped[:, 1].tolist() == pytest.approx([0.0625, 0.0625, 0.375, 1.0])
+
+
 def test_target_fidelity_projection_sets_fidelity_feature() -> None:
     cfg = config()
     projection = target_fidelity_projection(cfg)
@@ -150,6 +197,37 @@ def test_fidelity_summary_reports_counts_best_rows_and_pending_qmfkg() -> None:
     assert value(summary, "best_observed_objective") == pytest.approx(1.8)
     assert value(summary, "best_target_fidelity_row_id") == "target_1"
     assert value(summary, "best_target_fidelity_objective") == pytest.approx(1.8)
+    assert value(summary, "fidelity_mode") == "continuous"
+    assert value(summary, "configured_fidelity_levels") is None
+    assert value(summary, "configured_fidelity_level_count") is None
+    assert value(summary, "observed_fidelity_level_count") is None
+
+
+def test_discrete_fidelity_summary_appends_level_fields_without_reordering() -> None:
+    cfg = discrete_config()
+    df = observed_log(cfg)
+    df["fidelity"] = [0.25, 0.5, 1.0, 0.75]
+
+    summary = fidelity_summary(cfg, df)
+
+    assert summary["field"].tolist()[:12] == [
+        "fidelity_variable",
+        "target_fidelity",
+        "observed_rows",
+        "lower_fidelity_observed_rows",
+        "target_fidelity_observed_rows",
+        "min_observed_fidelity",
+        "max_observed_fidelity",
+        "pending_qmfkg_suggestions",
+        "best_observed_row_id",
+        "best_observed_objective",
+        "best_target_fidelity_row_id",
+        "best_target_fidelity_objective",
+    ]
+    assert value(summary, "fidelity_mode") == "discrete"
+    assert value(summary, "configured_fidelity_levels") == "0.25, 0.5, 0.75, 1"
+    assert value(summary, "configured_fidelity_level_count") == 4
+    assert value(summary, "observed_fidelity_level_count") == 3
 
 
 def test_fidelity_summary_counts_only_blocking_review_qmfkg_suggestions() -> None:
@@ -339,6 +417,24 @@ def test_extract_qmfkg_candidates_extracts_full_one_shot_result() -> None:
     assert extracted.shape == torch.Size([1, 2])
     assert torch.equal(extracted, candidates[:1])
     assert acquisition.calls == 1
+
+
+def test_extract_qmfkg_candidates_extracts_batch_from_full_one_shot_result() -> None:
+    class FakeAcquisition:
+        def extract_candidates(self, candidates: torch.Tensor) -> torch.Tensor:
+            return candidates[..., :2, :]
+
+    candidates = torch.arange(12, dtype=torch.double).reshape(6, 2)
+
+    extracted = _extract_qmf_kg_candidates(
+        FakeAcquisition(),
+        candidates,
+        q=2,
+        num_fantasies=4,
+    )
+
+    assert extracted.shape == torch.Size([2, 2])
+    assert torch.equal(extracted, candidates[:2])
 
 
 def test_extract_qmfkg_candidates_rejects_unexpected_result_shape() -> None:

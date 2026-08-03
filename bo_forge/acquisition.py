@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import torch
 from botorch.acquisition import LogExpectedImprovement, PosteriorMean
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
@@ -251,6 +253,7 @@ def optimize_qmf_kg(
     model: Model,
     current_value: torch.Tensor,
     *,
+    batch_size: int = 1,
     model_dim: int,
     fixed_features_list: list[dict[int, float]] | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
@@ -271,23 +274,32 @@ def optimize_qmf_kg(
     optimize_kwargs = {
         "acq_function": acquisition,
         "bounds": bounds,
-        "q": 1,
+        "q": batch_size,
         "num_restarts": config.bo.num_restarts,
         "raw_samples": config.bo.raw_samples,
         "options": {"batch_limit": 5, "maxiter": 200},
         "ic_generator": gen_one_shot_kg_initial_conditions,
     }
     if fixed_features_list:
-        candidates, acquisition_value = optimize_acqf_mixed(
-            **optimize_kwargs,
-            fixed_features_list=fixed_features_list,
-        )
+        with warnings.catch_warnings():
+            # BoTorch's joint post-selection KG evaluation standardizes a
+            # one-value tensor. Its documented zero result is valid, but recent
+            # PyTorch versions emit this harmless degrees-of-freedom warning.
+            warnings.filterwarnings(
+                "ignore",
+                message=r"std\(\): degrees of freedom is <= 0\.",
+                category=UserWarning,
+            )
+            candidates, acquisition_value = optimize_acqf_mixed(
+                **optimize_kwargs,
+                fixed_features_list=fixed_features_list,
+            )
     else:
         candidates, acquisition_value = optimize_acqf(**optimize_kwargs)
     candidates = _extract_qmf_kg_candidates(
         acquisition,
         candidates,
-        q=1,
+        q=batch_size,
         num_fantasies=config.fidelity.num_fantasies if config.fidelity else 64,
     )
     return candidates.detach(), acquisition_value.detach(), "qmf_kg"

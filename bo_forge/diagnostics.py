@@ -392,26 +392,57 @@ def plot_fidelity_diagnostics(
             linewidth=2,
             label=f"target fidelity = {target:g}",
         )
-        bin_count = min(10, max(1, int(fidelity_values.nunique())))
-        count_ax.hist(
-            fidelity_values,
-            bins=bin_count,
+        if config.fidelity.levels is None:
+            bin_count = min(10, max(1, int(fidelity_values.nunique())))
+            count_ax.hist(
+                fidelity_values,
+                bins=bin_count,
+                color="#64748b",
+                edgecolor="black",
+                alpha=0.85,
+            )
+    if config.fidelity.levels is not None:
+        levels = list(config.fidelity.levels)
+        counts = [
+            0
+            if observed.empty
+            else int(
+                pd.to_numeric(observed[fidelity_name]).map(
+                    lambda value, level=level: math.isclose(
+                        float(value), level, rel_tol=1e-9, abs_tol=1e-9
+                    )
+                ).sum()
+            )
+            for level in levels
+        ]
+        count_ax.bar(
+            levels,
+            counts,
+            width=_discrete_fidelity_bar_width(levels),
             color="#64748b",
             edgecolor="black",
             alpha=0.85,
         )
-        count_ax.axvline(
-            target,
-            color="#d97706",
-            linestyle="--",
-            linewidth=2,
-            label=f"target fidelity = {target:g}",
-        )
+        scatter_ax.set_xticks(levels)
+        count_ax.set_xticks(levels)
+
+    count_ax.axvline(
+        target,
+        color="#d97706",
+        linestyle="--",
+        linewidth=2,
+        label=f"target fidelity = {target:g}",
+    )
 
     set_title(scatter_ax, "Objective vs fidelity")
     set_axis_labels(scatter_ax, fidelity_name, objective)
     add_legend(scatter_ax)
-    set_title(count_ax, "Observed fidelity distribution")
+    count_title = (
+        "Observed fidelity level counts"
+        if config.fidelity.levels is not None
+        else "Observed fidelity distribution"
+    )
+    set_title(count_ax, count_title)
     set_axis_labels(count_ax, fidelity_name, "Observed rows")
     count_ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     add_legend(count_ax)
@@ -430,6 +461,15 @@ def plot_fidelity_diagnostics(
         show=show,
         tick_label_size=10,
     )
+
+
+def _discrete_fidelity_bar_width(levels: list[float]) -> float:
+    if len(levels) < 2:
+        return 0.1
+    return min(
+        current - previous
+        for previous, current in zip(levels, levels[1:], strict=False)
+    ) * 0.6
 
 
 def plot_context_diagnostics(

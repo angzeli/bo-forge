@@ -1,0 +1,7 @@
+row_id,iteration,status,source,catalyst_loading,reaction_temperature,fidelity,activity,predicted_mean,predicted_std,acquisition
+dmf_seed_0,0,observed,manual,0.08,48.0,0.25,0.512,,,
+dmf_seed_1,0,observed,manual,0.16,62.0,0.50,0.846,,,
+dmf_seed_2,1,observed,manual,0.24,76.0,0.75,1.184,,,
+dmf_seed_3,1,observed,manual,0.32,90.0,1.00,1.428,,,
+dmf_seed_4,2,observed,manual,0.40,104.0,0.50,1.006,,,
+dmf_seed_5,2,observed,manual,0.47,114.0,1.00,1.286,,,

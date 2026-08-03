@@ -1,5 +1,26 @@
 # 📝 BO Forge Changelog
 
+## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG
+
+This release opens v2.4.x by extending the existing single-objective qMFKG
+workflow without adding CSV columns or changing existing continuous-fidelity
+configs.
+
+- Adds optional ordered numeric `fidelity.levels` while keeping the fidelity
+  variable continuous and user-facing in CSV logs.
+- Maps Sobol/random initial fidelity coordinates into equal-width level bins.
+- Supports qMFKG batches from one through four with shared batch acquisition
+  values and row-specific posterior predictions.
+- Uses joint one-shot optimization for continuous fidelity and BoTorch's
+  conditioned greedy mixed fixed-feature optimization for discrete fidelity.
+- Validates off-grid fidelity values before append or observation writes.
+- Extends fidelity summaries and diagnostics with mode, configured levels, and
+  exact per-level counts.
+- Adds Streamlit creation and suggestion controls for continuous or ordered
+  discrete fidelity and batch sizes up to four.
+- Adds `configs/22_discrete_multi_fidelity_qmfkg.yaml`, its seed log, and an
+  output-free tutorial notebook.
+
 ## v2.3.3 - Code Quality And Error-Handling Refactor
 
 This patch closes v2.3.x with a behavior-preserving internal refactor. It adds

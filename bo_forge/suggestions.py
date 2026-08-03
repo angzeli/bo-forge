@@ -43,6 +43,10 @@ from bo_forge.multi_objective import (
     objectives_from_model_space,
     reference_point_to_model_space,
 )
+from bo_forge.multifidelity import (
+    fidelity_level_fixed_features,
+    map_initial_fidelity_to_levels,
+)
 from bo_forge.replicates import aggregate_observed_replicates, modeling_observed_data
 from bo_forge.transforms import (
     categorical_combination_count,
@@ -161,6 +165,11 @@ def _prepare_suggestion_state(
     requested_batch_size = batch_size if batch_size is not None else config.bo.batch_size
     if requested_batch_size < 1:
         raise SuggestionError(f"batch_size must be >= 1: value={requested_batch_size}.")
+    if config.fidelity is not None and requested_batch_size > 4:
+        raise SuggestionError(
+            "qMFKG supports batch_size from 1 through 4: "
+            f"requested={requested_batch_size}."
+        )
 
     observed_df = get_observed_data(config, df)
     training_observed_df = modeling_observed_data(config, observed_df)
@@ -477,15 +486,11 @@ def _suggest_multi_fidelity_model_based(
     observed_df: pd.DataFrame,
     batch_size: int,
 ) -> pd.DataFrame:
-    if batch_size != 1:
-        raise SuggestionError(
-            "qMFKG model-based suggestions support batch_size=1: "
-            f"requested={batch_size}."
-        )
     try:
         torch.manual_seed(config.bo.random_seed)
         model = fit_multi_fidelity_gp_model(config, observed_df)
         fixed_features_list = categorical_feature_assignments(config)
+        candidate_fixed_features_list = fidelity_level_fixed_features(config)
         model_dim = encoded_dimension(config)
         current_value = optimize_posterior_mean_at_target_fidelity(
             config=config,
@@ -503,8 +508,9 @@ def _suggest_multi_fidelity_model_based(
                 config=config,
                 model=model,
                 current_value=current_value,
+                batch_size=batch_size,
                 model_dim=model_dim,
-                fixed_features_list=fixed_features_list,
+                fixed_features_list=candidate_fixed_features_list,
             )
             decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
             rejection_message = _candidate_batch_rejection_message(
@@ -534,19 +540,24 @@ def _suggest_multi_fidelity_model_based(
     except (BotorchError, RuntimeError, ValueError) as exc:
         raise SuggestionError(f"Could not generate qMFKG suggestion: {exc}") from exc
 
-    row = _empty_row(config)
-    row["row_id"] = uuid.uuid4().hex
-    row["iteration"] = next_iteration(df)
-    row["status"] = "suggested"
-    row["source"] = "qmf_kg"
-    _populate_replicate_fields(config, row)
-    _populate_review_fields(config, row)
-    for name, value in zip(config.variable_names, user_candidates[0], strict=True):
-        row[name] = value
-    row["predicted_mean"] = float(mean_user.reshape(-1)[0])
-    row["predicted_std"] = float(std.reshape(-1)[0])
-    row["acquisition"] = float(acquisition_value.reshape(-1)[0])
-    return pd.DataFrame([row], columns=canonical_columns(config))
+    rows: list[dict[str, object]] = []
+    iteration = next_iteration(df)
+    acquisition_scalar = float(acquisition_value.reshape(-1)[0])
+    for index, candidate in enumerate(user_candidates):
+        row = _empty_row(config)
+        row["row_id"] = uuid.uuid4().hex
+        row["iteration"] = iteration
+        row["status"] = "suggested"
+        row["source"] = "qmf_kg"
+        _populate_replicate_fields(config, row)
+        _populate_review_fields(config, row)
+        for name, value in zip(config.variable_names, candidate, strict=True):
+            row[name] = value
+        row["predicted_mean"] = float(mean_user.reshape(-1)[index])
+        row["predicted_std"] = float(std.reshape(-1)[index])
+        row["acquisition"] = acquisition_scalar
+        rows.append(row)
+    return pd.DataFrame(rows, columns=canonical_columns(config))
 
 
 def _suggest_multi_objective_model_based(
@@ -1682,6 +1693,7 @@ def _initial_user_candidates(
                 generator=generator,
                 dtype=torch.double,
             )
+        unit = map_initial_fidelity_to_levels(config, unit)
         for candidate in unit_cube_to_design_values(config, unit):
             if context_values:
                 candidate = apply_context_to_candidate(config, candidate, context_values)
@@ -2047,6 +2059,13 @@ def _finite_design_space_size(
     sizes = []
     for variable in config.variables:
         if variable.name in fixed_names:
+            continue
+        if (
+            config.fidelity is not None
+            and config.fidelity.levels is not None
+            and variable.name == config.fidelity.variable
+        ):
+            sizes.append(len(config.fidelity.levels))
             continue
         if variable.type == "continuous":
             return None

@@ -55,6 +55,49 @@ def target_fidelity_unit_value(config: CampaignConfig) -> float:
     return (config.fidelity.target - variable.lower) / (variable.upper - variable.lower)
 
 
+def fidelity_level_unit_values(config: CampaignConfig) -> tuple[float, ...] | None:
+    """Return configured discrete fidelity levels in unit-cube coordinates."""
+    if config.fidelity is None:
+        raise ValueError("Campaign config does not define a fidelity section.")
+    if config.fidelity.levels is None:
+        return None
+    variable = fidelity_variable(config)
+    assert variable.lower is not None and variable.upper is not None
+    width = variable.upper - variable.lower
+    return tuple((level - variable.lower) / width for level in config.fidelity.levels)
+
+
+def fidelity_level_fixed_features(config: CampaignConfig) -> list[dict[int, float]]:
+    """Return one fixed-feature map per configured discrete fidelity level."""
+    unit_values = fidelity_level_unit_values(config)
+    if unit_values is None:
+        return []
+    feature_index = fidelity_feature_index(config)
+    return [{feature_index: value} for value in unit_values]
+
+
+def map_initial_fidelity_to_levels(
+    config: CampaignConfig,
+    x_unit: torch.Tensor,
+) -> torch.Tensor:
+    """Map initial-design fidelity coordinates into equal-width level bins."""
+    if config.fidelity is None:
+        return x_unit
+    unit_values = fidelity_level_unit_values(config)
+    if unit_values is None:
+        return x_unit
+    mapped = x_unit.clone()
+    index = fidelity_feature_index(config)
+    coordinates = mapped[..., index].clamp(min=0.0, max=1.0)
+    bin_indices = torch.clamp(
+        torch.floor(coordinates * len(unit_values)).to(dtype=torch.long),
+        max=len(unit_values) - 1,
+    )
+    level_tensor = torch.tensor(unit_values, dtype=mapped.dtype, device=mapped.device)
+    mapped[..., index] = level_tensor[bin_indices]
+    return mapped
+
+
 def target_fidelities(config: CampaignConfig) -> dict[int, float]:
     """Return BoTorch target-fidelity mapping in model-space feature coordinates."""
     return {fidelity_feature_index(config): target_fidelity_unit_value(config)}
@@ -111,6 +154,21 @@ def fidelity_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
         ("best_observed_objective", None),
         ("best_target_fidelity_row_id", None),
         ("best_target_fidelity_objective", None),
+        ("fidelity_mode", "discrete" if config.fidelity.levels is not None else "continuous"),
+        (
+            "configured_fidelity_levels",
+            None
+            if config.fidelity.levels is None
+            else ", ".join(f"{level:g}" for level in config.fidelity.levels),
+        ),
+        (
+            "configured_fidelity_level_count",
+            None if config.fidelity.levels is None else len(config.fidelity.levels),
+        ),
+        (
+            "observed_fidelity_level_count",
+            None if config.fidelity.levels is None else 0,
+        ),
     ]
     if observed.empty:
         return pd.DataFrame(rows, columns=["field", "value"])
@@ -137,6 +195,17 @@ def fidelity_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
             "best_target_fidelity_objective": None
             if target_best is None
             else float(target_best[config.objective.name]),
+            "observed_fidelity_level_count": (
+                None
+                if config.fidelity.levels is None
+                else sum(
+                    any(
+                        math.isclose(float(value), level, rel_tol=1e-9, abs_tol=1e-9)
+                        for value in fidelity_values
+                    )
+                    for level in config.fidelity.levels
+                )
+            ),
         }
     )
     return pd.DataFrame(list(values.items()), columns=["field", "value"])

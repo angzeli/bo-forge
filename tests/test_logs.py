@@ -64,6 +64,21 @@ def fidelity_config() -> CampaignConfig:
     )
 
 
+def discrete_fidelity_config() -> CampaignConfig:
+    cfg = fidelity_config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            levels=(0.25, 0.5, 0.75, 1.0),
+        ),
+    )
+
+
 def structured_config(*, review: bool = False) -> CampaignConfig:
     return CampaignConfig(
         campaign_name="structured_test",
@@ -492,6 +507,21 @@ def test_append_suggestions_with_config_accepts_qmfkg_logs(tmp_path: Path) -> No
     assert df.loc[0, "source"] == "qmf_kg"
 
 
+def test_append_suggestions_rejects_off_grid_fidelity_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = discrete_fidelity_config()
+    log_path = tmp_path / "campaign.csv"
+    pd.DataFrame(columns=canonical_columns(cfg)).to_csv(log_path, index=False)
+    suggestions = qmfkg_suggestion()
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogValidationError, match="off-grid fidelity"):
+        append_suggestions(log_path, suggestions, config=cfg)
+
+    assert log_path.read_bytes() == before
+
+
 def test_mark_observed_requires_config_for_qmfkg_logs_without_mutation(
     tmp_path: Path,
 ) -> None:
@@ -501,6 +531,20 @@ def test_mark_observed_requires_config_for_qmfkg_logs_without_mutation(
 
     with pytest.raises(LogWriteError, match="qMFKG mark_observed requires"):
         mark_observed(log_path, "qmfkg_1", 1.7)
+
+    assert log_path.read_bytes() == before
+
+
+def test_mark_observed_rejects_off_grid_fidelity_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = discrete_fidelity_config()
+    log_path = tmp_path / "campaign.csv"
+    qmfkg_suggestion().to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogValidationError, match="off-grid fidelity"):
+        mark_observed(log_path, "qmfkg_1", 1.7, config=cfg)
 
     assert log_path.read_bytes() == before
 

@@ -159,7 +159,8 @@ The repository also includes:
 - `configs/18_noisy_pending_qlognei.yaml` as a single-objective qLogNEI example with accepted pending review suggestions, paired with `notebooks/18_noisy_pending_qlognei_campaign.ipynb`,
 - `configs/19_multi_objective_qlognehvi.yaml` as a coupled multi-objective qLogNEHVI example with accepted pending review suggestions,
 - `configs/20_contextual_cost_review_logei.yaml` as a contextual cost-review LogEI example paired with `notebooks/20_contextual_cost_review_logei_campaign.ipynb`,
-- and `configs/21_contextual_replicate_logei.yaml` as the contextual replicate-aware LogEI example with two contexts and an observed repeated group.
+- `configs/21_contextual_replicate_logei.yaml` as the contextual replicate-aware LogEI example with two contexts and an observed repeated group,
+- and `configs/22_discrete_multi_fidelity_qmfkg.yaml` as the ordered-discrete and batch qMFKG example paired with `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
 
 Seed logs in `examples/` should remain small and clean. Example scripts and notebooks copy them to local working logs before making changes, so the committed seed data stays reproducible. Generated reports and diagnostic figures belong in `reports/`.
 

@@ -19,6 +19,9 @@ CLI_NOTEBOOK = Path("notebooks/04_cli_four_variable_campaign.ipynb")
 REPLICATE_NOTEBOOK = Path("notebooks/08_replicate_aware_campaign.ipynb")
 FOUR_OBJECTIVE_NOTEBOOK = Path("notebooks/11_four_objective_qlogehvi_campaign.ipynb")
 MULTI_FIDELITY_NOTEBOOK = Path("notebooks/15_multi_fidelity_qmfkg_campaign.ipynb")
+DISCRETE_MULTI_FIDELITY_NOTEBOOK = Path(
+    "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb"
+)
 CONTEXTUAL_NOTEBOOK = Path("notebooks/16_contextual_logei_campaign.ipynb")
 MODEL_PROFILE_NOTEBOOK = Path("notebooks/17_model_profile_logei_campaign.ipynb")
 QLOG_NEI_NOTEBOOK = Path("notebooks/18_noisy_pending_qlognei_campaign.ipynb")
@@ -98,6 +101,18 @@ def test_multi_fidelity_notebook_uses_existing_qmfkg_assets() -> None:
     assert "WORKING_CONFIG_PATH" not in source
     assert "write_working_config" not in source
     assert "text.replace(\"random_seed: 15\"" not in source
+
+
+def test_discrete_multi_fidelity_notebook_uses_v240_assets() -> None:
+    source = notebook_source(DISCRETE_MULTI_FIDELITY_NOTEBOOK)
+
+    assert "fidelity_summary()" in source
+    assert "plot_fidelity_diagnostics" in source
+    assert "configs' / '22_discrete_multi_fidelity_qmfkg.yaml" in source
+    assert "examples' / '22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in source
+    assert "TARGET_OBSERVED_ROWS = 15" in source
+    assert "CampaignSession.from_files(CONFIG_PATH, WORKING_LOG_PATH)" in source
+    assert "suggest_next(batch_size=min(2, remaining))" in source
 
 
 def test_multi_fidelity_tutorial_loop_reaches_target_with_committed_config(

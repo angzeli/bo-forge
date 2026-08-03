@@ -18,7 +18,7 @@ When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`.
 Contextual cost campaigns use the same columns; context variables remain normal
 variable columns and cost is evaluated on the full candidate, including fixed
-context values. `stages:` cannot be combined with `cost:` in v2.3.3.
+context values. `stages:` cannot be combined with `cost:` in v2.4.0.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -129,7 +129,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v2.3.3.
+- `stages:` cannot be combined with `cost:` in v2.4.0.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -152,13 +152,14 @@ campaign creation remain deferred.
 
 ## 🧪 Multi-Fidelity Rules
 
-v1.4.0 adds a conservative single-objective multi-fidelity workflow through an
-optional top-level `fidelity:` section:
+Single-objective multi-fidelity workflows use an optional top-level
+`fidelity:` section. Ordered numeric levels are additive in v2.4.0:
 
 ```yaml
 fidelity:
   variable: fidelity
   target: 1.0
+  levels: [0.25, 0.5, 0.75, 1.0]  # omit for continuous fidelity
   fixed_cost: 0.01
   fidelity_cost_weight: 1.0
   num_fantasies: 64
@@ -170,8 +171,12 @@ bo:
 Rules:
 
 - `fidelity.variable` must name one configured continuous variable;
-- all variables in v1.4.0 multi-fidelity configs must be continuous;
+- all variables in multi-fidelity configs must be continuous;
 - `fidelity.target` must lie within that variable's bounds;
+- when supplied, `fidelity.levels` must contain at least two finite, strictly
+  increasing in-bounds values and the highest level must equal the target;
+- every populated CSV fidelity value must match a configured level within the
+  existing `1e-9` numeric tolerance;
 - lower-fidelity observations are real measured objective values at that row's
   fidelity, not approximations stored in a separate column;
 - the target fidelity is the value BO Forge ultimately optimizes for;
@@ -179,14 +184,21 @@ Rules:
   model, evaluated on the normalized model-space fidelity coordinate;
 - fidelity cost is separate from BO Forge's `cost:` budget/ranking feature;
 - model-based qMFKG suggestions use `source=qmf_kg`;
-- once model-based qMFKG begins, `batch_size` must be `1`.
+- qMFKG supports batch sizes from one through four. Rows in one batch share an
+  iteration and joint acquisition scalar, while predictions remain row-specific.
+- Continuous-fidelity batches use joint one-shot optimization. Ordered
+  discrete-fidelity batches use conditioned greedy mixed optimization; their
+  shared scalar is the joint post-selection acquisition value.
 
-Unsupported v1.4.0 combinations are intentional: `fidelity:` cannot be combined
-with `objectives:`, `stages:`, `cost:`, or `replicates.enabled: true`.
+No new CSV columns are added: the fidelity variable remains a normal variable
+column for both continuous and discrete-level campaigns. Unsupported
+combinations remain intentional: `fidelity:` cannot be combined with
+`objectives:`, `stages:`, `context:`, `cost:`, or
+`replicates.enabled: true`.
 
 ## 🌐 Contextual BO Rules
 
-v2.3.3 supports a conservative single-objective contextual LogEI/qLogEI workflow:
+v2.4.0 supports a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -309,7 +321,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.3.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -347,7 +359,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.3.3, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.4.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -379,7 +391,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.3.3.
+and structured campaigns in v2.4.0.
 
 ## 🧪 Variable Value Rules
 

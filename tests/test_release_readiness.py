@@ -236,15 +236,16 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/INSTALLATION.md" in readme
 
 
-def test_v2_3_docs_describe_contextual_replicate_release_scope() -> None:
+def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.3.3" in readme
-    assert "v2.3.3 closes the v2.3.x line" in readme
+    assert "# 🧪 BO Forge v2.4.0" in readme
+    assert "v2.4.0 opens the v2.4.x multi-fidelity expansion line" in readme
+    assert "## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG" in changelog
     assert "## v2.3.3 - Code Quality And Error-Handling Refactor" in changelog
     assert "## v2.3.2 - Contextual Replicate-Aware BO" in changelog
     assert "context-matched active repeat selection" in changelog
@@ -270,10 +271,17 @@ def test_v2_3_docs_describe_contextual_replicate_release_scope() -> None:
     assert "notebooks/20_contextual_cost_review_logei_campaign.ipynb" in readme
     assert "configs/21_contextual_replicate_logei.yaml" in readme
     assert "examples/21_contextual_replicate_campaign_log.csv" in readme
+    assert "configs/22_discrete_multi_fidelity_qmfkg.yaml" in readme
+    assert "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in readme
+    assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in readme
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.3.3 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.4.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "ordered discrete fidelity levels" in streamlit_app_docs
+    assert "batch sizes from one through four" in streamlit_app_docs
+    assert "conditioned greedy mixed optimization" in readme
+    assert "conditioned greedy mixed optimization" in streamlit_app_docs
     assert "v2.2.1 adds Streamlit-facing qLogNEI diagnostics" in streamlit_app_docs
     assert "qLogNEI Summary" in streamlit_app_docs
     assert "qLogNEI Diagnostics" in streamlit_app_docs
@@ -317,13 +325,19 @@ def test_v2_3_docs_describe_contextual_replicate_release_scope() -> None:
     assert "no Streamlit multi-fidelity campaign creation" not in streamlit_app_docs
 
 
+def test_botorch_minor_version_is_bounded_for_optimizer_compatibility() -> None:
+    pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"botorch>=0.17,<0.18"' in pyproject
+
+
 def test_capability_matrix_documents_supported_and_deferred_combinations() -> None:
     matrix = (PROJECT_ROOT / "docs" / "CAPABILITY_MATRIX.md").read_text(
         encoding="utf-8"
     )
 
     required_phrases = [
-        "BO Forge v2.3.3",
+        "BO Forge v2.4.0",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -489,8 +503,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.3.3`" in roadmap
-    assert "v2.3.3 release closes the controlled" in roadmap
+    assert "Current baseline: `v2.4.0`" in roadmap
+    assert "v2.4.0 release opens the multi-fidelity" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -505,11 +519,18 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v231["v2.3.1<br/>Combination hardening"]' in roadmap
     assert 'v232["v2.3.2<br/>Contextual replicates"]' in roadmap
     assert 'v233["v2.3.3<br/>Code-quality closeout"]' in roadmap
+    assert 'v240["v2.4.0<br/>Discrete + batch qMFKG"]' in roadmap
+    assert 'v241["v2.4.1<br/>Performance hardening"]' in roadmap
+    assert 'v242["v2.4.2<br/>Diagnostic polish"]' in roadmap
+    assert 'v243["v2.4.3<br/>Release closeout"]' in roadmap
     assert "class v10,v20,v21,v22,v23 majorDone" in roadmap
-    assert "class v24,v25 majorFuture" in roadmap
+    assert "class v24 majorActive" in roadmap
+    assert "class v25 majorFuture" in roadmap
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
+    assert "class v240 patchActive" in roadmap
+    assert "class v241,v242,v243 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorFuture" in roadmap
     assert "classDef patchDone" in roadmap
@@ -539,6 +560,12 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "`v2.3.2` adds contextual replicate-aware group-mean fitting" in roadmap
     assert "`v2.3.3` closes the line with behavior-preserving" in roadmap
     assert "v2.4.x - Multi-Fidelity Expansion" in roadmap
+    assert re.search(
+        r"## v2\.4\.x - Multi-Fidelity Expansion\s+Status: active",
+        roadmap,
+    )
+    assert "ordered numeric fidelity levels" in roadmap
+    assert "batches from one through four" in roadmap
     assert "v2.5.x - App/API Operational Hardening" in roadmap
     assert "No mandatory database" in roadmap
     assert "No unrestricted feature cross-product" in roadmap
@@ -593,6 +620,11 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "notebooks/20_contextual_cost_review_logei_campaign.ipynb" in checklist
     assert "configs/21_contextual_replicate_logei.yaml" in checklist
     assert "examples/21_contextual_replicate_campaign_log.csv" in checklist
+    assert "configs/22_discrete_multi_fidelity_qmfkg.yaml" in checklist
+    assert "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in checklist
+    assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in checklist
+    assert "--batch-size 2" in checklist
+    assert "--batch-size 4" in checklist
 
 
 def test_requirements_lock_matches_current_release_snapshot() -> None:
@@ -600,7 +632,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.3.3" in requirements_lock
+    assert "BO Forge v2.4.0" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -652,7 +684,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.3.3." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.4.0." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -683,16 +715,22 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     )
 
     for content in (readme, cli_docs, quickstart):
+        assert "22_discrete_multi_fidelity_qmfkg" in content
+    for content in (readme, quickstart):
         assert "15_multi_fidelity_qmfkg" in content
     assert "fidelity-summary" in cli_docs
     assert "fidelity-diagnostics" in cli_docs
     assert "campaign.fidelity_summary()" in quickstart
     assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in quickstart
     assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in readme
+    assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in quickstart
+    assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in readme
     assert "source=qmf_kg" in csv_schema
     assert "no new CSV columns" in csv_schema
     assert "fidelity cost is separate from BO Forge's `cost:`" in csv_schema
-    assert "qMFKG model-based suggestions support batch_size=1" in common_errors
+    assert "qMFKG supports batch_size from 1 through 4" in common_errors
+    assert "fidelity.levels must be" in common_errors
+    assert "has off-grid fidelity value" in common_errors
 
 
 def test_contextual_docs_reference_example_and_context_contract() -> None:
@@ -993,6 +1031,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "examples/19_multi_objective_qlognehvi_campaign_log.csv",
         "examples/20_contextual_cost_review_campaign_log.csv",
         "examples/21_contextual_replicate_campaign_log.csv",
+        "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
         "configs/10_multi_objective_mixed_constrained_qlogehvi.yaml",
         "configs/11_four_objective_mixed_constrained_qlogehvi.yaml",
         "configs/12_cost_aware_multi_objective_qlogehvi.yaml",
@@ -1005,6 +1044,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "configs/19_multi_objective_qlognehvi.yaml",
         "configs/20_contextual_cost_review_logei.yaml",
         "configs/21_contextual_replicate_logei.yaml",
+        "configs/22_discrete_multi_fidelity_qmfkg.yaml",
         "notebooks/01_maximisation_logei_campaign.ipynb",
         "notebooks/10_multi_objective_qlogehvi_campaign.ipynb",
         "notebooks/11_four_objective_qlogehvi_campaign.ipynb",
@@ -1015,6 +1055,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "notebooks/17_model_profile_logei_campaign.ipynb",
         "notebooks/18_noisy_pending_qlognei_campaign.ipynb",
         "notebooks/20_contextual_cost_review_logei_campaign.ipynb",
+        "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb",
         "tests/conftest.py",
     }
     assert {f"{SDIST_ROOT}/{path}" for path in required_paths}.issubset(names)

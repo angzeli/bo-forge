@@ -15,7 +15,12 @@ from bo_forge.config import (
 )
 from bo_forge.errors import LogValidationError
 from bo_forge.logs import load_campaign_log
-from bo_forge.validation import canonical_columns, design_tuples, validate_campaign_data
+from bo_forge.validation import (
+    canonical_columns,
+    design_key_for_values,
+    design_tuples,
+    validate_campaign_data,
+)
 
 
 def config() -> CampaignConfig:
@@ -193,6 +198,62 @@ def fidelity_config() -> CampaignConfig:
         bo=BOConfig(batch_size=1, initial_design_size=3, acquisition="qmf_kg"),
         fidelity=FidelityConfig(variable="fidelity", target=1.0),
     )
+
+
+def discrete_fidelity_config() -> CampaignConfig:
+    cfg = fidelity_config()
+    return CampaignConfig(
+        campaign_name=cfg.campaign_name,
+        objective=cfg.objective,
+        variables=cfg.variables,
+        bo=cfg.bo,
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            levels=(0.25, 0.5, 0.75, 1.0),
+        ),
+    )
+
+
+def test_discrete_fidelity_rejects_off_grid_log_value() -> None:
+    cfg = discrete_fidelity_config()
+    row = {
+        "row_id": "off_grid",
+        "iteration": 0,
+        "status": "observed",
+        "source": "manual",
+        "x": 0.5,
+        "fidelity": 0.6,
+        "activity": 1.0,
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    with pytest.raises(LogValidationError, match="off-grid fidelity"):
+        validate_campaign_data(cfg, df)
+
+
+def test_discrete_fidelity_design_keys_canonicalize_values_within_grid_tolerance() -> None:
+    cfg = discrete_fidelity_config()
+    row = {
+        "row_id": "near_grid",
+        "iteration": 0,
+        "status": "observed",
+        "source": "manual",
+        "x": 0.5,
+        "fidelity": 0.2500000001,
+        "activity": 1.0,
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    validate_campaign_data(cfg, df)
+
+    assert design_key_for_values(cfg, (0.5, 0.25)) in design_tuples(cfg, df)
 
 
 def mixed_df() -> pd.DataFrame:

@@ -159,6 +159,8 @@ This `09` campaign is useful as a compact practical app demo:
 - the app can create a campaign from scratch;
 - `Campaign kind` selects single-objective, multi-objective, multi-fidelity
   qMFKG, or Contextual LogEI creation paths;
+- multi-fidelity creation can use continuous fidelity or ordered numeric levels
+  and batch sizes from one through four;
 - `Model profile` can choose curated single-objective profiles such as
   `default`, `smooth`, `rough`, or `robust` when the selected campaign kind
   supports them;

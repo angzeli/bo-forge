@@ -416,11 +416,10 @@ def _render_create_new_campaign(st: Any) -> None:
             batch_size = st.number_input(
                 "Batch size",
                 min_value=1,
-                max_value=1,
+                max_value=4,
                 value=1,
                 key="new_bo_batch_size_multi_fidelity",
-                disabled=True,
-                help="qMFKG model-based suggestions are sequential.",
+                help="qMFKG supports batches from 1 through 4.",
             )
         else:
             batch_size = st.number_input(
@@ -506,8 +505,9 @@ def _render_new_campaign_kind_callout(st: Any, campaign_kind: str) -> None:
         ),
         "Multi-fidelity qMFKG": (
             "Multi-fidelity qMFKG",
-            "App-created multi-fidelity campaigns are single-objective, continuous-variable "
-            "qMFKG campaigns. Advanced qMFKG defaults stay editable in the YAML preview.",
+            "App-created multi-fidelity campaigns are single-objective qMFKG campaigns "
+            "with continuous or ordered discrete fidelity. Advanced defaults stay editable "
+            "in the YAML preview.",
         ),
         "Contextual LogEI": (
             "Contextual LogEI",
@@ -557,7 +557,6 @@ def _collect_multi_fidelity_sections(
         fidelity_settings=fidelity_settings,
         bo_overrides={
             "acquisition": "qmf_kg",
-            "batch_size": 1,
             "raw_samples": 8,
             "num_restarts": 1,
             "mc_samples": 16,
@@ -1009,21 +1008,54 @@ def _collect_new_campaign_fidelity_settings(
     selected_variable = continuous_variables[variable_names.index(str(fidelity_variable))]
     lower = float(selected_variable["lower"])
     upper = float(selected_variable["upper"])
-    target = st.number_input(
-        "Target fidelity",
-        min_value=lower,
-        max_value=upper,
-        value=upper,
-        key=f"new_campaign_fidelity_target_{fidelity_variable}",
-        help="Defaults to the selected fidelity variable's upper bound.",
+    mode = st.radio(
+        "Fidelity mode",
+        ["Continuous", "Ordered discrete levels"],
+        horizontal=True,
+        key="new_campaign_fidelity_mode",
     )
-    return {
+    fidelity: dict[str, object] = {
         "variable": str(fidelity_variable),
-        "target": float(target),
         "fixed_cost": 0.01,
         "fidelity_cost_weight": 1.0,
         "num_fantasies": 8,
     }
+    if mode == "Ordered discrete levels":
+        levels_text = st.text_input(
+            "Fidelity levels",
+            value=f"{lower:g}, {(lower + upper) / 2:g}, {upper:g}",
+            key=f"new_campaign_fidelity_levels_{fidelity_variable}",
+            help=(
+                "Enter at least two strictly increasing numeric levels. The highest "
+                "level becomes the target fidelity."
+            ),
+        )
+        levels = parse_discrete_values_text(levels_text, str(fidelity_variable))
+        if len(levels) < 2:
+            raise ValueError("Discrete fidelity requires at least two levels.")
+        if any(
+            current <= previous
+            for previous, current in zip(levels, levels[1:], strict=False)
+        ):
+            raise ValueError("Fidelity levels must be strictly increasing.")
+        if levels[0] < lower or levels[-1] > upper:
+            raise ValueError(
+                f"Fidelity levels must stay within [{lower:g}, {upper:g}]."
+            )
+        fidelity["levels"] = levels
+        fidelity["target"] = levels[-1]
+    else:
+        fidelity["target"] = float(
+            st.number_input(
+                "Target fidelity",
+                min_value=lower,
+                max_value=upper,
+                value=upper,
+                key=f"new_campaign_fidelity_target_{fidelity_variable}",
+                help="Defaults to the selected fidelity variable's upper bound.",
+            )
+        )
+    return fidelity
 
 
 def _collect_new_campaign_context_settings(
@@ -1624,11 +1656,17 @@ def _render_suggestion_mode_notes(
         )
         _render_contextual_replicate_note(st, campaign)
     if campaign.config.fidelity is not None:
+        mode = "discrete-level" if campaign.config.fidelity.levels is not None else "continuous"
+        detail = (
+            "Discrete-level qMFKG constructs conditioned greedy batches from 1 through 4 "
+            "and reports one joint post-selection acquisition value."
+            if campaign.config.fidelity.levels is not None
+            else "Continuous qMFKG jointly optimizes batches from 1 through 4."
+        )
         _render_artifact_note(
             st,
             "qMFKG suggestions",
-            "Multi-fidelity qMFKG suggestions are sequential, so the "
-            "dry-run batch size is capped at 1.",
+            f"{mode.capitalize()} mode. {detail} Larger batches increase KG runtime.",
         )
     if campaign.config.bo.acquisition == "qlog_nei":
         _render_artifact_note(
@@ -1654,14 +1692,17 @@ def _render_contextual_replicate_note(st: Any, campaign: Any) -> None:
 
 def _render_suggestion_dry_run_form(st: Any, campaign: Any) -> tuple[object, bool]:
     is_multi_fidelity = campaign.config.fidelity is not None
+    configured_batch_size = max(1, int(campaign.config.bo.batch_size))
+    default_batch_size = (
+        min(4, configured_batch_size) if is_multi_fidelity else configured_batch_size
+    )
     with st.form("suggest_dry_run_form"):
         batch_size = st.number_input(
             "Batch size",
             min_value=1,
-            max_value=1 if is_multi_fidelity else 32,
-            value=1 if is_multi_fidelity else max(1, int(campaign.config.bo.batch_size)),
+            max_value=4 if is_multi_fidelity else 32,
+            value=default_batch_size,
             step=1,
-            disabled=is_multi_fidelity,
         )
         generate_clicked = st.form_submit_button(
             "Generate suggestions (dry run)",

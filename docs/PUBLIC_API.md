@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.3.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.4.0.
 
 Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
 
@@ -75,15 +75,19 @@ automatic stage transitions remain deferred.
 
 Multi-fidelity campaigns expose `FidelityConfig` and `fidelity_summary` through
 the top-level package for config construction and read-only inspection.
-v1.4.x multi-fidelity support remains single-objective, continuous-variable
-qMFKG only; BoTorch-facing helper functions in `bo_forge.multifidelity` are
+`FidelityConfig.levels` optionally constrains the continuous fidelity variable
+to ordered numeric levels. v2.4.0 supports qMFKG batches from one through four;
+`fidelity_summary()` appends the fidelity mode, configured levels and level
+counts after its existing fields. Existing continuous summaries keep those
+new level-specific values blank.
+BoTorch-facing helper functions in `bo_forge.multifidelity` remain
 implementation details rather than stable public API.
 
 Contextual campaigns expose `ContextConfig` and `context_summary` through the
 top-level package for config construction and read-only inspection.
 `CampaignConfig.context_variable_names` and
 `CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
-context variables and optimized decision variables. v2.3.3 contextual support
+context variables and optimized decision variables. v2.4.0 contextual support
 is single-objective LogEI/qLogEI only; `bo.acquisition: log_ei` may combine
 with `review.enabled: true`, deterministic `cost:`, replicates, or all three. Use
 `suggest_next(config, df, context_values={...})` or
@@ -100,7 +104,7 @@ columns.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.3.3 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.4.0 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect

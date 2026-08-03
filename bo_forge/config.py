@@ -69,6 +69,7 @@ class FidelityConfig:
     fixed_cost: float = 0.01
     fidelity_cost_weight: float = 1.0
     num_fantasies: int = 64
+    levels: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -255,6 +256,7 @@ def parse_campaign_config(raw: Any) -> CampaignConfig:
     )
     _validate_fidelity_combinations(
         fidelity=fidelity,
+        bo=bo,
         variables=variables,
         multi_objective=bool(objectives),
         stages=stages,
@@ -596,7 +598,14 @@ def _parse_fidelity(
         raise ConfigError("Config key 'fidelity' must be a mapping when provided.")
     unsupported = sorted(
         set(raw)
-        - {"variable", "target", "fixed_cost", "fidelity_cost_weight", "num_fantasies"}
+        - {
+            "variable",
+            "target",
+            "fixed_cost",
+            "fidelity_cost_weight",
+            "num_fantasies",
+            "levels",
+        }
     )
     if unsupported:
         raise ConfigError(f"Config key 'fidelity' has unsupported keys: {unsupported}.")
@@ -618,6 +627,7 @@ def _parse_fidelity(
             f"fidelity.target must be within variable '{variable_name}' bounds: "
             f"target={target:g}, lower={variable.lower:g}, upper={variable.upper:g}."
         )
+    levels = _parse_fidelity_levels(raw.get("levels"), variable, target)
     return FidelityConfig(
         variable=variable_name,
         target=target,
@@ -627,7 +637,55 @@ def _parse_fidelity(
             "fidelity.fidelity_cost_weight",
         ),
         num_fantasies=_positive_int(raw.get("num_fantasies", 64), "fidelity.num_fantasies"),
+        levels=levels,
     )
+
+
+def _parse_fidelity_levels(
+    raw: Any,
+    variable: VariableConfig,
+    target: float,
+) -> tuple[float, ...] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or len(raw) < 2:
+        raise ConfigError("fidelity.levels must be a list containing at least two values.")
+    levels: list[float] = []
+    for index, value in enumerate(raw):
+        if isinstance(value, bool):
+            raise ConfigError(f"fidelity.levels[{index}] must be a finite number.")
+        try:
+            level = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(
+                f"fidelity.levels[{index}] must be a finite number: value={value!r}."
+            ) from exc
+        if not math.isfinite(level):
+            raise ConfigError(f"fidelity.levels[{index}] must be a finite number.")
+        levels.append(level)
+
+    if any(
+        current <= previous
+        for previous, current in zip(levels, levels[1:], strict=False)
+    ):
+        raise ConfigError("fidelity.levels must be strictly increasing.")
+    assert variable.lower is not None and variable.upper is not None
+    outside = [
+        level
+        for level in levels
+        if level < variable.lower or level > variable.upper
+    ]
+    if outside:
+        raise ConfigError(
+            f"fidelity.levels must stay within variable '{variable.name}' bounds: "
+            f"outside={outside}, lower={variable.lower:g}, upper={variable.upper:g}."
+        )
+    if not math.isclose(levels[-1], target, rel_tol=1e-9, abs_tol=1e-9):
+        raise ConfigError(
+            "fidelity.target must equal the highest configured fidelity level: "
+            f"target={target:g}, highest_level={levels[-1]:g}."
+        )
+    return tuple(levels)
 
 
 def _parse_context(
@@ -837,6 +895,7 @@ def _validate_context_combinations(
 def _validate_fidelity_combinations(
     *,
     fidelity: FidelityConfig | None,
+    bo: BOConfig,
     variables: list[VariableConfig],
     multi_objective: bool,
     stages: list[StageConfig],
@@ -845,6 +904,11 @@ def _validate_fidelity_combinations(
 ) -> None:
     if fidelity is None:
         return
+    if bo.batch_size > 4:
+        raise ConfigError(
+            "qMFKG supports bo.batch_size from 1 through 4: "
+            f"configured={bo.batch_size}."
+        )
     if multi_objective:
         raise ConfigError("fidelity is only supported for single-objective campaigns.")
     if stages:

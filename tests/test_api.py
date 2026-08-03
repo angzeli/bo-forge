@@ -76,7 +76,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.3.3"
+    assert payload["version"] == "2.4.0"
     assert payload["experimental"] is True
 
 
@@ -136,6 +136,79 @@ def test_api_validation_and_summary_accept_multi_fidelity_example(tmp_path: Path
     assert validation.json()["validation"]["ok"] is True
     assert summary.status_code == 200
     assert summary.json()["summary"]["columns"] == ["field", "value"]
+    assert log_path.read_bytes() == before
+
+
+def test_api_discrete_qmfkg_batch_dry_run_and_append(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "22_discrete_multi_fidelity_qmfkg.yaml",
+        "22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    cfg = CampaignConfig.from_yaml(tmp_path / ref["config_path"])
+    candidates = values_to_unit_cube(cfg, [(0.2, 70.0, 0.5), (0.4, 100.0, 1.0)])
+
+    class FakePosterior:
+        mean = torch.tensor([[1.1], [1.4]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x_unit: torch.Tensor) -> FakePosterior:
+            return FakePosterior()
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: FakeModel(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([1.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_qmf_kg",
+        lambda **_kwargs: (candidates, torch.tensor(0.4), "qmf_kg"),
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+    api_client = client(tmp_path)
+
+    dry_run = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 2},
+    )
+
+    assert dry_run.status_code == 200, dry_run.text
+    payload = dry_run.json()
+    assert len(payload["suggestions"]["records"]) == 2
+    assert log_path.read_bytes() == before
+    append_payload(api_client, ref, payload["staged_bundle"])
+    assert len(pd.read_csv(log_path, keep_default_na=False)) == 8
+
+
+def test_api_discrete_qmfkg_rejects_batch_above_four_without_mutation(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "22_discrete_multi_fidelity_qmfkg.yaml",
+        "22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    response = client(tmp_path).post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 5},
+    )
+
+    assert response.status_code == 400
+    assert "batch_size from 1 through 4" in response.json()["error"]["message"]
     assert log_path.read_bytes() == before
 
 

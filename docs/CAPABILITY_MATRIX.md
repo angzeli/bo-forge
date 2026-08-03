@@ -1,9 +1,8 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.3.3 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
-experimental API workflows stable while making supported and intentionally
-deferred combinations explicit. v2.3.3 changes internal structure and quality
-enforcement only; every support status below is unchanged from v2.3.2.
+BO Forge v2.4.0 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+experimental API workflows stable while expanding single-objective qMFKG to
+ordered numeric fidelity levels and batches from one through four.
 
 Legend:
 
@@ -28,7 +27,7 @@ Legend:
 | Multi-objective active replicate repeats | rejected | Multi-objective replicate configs default to `new_only`; active repeats are deferred. |
 | Deterministic `cost:` ranking | supported | Single-objective and coupled multi-objective deterministic cost workflows are supported. |
 | Structured stages | supported | Explicit stage selection, validation, summaries, diagnostics, CLI, and Streamlit workflow. |
-| Single-objective multi-fidelity qMFKG | supported | One continuous fidelity variable, `batch_size=1`, no new CSV columns. |
+| Single-objective multi-fidelity qMFKG | supported | One continuous fidelity variable, optional ordered numeric levels, `1 <= batch_size <= 4`, no new CSV columns. |
 | Single-objective contextual LogEI/qLogEI | supported | Context variables are fixed at suggestion time and remain normal CSV variables. |
 
 ## Combination Matrix

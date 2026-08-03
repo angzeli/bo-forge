@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.3.3`. The v2.3.3 release closes the controlled
-combinations line with a behavior-preserving code-quality and error-handling
-refactor. Contextual qLogNEI, qLogNEHVI, multi-objective, structured, and
-multi-fidelity workflows remain deferred.
+Current baseline: `v2.4.0`. The v2.4.0 release opens the multi-fidelity
+expansion line with ordered discrete fidelity levels and qMFKG batches from one
+through four. Existing continuous-fidelity campaigns remain compatible, while
+broader fidelity combinations remain deferred.
 
 ## Roadmap So Far
 
@@ -27,6 +27,10 @@ flowchart LR
     v231["v2.3.1<br/>Combination hardening"]
     v232["v2.3.2<br/>Contextual replicates"]
     v233["v2.3.3<br/>Code-quality closeout"]
+    v240["v2.4.0<br/>Discrete + batch qMFKG"]
+    v241["v2.4.1<br/>Performance hardening"]
+    v242["v2.4.2<br/>Diagnostic polish"]
+    v243["v2.4.3<br/>Release closeout"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -40,18 +44,26 @@ flowchart LR
     v23 -.-> v231
     v23 -.-> v232
     v23 -.-> v233
+    v24 -.-> v240
+    v24 -.-> v241
+    v24 -.-> v242
+    v24 -.-> v243
 
     class v10,v20,v21,v22,v23 majorDone
-    class v24,v25 majorFuture
+    class v24 majorActive
+    class v25 majorFuture
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
+    class v240 patchActive
+    class v241,v242,v243 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
     classDef patchActive fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
+    classDef patchFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:1.5px,color:#111827;
 ```
 
 ## v2.0.x - Stable v2 Baseline
@@ -127,10 +139,15 @@ Status: completed
 
 ## v2.4.x - Multi-Fidelity Expansion
 
-Status: planned
+Status: active
 
-- Explore discrete fidelity levels.
-- Expand fidelity diagnostics.
+- `v2.4.0` adds ordered numeric fidelity levels and qMFKG batches from one through four,
+  plus exact-level diagnostics, Streamlit creation controls, and example 22.
+- `v2.4.1` is reserved for performance hardening after batch-qMFKG feedback.
+- `v2.4.2` is reserved for diagnostic polish without wider modeling scope.
+- `v2.4.3` is reserved for release closeout and regression hardening.
+- Preserve continuous-fidelity YAML and CSV compatibility.
+- Keep named fidelity sources, per-level costs, and batches above four deferred.
 - Revisit stage/fidelity and context/fidelity interactions only after the
   conservative qMFKG baseline remains stable.
 

@@ -618,6 +618,68 @@ def test_app_service_fidelity_summary_and_diagnostics_plot_routing(tmp_path: Pat
     plt.close(result.figure)
 
 
+def test_app_service_discrete_qmfkg_batch_dry_run_and_append(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = copy_example_config(tmp_path, "22_discrete_multi_fidelity_qmfkg.yaml")
+    log_path = copy_example_log(
+        tmp_path, "22_discrete_multi_fidelity_qmfkg_campaign_log.csv"
+    )
+    cfg = CampaignConfig.from_yaml(config_path)
+    candidates = values_to_unit_cube(cfg, [(0.2, 70.0, 0.5), (0.4, 100.0, 1.0)])
+
+    class FakePosterior:
+        mean = torch.tensor([[1.1], [1.4]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x_unit: torch.Tensor) -> FakePosterior:
+            return FakePosterior()
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: FakeModel(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([1.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_qmf_kg",
+        lambda **_kwargs: (candidates, torch.tensor(0.4), "qmf_kg"),
+    )
+    service = CampaignAppService.load(config_path, log_path)
+    before = log_path.read_bytes()
+    initial_count = len(service.df)
+
+    staged = service.suggest_dry_run(batch_size=2)
+
+    assert len(staged.suggestions) == 2
+    assert log_path.read_bytes() == before
+    appended = service.append_staged(staged.bundle)
+    assert len(appended.service.df) == initial_count + 2
+
+
+def test_app_service_discrete_qmfkg_rejects_batch_above_four_without_mutation(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "22_discrete_multi_fidelity_qmfkg.yaml")
+    log_path = copy_example_log(
+        tmp_path, "22_discrete_multi_fidelity_qmfkg_campaign_log.csv"
+    )
+    service = CampaignAppService.load(config_path, log_path)
+    before = log_path.read_bytes()
+
+    with pytest.raises(SuggestionError, match="batch_size from 1 through 4"):
+        service.suggest_dry_run(batch_size=5)
+
+    assert log_path.read_bytes() == before
+
+
 def test_app_service_context_summary_and_diagnostics_plot_routing(tmp_path: Path) -> None:
     log_path = copy_example_log(tmp_path, "16_contextual_logei_campaign_log.csv")
     service = CampaignAppService.load(

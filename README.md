@@ -1,11 +1,13 @@
-# 🧪 BO Forge v2.3.3
+# 🧪 BO Forge v2.4.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.3.3 closes the v2.3.x line with a behavior-preserving internal refactor. Core
-suggestion routing, CSV transitions, expression evaluation, plotting adapters,
-and Streamlit workflows are decomposed behind the same public interfaces, with
-an enforced production complexity limit and clearer numerical documentation.
+v2.4.0 opens the v2.4.x multi-fidelity expansion line with ordered discrete
+fidelity levels and qMFKG batches from one through four. Existing continuous
+fidelity YAML, CSV schemas, commands, and public interfaces remain compatible.
+Continuous batches use joint one-shot optimization. Ordered discrete batches
+use BoTorch's conditioned greedy mixed optimization and report a joint
+post-selection acquisition value.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -25,7 +27,7 @@ BO Forge deliberately supports only:
 - optional cost-aware ranking and human review
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
 - optional structured/staged campaign logs with stage-aware validation, explicit stage-aware suggestions, and read-only stage diagnostics
-- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable and read-only fidelity diagnostics
+- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable, optional ordered numeric levels, batches of one through four, and read-only fidelity diagnostics
 - optional single-objective contextual LogEI/qLogEI with context variables fixed at suggestion time, including review, deterministic cost, and replicate combinations
 - resume from existing logs
 - basic diagnostics, model diagnostics, model-profile comparison plots, Pareto-front plots, and hypervolume progress
@@ -35,7 +37,7 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe for local/trusted-network exploration
 
-It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, or qLogNEI/qLogNEHVI, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, automatic stage transitions, advanced Streamlit multi-fidelity combinations beyond single-objective continuous-fidelity qMFKG, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, or qLogNEI/qLogNEHVI, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, named fidelity sources, per-level fidelity costs, qMFKG batches above four, automatic stage transitions, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -142,6 +144,12 @@ with `campaign.fidelity_summary()`, `bo-forge fidelity-summary`, or
 `bo-forge plot --kind fidelity-diagnostics`; the notebook walkthrough is
 `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
 
+The ordered-discrete and batch qMFKG example is
+`configs/22_discrete_multi_fidelity_qmfkg.yaml` with seed log
+`examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`. It constrains the
+continuous fidelity variable to four numeric levels and demonstrates qMFKG
+batches through `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
+
 The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
 log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
 suggestions with `CampaignSession.suggest_next(context_values={...})` or
@@ -232,7 +240,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.3.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.4.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

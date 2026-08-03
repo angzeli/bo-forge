@@ -188,21 +188,27 @@ The structured tutorial files are:
 
 ## 🧪 Multi-Fidelity qMFKG
 
-v1.4.0 adds a conservative single-objective multi-fidelity workflow with one
-continuous fidelity variable. v1.4.1 adds read-only summaries and diagnostics,
-and v1.4.2 adds a notebook walkthrough for that workflow:
+BO Forge supports single-objective qMFKG with either a continuous fidelity
+range or ordered numeric fidelity levels. v2.4.0 also supports qMFKG batches
+from one through four:
 
 ```yaml
 fidelity:
   variable: fidelity
   target: 1.0
+  levels: [0.25, 0.5, 0.75, 1.0]  # omit for continuous fidelity
   fixed_cost: 0.01
   fidelity_cost_weight: 1.0
   num_fantasies: 64
 
 bo:
   acquisition: qmf_kg
+  batch_size: 2
 ```
+
+Continuous-fidelity batches use joint one-shot optimization. Ordered discrete
+batches use BoTorch's conditioned greedy mixed optimization and report a joint
+post-selection acquisition value.
 
 The fidelity variable remains a normal CSV variable column. Lower-fidelity rows
 are real objective measurements at that fidelity; the target fidelity is the
@@ -211,46 +217,49 @@ information gain against the configured affine fidelity cost evaluated on the
 normalized model-space fidelity coordinate. This fidelity cost is not the same
 as BO Forge's existing `cost:` budget/ranking feature.
 
-Try the bundled seed log:
+Try the bundled discrete-fidelity seed log:
 
 ```bash
 bo-forge validate \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
 bo-forge suggest \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
-  --batch-size 1
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
+  --batch-size 2
 
 bo-forge fidelity-summary \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
 bo-forge plot \
-  --config configs/15_multi_fidelity_qmfkg.yaml \
-  --log examples/15_multi_fidelity_qmfkg_campaign_log.csv \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
   --kind fidelity-diagnostics \
-  --output reports/15_multi_fidelity_diagnostics.png
+  --output reports/22_discrete_multi_fidelity_diagnostics.png
 ```
 
 From Python:
 
 ```python
 campaign = CampaignSession.from_files(
-    "configs/15_multi_fidelity_qmfkg.yaml",
-    "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
+    "configs/22_discrete_multi_fidelity_qmfkg.yaml",
+    "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
 )
 campaign.fidelity_summary()
 ```
 
-The tutorial notebook is:
+The continuous baseline and discrete/batch tutorial notebooks are:
 
 - `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
+- `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
 
-In v1.4.x, multi-fidelity is single-objective only and cannot be combined with
-`objectives:`, `stages:`, `cost:`, `replicates.enabled: true`, categorical,
-integer, or discrete variables, or model-based `batch_size > 1`.
+Multi-fidelity remains single-objective and cannot be combined with
+`objectives:`, `stages:`, `context:`, `cost:`, `replicates.enabled: true`,
+categorical, integer, or discrete variables. Ordered fidelity levels constrain
+one continuous variable; they are not a new variable type. Batch sizes above
+four are rejected.
 
 ## 🌐 Contextual LogEI/qLogEI
 
@@ -309,7 +318,7 @@ their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
 `notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
 create `Campaign kind = Contextual LogEI` configs with selected context
-variables and optional defaults. In v2.3.3, single-objective contextual
+variables and optional defaults. In v2.4.0, single-objective contextual
 `bo.acquisition: log_ei` campaigns can combine `context:` with review metadata,
 deterministic `cost:`, replicates, or all three. Contextual active repeats only
 target replicate groups matching the requested context; fitting still uses
@@ -340,7 +349,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.3.3; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.4.0; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -554,7 +563,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.3.3 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

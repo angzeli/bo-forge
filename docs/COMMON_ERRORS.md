@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.3.3 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.4.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.3.3 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.4.0 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -290,17 +290,38 @@ fidelity:
 
 ### `fidelity cannot be combined with ...`
 
-v1.4.0 multi-fidelity support is deliberately conservative.
+v2.4.0 multi-fidelity support remains deliberately conservative.
 
-Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `cost:`, or
-`replicates.enabled: true`. Multi-objective, structured, cost-aware, and
-replicate-aware multi-fidelity workflows are deferred.
+Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `context:`,
+`cost:`, or `replicates.enabled: true`. Multi-objective, structured,
+contextual, cost-aware, and replicate-aware multi-fidelity workflows are
+deferred.
 
-### `qMFKG model-based suggestions support batch_size=1`
+### `qMFKG supports batch_size from 1 through 4`
 
-Once the initial design is complete, v1.4.0 qMFKG suggestions are one-at-a-time.
+v2.4.0 supports qMFKG batches up to four candidates. Larger batches are
+intentionally rejected because runtime and memory grow quickly. Continuous
+batches use joint one-shot optimization; ordered discrete batches use
+conditioned greedy mixed optimization.
 
-Fix: request `batch_size=1` for multi-fidelity model-based suggestions.
+Fix: request `batch_size` 1, 2, 3, or 4.
+
+### `fidelity.levels must be ...`
+
+Ordered discrete fidelity requires at least two finite, strictly increasing
+levels inside the fidelity variable bounds. The highest level must equal
+`fidelity.target`.
+
+Fix: sort and deduplicate the numeric levels, keep them in bounds, and set the
+target to the final level.
+
+### `has off-grid fidelity value`
+
+A discrete-fidelity config was loaded with a CSV value that is not one of
+`fidelity.levels` within numeric tolerance.
+
+Fix: correct the CSV fidelity value to a configured level. Config-aware append
+and observation paths reject this before writing.
 
 ## 🧾 CSV Schema Errors
 

@@ -676,7 +676,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.3.3\n"
+    assert captured.out == "bo-forge 2.4.0\n"
     assert captured.err == ""
 
 
@@ -685,7 +685,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.3.3\n"
+    assert completed.stdout == "bo-forge 2.4.0\n"
     assert completed.stderr == ""
 
 
@@ -2465,7 +2465,7 @@ def test_multi_fidelity_cli_plot_fidelity_diagnostics_writes_output(
     assert output_path.exists()
 
 
-def test_multi_fidelity_cli_batch_size_failure_has_specific_hint_without_mutation(
+def test_multi_fidelity_cli_rejects_batch_size_above_four_without_mutation(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -2474,12 +2474,12 @@ def test_multi_fidelity_cli_batch_size_failure_has_specific_hint_without_mutatio
     log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
     before = log_path.read_bytes()
 
-    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "2", "--append"]) == 1
+    assert run(["suggest", *base_args(config_path, log_path), "--batch-size", "5", "--append"]) == 1
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "qMFKG model-based suggestions support batch_size=1" in captured.err
-    assert "Hint: Use --batch-size 1 for model-based qMFKG suggestions." in captured.err
+    assert "qMFKG supports batch_size from 1 through 4" in captured.err
+    assert "Hint: Use --batch-size 1, 2, 3, or 4" in captured.err
     assert log_path.read_bytes() == before
 
 

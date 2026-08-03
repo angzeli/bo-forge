@@ -1,4 +1,5 @@
 import math
+import warnings
 from dataclasses import replace
 
 import pandas as pd
@@ -1854,12 +1855,147 @@ def test_multi_fidelity_qmfkg_returns_one_valid_non_mutating_suggestion() -> Non
     assert list(suggestions.columns) == canonical_columns(cfg)
 
 
-def test_multi_fidelity_qmfkg_rejects_model_based_batch_size_above_one() -> None:
+def test_multi_fidelity_qmfkg_rejects_batch_size_above_four() -> None:
     cfg = multi_fidelity_config(initial_design_size=3)
     df = multi_fidelity_observed_log(cfg)
 
-    with pytest.raises(SuggestionError, match="batch_size=1"):
-        suggest_next(cfg, df, batch_size=2)
+    with pytest.raises(SuggestionError, match="batch_size from 1 through 4"):
+        suggest_next(cfg, df, batch_size=5)
+
+
+def test_discrete_qmfkg_batch_uses_levels_shared_iteration_and_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=2),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    candidates = values_to_unit_cube(cfg, [(0.4, 0.5), (0.8, 1.0)])
+    captured: dict[str, object] = {}
+
+    class FakePosterior:
+        mean = torch.tensor([[1.1], [1.4]], dtype=torch.double)
+        variance = torch.tensor([[0.01], [0.04]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, x_unit: torch.Tensor) -> FakePosterior:
+            assert x_unit.shape == torch.Size([2, 2])
+            return FakePosterior()
+
+    def fake_optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured.update(kwargs)
+        return candidates, torch.tensor(0.42, dtype=torch.double), "qmf_kg"
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: FakeModel(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([1.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", fake_optimizer)
+
+    suggestions = suggest_next(cfg, df, batch_size=2)
+
+    assert captured["batch_size"] == 2
+    assert captured["fixed_features_list"] == [
+        {1: pytest.approx(0.0625)},
+        {1: pytest.approx(0.375)},
+        {1: pytest.approx(0.6875)},
+        {1: pytest.approx(1.0)},
+    ]
+    assert len(suggestions) == 2
+    assert suggestions["fidelity"].astype(float).tolist() == pytest.approx([0.5, 1.0])
+    assert suggestions["predicted_mean"].astype(float).tolist() == pytest.approx([1.1, 1.4])
+    assert suggestions["predicted_std"].astype(float).tolist() == pytest.approx([0.1, 0.2])
+    assert suggestions["iteration"].nunique() == 1
+    assert suggestions["acquisition"].astype(float).tolist() == pytest.approx([0.42, 0.42])
+
+
+@pytest.mark.parametrize("batch_size", [2, 4])
+def test_discrete_qmfkg_real_optimizer_returns_warning_free_batch(batch_size: int) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=batch_size, min_normalized_distance=0.0),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        suggestions = suggest_next(cfg, df, batch_size=batch_size)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == batch_size
+    assert set(suggestions["fidelity"].astype(float)).issubset({0.25, 0.5, 0.75, 1.0})
+    assert suggestions["iteration"].nunique() == 1
+    assert suggestions["acquisition"].nunique() == 1
+    assert not any("degrees of freedom is <= 0" in str(item.message) for item in caught)
+
+
+@pytest.mark.parametrize("method", ["sobol", "random"])
+def test_discrete_fidelity_initial_design_uses_only_configured_levels(method: str) -> None:
+    base = multi_fidelity_config(initial_design_size=4)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=4, initial_design_method=method),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+    )
+    empty = empty_campaign_log(cfg)
+
+    first = suggest_next(cfg, empty, batch_size=4)
+    second = suggest_next(cfg, empty, batch_size=4)
+
+    pd.testing.assert_frame_equal(
+        first.drop(columns="row_id").reset_index(drop=True),
+        second.drop(columns="row_id").reset_index(drop=True),
+    )
+    assert set(first["fidelity"].astype(float)).issubset({0.25, 0.5, 0.75, 1.0})
+
+
+def test_discrete_fidelity_only_initial_design_reports_exhausted_space() -> None:
+    cfg = CampaignConfig(
+        campaign_name="fidelity_only",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("fidelity", "continuous", 0.25, 1.0),),
+        bo=BOConfig(
+            batch_size=1,
+            initial_design_size=5,
+            acquisition="qmf_kg",
+            min_normalized_distance=0.0,
+        ),
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.0,
+            levels=(0.25, 0.5, 0.75, 1.0),
+        ),
+    )
+    rows = [
+        {
+            "row_id": f"level_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "fidelity": level,
+            "activity": float(index),
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+        for index, level in enumerate(cfg.fidelity.levels)
+    ]
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+    with pytest.raises(SuggestionError, match="finite design space is exhausted"):
+        suggest_next(cfg, df, batch_size=1)
 
 
 def test_multi_fidelity_qmfkg_wraps_optimizer_failures(
@@ -1889,6 +2025,128 @@ def test_multi_fidelity_qmfkg_wraps_optimizer_failures(
         match="Could not generate qMFKG suggestion: optimizer exploded",
     ):
         suggest_next(cfg, df, batch_size=1)
+
+
+def test_discrete_qmfkg_retries_duplicate_batches_then_reports_exhaustion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=2, min_normalized_distance=0.0),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    duplicate_batch = values_to_unit_cube(cfg, [(0.1, 0.25), (0.3, 0.5)])
+    calls = 0
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+
+    def duplicate_optimizer(**_kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        nonlocal calls
+        calls += 1
+        return duplicate_batch, torch.tensor(0.0, dtype=torch.double), "qmf_kg"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", duplicate_optimizer)
+
+    with pytest.raises(SuggestionError, match=f"{MAX_DECODE_RETRIES} retries"):
+        suggest_next(cfg, df, batch_size=2)
+
+    assert calls == MAX_DECODE_RETRIES
+
+
+def test_discrete_qmfkg_review_pending_batch_blocks_new_suggestions() -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=2),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+        review=ReviewConfig(enabled=True),
+    )
+    observed = multi_fidelity_observed_log(cfg)
+    observed["review_status"] = "accepted"
+    observed["review_note"] = ""
+    observed = observed.loc[:, canonical_columns(cfg)]
+    pending = {
+        "row_id": "pending_qmfkg_batch",
+        "iteration": 5,
+        "status": "suggested",
+        "source": "qmf_kg",
+        "review_status": "pending",
+        "review_note": "",
+        "x": 0.95,
+        "fidelity": 0.5,
+        "activity": "",
+        "predicted_mean": 1.0,
+        "predicted_std": 0.2,
+        "acquisition": 0.1,
+    }
+    df = pd.concat(
+        [observed, pd.DataFrame([pending], columns=canonical_columns(cfg))],
+        ignore_index=True,
+    )
+
+    with pytest.raises(SuggestionError, match="unresolved status='suggested'"):
+        suggest_next(cfg, df, batch_size=2)
+
+
+def test_discrete_qmfkg_retries_constraint_violating_batch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=2, min_normalized_distance=0.0),
+        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+        constraints=(ConstraintConfig("x_limit", "x <= 0.9"),),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    candidate_batches = [
+        values_to_unit_cube(cfg, [(0.95, 0.25), (0.7, 0.5)]),
+        values_to_unit_cube(cfg, [(0.4, 0.25), (0.7, 0.5)]),
+    ]
+    calls = 0
+
+    class FakePosterior:
+        mean = torch.tensor([[1.0], [1.1]], dtype=torch.double)
+        variance = torch.tensor([[0.04], [0.04]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x_unit: torch.Tensor) -> FakePosterior:
+            return FakePosterior()
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: FakeModel(),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+
+    def optimizer(**_kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        nonlocal calls
+        candidate = candidate_batches[min(calls, len(candidate_batches) - 1)]
+        calls += 1
+        return candidate, torch.tensor(0.2, dtype=torch.double), "qmf_kg"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", optimizer)
+
+    result = suggest_next(cfg, df, batch_size=2)
+
+    assert calls == 2
+    assert result["x"].astype(float).tolist() == pytest.approx([0.4, 0.7])
 
 
 def test_suggest_next_returns_model_based_batch_suggestions() -> None:

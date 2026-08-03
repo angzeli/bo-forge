@@ -82,6 +82,7 @@ def validate_campaign_data(config: CampaignConfig, df: pd.DataFrame) -> None:
     _validate_stage(config, df)
     _validate_review(config, df)
     _validate_variables(config, df)
+    _validate_fidelity_levels(config, df)
     _validate_replicates(config, df)
     _validate_constraints(config, df)
     if config.is_multi_objective:
@@ -188,7 +189,7 @@ def design_key_for_values(
 ) -> tuple[object, ...]:
     """Return one stable typed design key for user-facing variable values."""
     return tuple(
-        _normalise_variable_value(variable, value)
+        _normalise_design_value(config, variable, value)
         for variable, value in zip(config.variables, values, strict=True)
     )
 
@@ -350,6 +351,27 @@ def _validate_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
             raise LogValidationError(
                 f"Variable '{variable.name}' has unsupported type '{variable.type}'."
             )
+
+
+def _validate_fidelity_levels(config: CampaignConfig, df: pd.DataFrame) -> None:
+    if config.fidelity is None or config.fidelity.levels is None:
+        return
+    fidelity_name = config.fidelity.variable
+    levels = config.fidelity.levels
+    numeric = pd.to_numeric(df[fidelity_name], errors="coerce")
+    valid = numeric.map(
+        lambda value: any(
+            math.isclose(float(value), level, rel_tol=1e-9, abs_tol=1e-9)
+            for level in levels
+        )
+    )
+    if (~valid).any():
+        row_id = str(df.loc[~valid, "row_id"].iloc[0])
+        value = df.loc[~valid, fidelity_name].iloc[0]
+        raise LogValidationError(
+            f"Row '{row_id}' has off-grid fidelity value for variable "
+            f"'{fidelity_name}': value={value!r}, allowed={list(levels)}."
+        )
 
 
 def _validate_structured_variables(config: CampaignConfig, df: pd.DataFrame) -> None:
@@ -848,6 +870,25 @@ def _normalise_variable_value(variable: VariableConfig, value: object) -> object
     raise LogValidationError(
         f"Variable '{variable.name}' has unsupported type '{variable.type}'."
     )
+
+
+def _normalise_design_value(
+    config: CampaignConfig,
+    variable: VariableConfig,
+    value: object,
+) -> object:
+    normalised = _normalise_variable_value(variable, value)
+    if (
+        config.fidelity is None
+        or config.fidelity.levels is None
+        or variable.name != config.fidelity.variable
+    ):
+        return normalised
+    numeric = float(normalised)
+    for level in config.fidelity.levels:
+        if math.isclose(numeric, level, rel_tol=1e-9, abs_tol=1e-9):
+            return round(level, 12)
+    return normalised
 
 
 def _finite_float(variable: VariableConfig, value: object) -> float:

@@ -324,6 +324,88 @@ def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
     assert list(empty_log.columns) == canonical_columns(config)
 
 
+def test_build_campaign_yaml_text_supports_discrete_batch_qmfkg() -> None:
+    text = build_campaign_yaml_text(
+        campaign_name="app_created_discrete_fidelity",
+        objective_name="activity",
+        objective_direction="maximize",
+        variables=[
+            {"name": "loading", "type": "continuous", "lower": 0.0, "upper": 1.0},
+            {"name": "fidelity", "type": "continuous", "lower": 0.2, "upper": 1.0},
+        ],
+        batch_size=3,
+        initial_design_size=6,
+        initial_design_method="sobol",
+        random_seed=22,
+        fidelity={
+            "variable": "fidelity",
+            "target": 1.0,
+            "levels": [0.25, 0.5, 0.75, 1.0],
+            "fixed_cost": 0.01,
+            "fidelity_cost_weight": 1.0,
+            "num_fantasies": 8,
+        },
+        bo_overrides={
+            "acquisition": "qmf_kg",
+            "raw_samples": 8,
+            "num_restarts": 1,
+            "mc_samples": 16,
+            "min_normalized_distance": 0.0,
+        },
+    )
+
+    config = parse_campaign_config_text(text)
+    empty_log = empty_campaign_log(config)
+
+    assert config.fidelity is not None
+    assert config.fidelity.levels == (0.25, 0.5, 0.75, 1.0)
+    assert config.fidelity.target == pytest.approx(1.0)
+    assert config.bo.batch_size == 3
+    assert list(empty_log.columns) == canonical_columns(config)
+
+
+def test_suggest_form_preserves_non_fidelity_configured_batch_size() -> None:
+    captured: dict[str, object] = {}
+
+    class Form:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    class FakeStreamlit:
+        @staticmethod
+        def form(_key: str) -> Form:
+            return Form()
+
+        @staticmethod
+        def number_input(_label: str, **kwargs: object) -> object:
+            captured.update(kwargs)
+            return kwargs["value"]
+
+        @staticmethod
+        def form_submit_button(*_args: object, **_kwargs: object) -> bool:
+            return False
+
+    campaign = SimpleNamespace(
+        config=SimpleNamespace(
+            fidelity=None,
+            bo=SimpleNamespace(batch_size=8),
+        )
+    )
+
+    batch_size, clicked = streamlit_app._render_suggestion_dry_run_form(
+        FakeStreamlit,
+        campaign,
+    )
+
+    assert batch_size == 8
+    assert captured["max_value"] == 32
+    assert captured["value"] == 8
+    assert not clicked
+
+
 def test_build_campaign_yaml_text_supports_contextual_logei() -> None:
     text = build_campaign_yaml_text(
         campaign_name="app_created_contextual_campaign",
@@ -2819,6 +2901,15 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
         "Multi-fidelity qMFKG"
     )
     app.run(timeout=10)
+    next(
+        input_
+        for input_ in app.number_input
+        if input_.key == "new_bo_batch_size_multi_fidelity"
+    ).set_value(2)
+    next(radio for radio in app.radio if radio.label == "Fidelity mode").set_value(
+        "Ordered discrete levels"
+    )
+    app.run(timeout=10)
     next(checkbox for checkbox in app.checkbox if checkbox.label == "Enable review").check()
     app.run(timeout=10)
 
@@ -2842,8 +2933,9 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
     assert config.fidelity is not None
     assert config.fidelity.variable == "fidelity"
     assert config.fidelity.target == pytest.approx(1.0)
+    assert config.fidelity.levels == (0.0, 0.5, 1.0)
     assert config.bo.acquisition == "qmf_kg"
-    assert config.bo.batch_size == 1
+    assert config.bo.batch_size == 2
     assert config.review.enabled
     assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
 
@@ -2858,10 +2950,10 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
         if number_input.label == "Batch size"
     ]
     assert "qMFKG suggestions" in suggest_markdown
-    assert batch_inputs[-1].value == 1
+    assert batch_inputs[-1].value == 2
     assert batch_inputs[-1].min == 1
-    assert batch_inputs[-1].max == 1
-    assert batch_inputs[-1].proto.disabled
+    assert batch_inputs[-1].max == 4
+    assert not batch_inputs[-1].proto.disabled
 
 
 def test_streamlit_app_can_create_contextual_logei_campaign(tmp_path: Path) -> None:
