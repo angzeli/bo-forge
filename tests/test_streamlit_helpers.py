@@ -297,6 +297,8 @@ def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
             "fixed_cost": 0.01,
             "fidelity_cost_weight": 1.0,
             "num_fantasies": 8,
+            "optimizer_maxiter": 80,
+            "optimizer_timeout_seconds": 15.0,
         },
         bo_overrides={
             "acquisition": "qmf_kg",
@@ -314,6 +316,8 @@ def test_build_campaign_yaml_text_supports_multi_fidelity_qmfkg() -> None:
     assert config.fidelity is not None
     assert config.fidelity.variable == "fidelity"
     assert config.fidelity.target == pytest.approx(1.0)
+    assert config.fidelity.optimizer_maxiter == 80
+    assert config.fidelity.optimizer_timeout_seconds == pytest.approx(15.0)
     assert config.bo.acquisition == "qmf_kg"
     assert config.bo.batch_size == 1
     assert config.bo.raw_samples == 8
@@ -360,6 +364,8 @@ def test_build_campaign_yaml_text_supports_discrete_batch_qmfkg() -> None:
     assert config.fidelity is not None
     assert config.fidelity.levels == (0.25, 0.5, 0.75, 1.0)
     assert config.fidelity.target == pytest.approx(1.0)
+    assert config.fidelity.optimizer_maxiter == 200
+    assert config.fidelity.optimizer_timeout_seconds is None
     assert config.bo.batch_size == 3
     assert list(empty_log.columns) == canonical_columns(config)
 
@@ -404,6 +410,47 @@ def test_suggest_form_preserves_non_fidelity_configured_batch_size() -> None:
     assert captured["max_value"] == 32
     assert captured["value"] == 8
     assert not clicked
+
+
+def test_failed_qmfkg_dry_run_keeps_existing_staged_state() -> None:
+    existing_bundle = {"suggestions_fingerprint": "existing"}
+
+    class FakeStreamlit:
+        session_state = {
+            streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY: existing_bundle,
+        }
+        errors: list[str] = []
+
+        @classmethod
+        def error(cls, message: str) -> None:
+            cls.errors.append(message)
+
+    class FailingCampaign:
+        @staticmethod
+        def suggest_dry_run(*_args: object, **_kwargs: object) -> None:
+            raise suggestions_module.SuggestionError(
+                "qMFKG acquisition optimization timed out"
+            )
+
+    request_state = streamlit_app._SuggestionRequestState(
+        config_path=Path("config.yaml"),
+        log_path=Path("campaign.csv"),
+        selected_stage=None,
+        context_values=None,
+    )
+
+    streamlit_app._generate_staged_suggestions(
+        FakeStreamlit,
+        FailingCampaign(),
+        request_state,
+        1,
+    )
+
+    assert FakeStreamlit.errors == ["qMFKG acquisition optimization timed out"]
+    assert (
+        FakeStreamlit.session_state[streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY]
+        is existing_bundle
+    )
 
 
 def test_build_campaign_yaml_text_supports_contextual_logei() -> None:
@@ -2910,6 +2957,22 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
         "Ordered discrete levels"
     )
     app.run(timeout=10)
+    next(
+        input_
+        for input_ in app.number_input
+        if input_.label == "Max optimizer iterations"
+    ).set_value(85)
+    next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.label == "Limit acquisition runtime"
+    ).check()
+    app.run(timeout=10)
+    next(
+        input_
+        for input_ in app.number_input
+        if input_.label == "Acquisition timeout (seconds)"
+    ).set_value(12.0)
     next(checkbox for checkbox in app.checkbox if checkbox.label == "Enable review").check()
     app.run(timeout=10)
 
@@ -2934,6 +2997,8 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
     assert config.fidelity.variable == "fidelity"
     assert config.fidelity.target == pytest.approx(1.0)
     assert config.fidelity.levels == (0.0, 0.5, 1.0)
+    assert config.fidelity.optimizer_maxiter == 85
+    assert config.fidelity.optimizer_timeout_seconds == pytest.approx(12.0)
     assert config.bo.acquisition == "qmf_kg"
     assert config.bo.batch_size == 2
     assert config.review.enabled
@@ -2950,6 +3015,8 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
         if number_input.label == "Batch size"
     ]
     assert "qMFKG suggestions" in suggest_markdown
+    assert "Optimizer max iterations: 85" in suggest_markdown
+    assert "Acquisition timeout: 12 seconds" in suggest_markdown
     assert batch_inputs[-1].value == 2
     assert batch_inputs[-1].min == 1
     assert batch_inputs[-1].max == 4
@@ -3408,6 +3475,9 @@ def test_streamlit_multi_fidelity_target_defaults_to_selected_variable_upper(
     assert config.fidelity is not None
     assert config.fidelity.variable == "temperature"
     assert config.fidelity.target == pytest.approx(2.5)
+    assert config.fidelity.optimizer_maxiter == 200
+    assert config.fidelity.optimizer_timeout_seconds is None
+    assert "optimizer_timeout_seconds" not in config_path.read_text(encoding="utf-8")
     assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
 
 

@@ -618,6 +618,29 @@ def test_app_service_fidelity_summary_and_diagnostics_plot_routing(tmp_path: Pat
     plt.close(result.figure)
 
 
+def test_app_service_preserves_qmfkg_timeout_error_and_log_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = copy_example_config(tmp_path, "22_discrete_multi_fidelity_qmfkg.yaml")
+    log_path = copy_example_log(
+        tmp_path,
+        "22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    service = CampaignAppService.load(config_path, log_path)
+    before = log_path.read_bytes()
+
+    def fail_suggest(*_args: object, **_kwargs: object) -> pd.DataFrame:
+        raise SuggestionError("qMFKG acquisition optimization timed out")
+
+    monkeypatch.setattr(CampaignSession, "suggest_next", fail_suggest)
+
+    with pytest.raises(SuggestionError, match="qMFKG acquisition optimization timed out"):
+        service.suggest_dry_run(batch_size=1)
+
+    assert log_path.read_bytes() == before
+
+
 def test_app_service_discrete_qmfkg_batch_dry_run_and_append(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

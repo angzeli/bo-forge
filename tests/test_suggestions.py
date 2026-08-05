@@ -453,6 +453,22 @@ def multi_fidelity_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
+def patch_multi_fidelity_test_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakePosterior:
+        mean = torch.tensor([[1.2]], dtype=torch.double)
+        variance = torch.tensor([[0.04]], dtype=torch.double)
+
+    class FakeModel:
+        def posterior(self, _x_unit: torch.Tensor) -> FakePosterior:
+            return FakePosterior()
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: FakeModel(),
+    )
+
+
 def mixed_observed_log(cfg: CampaignConfig) -> pd.DataFrame:
     rows = []
     for index, (x_value, repeats, dose, solvent, score) in enumerate(
@@ -1918,13 +1934,18 @@ def test_discrete_qmfkg_batch_uses_levels_shared_iteration_and_acquisition(
     assert suggestions["acquisition"].astype(float).tolist() == pytest.approx([0.42, 0.42])
 
 
-@pytest.mark.parametrize("batch_size", [2, 4])
+@pytest.mark.parametrize("batch_size", [1, 2, 4])
 def test_discrete_qmfkg_real_optimizer_returns_warning_free_batch(batch_size: int) -> None:
     base = multi_fidelity_config(initial_design_size=3)
     cfg = replace(
         base,
         bo=replace(base.bo, batch_size=batch_size, min_normalized_distance=0.0),
-        fidelity=replace(base.fidelity, levels=(0.25, 0.5, 0.75, 1.0)),
+        fidelity=replace(
+            base.fidelity,
+            levels=(0.25, 0.5, 0.75, 1.0),
+            optimizer_maxiter=7,
+            optimizer_timeout_seconds=30.0,
+        ),
     )
     df = multi_fidelity_observed_log(cfg)
     before = df.copy(deep=True)
@@ -1939,6 +1960,30 @@ def test_discrete_qmfkg_real_optimizer_returns_warning_free_batch(batch_size: in
     assert suggestions["iteration"].nunique() == 1
     assert suggestions["acquisition"].nunique() == 1
     assert not any("degrees of freedom is <= 0" in str(item.message) for item in caught)
+
+
+@pytest.mark.parametrize("batch_size", [2, 4])
+def test_continuous_qmfkg_real_optimizer_returns_batch(batch_size: int) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    cfg = replace(
+        base,
+        bo=replace(base.bo, batch_size=batch_size, min_normalized_distance=0.0),
+        fidelity=replace(
+            base.fidelity,
+            optimizer_maxiter=7,
+            optimizer_timeout_seconds=30.0,
+        ),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+
+    suggestions = suggest_next(cfg, df, batch_size=batch_size)
+
+    pd.testing.assert_frame_equal(df, before)
+    assert len(suggestions) == batch_size
+    assert suggestions["fidelity"].astype(float).between(0.2, 1.0).all()
+    assert suggestions["iteration"].nunique() == 1
+    assert suggestions["acquisition"].nunique() == 1
 
 
 @pytest.mark.parametrize("method", ["sobol", "random"])
@@ -2025,6 +2070,281 @@ def test_multi_fidelity_qmfkg_wraps_optimizer_failures(
         match="Could not generate qMFKG suggestion: optimizer exploded",
     ):
         suggest_next(cfg, df, batch_size=1)
+
+
+def test_qmfkg_timeout_accepts_candidate_returned_at_shared_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=10.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    candidate = values_to_unit_cube(cfg, [(0.4, 0.6)])
+    times = iter([100.0, 102.0, 106.0, 110.0])
+    captured: dict[str, float | None] = {}
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+
+    def target_optimizer(**kwargs: object) -> torch.Tensor:
+        captured["target"] = kwargs["timeout_seconds"]  # type: ignore[assignment]
+        return torch.tensor([0.0], dtype=torch.double)
+
+    def candidate_optimizer(
+        **kwargs: object,
+    ) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured["candidate"] = kwargs["timeout_seconds"]  # type: ignore[assignment]
+        return candidate, torch.tensor(0.2), "qmf_kg"
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        target_optimizer,
+    )
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", candidate_optimizer)
+
+    result = suggest_next(cfg, df, batch_size=1)
+
+    assert len(result) == 1
+    assert captured["target"] == pytest.approx(8.0)
+    assert captured["candidate"] == pytest.approx(4.0)
+
+
+def test_qmfkg_timeout_rejects_candidate_returned_after_shared_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=10.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+    candidate = values_to_unit_cube(cfg, [(0.4, 0.6)])
+    times = iter([100.0, 102.0, 106.0, 111.0])
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_qmf_kg",
+        lambda **_kwargs: (candidate, torch.tensor(0.2), "qmf_kg"),
+    )
+
+    with pytest.raises(SuggestionError, match="acquisition optimization timed out"):
+        suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_qmfkg_model_fit_timeout_is_not_reported_as_acquisition_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=10.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError("fit stalled")),
+    )
+
+    with pytest.raises(
+        SuggestionError,
+        match="Could not generate qMFKG suggestion: fit stalled",
+    ) as exc_info:
+        suggest_next(cfg, df, batch_size=1)
+
+    assert "acquisition optimization timed out" not in str(exc_info.value)
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_qmfkg_candidate_optimizer_timeout_is_reported_as_acquisition_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=10.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+    times = iter([100.0, 101.0, 102.0])
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_qmf_kg",
+        lambda **_kwargs: (_ for _ in ()).throw(TimeoutError("optimizer stopped")),
+    )
+
+    with pytest.raises(SuggestionError, match="acquisition optimization timed out"):
+        suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_qmfkg_timeout_between_target_and_candidate_optimization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=5.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    before = df.copy(deep=True)
+    times = iter([10.0, 11.0, 15.0])
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_qmf_kg",
+        lambda **_kwargs: pytest.fail("candidate optimization must not start"),
+    )
+
+    with pytest.raises(SuggestionError, match="acquisition optimization timed out"):
+        suggest_next(cfg, df, batch_size=1)
+
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_qmfkg_timeout_after_rejected_batch_stops_before_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=5.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    duplicate = values_to_unit_cube(cfg, [(0.1, 0.25)])
+    times = iter([20.0, 20.5, 21.0, 24.9, 25.1])
+    calls = 0
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+
+    def duplicate_optimizer(
+        **_kwargs: object,
+    ) -> tuple[torch.Tensor, torch.Tensor, str]:
+        nonlocal calls
+        calls += 1
+        return duplicate, torch.tensor(0.0), "qmf_kg"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", duplicate_optimizer)
+
+    with pytest.raises(
+        SuggestionError,
+        match="Last rejection: candidate duplicates an existing design exactly",
+    ):
+        suggest_next(cfg, df, batch_size=1)
+
+    assert calls == 1
+
+
+def test_qmfkg_retries_receive_remaining_shared_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = multi_fidelity_config(initial_design_size=3)
+    assert base.fidelity is not None
+    cfg = replace(
+        base,
+        fidelity=replace(base.fidelity, optimizer_timeout_seconds=10.0),
+    )
+    df = multi_fidelity_observed_log(cfg)
+    batches = [
+        values_to_unit_cube(cfg, [(0.1, 0.25)]),
+        values_to_unit_cube(cfg, [(0.4, 0.6)]),
+    ]
+    times = iter([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    remaining: list[float] = []
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: torch.tensor([0.0], dtype=torch.double),
+    )
+
+    def optimizer(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor, str]:
+        value = kwargs["timeout_seconds"]
+        assert isinstance(value, float)
+        remaining.append(value)
+        return batches[len(remaining) - 1], torch.tensor(0.2), "qmf_kg"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", optimizer)
+
+    result = suggest_next(cfg, df, batch_size=1)
+
+    assert len(result) == 1
+    assert remaining == pytest.approx([8.0, 6.0])
+
+
+def test_qmfkg_without_timeout_preserves_optimizer_route_without_reading_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = multi_fidelity_config(initial_design_size=3)
+    df = multi_fidelity_observed_log(cfg)
+    candidate = values_to_unit_cube(cfg, [(0.4, 0.6)])
+    captured: list[float | None] = []
+    patch_multi_fidelity_test_model(monkeypatch)
+    monkeypatch.setattr(
+        suggestions_module.time,
+        "monotonic",
+        lambda: pytest.fail("unset timeout must not read the monotonic clock"),
+    )
+
+    def target_optimizer(**kwargs: object) -> torch.Tensor:
+        captured.append(kwargs["timeout_seconds"])  # type: ignore[arg-type]
+        return torch.tensor([0.0], dtype=torch.double)
+
+    def candidate_optimizer(
+        **kwargs: object,
+    ) -> tuple[torch.Tensor, torch.Tensor, str]:
+        captured.append(kwargs["timeout_seconds"])  # type: ignore[arg-type]
+        return candidate, torch.tensor(0.2), "qmf_kg"
+
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        target_optimizer,
+    )
+    monkeypatch.setattr(suggestions_module, "optimize_qmf_kg", candidate_optimizer)
+
+    result = suggest_next(cfg, df, batch_size=1)
+
+    assert len(result) == 1
+    assert captured == [None, None]
 
 
 def test_discrete_qmfkg_retries_duplicate_batches_then_reports_exhaustion(

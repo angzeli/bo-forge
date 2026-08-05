@@ -9,7 +9,6 @@ from typing import Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
-from bo_forge.contextual import context_summary as _context_summary
 from bo_forge.costs import (
     accepted_pending_estimated_cost,
     budget_remaining,
@@ -27,16 +26,6 @@ from bo_forge.logs import (
 from bo_forge.logs import (
     review_suggestion as _review_suggestion,
 )
-from bo_forge.models import model_profile_comparison as _model_profile_comparison
-from bo_forge.models import model_summary as _model_summary
-from bo_forge.multi_objective import (
-    pareto_front as _pareto_front,
-)
-from bo_forge.multi_objective import (
-    pareto_summary as _pareto_summary,
-)
-from bo_forge.multifidelity import fidelity_summary as _fidelity_summary
-from bo_forge.noisy import qlog_nei_summary as _qlog_nei_summary
 from bo_forge.replicates import (
     best_replicate_group as _best_replicate_group,
 )
@@ -45,13 +34,6 @@ from bo_forge.replicates import (
 )
 from bo_forge.replicates import (
     replicate_summary as _replicate_summary,
-)
-from bo_forge.structured import stage_summary as _stage_summary
-from bo_forge.suggestions import (
-    suggest_next as _suggest_next,
-)
-from bo_forge.suggestions import (
-    suggestion_quality_summary,
 )
 from bo_forge.validation import (
     canonical_columns,
@@ -497,37 +479,53 @@ class CampaignSession:
 
     def pareto_front(self) -> pd.DataFrame:
         """Return nondominated observed rows for a multi-objective campaign."""
-        return _pareto_front(self.config, self.df)
+        from bo_forge.multi_objective import pareto_front
+
+        return pareto_front(self.config, self.df)
 
     def pareto_summary(self) -> pd.DataFrame:
         """Return Pareto-front and hypervolume summary fields."""
-        return _pareto_summary(self.config, self.df)
+        from bo_forge.multi_objective import pareto_summary
+
+        return pareto_summary(self.config, self.df)
 
     def stage_summary(self) -> pd.DataFrame:
         """Return structured-campaign stage summary rows."""
-        return _stage_summary(self.config, self.df)
+        from bo_forge.structured import stage_summary
+
+        return stage_summary(self.config, self.df)
 
     def fidelity_summary(self) -> pd.DataFrame:
         """Return multi-fidelity campaign summary fields."""
-        return _fidelity_summary(self.config, self.df)
+        from bo_forge.multifidelity import fidelity_summary
+
+        return fidelity_summary(self.config, self.df)
 
     def context_summary(self) -> pd.DataFrame:
         """Return contextual-campaign summary rows by context combination."""
-        return _context_summary(self.config, self.df)
+        from bo_forge.contextual import context_summary
+
+        return context_summary(self.config, self.df)
 
     def qlog_nei_summary(self) -> pd.DataFrame:
         """Return qLogNEI pending-state summary fields."""
-        return _qlog_nei_summary(self.config, self.df)
+        from bo_forge.noisy import qlog_nei_summary
+
+        return qlog_nei_summary(self.config, self.df)
 
     def model_summary(self) -> pd.DataFrame:
         """Return model-profile and fitting-input summary fields."""
-        return _model_summary(self.config, self.df)
+        from bo_forge.models import model_summary
+
+        return model_summary(self.config, self.df)
 
     def model_profile_comparison(
         self, profiles: list[str] | tuple[str, ...] | None = None
     ) -> pd.DataFrame:
         """Return read-only model-profile comparison diagnostics."""
-        return _model_profile_comparison(self.config, self.df, profiles=profiles)
+        from bo_forge.models import model_profile_comparison
+
+        return model_profile_comparison(self.config, self.df, profiles=profiles)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -544,7 +542,9 @@ class CampaignSession:
         context_values: dict[str, object] | None = None,
     ) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
-        return _suggest_next(
+        from bo_forge.suggestions import suggest_next
+
+        return suggest_next(
             self.config,
             self.df.copy(deep=True),
             batch_size=batch_size,
@@ -554,6 +554,8 @@ class CampaignSession:
 
     def suggestion_quality(self, suggestions: pd.DataFrame) -> pd.DataFrame:
         """Return read-only quality diagnostics for suggested rows."""
+        from bo_forge.suggestions import suggestion_quality_summary
+
         return suggestion_quality_summary(
             self.config,
             self.df.copy(deep=True),

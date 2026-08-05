@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.4.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.4.1 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.4.0 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.4.1 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -290,7 +290,7 @@ fidelity:
 
 ### `fidelity cannot be combined with ...`
 
-v2.4.0 multi-fidelity support remains deliberately conservative.
+v2.4.1 multi-fidelity support remains deliberately conservative.
 
 Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `context:`,
 `cost:`, or `replicates.enabled: true`. Multi-objective, structured,
@@ -299,12 +299,26 @@ deferred.
 
 ### `qMFKG supports batch_size from 1 through 4`
 
-v2.4.0 supports qMFKG batches up to four candidates. Larger batches are
+v2.4.1 supports qMFKG batches up to four candidates. Larger batches are
 intentionally rejected because runtime and memory grow quickly. Continuous
 batches use joint one-shot optimization; ordered discrete batches use
 conditioned greedy mixed optimization.
 
 Fix: request `batch_size` 1, 2, 3, or 4.
+
+### `qMFKG acquisition optimization timed out`
+
+The optional `fidelity.optimizer_timeout_seconds` deadline expired after model
+fitting before BO Forge obtained a valid candidate batch. One deadline covers
+target-value optimization and all candidate retries. BO Forge rejects candidate
+batches returned after the deadline.
+
+Fix: raise or remove the timeout, reduce batch size, fidelity levels,
+`num_fantasies`, `bo.num_restarts`, or `bo.raw_samples`, or relax restrictive
+constraints. A timeout is a safety limit, not a candidate-quality guarantee or
+an immediate-cancellation mechanism. BoTorch initial-condition generation and
+an in-flight optimizer call can finish after the configured limit before BO
+Forge reports the timeout. Failed suggestions do not mutate the CSV.
 
 ### `fidelity.levels must be ...`
 

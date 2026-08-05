@@ -1,7 +1,11 @@
+from dataclasses import replace
+from typing import get_type_hints
+
 import pandas as pd
 import pytest
 import torch
 
+import bo_forge.acquisition as acquisition_module
 from bo_forge.acquisition import _extract_qmf_kg_candidates
 from bo_forge.config import (
     BOConfig,
@@ -24,6 +28,111 @@ from bo_forge.multifidelity import (
     target_fidelity_unit_value,
 )
 from bo_forge.validation import canonical_columns
+
+
+def test_target_fidelity_optimizer_forwards_maxiter_and_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = config()
+    assert cfg.fidelity is not None
+    cfg = replace(
+        cfg,
+        fidelity=replace(
+            cfg.fidelity,
+            optimizer_maxiter=37,
+            optimizer_timeout_seconds=9.0,
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(acquisition_module, "PosteriorMean", lambda model: object())
+
+    def fake_optimize(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor]:
+        captured.update(kwargs)
+        return torch.zeros((1, 2), dtype=torch.double), torch.tensor(1.0)
+
+    monkeypatch.setattr(acquisition_module, "optimize_acqf", fake_optimize)
+
+    result = acquisition_module.optimize_posterior_mean_at_target_fidelity(
+        cfg,
+        object(),
+        model_dim=2,
+        timeout_seconds=4.25,
+    )
+
+    assert result.tolist() == pytest.approx([1.0])
+    assert captured["options"] == {"batch_limit": 5, "maxiter": 37}
+    assert captured["timeout_sec"] == pytest.approx(4.25)
+
+
+def test_multifidelity_runtime_type_hints_resolve_after_lazy_import_hardening() -> None:
+    mapping_hints = get_type_hints(map_initial_fidelity_to_levels)
+    projection_hints = get_type_hints(target_fidelity_projection)
+    cost_hints = get_type_hints(affine_fidelity_cost_model)
+
+    assert mapping_hints["config"] is CampaignConfig
+    assert "x_unit" in mapping_hints
+    assert "return" in mapping_hints
+    assert projection_hints["config"] is CampaignConfig
+    assert "return" in projection_hints
+    assert cost_hints["config"] is CampaignConfig
+    assert "return" in cost_hints
+
+
+@pytest.mark.parametrize("discrete", [False, True])
+def test_qmfkg_optimizer_forwards_maxiter_and_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    discrete: bool,
+) -> None:
+    cfg = discrete_config() if discrete else config()
+    assert cfg.fidelity is not None
+    cfg = replace(cfg, fidelity=replace(cfg.fidelity, optimizer_maxiter=41))
+    captured: dict[str, object] = {}
+
+    class FakeAcquisition:
+        def extract_candidates(self, candidates: torch.Tensor) -> torch.Tensor:
+            return candidates
+
+    monkeypatch.setattr(
+        acquisition_module,
+        "qMultiFidelityKnowledgeGradient",
+        lambda **_kwargs: FakeAcquisition(),
+    )
+    monkeypatch.setattr(
+        acquisition_module,
+        "InverseCostWeightedUtility",
+        lambda **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        acquisition_module,
+        "affine_fidelity_cost_model",
+        lambda _config: object(),
+    )
+    monkeypatch.setattr(
+        acquisition_module,
+        "target_fidelity_projection",
+        lambda _config: object(),
+    )
+
+    def fake_optimize(**kwargs: object) -> tuple[torch.Tensor, torch.Tensor]:
+        captured.update(kwargs)
+        return torch.zeros((2, 2), dtype=torch.double), torch.tensor(0.5)
+
+    optimizer_name = "optimize_acqf_mixed" if discrete else "optimize_acqf"
+    monkeypatch.setattr(acquisition_module, optimizer_name, fake_optimize)
+
+    acquisition_module.optimize_qmf_kg(
+        cfg,
+        object(),
+        torch.tensor([0.0]),
+        batch_size=2,
+        model_dim=2,
+        fixed_features_list=[{1: 0.0}, {1: 1.0}] if discrete else None,
+        timeout_seconds=3.5,
+    )
+
+    assert captured["options"] == {"batch_limit": 5, "maxiter": 41}
+    assert captured["timeout_sec"] == pytest.approx(3.5)
 
 
 def config() -> CampaignConfig:

@@ -70,6 +70,8 @@ class FidelityConfig:
     fidelity_cost_weight: float = 1.0
     num_fantasies: int = 64
     levels: tuple[float, ...] | None = None
+    optimizer_maxiter: int = 200
+    optimizer_timeout_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -605,6 +607,8 @@ def _parse_fidelity(
             "fidelity_cost_weight",
             "num_fantasies",
             "levels",
+            "optimizer_maxiter",
+            "optimizer_timeout_seconds",
         }
     )
     if unsupported:
@@ -628,6 +632,12 @@ def _parse_fidelity(
             f"target={target:g}, lower={variable.lower:g}, upper={variable.upper:g}."
         )
     levels = _parse_fidelity_levels(raw.get("levels"), variable, target)
+    optimizer_timeout_seconds = None
+    if raw.get("optimizer_timeout_seconds") is not None:
+        optimizer_timeout_seconds = _positive_float(
+            raw["optimizer_timeout_seconds"],
+            "fidelity.optimizer_timeout_seconds",
+        )
     return FidelityConfig(
         variable=variable_name,
         target=target,
@@ -638,6 +648,11 @@ def _parse_fidelity(
         ),
         num_fantasies=_positive_int(raw.get("num_fantasies", 64), "fidelity.num_fantasies"),
         levels=levels,
+        optimizer_maxiter=_positive_int(
+            raw.get("optimizer_maxiter", 200),
+            "fidelity.optimizer_maxiter",
+        ),
+        optimizer_timeout_seconds=optimizer_timeout_seconds,
     )
 
 
@@ -1200,7 +1215,14 @@ def _non_negative_float(value: Any, context: str) -> float:
 
 
 def _positive_float(value: Any, context: str) -> float:
-    parsed = _non_negative_float(value, context)
+    if isinstance(value, bool):
+        raise ConfigError(f"{context} must be numeric, not a boolean.")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{context} must be numeric.") from exc
+    if not math.isfinite(parsed):
+        raise ConfigError(f"{context} must be finite.")
     if parsed <= 0:
         raise ConfigError(f"{context} must be > 0: value={parsed:g}.")
     return parsed

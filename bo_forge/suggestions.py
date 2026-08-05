@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import time
 import uuid
 from dataclasses import dataclass, replace
 
@@ -492,25 +493,49 @@ def _suggest_multi_fidelity_model_based(
         fixed_features_list = categorical_feature_assignments(config)
         candidate_fixed_features_list = fidelity_level_fixed_features(config)
         model_dim = encoded_dimension(config)
-        current_value = optimize_posterior_mean_at_target_fidelity(
-            config=config,
-            model=model,
-            model_dim=model_dim,
-            fixed_features_list=fixed_features_list,
-        )
+        deadline = _qmfkg_optimizer_deadline(config)
+        try:
+            current_value = optimize_posterior_mean_at_target_fidelity(
+                config=config,
+                model=model,
+                model_dim=model_dim,
+                fixed_features_list=fixed_features_list,
+                timeout_seconds=_remaining_qmfkg_optimizer_time(config, deadline),
+            )
+        except TimeoutError as exc:
+            raise SuggestionError(_qmfkg_timeout_message(config)) from exc
         user_candidates: list[tuple[object, ...]] | None = None
         acquisition_value: torch.Tensor | None = None
         rejection_message = "no candidate was decoded"
 
         for attempt in range(MAX_DECODE_RETRIES):
+            remaining_timeout = _remaining_qmfkg_optimizer_time(
+                config,
+                deadline,
+                last_rejection=rejection_message if attempt > 0 else None,
+            )
             torch.manual_seed(config.bo.random_seed + attempt)
-            x_unit_raw, acquisition_value, _ = optimize_qmf_kg(
-                config=config,
-                model=model,
-                current_value=current_value,
-                batch_size=batch_size,
-                model_dim=model_dim,
-                fixed_features_list=candidate_fixed_features_list,
+            try:
+                x_unit_raw, acquisition_value, _ = optimize_qmf_kg(
+                    config=config,
+                    model=model,
+                    current_value=current_value,
+                    batch_size=batch_size,
+                    model_dim=model_dim,
+                    fixed_features_list=candidate_fixed_features_list,
+                    timeout_seconds=remaining_timeout,
+                )
+            except TimeoutError as exc:
+                raise SuggestionError(
+                    _qmfkg_timeout_message(
+                        config,
+                        rejection_message if attempt > 0 else None,
+                    )
+                ) from exc
+            _check_qmfkg_optimizer_deadline(
+                config,
+                deadline,
+                last_rejection=rejection_message if attempt > 0 else None,
             )
             decoded_candidates = unit_cube_to_user_values(config, x_unit_raw)
             rejection_message = _candidate_batch_rejection_message(
@@ -537,6 +562,8 @@ def _suggest_multi_fidelity_model_based(
             mean_user = objective_from_model_space(config, mean_model)
     except SuggestionError:
         raise
+    except TimeoutError as exc:
+        raise SuggestionError(f"Could not generate qMFKG suggestion: {exc}") from exc
     except (BotorchError, RuntimeError, ValueError) as exc:
         raise SuggestionError(f"Could not generate qMFKG suggestion: {exc}") from exc
 
@@ -558,6 +585,52 @@ def _suggest_multi_fidelity_model_based(
         row["acquisition"] = acquisition_scalar
         rows.append(row)
     return pd.DataFrame(rows, columns=canonical_columns(config))
+
+
+def _qmfkg_optimizer_deadline(config: CampaignConfig) -> float | None:
+    if config.fidelity is None or config.fidelity.optimizer_timeout_seconds is None:
+        return None
+    return time.monotonic() + config.fidelity.optimizer_timeout_seconds
+
+
+def _remaining_qmfkg_optimizer_time(
+    config: CampaignConfig,
+    deadline: float | None,
+    *,
+    last_rejection: str | None = None,
+) -> float | None:
+    if deadline is None:
+        return None
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        return remaining
+    raise SuggestionError(_qmfkg_timeout_message(config, last_rejection))
+
+
+def _check_qmfkg_optimizer_deadline(
+    config: CampaignConfig,
+    deadline: float | None,
+    *,
+    last_rejection: str | None = None,
+) -> None:
+    if deadline is not None and time.monotonic() > deadline:
+        raise SuggestionError(_qmfkg_timeout_message(config, last_rejection))
+
+
+def _qmfkg_timeout_message(
+    config: CampaignConfig,
+    last_rejection: str | None = None,
+) -> str:
+    assert config.fidelity is not None
+    timeout = config.fidelity.optimizer_timeout_seconds
+    timeout_label = "unset" if timeout is None else f"{timeout:g}"
+    message = (
+        "qMFKG acquisition optimization timed out before a valid candidate batch "
+        f"was available: optimizer_timeout_seconds={timeout_label}."
+    )
+    if last_rejection is not None:
+        message += f" Last rejection: {last_rejection}"
+    return message
 
 
 def _suggest_multi_objective_model_based(

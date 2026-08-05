@@ -834,7 +834,89 @@ bo:
     assert config.fidelity.fidelity_cost_weight == 2.5
     assert config.fidelity.num_fantasies == 8
     assert config.fidelity.levels is None
+    assert config.fidelity.optimizer_maxiter == 200
+    assert config.fidelity.optimizer_timeout_seconds is None
     assert config.bo.acquisition == "qmf_kg"
+
+
+def test_config_from_yaml_parses_fidelity_optimizer_controls(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: fidelity_runtime_controls
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+  optimizer_maxiter: 75
+  optimizer_timeout_seconds: 12.5
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    config = CampaignConfig.from_yaml(path)
+
+    assert config.fidelity is not None
+    assert config.fidelity.optimizer_maxiter == 75
+    assert config.fidelity.optimizer_timeout_seconds == pytest.approx(12.5)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("optimizer_maxiter", "0", "must be >= 1"),
+        ("optimizer_maxiter", "1.5", "must be an integer"),
+        ("optimizer_timeout_seconds", "0", "must be > 0"),
+        ("optimizer_timeout_seconds", "-1", "must be > 0"),
+        ("optimizer_timeout_seconds", ".nan", "must be finite"),
+        ("optimizer_timeout_seconds", "true", "must be numeric, not a boolean"),
+    ],
+)
+def test_fidelity_rejects_invalid_optimizer_controls(
+    tmp_path: Path,
+    field: str,
+    value: str,
+    message: str,
+) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        f"""
+campaign_name: bad_fidelity_runtime_control
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 0.2
+    upper: 1.0
+fidelity:
+  variable: fidelity
+  target: 1.0
+  {field}: {value}
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
 
 
 def test_config_from_yaml_parses_discrete_fidelity_levels(tmp_path: Path) -> None:

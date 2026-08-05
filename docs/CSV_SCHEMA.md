@@ -18,7 +18,7 @@ When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`.
 Contextual cost campaigns use the same columns; context variables remain normal
 variable columns and cost is evaluated on the full candidate, including fixed
-context values. `stages:` cannot be combined with `cost:` in v2.4.0.
+context values. `stages:` cannot be combined with `cost:` in v2.4.1.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -129,7 +129,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v2.4.0.
+- `stages:` cannot be combined with `cost:` in v2.4.1.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -153,7 +153,7 @@ campaign creation remain deferred.
 ## 🧪 Multi-Fidelity Rules
 
 Single-objective multi-fidelity workflows use an optional top-level
-`fidelity:` section. Ordered numeric levels are additive in v2.4.0:
+`fidelity:` section. Ordered numeric levels remain supported in v2.4.1:
 
 ```yaml
 fidelity:
@@ -163,6 +163,8 @@ fidelity:
   fixed_cost: 0.01
   fidelity_cost_weight: 1.0
   num_fantasies: 64
+  optimizer_maxiter: 200
+  optimizer_timeout_seconds: 60  # optional; omit for no timeout
 
 bo:
   acquisition: qmf_kg
@@ -183,6 +185,13 @@ Rules:
 - qMFKG trades information gain against the configured affine fidelity cost
   model, evaluated on the normalized model-space fidelity coordinate;
 - fidelity cost is separate from BO Forge's `cost:` budget/ranking feature;
+- `fidelity.optimizer_maxiter` defaults to `200` and applies to both
+  target-value and qMFKG candidate optimization;
+- optional `fidelity.optimizer_timeout_seconds` sets one deadline after model
+  fitting across target-value optimization and all candidate retries; candidate
+  batches returned after the deadline are rejected, although BoTorch
+  initial-condition generation and in-flight calls may finish later because
+  cancellation is cooperative; timeout failure does not mutate the CSV;
 - model-based qMFKG suggestions use `source=qmf_kg`;
 - qMFKG supports batch sizes from one through four. Rows in one batch share an
   iteration and joint acquisition scalar, while predictions remain row-specific.
@@ -198,7 +207,7 @@ combinations remain intentional: `fidelity:` cannot be combined with
 
 ## 🌐 Contextual BO Rules
 
-v2.4.0 supports a conservative single-objective contextual LogEI/qLogEI workflow:
+v2.4.1 supports a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -321,7 +330,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.4.0 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.4.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -359,7 +368,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.4.0, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.4.1, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -391,7 +400,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.4.0.
+and structured campaigns in v2.4.1.
 
 ## 🧪 Variable Value Rules
 

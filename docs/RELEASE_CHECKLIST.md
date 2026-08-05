@@ -43,6 +43,12 @@ Confirm:
 - `README.md` includes install commands for the core package, app/API extras, `bo-forge`, `bo-forge-app`, and `bo-forge-api`.
 - `docs/CAPABILITY_MATRIX.md` lists supported, read-only, rejected, and deferred workflow combinations.
 - `docs/STREAMLIT_DEPLOYMENT.md` describes local-only, trusted-LAN, SSH/VPN, and authenticated reverse-proxy modes.
+- subprocess import-boundary tests prove package import, version, help,
+  validation, and fidelity-summary avoid Torch, BoTorch, GPyTorch, Matplotlib,
+  Streamlit, and FastAPI;
+- `docs/PERFORMANCE_BENCHMARKS.md` records five-run warm-cache startup and
+  representative qMFKG `q=1/2/4` medians without machine-dependent CI
+  thresholds.
 - `docs/API_PROBE.md` describes the experimental API probe, root-bound paths, and no-auth safety model.
 - No tracked caches, working logs, latest-suggestion CSVs, notebook outputs, or runtime reports are present.
 - `docs/QLOGNEHVI_FEASIBILITY.md` states that qLogNEHVI is implemented only
@@ -88,7 +94,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.0-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.1-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -105,7 +111,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.0-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.1-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -122,7 +128,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.0-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.1-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -135,7 +141,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.0.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.1.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -181,7 +187,8 @@ Confirm the full local loop still works:
 - create or load a campaign;
 - create a `Campaign kind = Multi-fidelity qMFKG` campaign and confirm the
   generated YAML contains `fidelity:` and `bo.acquisition: qmf_kg`; repeat with
-  ordered discrete levels and batch size 2;
+  ordered discrete levels and batch size 2; verify optimizer max iterations,
+  the opt-in timeout, and timeout omission when its toggle is off;
 - create a `Campaign kind = Contextual LogEI` campaign and confirm the
   generated YAML contains `context:` and `bo.acquisition: log_ei`;
 - create a supported single-objective campaign with `model.profile: smooth` and
@@ -208,8 +215,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.4.0`.
-- Tag the release as `v2.4.0`.
+  install paths, and the release tag all agree on `v2.4.1`.
+- Tag the release as `v2.4.1`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

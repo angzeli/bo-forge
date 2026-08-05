@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.4.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.4.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -24,6 +24,13 @@ batch sizes from one through four while preserving continuous-fidelity creation.
 Continuous batches use joint one-shot optimization. Ordered discrete batches
 use conditioned greedy mixed optimization and display a joint post-selection
 acquisition value.
+
+v2.4.1 adds advanced `Max optimizer iterations` and opt-in acquisition timeout
+controls. The Suggest panel displays both configured values. The timeout is one
+deadline after model fitting, and candidate batches returned after it are
+rejected. BoTorch initial-condition generation and in-flight calls cannot be
+cancelled immediately, so a failed dry run can finish after the configured
+limit. The timeout does not guarantee candidate quality.
 
 The completed v1.5.x line closed the Streamlit-facing contextual BO workflow.
 The app can create
@@ -110,6 +117,9 @@ When `Create Campaign` uses `Campaign kind = Multi-fidelity qMFKG`, the app:
 - writes a top-level `fidelity:` block;
 - sets `bo.acquisition: qmf_kg` and allows `bo.batch_size` from 1 through 4;
 - uses responsive qMFKG defaults matching the tutorial example;
+- exposes `Max optimizer iterations`, defaulting to `200`;
+- optionally writes `optimizer_timeout_seconds` when `Limit acquisition
+  runtime` is enabled, and omits it otherwise;
 - allows optional `review.enabled: true`;
 - leaves cost, replicates, structured stages, multi-objective fields, named
   fidelity sources, and categorical fidelity variables out of scope. The

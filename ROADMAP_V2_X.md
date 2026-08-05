@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.4.0`. The v2.4.0 release opens the multi-fidelity
-expansion line with ordered discrete fidelity levels and qMFKG batches from one
-through four. Existing continuous-fidelity campaigns remain compatible, while
-broader fidelity combinations remain deferred.
+Current baseline: `v2.4.1`. The v2.4.1 release hardens the multi-fidelity
+expansion line with opt-in qMFKG runtime controls and lightweight package/CLI
+startup. Existing v2.4.0 numerical behavior remains the default, while broader
+fidelity combinations remain deferred.
 
 ## Roadmap So Far
 
@@ -55,8 +55,9 @@ flowchart LR
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
-    class v240 patchActive
-    class v241,v242,v243 patchFuture
+    class v240 patchDone
+    class v241 patchActive
+    class v242,v243 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -143,7 +144,8 @@ Status: active
 
 - `v2.4.0` adds ordered numeric fidelity levels and qMFKG batches from one through four,
   plus exact-level diagnostics, Streamlit creation controls, and example 22.
-- `v2.4.1` is reserved for performance hardening after batch-qMFKG feedback.
+- `v2.4.1` adds opt-in optimizer iteration/timeout controls and lazy startup
+  boundaries without changing the default qMFKG numerical path.
 - `v2.4.2` is reserved for diagnostic polish without wider modeling scope.
 - `v2.4.3` is reserved for release closeout and regression hardening.
 - Preserve continuous-fidelity YAML and CSV compatibility.

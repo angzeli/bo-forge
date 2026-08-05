@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib
@@ -5,6 +6,7 @@ import pandas as pd
 import pytest
 
 import bo_forge.session as session_module
+import bo_forge.suggestions as suggestions_module
 from bo_forge import CampaignSession
 from bo_forge.config import (
     BOConfig,
@@ -16,7 +18,7 @@ from bo_forge.config import (
     StageConfig,
     VariableConfig,
 )
-from bo_forge.errors import LogValidationError
+from bo_forge.errors import LogValidationError, SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, mark_observed
 from bo_forge.validation import canonical_columns
@@ -797,6 +799,45 @@ def test_fidelity_summary_and_report_include_fidelity_section() -> None:
     assert summary_value(summary, "best_observed_row_id") == "mf_seed_3"
     assert "fidelity_summary" in report
     assert "Fidelity Summary\n----------------" in text
+
+
+def test_qmfkg_timeout_before_optimization_leaves_csv_bytes_unchanged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = Path("examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv")
+    log_path = tmp_path / "campaign.csv"
+    log_path.write_bytes(source.read_bytes())
+    campaign = CampaignSession.from_files(
+        "configs/22_discrete_multi_fidelity_qmfkg.yaml",
+        log_path,
+    )
+    assert campaign.config.fidelity is not None
+    campaign.config = replace(
+        campaign.config,
+        fidelity=replace(
+            campaign.config.fidelity,
+            optimizer_timeout_seconds=1.0,
+        ),
+    )
+    before = log_path.read_bytes()
+    times = iter([50.0, 51.0])
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(
+        suggestions_module,
+        "optimize_posterior_mean_at_target_fidelity",
+        lambda **_kwargs: pytest.fail("target optimization must not start"),
+    )
+
+    with pytest.raises(SuggestionError, match="acquisition optimization timed out"):
+        campaign.suggest_next(batch_size=1)
+
+    assert log_path.read_bytes() == before
 
 
 def test_fidelity_summary_rejects_non_fidelity_session(tmp_path: Path) -> None:

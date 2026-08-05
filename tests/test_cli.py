@@ -222,8 +222,14 @@ def write_fidelity_config(
     *,
     initial_design_size: int = 3,
     review: bool = False,
+    timeout_seconds: float | None = None,
 ) -> Path:
     review_block = "review:\n  enabled: true\n" if review else ""
+    timeout_line = (
+        ""
+        if timeout_seconds is None
+        else f"  optimizer_timeout_seconds: {timeout_seconds:g}\n"
+    )
     path.write_text(
         f"""
 campaign_name: fidelity_cli_test
@@ -243,6 +249,7 @@ fidelity:
   variable: fidelity
   target: 1.0
   num_fantasies: 8
+{timeout_line}\
 {review_block}\
 bo:
   batch_size: 1
@@ -676,7 +683,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.4.0\n"
+    assert captured.out == "bo-forge 2.4.1\n"
     assert captured.err == ""
 
 
@@ -685,7 +692,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.4.0\n"
+    assert completed.stdout == "bo-forge 2.4.1\n"
     assert completed.stderr == ""
 
 
@@ -2328,6 +2335,35 @@ def test_multi_fidelity_cli_fidelity_summary_outputs_table(
     assert "target_fidelity_observed_rows" in captured.out
     assert "best_target_fidelity_row_id" in captured.out
     assert "mf_obs_3" in captured.out
+
+
+def test_multi_fidelity_cli_translates_qmfkg_timeout_without_mutation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = write_fidelity_config(
+        tmp_path / "fidelity.yaml",
+        timeout_seconds=1.0,
+    )
+    cfg = CampaignConfig.from_yaml(config_path)
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+    before = log_path.read_bytes()
+    times = iter([10.0, 11.0])
+    monkeypatch.setattr(
+        suggestions_module,
+        "fit_multi_fidelity_gp_model",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(suggestions_module.time, "monotonic", lambda: next(times))
+
+    assert run(["suggest", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "qMFKG acquisition optimization timed out" in captured.err
+    assert "Increase or remove fidelity.optimizer_timeout_seconds" in captured.err
+    assert "Resolve pending suggestions" not in captured.err
+    assert log_path.read_bytes() == before
 
 
 def test_multi_fidelity_cli_fidelity_summary_counts_review_blocking_qmfkg(

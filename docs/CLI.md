@@ -249,6 +249,14 @@ discrete-fidelity batches are constructed greedily with BoTorch mixed
 fixed-feature optimization, then assigned one joint post-selection acquisition
 value.
 
+Optional `fidelity.optimizer_maxiter` and
+`fidelity.optimizer_timeout_seconds` settings control the existing optimizer;
+they do not add CLI flags. The timeout starts after model fitting, spans
+target-value optimization and candidate retries, and rejects candidate batches
+returned after the shared deadline. BoTorch initial-condition generation and
+an in-flight optimizer call cannot be cancelled immediately, so the command can
+return later than the configured limit. The timeout is not a quality guarantee.
+
 The generated model-based row uses `source=qmf_kg`. Use a copied working log
 before `--append`, as with the other examples.
 

@@ -14,6 +14,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -29,7 +30,9 @@ from bo_forge.errors import (
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import load_campaign_log
 from bo_forge.plot_registry import _PLOT_ROUTES, _canonical_plot_kind
-from bo_forge.session import CampaignSession, _format_campaign_report
+
+if TYPE_CHECKING:
+    from bo_forge.session import CampaignSession
 
 
 class _CLIOutputError(BOForgeError):
@@ -280,6 +283,8 @@ def _add_config_log_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _load_session(args: argparse.Namespace) -> CampaignSession:
+    from bo_forge.session import CampaignSession
+
     return CampaignSession.from_files(args.config, args.log)
 
 
@@ -419,6 +424,8 @@ def _cmd_pareto_summary(args: argparse.Namespace) -> int:
 def _cmd_report(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if args.output is None:
+        from bo_forge.session import _format_campaign_report
+
         print(_format_campaign_report(campaign.report()))
     else:
         try:
@@ -701,6 +708,11 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
             )
         if "qMFKG supports batch_size from 1 through 4" in str(exc):
             return "Hint: Use --batch-size 1, 2, 3, or 4 for qMFKG suggestions."
+        if "qMFKG acquisition optimization timed out" in str(exc):
+            return (
+                "Hint: Increase or remove fidelity.optimizer_timeout_seconds, "
+                "reduce qMFKG runtime settings, or relax restrictive constraints."
+            )
         if (
             "Structured campaign suggestions require an explicit stage" in str(exc)
             or "Invalid structured campaign stage" in str(exc)

@@ -1,13 +1,12 @@
-# 🧪 BO Forge v2.4.0
+# 🧪 BO Forge v2.4.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.4.0 opens the v2.4.x multi-fidelity expansion line with ordered discrete
-fidelity levels and qMFKG batches from one through four. Existing continuous
-fidelity YAML, CSV schemas, commands, and public interfaces remain compatible.
-Continuous batches use joint one-shot optimization. Ordered discrete batches
-use BoTorch's conditioned greedy mixed optimization and report a joint
-post-selection acquisition value.
+v2.4.1 hardens the v2.4.x multi-fidelity line with opt-in qMFKG optimizer
+limits and lightweight package/CLI startup. Existing configs retain the v2.4.0
+numerical path when the new settings are omitted. Continuous batches use joint
+one-shot optimization. Ordered discrete batches use BoTorch's conditioned greedy mixed optimization
+and report a joint post-selection acquisition value.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -149,6 +148,14 @@ The ordered-discrete and batch qMFKG example is
 `examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`. It constrains the
 continuous fidelity variable to four numeric levels and demonstrates qMFKG
 batches through `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
+qMFKG runtime grows with batch size, fidelity levels, fantasies, restarts, and
+raw samples. Optional `fidelity.optimizer_maxiter` and
+`fidelity.optimizer_timeout_seconds` settings provide a user-selected safety limit;
+the timeout covers acquisition optimization after model fitting, and BO Forge
+rejects candidates returned after the shared deadline. BoTorch
+initial-condition generation and in-flight calls cannot be cancelled
+immediately, so the command can return later than the configured limit. The
+setting is not a candidate-quality guarantee.
 
 The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
 log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
@@ -240,7 +247,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.4.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.4.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

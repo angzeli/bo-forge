@@ -243,8 +243,9 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.4.0" in readme
-    assert "v2.4.0 opens the v2.4.x multi-fidelity expansion line" in readme
+    assert "# 🧪 BO Forge v2.4.1" in readme
+    assert "v2.4.1 hardens the v2.4.x multi-fidelity line" in readme
+    assert "## v2.4.1 - qMFKG Performance And Startup Hardening" in changelog
     assert "## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG" in changelog
     assert "## v2.3.3 - Code Quality And Error-Handling Refactor" in changelog
     assert "## v2.3.2 - Contextual Replicate-Aware BO" in changelog
@@ -277,11 +278,13 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.4.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.4.1 provides a local Streamlit workbench" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
     assert "batch sizes from one through four" in streamlit_app_docs
     assert "conditioned greedy mixed optimization" in readme
     assert "conditioned greedy mixed optimization" in streamlit_app_docs
+    assert "Max optimizer iterations" in streamlit_app_docs
+    assert "Limit acquisition" in streamlit_app_docs
     assert "v2.2.1 adds Streamlit-facing qLogNEI diagnostics" in streamlit_app_docs
     assert "qLogNEI Summary" in streamlit_app_docs
     assert "qLogNEI Diagnostics" in streamlit_app_docs
@@ -331,13 +334,43 @@ def test_botorch_minor_version_is_bounded_for_optimizer_compatibility() -> None:
     assert '"botorch>=0.17,<0.18"' in pyproject
 
 
+def test_v2_4_1_docs_cover_qmfkg_runtime_controls_and_lazy_startup() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
+    common_errors = (PROJECT_ROOT / "docs" / "COMMON_ERRORS.md").read_text(
+        encoding="utf-8"
+    )
+    public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(
+        encoding="utf-8"
+    )
+    performance = (PROJECT_ROOT / "docs" / "PERFORMANCE_BENCHMARKS.md").read_text(
+        encoding="utf-8"
+    )
+
+    for content in (readme, quickstart, common_errors):
+        assert "optimizer_timeout_seconds" in content
+        assert "safety limit" in content
+        assert "candidate-quality guarantee" in content
+        assert "returned after" in content
+        assert "in-flight" in content
+    assert "optimizer_maxiter" in quickstart
+    assert "returned after" in public_api
+    assert "in-flight" in public_api
+    assert "Top-level exports are resolved lazily" in public_api
+    assert "does not load optimizer or plotting dependencies" in public_api
+    assert "median of five warm-cache subprocess runs" in performance
+    assert "Discrete qMFKG `q=1` suggestion" in performance
+    assert "Discrete qMFKG `q=2` suggestion" in performance
+    assert "Discrete qMFKG `q=4` suggestion" in performance
+
+
 def test_capability_matrix_documents_supported_and_deferred_combinations() -> None:
     matrix = (PROJECT_ROOT / "docs" / "CAPABILITY_MATRIX.md").read_text(
         encoding="utf-8"
     )
 
     required_phrases = [
-        "BO Forge v2.4.0",
+        "BO Forge v2.4.1",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -503,8 +536,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.4.0`" in roadmap
-    assert "v2.4.0 release opens the multi-fidelity" in roadmap
+    assert "Current baseline: `v2.4.1`" in roadmap
+    assert "v2.4.1 release hardens the multi-fidelity" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -529,8 +562,9 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
-    assert "class v240 patchActive" in roadmap
-    assert "class v241,v242,v243 patchFuture" in roadmap
+    assert "class v240 patchDone" in roadmap
+    assert "class v241 patchActive" in roadmap
+    assert "class v242,v243 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorFuture" in roadmap
     assert "classDef patchDone" in roadmap
@@ -632,7 +666,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.4.0" in requirements_lock
+    assert "BO Forge v2.4.1" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -684,7 +718,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.4.0." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.4.1." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 

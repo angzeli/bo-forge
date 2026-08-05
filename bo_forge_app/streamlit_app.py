@@ -545,7 +545,8 @@ def _collect_multi_fidelity_sections(
         st,
         "qMFKG defaults",
         "Generated YAML uses num_fantasies=8, raw_samples=8, num_restarts=1, "
-        "mc_samples=16, and min_normalized_distance=0.0.",
+        "mc_samples=16, min_normalized_distance=0.0, optimizer_maxiter=200, "
+        "and no acquisition timeout unless enabled.",
     )
     review_enabled = st.checkbox(
         "Enable review",
@@ -1019,7 +1020,36 @@ def _collect_new_campaign_fidelity_settings(
         "fixed_cost": 0.01,
         "fidelity_cost_weight": 1.0,
         "num_fantasies": 8,
+        "optimizer_maxiter": int(
+            st.number_input(
+                "Max optimizer iterations",
+                min_value=1,
+                value=200,
+                step=1,
+                key="new_campaign_fidelity_optimizer_maxiter",
+            )
+        ),
     }
+    limit_runtime = st.checkbox(
+        "Limit acquisition runtime",
+        value=False,
+        key="new_campaign_fidelity_limit_runtime",
+        help=(
+            "Applies one safety deadline to target-value optimization and candidate "
+            "retries after model fitting. It does not guarantee candidate quality or "
+            "immediate cancellation."
+        ),
+    )
+    if limit_runtime:
+        fidelity["optimizer_timeout_seconds"] = float(
+            st.number_input(
+                "Acquisition timeout (seconds)",
+                min_value=0.1,
+                value=60.0,
+                step=1.0,
+                key="new_campaign_fidelity_optimizer_timeout_seconds",
+            )
+        )
     if mode == "Ordered discrete levels":
         levels_text = st.text_input(
             "Fidelity levels",
@@ -1663,10 +1693,19 @@ def _render_suggestion_mode_notes(
             if campaign.config.fidelity.levels is not None
             else "Continuous qMFKG jointly optimizes batches from 1 through 4."
         )
+        timeout = campaign.config.fidelity.optimizer_timeout_seconds
+        runtime = (
+            f"Optimizer max iterations: {campaign.config.fidelity.optimizer_maxiter}. "
+            + (
+                "No acquisition timeout is configured."
+                if timeout is None
+                else f"Acquisition timeout: {timeout:g} seconds."
+            )
+        )
         _render_artifact_note(
             st,
             "qMFKG suggestions",
-            f"{mode.capitalize()} mode. {detail} Larger batches increase KG runtime.",
+            f"{mode.capitalize()} mode. {detail} {runtime} Larger batches increase KG runtime.",
         )
     if campaign.config.bo.acquisition == "qlog_nei":
         _render_artifact_note(

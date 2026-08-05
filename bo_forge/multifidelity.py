@@ -5,15 +5,19 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from functools import partial
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-import torch
-from botorch.acquisition.utils import project_to_target_fidelity
-from botorch.models.cost import AffineFidelityCostModel
 
 from bo_forge.config import CampaignConfig, VariableConfig
-from bo_forge.transforms import encoded_dimension, encoded_feature_indices
 from bo_forge.validation import get_observed_data, validate_campaign_data
+
+if TYPE_CHECKING:
+    from botorch.models.cost import AffineFidelityCostModel
+    from torch import Tensor
+else:
+    Tensor = Any
+    AffineFidelityCostModel = Any
 
 
 def fidelity_variable(config: CampaignConfig) -> VariableConfig:
@@ -37,6 +41,8 @@ def fidelity_variable_index(config: CampaignConfig) -> int:
 
 def fidelity_feature_index(config: CampaignConfig) -> int:
     """Return the model-space feature index of the fidelity variable."""
+    from bo_forge.transforms import encoded_feature_indices
+
     if config.fidelity is None:
         raise ValueError("Campaign config does not define a fidelity section.")
     indices = encoded_feature_indices(config)[config.fidelity.variable]
@@ -78,9 +84,11 @@ def fidelity_level_fixed_features(config: CampaignConfig) -> list[dict[int, floa
 
 def map_initial_fidelity_to_levels(
     config: CampaignConfig,
-    x_unit: torch.Tensor,
-) -> torch.Tensor:
+    x_unit: Tensor,
+) -> Tensor:
     """Map initial-design fidelity coordinates into equal-width level bins."""
+    import torch
+
     if config.fidelity is None:
         return x_unit
     unit_values = fidelity_level_unit_values(config)
@@ -103,8 +111,12 @@ def target_fidelities(config: CampaignConfig) -> dict[int, float]:
     return {fidelity_feature_index(config): target_fidelity_unit_value(config)}
 
 
-def target_fidelity_projection(config: CampaignConfig) -> Callable[[torch.Tensor], torch.Tensor]:
+def target_fidelity_projection(config: CampaignConfig) -> Callable[[Tensor], Tensor]:
     """Return a BoTorch projection callable to the configured target fidelity."""
+    from botorch.acquisition.utils import project_to_target_fidelity
+
+    from bo_forge.transforms import encoded_dimension
+
     return partial(
         project_to_target_fidelity,
         target_fidelities=target_fidelities(config),
@@ -114,6 +126,8 @@ def target_fidelity_projection(config: CampaignConfig) -> Callable[[torch.Tensor
 
 def affine_fidelity_cost_model(config: CampaignConfig) -> AffineFidelityCostModel:
     """Return BoTorch's affine fidelity cost model for qMFKG."""
+    from botorch.models.cost import AffineFidelityCostModel
+
     if config.fidelity is None:
         raise ValueError("Campaign config does not define a fidelity section.")
     return AffineFidelityCostModel(

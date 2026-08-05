@@ -215,6 +215,7 @@ def optimize_posterior_mean_at_target_fidelity(
     *,
     model_dim: int,
     fixed_features_list: list[dict[int, float]] | None = None,
+    timeout_seconds: float | None = None,
 ) -> torch.Tensor:
     """Optimize posterior mean at the configured target fidelity."""
     bounds = torch.tensor(
@@ -229,8 +230,13 @@ def optimize_posterior_mean_at_target_fidelity(
         "q": 1,
         "num_restarts": config.bo.num_restarts,
         "raw_samples": config.bo.raw_samples,
-        "options": {"batch_limit": 5, "maxiter": 200},
+        "options": {
+            "batch_limit": 5,
+            "maxiter": config.fidelity.optimizer_maxiter if config.fidelity else 200,
+        },
     }
+    if timeout_seconds is not None:
+        optimize_kwargs["timeout_sec"] = timeout_seconds
     if fixed_features_list:
         candidates, current_value = optimize_acqf_mixed(
             **optimize_kwargs,
@@ -256,6 +262,7 @@ def optimize_qmf_kg(
     batch_size: int = 1,
     model_dim: int,
     fixed_features_list: list[dict[int, float]] | None = None,
+    timeout_seconds: float | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, str]:
     """Optimize qMFKG in unit-cube model space."""
     bounds = torch.tensor(
@@ -277,9 +284,14 @@ def optimize_qmf_kg(
         "q": batch_size,
         "num_restarts": config.bo.num_restarts,
         "raw_samples": config.bo.raw_samples,
-        "options": {"batch_limit": 5, "maxiter": 200},
+        "options": {
+            "batch_limit": 5,
+            "maxiter": config.fidelity.optimizer_maxiter if config.fidelity else 200,
+        },
         "ic_generator": gen_one_shot_kg_initial_conditions,
     }
+    if timeout_seconds is not None:
+        optimize_kwargs["timeout_sec"] = timeout_seconds
     if fixed_features_list:
         with warnings.catch_warnings():
             # BoTorch's joint post-selection KG evaluation standardizes a

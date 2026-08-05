@@ -1,5 +1,30 @@
 # 📝 BO Forge Changelog
 
+## v2.4.1 - qMFKG Performance And Startup Hardening
+
+This patch adds opt-in qMFKG runtime limits and removes unnecessary optimizer
+imports from lightweight package and CLI operations. Existing configs keep the
+v2.4.0 numerical behavior when the new settings are omitted.
+
+- Adds optional `fidelity.optimizer_maxiter`, defaulting to `200`.
+- Adds optional `fidelity.optimizer_timeout_seconds`, with no timeout by
+  default.
+- Uses one acquisition deadline across target-fidelity posterior-mean
+  optimization and all candidate retries after model fitting.
+- Passes the remaining timeout budget and configured iteration limit into the
+  existing continuous and discrete BoTorch optimization routes.
+- Keeps timeout failures non-mutating and reports a clear `SuggestionError`
+  when no valid batch is available by the deadline; candidates returned after
+  the shared deadline are rejected.
+- Documents that BoTorch initial-condition generation and an in-flight
+  optimizer call are cooperative rather than immediately cancellable, so a
+  timeout error can return after the configured wall-clock limit.
+- Lazily resolves heavy top-level public exports and session operations so
+  version, help, validation, and fidelity-summary paths avoid Torch, BoTorch,
+  GPyTorch, Matplotlib, Streamlit, and FastAPI imports.
+- Adds Streamlit creation controls and Suggest-panel runtime settings without
+  changing staged append or CSV safety behavior.
+
 ## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG
 
 This release opens v2.4.x by extending the existing single-objective qMFKG

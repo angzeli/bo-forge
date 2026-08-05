@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 import bo_forge.suggestions as suggestions_module
 from bo_forge.config import CampaignConfig
+from bo_forge.errors import SuggestionError
+from bo_forge.session import CampaignSession
 from bo_forge.transforms import values_to_unit_cube
 from bo_forge_app import api_cli
 from bo_forge_app.api import create_app
@@ -76,7 +78,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.4.0"
+    assert payload["version"] == "2.4.1"
     assert payload["experimental"] is True
 
 
@@ -209,6 +211,36 @@ def test_api_discrete_qmfkg_rejects_batch_above_four_without_mutation(
 
     assert response.status_code == 400
     assert "batch_size from 1 through 4" in response.json()["error"]["message"]
+    assert log_path.read_bytes() == before
+
+
+def test_api_translates_qmfkg_timeout_without_mutating_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "22_discrete_multi_fidelity_qmfkg.yaml",
+        "22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    def fail_suggest(*_args: object, **_kwargs: object) -> pd.DataFrame:
+        raise SuggestionError("qMFKG acquisition optimization timed out")
+
+    monkeypatch.setattr(CampaignSession, "suggest_next", fail_suggest)
+
+    response = client(tmp_path).post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 1},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == {
+        "code": "bo_forge_error",
+        "message": "qMFKG acquisition optimization timed out",
+    }
     assert log_path.read_bytes() == before
 
 
