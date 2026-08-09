@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.4.2`. The v2.4.2 release adds read-only fidelity coverage
-and target-fidelity progress diagnostics while preserving the v2.4.1 runtime
-controls, lightweight startup, and qMFKG numerical behavior. Broader fidelity
-combinations remain deferred.
+Current baseline: `v2.4.3`. The v2.4.3 release closes the v2.4.x line with
+regression hardening, tutorial alignment, documentation cleanup, and package
+verification while preserving qMFKG numerical behavior and schemas. Broader
+fidelity combinations remain deferred.
 
 ## Roadmap So Far
 
@@ -49,22 +49,16 @@ flowchart LR
     v24 -.-> v242
     v24 -.-> v243
 
-    class v10,v20,v21,v22,v23 majorDone
-    class v24 majorActive
+    class v20,v21,v22,v23,v24 majorDone
     class v25 majorFuture
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
-    class v240,v241 patchDone
-    class v242 patchActive
-    class v243 patchFuture
+    class v240,v241,v242,v243 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
-    classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
-    classDef patchActive fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
-    classDef patchFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:1.5px,color:#111827;
 ```
 
 ## v2.0.x - Stable v2 Baseline
@@ -140,7 +134,7 @@ Status: completed
 
 ## v2.4.x - Multi-Fidelity Expansion
 
-Status: active
+Status: completed
 
 - `v2.4.0` adds ordered numeric fidelity levels and qMFKG batches from one through four,
   plus exact-level diagnostics, Streamlit creation controls, and example 22.
@@ -148,7 +142,11 @@ Status: active
   boundaries without changing the default qMFKG numerical path.
 - `v2.4.2` adds read-only fidelity coverage tables and target-fidelity progress
   plots across Python, CLI, reports, Streamlit, service, and API summary views.
-- `v2.4.3` is reserved for release closeout and regression hardening.
+- `v2.4.2` adds no fidelity schema keys and tightens rejection of numerically
+  ambiguous ordered levels so each row belongs to at most one level.
+- `v2.4.3` closes the line with behavior-freeze coverage, tutorial alignment,
+  documentation cleanup, and final package verification without changing BO
+  capability or schemas.
 - Preserve continuous-fidelity YAML and CSV compatibility.
 - Keep named fidelity sources, per-level costs, and batches above four deferred.
 - Revisit stage/fidelity and context/fidelity interactions only after the

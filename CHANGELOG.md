@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v2.4.3 - Multi-Fidelity Release Closeout
+
+This closeout patch freezes the completed v2.4.x multi-fidelity contracts,
+aligns the discrete qMFKG tutorial with the fidelity coverage and progress
+diagnostics, and refreshes release/package checks. It adds no BO capability,
+configuration key, CSV column, command, plot kind, endpoint, or supported
+feature combination.
+
+- Adds a compact continuous/discrete behavior-freeze matrix for initial and
+  model-based qMFKG batches of one, two, and four.
+- Locks canonical schemas, deterministic initial/model-based routes, batch
+  metadata, and read-only summary/coverage/report behavior; the API regression
+  suite separately verifies JSON-safe sparse coverage values.
+- Adds an opt-in isolated dependency-resolution probe for core, app, API, and
+  source-distribution release installs, including `pip check`.
+- Updates notebook 22 to demonstrate `fidelity_summary()`,
+  `fidelity_coverage()`, `plot_fidelity_diagnostics()`, and
+  `plot_fidelity_progress()` in its existing batched 15-observation workflow.
+- Marks v2.4.x complete while leaving broader fidelity combinations deferred.
+
 ## v2.4.2 - Multi-Fidelity Diagnostic Polish
 
 This read-only diagnostics patch adds fidelity-level coverage and target-fidelity
@@ -17,6 +37,8 @@ suggestions, or supported campaign combinations.
 - Includes Fidelity Coverage in reports, Streamlit Data/Reports, the app service,
   and the additive experimental API summary payload.
 - Keeps the existing Fidelity Summary and Fidelity Diagnostics contracts unchanged.
+- Adds no fidelity schema keys; it tightens validation so numerically ambiguous
+  ordered levels and row values are rejected instead of being grouped twice.
 
 ## v2.4.1 - qMFKG Performance And Startup Hardening
 

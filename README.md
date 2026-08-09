@@ -1,11 +1,10 @@
-# 🧪 BO Forge v2.4.2
+# 🧪 BO Forge v2.4.3
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.4.2 adds read-only fidelity coverage and target-fidelity progress diagnostics
-for continuous and ordered-discrete qMFKG campaigns. It keeps the v2.4.1
-runtime controls, lightweight startup boundaries, optimizer behavior, config,
-and CSV schemas unchanged.
+v2.4.3 closes the v2.4.x multi-fidelity line with regression hardening,
+tutorial alignment, documentation cleanup, and final package verification. It
+keeps the v2.4.2 diagnostics, qMFKG behavior, config, and CSV schemas unchanged.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -250,7 +249,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.4.2 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.4.3 environment is recorded in `requirements-lock.txt`.
 
 ---
 

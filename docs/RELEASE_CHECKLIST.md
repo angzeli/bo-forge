@@ -73,6 +73,11 @@ Confirm:
   `examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`, and
   `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb` validate and are
   included in the source distribution.
+- Notebook 22 remains output-free, targets 15 observed rows, and demonstrates
+  fidelity summary, coverage, diagnostics, progress, and batched observation
+  updates.
+- The v2.4.3 behavior-freeze matrix covers continuous/discrete initial and
+  mocked model-based qMFKG batches for `q=1`, `q=2`, and `q=4`.
 
 ## 📦 Build
 
@@ -92,13 +97,23 @@ Package-data boundary:
 
 `twine check` is the README/PyPI rendering gate.
 
+The normal test suite uses the already-installed development dependencies for
+fast artifact-boundary checks. Before publishing, run the same distribution
+test in isolated environments with normal dependency resolution and `pip check`:
+
+```bash
+BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES=1 ./.venv/bin/python -m pytest \
+  tests/test_release_readiness.py::test_built_distributions_install_from_outside_source_tree \
+  -p no:cacheprovider
+```
+
 ## 🧪 Fresh Core Wheel Smoke
 
 Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.2-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.3-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -115,7 +130,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.2-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.3-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -132,7 +147,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.2-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.3-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -145,7 +160,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.2.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.3.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -219,8 +234,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.4.2`.
-- Tag the release as `v2.4.2`.
+  install paths, and the release tag all agree on `v2.4.3`.
+- Tag the release as `v2.4.3`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

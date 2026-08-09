@@ -107,7 +107,9 @@ def test_discrete_multi_fidelity_notebook_uses_v240_assets() -> None:
     source = notebook_source(DISCRETE_MULTI_FIDELITY_NOTEBOOK)
 
     assert "fidelity_summary()" in source
+    assert "fidelity_coverage()" in source
     assert "plot_fidelity_diagnostics" in source
+    assert "plot_fidelity_progress" in source
     assert "configs' / '22_discrete_multi_fidelity_qmfkg.yaml" in source
     assert "examples' / '22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in source
     assert "TARGET_OBSERVED_ROWS = 15" in source

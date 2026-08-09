@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.4.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.4.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -35,6 +35,10 @@ limit. The timeout does not guarantee candidate quality.
 v2.4.2 keeps the compact Fidelity Summary in Overview and adds the wider
 Fidelity Coverage table to Data and Reports. Reports also exposes Fidelity Progress
 lazily alongside the existing Fidelity Diagnostics plot.
+
+v2.4.3 closes the multi-fidelity line with regression and campaign-switch
+coverage. It keeps these tables and plots lazy and adds no Streamlit workflow
+or support-status change.
 
 The completed v1.5.x line closed the Streamlit-facing contextual BO workflow.
 The app can create

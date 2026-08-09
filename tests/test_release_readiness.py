@@ -21,6 +21,7 @@ PYPROJECT = tomllib.loads(
 PROJECT_VERSION = PYPROJECT["project"]["version"]
 SDIST_ROOT = f"bo_forge-{PROJECT_VERSION}"
 DIST_INFO_ROOT = f"bo_forge-{PROJECT_VERSION}.dist-info"
+RELEASE_DEPENDENCY_PROBE_ENV = "BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES"
 
 
 def test_version_and_production_complexity_gate_match_project_metadata() -> None:
@@ -243,8 +244,9 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.4.2" in readme
-    assert "v2.4.2 adds read-only fidelity coverage" in readme
+    assert "# 🧪 BO Forge v2.4.3" in readme
+    assert "v2.4.3 closes the v2.4.x multi-fidelity line" in readme
+    assert "## v2.4.3 - Multi-Fidelity Release Closeout" in changelog
     assert "## v2.4.2 - Multi-Fidelity Diagnostic Polish" in changelog
     assert "## v2.4.1 - qMFKG Performance And Startup Hardening" in changelog
     assert "## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG" in changelog
@@ -279,7 +281,7 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.4.2 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.4.3 provides a local Streamlit workbench" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -373,7 +375,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.4.2",
+        "BO Forge v2.4.3",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -539,8 +541,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.4.2`" in roadmap
-    assert "v2.4.2 release adds read-only fidelity coverage" in roadmap
+    assert "Current baseline: `v2.4.3`" in roadmap
+    assert "v2.4.3 release closes the v2.4.x line" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -559,18 +561,18 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v241["v2.4.1<br/>Performance hardening"]' in roadmap
     assert 'v242["v2.4.2<br/>Diagnostic polish"]' in roadmap
     assert 'v243["v2.4.3<br/>Release closeout"]' in roadmap
-    assert "class v10,v20,v21,v22,v23 majorDone" in roadmap
-    assert "class v24 majorActive" in roadmap
+    assert "class v20,v21,v22,v23,v24 majorDone" in roadmap
     assert "class v25 majorFuture" in roadmap
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
-    assert "class v240,v241 patchDone" in roadmap
-    assert "class v242 patchActive" in roadmap
-    assert "class v243 patchFuture" in roadmap
+    assert "class v240,v241,v242,v243 patchDone" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorFuture" in roadmap
     assert "classDef patchDone" in roadmap
+    assert "classDef majorActive" not in roadmap
+    assert "classDef patchActive" not in roadmap
+    assert "classDef patchFuture" not in roadmap
     assert "v2.0.x - Stable v2 Baseline" in roadmap
     assert "Status: completed" in roadmap
     assert "v2.1.x - Model Profiles And Advanced Surrogates" in roadmap
@@ -597,8 +599,9 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "`v2.3.2` adds contextual replicate-aware group-mean fitting" in roadmap
     assert "`v2.3.3` closes the line with behavior-preserving" in roadmap
     assert "v2.4.x - Multi-Fidelity Expansion" in roadmap
+    assert "`v2.4.3` closes the line" in roadmap
     assert re.search(
-        r"## v2\.4\.x - Multi-Fidelity Expansion\s+Status: active",
+        r"## v2\.4\.x - Multi-Fidelity Expansion\s+Status: completed",
         roadmap,
     )
     assert "ordered numeric fidelity levels" in roadmap
@@ -637,6 +640,8 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "/tmp/bo_forge_app_release_probe/bin/pip check" in checklist
     assert "/tmp/bo_forge_api_release_probe/bin/pip check" in checklist
     assert "/tmp/bo_forge_sdist_release_probe/bin/pip check" in checklist
+    assert "BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES=1" in checklist
+    assert "test_built_distributions_install_from_outside_source_tree" in checklist
     assert "fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
     assert "fidelity-coverage --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
     assert "--kind fidelity-diagnostics" in checklist
@@ -671,7 +676,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.4.2" in requirements_lock
+    assert "BO Forge v2.4.3" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -723,7 +728,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.4.2." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.4.3." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -963,6 +968,7 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
     dist_dir = tmp_path / "dist"
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
+    resolve_dependencies = env.get(RELEASE_DEPENDENCY_PROBE_ENV) == "1"
 
     subprocess.run(
         [
@@ -998,6 +1004,7 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         probe_root=tmp_path / "wheel_probe",
         env=env,
         install_args=[],
+        resolve_dependencies=resolve_dependencies,
     )
     _install_core_only_app_missing_streamlit_probe(
         wheel=wheels[0],
@@ -1008,17 +1015,47 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         wheel=wheels[0],
         probe_root=tmp_path / "app_probe",
         env=env,
+        resolve_dependencies=resolve_dependencies,
     )
     _install_api_extra_and_probe(
         wheel=wheels[0],
         probe_root=tmp_path / "api_probe",
         env=env,
+        resolve_dependencies=resolve_dependencies,
     )
     _install_distribution_and_probe(
         artifact=sdists[0],
         probe_root=tmp_path / "sdist_probe",
         env=env,
         install_args=["--no-build-isolation"],
+        resolve_dependencies=resolve_dependencies,
+    )
+
+
+def test_release_dependency_probe_commands_are_isolated_when_enabled(tmp_path: Path) -> None:
+    venv_dir = tmp_path / "venv"
+    pip = venv_dir / "bin" / "pip"
+    wheel = tmp_path / "bo_forge.whl"
+
+    assert "--system-site-packages" not in _venv_create_command(
+        venv_dir,
+        resolve_dependencies=True,
+    )
+    assert "--no-deps" not in _pip_install_command(
+        pip,
+        wheel,
+        install_args=[],
+        resolve_dependencies=True,
+    )
+    assert "--system-site-packages" in _venv_create_command(
+        venv_dir,
+        resolve_dependencies=False,
+    )
+    assert "--no-deps" in _pip_install_command(
+        pip,
+        wheel,
+        install_args=[],
+        resolve_dependencies=False,
     )
 
 
@@ -1143,30 +1180,45 @@ def _install_distribution_and_probe(
     probe_root: Path,
     env: dict[str, str],
     install_args: list[str],
+    resolve_dependencies: bool,
 ) -> None:
     venv_dir = probe_root / "venv"
     probe_dir = probe_root / "probe"
     probe_dir.mkdir(parents=True)
 
     subprocess.run(
-        [sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)],
+        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
         env=env,
         check=True,
         text=True,
     )
     python = venv_dir / "bin" / "python"
     pip = venv_dir / "bin" / "pip"
+    effective_install_args = list(install_args)
+    if resolve_dependencies:
+        effective_install_args = [
+            argument
+            for argument in effective_install_args
+            if argument != "--no-build-isolation"
+        ]
     install_env = env
-    if "--no-build-isolation" in install_args:
+    if "--no-build-isolation" in effective_install_args:
         install_env = dict(env)
         install_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
     subprocess.run(
-        [str(pip), "install", "--no-deps", *install_args, str(artifact)],
+        _pip_install_command(
+            pip,
+            artifact,
+            install_args=effective_install_args,
+            resolve_dependencies=resolve_dependencies,
+        ),
         cwd=probe_dir,
         env=install_env,
         check=True,
         text=True,
     )
+    if resolve_dependencies:
+        _run_pip_check(pip, probe_dir, env)
     completed = subprocess.run(
         [str(venv_dir / "bin" / "bo-forge"), "--version"],
         cwd=probe_dir,
@@ -1227,12 +1279,13 @@ def _install_app_extra_and_probe(
     wheel: Path,
     probe_root: Path,
     env: dict[str, str],
+    resolve_dependencies: bool,
 ) -> None:
     venv_dir = probe_root / "venv"
     probe_dir = probe_root / "probe"
     probe_dir.mkdir(parents=True)
     subprocess.run(
-        [sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)],
+        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
         env=env,
         check=True,
         text=True,
@@ -1240,12 +1293,19 @@ def _install_app_extra_and_probe(
     python = venv_dir / "bin" / "python"
     pip = venv_dir / "bin" / "pip"
     subprocess.run(
-        [str(pip), "install", "--no-deps", f"{wheel}[app]"],
+        _pip_install_command(
+            pip,
+            f"{wheel}[app]",
+            install_args=[],
+            resolve_dependencies=resolve_dependencies,
+        ),
         cwd=probe_dir,
         env=env,
         check=True,
         text=True,
     )
+    if resolve_dependencies:
+        _run_pip_check(pip, probe_dir, env)
     source_root = str(PROJECT_ROOT.resolve())
     script = f"""
 from pathlib import Path
@@ -1288,12 +1348,13 @@ def _install_api_extra_and_probe(
     wheel: Path,
     probe_root: Path,
     env: dict[str, str],
+    resolve_dependencies: bool,
 ) -> None:
     venv_dir = probe_root / "venv"
     probe_dir = probe_root / "probe"
     probe_dir.mkdir(parents=True)
     subprocess.run(
-        [sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)],
+        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
         env=env,
         check=True,
         text=True,
@@ -1301,15 +1362,23 @@ def _install_api_extra_and_probe(
     python = venv_dir / "bin" / "python"
     pip = venv_dir / "bin" / "pip"
     subprocess.run(
-        [str(pip), "install", "--no-deps", f"{wheel}[api]"],
+        _pip_install_command(
+            pip,
+            f"{wheel}[api]",
+            install_args=[],
+            resolve_dependencies=resolve_dependencies,
+        ),
         cwd=probe_dir,
         env=env,
         check=True,
         text=True,
     )
+    if resolve_dependencies:
+        _run_pip_check(pip, probe_dir, env)
     source_root = str(PROJECT_ROOT.resolve())
     probe_env = dict(env)
-    probe_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
+    if not resolve_dependencies:
+        probe_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
     script = f"""
 from pathlib import Path
 import fastapi
@@ -1336,6 +1405,40 @@ assert uvicorn.__version__
         check=True,
         text=True,
         capture_output=True,
+    )
+
+
+def _venv_create_command(
+    venv_dir: Path,
+    *,
+    resolve_dependencies: bool,
+) -> list[str]:
+    command = [sys.executable, "-m", "venv"]
+    if not resolve_dependencies:
+        command.append("--system-site-packages")
+    return [*command, str(venv_dir)]
+
+
+def _pip_install_command(
+    pip: Path,
+    artifact: str | Path,
+    *,
+    install_args: list[str],
+    resolve_dependencies: bool,
+) -> list[str]:
+    command = [str(pip), "install"]
+    if not resolve_dependencies:
+        command.append("--no-deps")
+    return [*command, *install_args, str(artifact)]
+
+
+def _run_pip_check(pip: Path, cwd: Path, env: dict[str, str]) -> None:
+    subprocess.run(
+        [str(pip), "check"],
+        cwd=cwd,
+        env=env,
+        check=True,
+        text=True,
     )
 
 

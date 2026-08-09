@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -8,6 +9,16 @@ from bo_forge.config import CampaignConfig
 from bo_forge.validation import canonical_columns
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def close_matplotlib_figures_after_test() -> None:
+    """Close figures without importing Matplotlib in lightweight test processes."""
+    yield
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    if pyplot is not None:
+        pyplot.close("all")
+
 
 _SUGGESTION_FIXTURES = {
     "07_cost_aware_human_review_latest_suggestions.csv": (

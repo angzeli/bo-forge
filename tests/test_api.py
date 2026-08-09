@@ -78,7 +78,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.4.2"
+    assert payload["version"] == "2.4.3"
     assert payload["experimental"] is True
 
 
@@ -155,6 +155,34 @@ def test_api_validation_and_summary_accept_multi_fidelity_example(tmp_path: Path
         "latest_observed_iteration",
     ]
     assert payload["fidelity_coverage"]["records"]
+    assert log_path.read_bytes() == before
+
+
+def test_api_fidelity_coverage_serializes_sparse_values_as_json_null(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "22_discrete_multi_fidelity_qmfkg.yaml",
+        "22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    df = pd.read_csv(log_path, keep_default_na=False)
+    target_only = df.loc[pd.to_numeric(df["fidelity"]) == 1.0]
+    target_only.to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    response = client(tmp_path).post("/campaign/summary", json=ref)
+
+    assert response.status_code == 200
+    records = response.json()["fidelity_coverage"]["records"]
+    unused_level = next(record for record in records if record["fidelity"] == 0.25)
+    assert unused_level["objective_mean"] is None
+    assert unused_level["objective_std"] is None
+    assert unused_level["objective_best"] is None
+    assert unused_level["best_row_id"] is None
+    assert unused_level["latest_observed_iteration"] is None
+    assert "NaN" not in response.text
     assert log_path.read_bytes() == before
 
 

@@ -1,8 +1,8 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.4.2 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
-experimental API workflows stable while adding read-only fidelity coverage and
-target-fidelity progress diagnostics to the v2.4 multi-fidelity scope.
+BO Forge v2.4.3 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+experimental API workflows stable while closing the v2.4 multi-fidelity line.
+Capability statuses are unchanged from v2.4.2.
 
 Legend:
 
