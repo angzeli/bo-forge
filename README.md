@@ -1,12 +1,11 @@
-# 🧪 BO Forge v2.4.1
+# 🧪 BO Forge v2.4.2
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.4.1 hardens the v2.4.x multi-fidelity line with opt-in qMFKG optimizer
-limits and lightweight package/CLI startup. Existing configs retain the v2.4.0
-numerical path when the new settings are omitted. Continuous batches use joint
-one-shot optimization. Ordered discrete batches use BoTorch's conditioned greedy mixed optimization
-and report a joint post-selection acquisition value.
+v2.4.2 adds read-only fidelity coverage and target-fidelity progress diagnostics
+for continuous and ordered-discrete qMFKG campaigns. It keeps the v2.4.1
+runtime controls, lightweight startup boundaries, optimizer behavior, config,
+and CSV schemas unchanged.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -26,7 +25,7 @@ BO Forge deliberately supports only:
 - optional cost-aware ranking and human review
 - optional replicate tracking, replicate-derived observation variance, and replicate-aware aggregation
 - optional structured/staged campaign logs with stage-aware validation, explicit stage-aware suggestions, and read-only stage diagnostics
-- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable, optional ordered numeric levels, batches of one through four, and read-only fidelity diagnostics
+- optional single-objective multi-fidelity qMFKG with one continuous fidelity variable, optional ordered numeric levels, batches of one through four, and read-only fidelity coverage/progress diagnostics
 - optional single-objective contextual LogEI/qLogEI with context variables fixed at suggestion time, including review, deterministic cost, and replicate combinations
 - resume from existing logs
 - basic diagnostics, model diagnostics, model-profile comparison plots, Pareto-front plots, and hypervolume progress
@@ -139,8 +138,9 @@ Future interfaces should keep wrapping this backend package rather than moving B
 
 The bundled multi-fidelity example is `configs/15_multi_fidelity_qmfkg.yaml`
 with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`. Inspect it
-with `campaign.fidelity_summary()`, `bo-forge fidelity-summary`, or
-`bo-forge plot --kind fidelity-diagnostics`; the notebook walkthrough is
+with `campaign.fidelity_summary()`, `campaign.fidelity_coverage()`,
+`bo-forge fidelity-summary`, `bo-forge fidelity-coverage`, or the
+`fidelity-diagnostics` and `fidelity-progress` plots; the notebook walkthrough is
 `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
 
 The ordered-discrete and batch qMFKG example is
@@ -148,6 +148,9 @@ The ordered-discrete and batch qMFKG example is
 `examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`. It constrains the
 continuous fidelity variable to four numeric levels and demonstrates qMFKG
 batches through `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
+Continuous batches use joint one-shot optimization; ordered-discrete batches
+use BoTorch's conditioned greedy mixed optimization and report one joint
+post-selection acquisition value.
 qMFKG runtime grows with batch size, fidelity levels, fantasies, restarts, and
 raw samples. Optional `fidelity.optimizer_maxiter` and
 `fidelity.optimizer_timeout_seconds` settings provide a user-selected safety limit;
@@ -247,7 +250,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.4.1 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.4.2 environment is recorded in `requirements-lock.txt`.
 
 ---
 

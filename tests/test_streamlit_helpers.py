@@ -1196,6 +1196,7 @@ def test_available_plot_kinds_follow_config_features() -> None:
         "progress",
         "diagnostics",
         "fidelity_diagnostics",
+        "fidelity_progress",
     ]
     assert available_plot_kinds(context) == [
         "progress",
@@ -2608,6 +2609,38 @@ def test_streamlit_loaded_contextual_campaign_shows_context_inputs() -> None:
     assert "Context Diagnostics" in list(plot_select.options)
 
 
+def test_streamlit_switch_from_fidelity_campaign_clears_fidelity_tables() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file("bo_forge_app/streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/15_multi_fidelity_qmfkg.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/15_multi_fidelity_qmfkg_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
+    app.run(timeout=10)
+    assert any(subheader.value == "Fidelity Coverage" for subheader in app.subheader)
+
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        "configs/01_simple_2d_maximise_logei.yaml"
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        "examples/01_simple_2d_maximise_logei_campaign_log.csv"
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
+    app.run(timeout=10)
+
+    assert not any(subheader.value == "Fidelity Coverage" for subheader in app.subheader)
+    assert len(app.exception) == 0
+
+
 def test_streamlit_context_change_clears_staged_bundle_without_mutation(
     tmp_path: Path,
 ) -> None:
@@ -3005,6 +3038,18 @@ def test_streamlit_app_can_create_multi_fidelity_qmfkg_campaign(tmp_path: Path) 
     assert list(pd.read_csv(log_path, keep_default_na=False).columns) == canonical_columns(config)
 
     assert any(subheader.value == "Fidelity Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Data")
+    app.run(timeout=10)
+    assert any(subheader.value == "Fidelity Coverage" for subheader in app.subheader)
+    assert not any(subheader.value == "Fidelity Summary" for subheader in app.subheader)
+
+    next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Reports")
+    app.run(timeout=10)
+    assert any(subheader.value == "Fidelity Coverage" for subheader in app.subheader)
+    plot_select = next(selectbox for selectbox in app.selectbox if selectbox.label == "Plot kind")
+    assert "Fidelity Diagnostics" in list(plot_select.options)
+    assert "Fidelity Progress" in list(plot_select.options)
 
     next(radio for radio in app.radio if radio.label == "Workbench panel").set_value("Suggest")
     app.run(timeout=10)

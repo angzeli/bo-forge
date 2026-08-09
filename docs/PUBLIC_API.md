@@ -1,8 +1,8 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.4.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.4.2.
 
-Top-level exports are resolved lazily in v2.4.1. Names, signatures, `__all__`,
+Top-level exports are resolved lazily in v2.4.2. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
 does not load optimizer or plotting dependencies.
 
@@ -41,6 +41,7 @@ These names are supported imports from `bo_forge`:
 - `configured_stage_names`
 - `context_summary`
 - `evaluate_cost`
+- `fidelity_coverage`
 - `fidelity_summary`
 - `get_observed_data`
 - `hypervolume`
@@ -77,10 +78,11 @@ campaigns, stage best values use replicate group means; the `best_row_id`
 field contains the best `replicate_group`. Cost-aware structured campaigns and
 automatic stage transitions remain deferred.
 
-Multi-fidelity campaigns expose `FidelityConfig` and `fidelity_summary` through
+Multi-fidelity campaigns expose `FidelityConfig`, `fidelity_summary`, and
+`fidelity_coverage` through
 the top-level package for config construction and read-only inspection.
 `FidelityConfig.levels` optionally constrains the continuous fidelity variable
-to ordered numeric levels. v2.4.1 supports qMFKG batches from one through four.
+to ordered numeric levels. v2.4.2 supports qMFKG batches from one through four.
 `FidelityConfig.optimizer_maxiter` defaults to `200`, while
 `optimizer_timeout_seconds` defaults to `None`; omitting both preserves the
 v2.4.0 numerical path. The timeout is one acquisition deadline after model
@@ -91,6 +93,13 @@ timeout is not a candidate-quality guarantee.
 `fidelity_summary()` appends the fidelity mode, configured levels and level
 counts after its existing fields. Existing continuous summaries keep those
 new level-specific values blank.
+`fidelity_coverage()` returns deterministic per-fidelity observed statistics,
+active suggestion counts, affine modeled evaluation cost, and direction-aware
+best rows without fitting a model or mutating the input data. Continuous values
+remain exact sorted coverage keys; discrete rows map uniquely to configured
+levels. Use
+`CampaignSession.plot_fidelity_progress()` for fidelity-by-iteration and
+target-fidelity best-so-far progress.
 BoTorch-facing helper functions in `bo_forge.multifidelity` remain
 implementation details rather than stable public API.
 
@@ -98,7 +107,7 @@ Contextual campaigns expose `ContextConfig` and `context_summary` through the
 top-level package for config construction and read-only inspection.
 `CampaignConfig.context_variable_names` and
 `CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
-context variables and optimized decision variables. v2.4.1 contextual support
+context variables and optimized decision variables. v2.4.2 contextual support
 is single-objective LogEI/qLogEI only; `bo.acquisition: log_ei` may combine
 with `review.enabled: true`, deterministic `cost:`, replicates, or all three. Use
 `suggest_next(config, df, context_values={...})` or
@@ -115,7 +124,7 @@ columns.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.4.1 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.4.2 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect

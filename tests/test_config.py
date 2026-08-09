@@ -961,6 +961,7 @@ bo:
         ("[0.25, .nan, 1.0]", "1.0", "finite number"),
         ("[0.25, 0.25, 1.0]", "1.0", "strictly increasing"),
         ("[0.5, 0.25, 1.0]", "1.0", "strictly increasing"),
+        ("[0.25, 0.2500000005, 1.0]", "1.0", "separated enough"),
         ("[0.1, 0.5, 1.0]", "1.0", "within.*bounds"),
         ("[0.25, 0.5, 0.75]", "1.0", "highest configured fidelity level"),
     ],
@@ -997,6 +998,36 @@ bo:
     )
 
     with pytest.raises(ConfigError, match=message):
+        CampaignConfig.from_yaml(path)
+
+
+def test_discrete_fidelity_rejects_relative_tolerance_overlap(tmp_path: Path) -> None:
+    path = write_yaml(
+        tmp_path / "campaign.yaml",
+        """
+campaign_name: large_scale_discrete_fidelity
+objective:
+  name: activity
+  direction: maximize
+variables:
+  - name: x
+    type: continuous
+    lower: 0
+    upper: 1
+  - name: fidelity
+    type: continuous
+    lower: 1000000000
+    upper: 1000000010
+fidelity:
+  variable: fidelity
+  target: 1000000010
+  levels: [1000000000, 1000000001, 1000000010]
+bo:
+  acquisition: qmf_kg
+""",
+    )
+
+    with pytest.raises(ConfigError, match="separated enough"):
         CampaignConfig.from_yaml(path)
 
 

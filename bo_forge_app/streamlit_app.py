@@ -1477,9 +1477,9 @@ def _render_data(
     if campaign.config.fidelity is not None:
         _render_table_section(
             st,
-            "Fidelity Summary",
-            _view_data_value(view_data, "fidelity_summary", campaign.fidelity_summary),
-            empty_kind="fidelity_summary",
+            "Fidelity Coverage",
+            _view_data_value(view_data, "fidelity_coverage", campaign.fidelity_coverage),
+            empty_kind="fidelity_coverage",
             expanded_raw=False,
         )
     if campaign.config.context is not None:
@@ -2411,6 +2411,14 @@ def _render_reports(
             ),
         ],
     )
+    if campaign.config.fidelity is not None:
+        _render_table_section(
+            st,
+            "Fidelity Coverage",
+            _view_data_value(view_data, "fidelity_coverage", campaign.fidelity_coverage),
+            empty_kind="fidelity_coverage",
+            expanded_raw=False,
+        )
 
     with st.form("report_actions_form"):
         report_path = Path(

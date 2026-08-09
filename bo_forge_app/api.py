@@ -168,6 +168,8 @@ def create_app(root: str | Path) -> FastAPI:
             "pareto_front": _table_payload(view_data.pareto_front),
             "cost_summary": _table_payload(view_data.cost_summary),
             "replicate_summary": _table_payload(view_data.replicate_summary),
+            "fidelity_summary": _table_payload(view_data.fidelity_summary),
+            "fidelity_coverage": _table_payload(view_data.fidelity_coverage),
             "log_fingerprint": file_fingerprint(service.log_path),
         }
 

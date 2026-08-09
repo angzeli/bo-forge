@@ -1,8 +1,8 @@
-"""BO Forge v2.4.1."""
+"""BO Forge v2.4.2."""
 
 from importlib import import_module
 
-__version__ = "2.4.1"
+__version__ = "2.4.2"
 
 from bo_forge.config import (
     BOConfig,
@@ -56,6 +56,7 @@ __all__ = [
     "configured_stage_names",
     "context_summary",
     "evaluate_cost",
+    "fidelity_coverage",
     "fidelity_summary",
     "get_observed_data",
     "hypervolume",
@@ -87,6 +88,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "context_summary": ("bo_forge.contextual", "context_summary"),
     "evaluate_cost": ("bo_forge.costs", "evaluate_cost"),
     "fidelity_summary": ("bo_forge.multifidelity", "fidelity_summary"),
+    "fidelity_coverage": ("bo_forge.multifidelity", "fidelity_coverage"),
     "get_observed_data": ("bo_forge.validation", "get_observed_data"),
     "hypervolume": ("bo_forge.multi_objective", "hypervolume"),
     "hypervolume_progress": ("bo_forge.multi_objective", "hypervolume_progress"),

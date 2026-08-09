@@ -683,7 +683,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.4.1\n"
+    assert captured.out == "bo-forge 2.4.2\n"
     assert captured.err == ""
 
 
@@ -692,7 +692,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.4.1\n"
+    assert completed.stdout == "bo-forge 2.4.2\n"
     assert completed.stderr == ""
 
 
@@ -2337,6 +2337,23 @@ def test_multi_fidelity_cli_fidelity_summary_outputs_table(
     assert "mf_obs_3" in captured.out
 
 
+def test_multi_fidelity_cli_fidelity_coverage_outputs_table(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+
+    assert run(["fidelity-coverage", *base_args(config_path, log_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert "modeled_evaluation_cost" in captured.out
+    assert "active_suggestions" in captured.out
+    assert "objective_best" in captured.out
+    assert "None" not in captured.out
+
+
 def test_multi_fidelity_cli_translates_qmfkg_timeout_without_mutation(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -2472,6 +2489,25 @@ def test_multi_fidelity_cli_fidelity_summary_rejects_non_fidelity_config(
     captured = capsys.readouterr()
     assert "fidelity-summary requires a multi-fidelity config" in captured.err
 
+    assert run(["fidelity-coverage", *base_args(config_path, log_path)]) == 1
+    captured = capsys.readouterr()
+    assert "fidelity-coverage requires a multi-fidelity config" in captured.err
+
+    output_path = tmp_path / "fidelity_progress.png"
+    assert run(
+        [
+            "plot",
+            *base_args(config_path, log_path),
+            "--kind",
+            "fidelity-progress",
+            "--output",
+            str(output_path),
+        ]
+    ) == 1
+    captured = capsys.readouterr()
+    assert "plot --kind fidelity-progress requires a multi-fidelity config" in captured.err
+    assert not output_path.exists()
+
 
 def test_multi_fidelity_cli_plot_fidelity_diagnostics_writes_output(
     tmp_path: Path,
@@ -2498,6 +2534,31 @@ def test_multi_fidelity_cli_plot_fidelity_diagnostics_writes_output(
 
     captured = capsys.readouterr()
     assert f"Wrote fidelity-diagnostics plot: {output_path}" in captured.out
+    assert output_path.exists()
+
+
+def test_multi_fidelity_cli_plot_fidelity_progress_writes_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_fidelity_config(tmp_path / "fidelity.yaml")
+    cfg = fidelity_config()
+    log_path = write_log(tmp_path / "fidelity.csv", cfg, fidelity_observed_log(cfg))
+    output_path = tmp_path / "reports" / "fidelity_progress.png"
+
+    assert run(
+        [
+            "plot",
+            *base_args(config_path, log_path),
+            "--kind",
+            "fidelity-progress",
+            "--output",
+            str(output_path),
+        ]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert f"Wrote fidelity-progress plot: {output_path}" in captured.out
     assert output_path.exists()
 
 

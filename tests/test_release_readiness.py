@@ -243,8 +243,9 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.4.1" in readme
-    assert "v2.4.1 hardens the v2.4.x multi-fidelity line" in readme
+    assert "# 🧪 BO Forge v2.4.2" in readme
+    assert "v2.4.2 adds read-only fidelity coverage" in readme
+    assert "## v2.4.2 - Multi-Fidelity Diagnostic Polish" in changelog
     assert "## v2.4.1 - qMFKG Performance And Startup Hardening" in changelog
     assert "## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG" in changelog
     assert "## v2.3.3 - Code Quality And Error-Handling Refactor" in changelog
@@ -278,7 +279,9 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.4.1 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.4.2 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "Fidelity Coverage" in streamlit_app_docs
+    assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
     assert "batch sizes from one through four" in streamlit_app_docs
     assert "conditioned greedy mixed optimization" in readme
@@ -370,7 +373,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.4.1",
+        "BO Forge v2.4.2",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -536,8 +539,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.4.1`" in roadmap
-    assert "v2.4.1 release hardens the multi-fidelity" in roadmap
+    assert "Current baseline: `v2.4.2`" in roadmap
+    assert "v2.4.2 release adds read-only fidelity coverage" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -562,9 +565,9 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
-    assert "class v240 patchDone" in roadmap
-    assert "class v241 patchActive" in roadmap
-    assert "class v242,v243 patchFuture" in roadmap
+    assert "class v240,v241 patchDone" in roadmap
+    assert "class v242 patchActive" in roadmap
+    assert "class v243 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorFuture" in roadmap
     assert "classDef patchDone" in roadmap
@@ -635,7 +638,9 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "/tmp/bo_forge_api_release_probe/bin/pip check" in checklist
     assert "/tmp/bo_forge_sdist_release_probe/bin/pip check" in checklist
     assert "fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
+    assert "fidelity-coverage --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
     assert "--kind fidelity-diagnostics" in checklist
+    assert "--kind fidelity-progress" in checklist
     assert "context-summary --config configs/16_contextual_logei.yaml" in checklist
     assert "--kind context-diagnostics" in checklist
     assert "model-summary --config configs/17_model_profile_logei.yaml" in checklist
@@ -666,7 +671,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.4.1" in requirements_lock
+    assert "BO Forge v2.4.2" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -718,7 +723,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.4.1." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.4.2." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -747,14 +752,22 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     common_errors = (PROJECT_ROOT / "docs" / "COMMON_ERRORS.md").read_text(
         encoding="utf-8"
     )
+    public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
+    api_probe = (PROJECT_ROOT / "docs" / "API_PROBE.md").read_text(encoding="utf-8")
 
     for content in (readme, cli_docs, quickstart):
         assert "22_discrete_multi_fidelity_qmfkg" in content
     for content in (readme, quickstart):
         assert "15_multi_fidelity_qmfkg" in content
     assert "fidelity-summary" in cli_docs
+    assert "fidelity-coverage" in cli_docs
     assert "fidelity-diagnostics" in cli_docs
+    assert "fidelity-progress" in cli_docs
     assert "campaign.fidelity_summary()" in quickstart
+    assert "campaign.fidelity_coverage()" in quickstart
+    assert "- `fidelity_coverage`" in public_api
+    assert "CampaignSession.plot_fidelity_progress()" in public_api
+    assert "`fidelity_summary` and `fidelity_coverage`" in api_probe
     assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in quickstart
     assert "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb" in readme
     assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in quickstart
@@ -765,6 +778,9 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     assert "qMFKG supports batch_size from 1 through 4" in common_errors
     assert "fidelity.levels must be" in common_errors
     assert "has off-grid fidelity value" in common_errors
+    assert "has ambiguous fidelity value" in common_errors
+    assert "must match exactly one configured level" in csv_schema
+    assert "maps each row to exactly one configured level" in csv_schema
 
 
 def test_contextual_docs_reference_example_and_context_contract() -> None:

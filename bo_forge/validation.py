@@ -8,7 +8,7 @@ from dataclasses import replace
 
 import pandas as pd
 
-from bo_forge.config import CampaignConfig, VariableConfig
+from bo_forge.config import CampaignConfig, VariableConfig, fidelity_values_match
 from bo_forge.constraints import constraint_variable_names, constraint_violations_for_row
 from bo_forge.errors import LogValidationError
 
@@ -359,18 +359,25 @@ def _validate_fidelity_levels(config: CampaignConfig, df: pd.DataFrame) -> None:
     fidelity_name = config.fidelity.variable
     levels = config.fidelity.levels
     numeric = pd.to_numeric(df[fidelity_name], errors="coerce")
-    valid = numeric.map(
-        lambda value: any(
-            math.isclose(float(value), level, rel_tol=1e-9, abs_tol=1e-9)
-            for level in levels
-        )
+    matching_levels = numeric.map(
+        lambda value: tuple(level for level in levels if fidelity_values_match(value, level))
     )
-    if (~valid).any():
-        row_id = str(df.loc[~valid, "row_id"].iloc[0])
-        value = df.loc[~valid, fidelity_name].iloc[0]
+    off_grid = matching_levels.map(len) == 0
+    if off_grid.any():
+        row_id = str(df.loc[off_grid, "row_id"].iloc[0])
+        value = df.loc[off_grid, fidelity_name].iloc[0]
         raise LogValidationError(
             f"Row '{row_id}' has off-grid fidelity value for variable "
             f"'{fidelity_name}': value={value!r}, allowed={list(levels)}."
+        )
+    ambiguous = matching_levels.map(len) > 1
+    if ambiguous.any():
+        row_id = str(df.loc[ambiguous, "row_id"].iloc[0])
+        value = df.loc[ambiguous, fidelity_name].iloc[0]
+        matches = list(matching_levels.loc[ambiguous].iloc[0])
+        raise LogValidationError(
+            f"Row '{row_id}' has ambiguous fidelity value for variable "
+            f"'{fidelity_name}': value={value!r}, matching_levels={matches}."
         )
 
 
@@ -886,7 +893,7 @@ def _normalise_design_value(
         return normalised
     numeric = float(normalised)
     for level in config.fidelity.levels:
-        if math.isclose(numeric, level, rel_tol=1e-9, abs_tol=1e-9):
+        if fidelity_values_match(numeric, level):
             return round(level, 12)
     return normalised
 

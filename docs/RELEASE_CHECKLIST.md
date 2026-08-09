@@ -12,12 +12,16 @@ Use this checklist before publishing a GitHub release or PyPI package.
 ./.venv/bin/python -m bo_forge validate --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
 ./.venv/bin/python -m bo_forge suggest --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m bo_forge fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
+./.venv/bin/python -m bo_forge fidelity-coverage --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv
 ./.venv/bin/python -m bo_forge plot --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv --kind fidelity-diagnostics --output /tmp/bo_forge_fidelity_diagnostics.png
+./.venv/bin/python -m bo_forge plot --config configs/15_multi_fidelity_qmfkg.yaml --log examples/15_multi_fidelity_qmfkg_campaign_log.csv --kind fidelity-progress --output /tmp/bo_forge_fidelity_progress.png
 ./.venv/bin/python -m bo_forge validate --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 ./.venv/bin/python -m bo_forge suggest --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv --batch-size 2
 ./.venv/bin/python -m bo_forge suggest --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv --batch-size 4
 ./.venv/bin/python -m bo_forge fidelity-summary --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
+./.venv/bin/python -m bo_forge fidelity-coverage --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 ./.venv/bin/python -m bo_forge plot --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv --kind fidelity-diagnostics --output /tmp/bo_forge_discrete_fidelity_diagnostics.png
+./.venv/bin/python -m bo_forge plot --config configs/22_discrete_multi_fidelity_qmfkg.yaml --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv --kind fidelity-progress --output /tmp/bo_forge_discrete_fidelity_progress.png
 ./.venv/bin/python -m bo_forge validate --config configs/16_contextual_logei.yaml --log examples/16_contextual_logei_campaign_log.csv
 ./.venv/bin/python -m bo_forge suggest --config configs/16_contextual_logei.yaml --log examples/16_contextual_logei_campaign_log.csv --context feedstock_acidity=0.25 --batch-size 1
 ./.venv/bin/python -m bo_forge context-summary --config configs/16_contextual_logei.yaml --log examples/16_contextual_logei_campaign_log.csv
@@ -44,7 +48,7 @@ Confirm:
 - `docs/CAPABILITY_MATRIX.md` lists supported, read-only, rejected, and deferred workflow combinations.
 - `docs/STREAMLIT_DEPLOYMENT.md` describes local-only, trusted-LAN, SSH/VPN, and authenticated reverse-proxy modes.
 - subprocess import-boundary tests prove package import, version, help,
-  validation, and fidelity-summary avoid Torch, BoTorch, GPyTorch, Matplotlib,
+  validation, fidelity-summary, and fidelity-coverage avoid Torch, BoTorch, GPyTorch, Matplotlib,
   Streamlit, and FastAPI;
 - `docs/PERFORMANCE_BENCHMARKS.md` records five-run warm-cache startup and
   representative qMFKG `q=1/2/4` medians without machine-dependent CI
@@ -94,7 +98,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.1-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.2-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -111,7 +115,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.1-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.2-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -128,7 +132,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.1-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.2-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -141,7 +145,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.1.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.2.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -215,8 +219,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.4.1`.
-- Tag the release as `v2.4.1`.
+  install paths, and the release tag all agree on `v2.4.2`.
+- Tag the release as `v2.4.2`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

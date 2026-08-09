@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.4.1 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.4.2 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.4.1 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.4.2 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -290,7 +290,7 @@ fidelity:
 
 ### `fidelity cannot be combined with ...`
 
-v2.4.1 multi-fidelity support remains deliberately conservative.
+v2.4.2 multi-fidelity support remains deliberately conservative.
 
 Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `context:`,
 `cost:`, or `replicates.enabled: true`. Multi-objective, structured,
@@ -299,7 +299,7 @@ deferred.
 
 ### `qMFKG supports batch_size from 1 through 4`
 
-v2.4.1 supports qMFKG batches up to four candidates. Larger batches are
+v2.4.2 supports qMFKG batches up to four candidates. Larger batches are
 intentionally rejected because runtime and memory grow quickly. Continuous
 batches use joint one-shot optimization; ordered discrete batches use
 conditioned greedy mixed optimization.
@@ -323,11 +323,12 @@ Forge reports the timeout. Failed suggestions do not mutate the CSV.
 ### `fidelity.levels must be ...`
 
 Ordered discrete fidelity requires at least two finite, strictly increasing
-levels inside the fidelity variable bounds. The highest level must equal
-`fidelity.target`.
+levels inside the fidelity variable bounds. Adjacent levels must also be far
+enough apart that the `1e-9` CSV matching tolerance cannot overlap. The highest
+level must equal `fidelity.target`.
 
-Fix: sort and deduplicate the numeric levels, keep them in bounds, and set the
-target to the final level.
+Fix: sort and deduplicate the numeric levels, separate near-equal levels, keep
+them in bounds, and set the target to the final level.
 
 ### `has off-grid fidelity value`
 
@@ -336,6 +337,15 @@ A discrete-fidelity config was loaded with a CSV value that is not one of
 
 Fix: correct the CSV fidelity value to a configured level. Config-aware append
 and observation paths reject this before writing.
+
+### `has ambiguous fidelity value`
+
+A discrete-fidelity CSV value matched more than one configured level within the
+numeric tolerance. BO Forge rejects the row because coverage, duplicate checks,
+and diagnostics require one unambiguous level.
+
+Fix: use the exact configured fidelity level. If the configured levels are too
+close to distinguish, separate them and validate the YAML again.
 
 ## 🧾 CSV Schema Errors
 

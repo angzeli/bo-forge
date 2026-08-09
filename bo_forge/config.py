@@ -29,6 +29,23 @@ RESERVED_COLUMNS = {
     "utility",
 }
 RESERVED_COLUMN_PREFIXES = ("predicted_mean_", "predicted_std_")
+FIDELITY_MATCH_REL_TOL = 1e-9
+FIDELITY_MATCH_ABS_TOL = 1e-9
+
+
+def fidelity_values_match(left: object, right: object) -> bool:
+    """Return whether two fidelity values match under the public CSV tolerance."""
+    try:
+        left_value = float(left)
+        right_value = float(right)
+    except (TypeError, ValueError):
+        return False
+    return math.isclose(
+        left_value,
+        right_value,
+        rel_tol=FIDELITY_MATCH_REL_TOL,
+        abs_tol=FIDELITY_MATCH_ABS_TOL,
+    )
 
 
 @dataclass(frozen=True)
@@ -684,6 +701,17 @@ def _parse_fidelity_levels(
         for previous, current in zip(levels, levels[1:], strict=False)
     ):
         raise ConfigError("fidelity.levels must be strictly increasing.")
+    for previous, current in zip(levels, levels[1:], strict=False):
+        matching_radius = max(
+            FIDELITY_MATCH_ABS_TOL,
+            FIDELITY_MATCH_REL_TOL * max(abs(previous), abs(current)),
+        )
+        if current - previous <= 2 * matching_radius:
+            raise ConfigError(
+                "fidelity.levels must be separated enough to map CSV values "
+                "unambiguously under the 1e-9 numeric tolerance: "
+                f"levels={previous:g}, {current:g}."
+            )
     assert variable.lower is not None and variable.upper is not None
     outside = [
         level
@@ -695,7 +723,7 @@ def _parse_fidelity_levels(
             f"fidelity.levels must stay within variable '{variable.name}' bounds: "
             f"outside={outside}, lower={variable.lower:g}, upper={variable.upper:g}."
         )
-    if not math.isclose(levels[-1], target, rel_tol=1e-9, abs_tol=1e-9):
+    if not fidelity_values_match(levels[-1], target):
         raise ConfigError(
             "fidelity.target must equal the highest configured fidelity level: "
             f"target={target:g}, highest_level={levels[-1]:g}."

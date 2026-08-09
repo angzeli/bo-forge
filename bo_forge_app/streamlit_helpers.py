@@ -523,6 +523,10 @@ def empty_state_message(kind: str) -> tuple[str, str]:
             "No fidelity summary available.",
             "Fidelity summaries appear only when a fidelity section is configured.",
         ),
+        "fidelity_coverage": (
+            "No fidelity coverage available.",
+            "Observed or active fidelity values will appear here.",
+        ),
         "context_summary": (
             "No context summary available.",
             "Context summaries appear only when a context section is configured.",
@@ -632,6 +636,7 @@ def available_plot_kinds(config: CampaignConfig) -> list[str]:
         kinds.append("stage_diagnostics")
     if config.fidelity is not None:
         kinds.append("fidelity_diagnostics")
+        kinds.append("fidelity_progress")
     if config.context is not None:
         kinds.append("context_diagnostics")
     if config.bo.acquisition == "qlog_nei":

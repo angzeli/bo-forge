@@ -23,6 +23,10 @@ from bo_forge.multi_objective import (
     multi_objective_observed_data,
     pareto_front,
 )
+from bo_forge.multifidelity import (
+    _active_fidelity_suggestions,
+    _is_target_fidelity,
+)
 from bo_forge.noisy import qlog_nei_summary
 from bo_forge.plot_style import (
     add_legend,
@@ -448,6 +452,155 @@ def plot_fidelity_diagnostics(
     add_legend(count_ax)
     fig.suptitle(
         f"{config.campaign_name}: fidelity diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        color="black",
+    )
+    return finalise_axes(
+        fig,
+        axes,
+        filename=filename,
+        fig_folder=fig_folder,
+        save_path=save_path,
+        show=show,
+        tick_label_size=10,
+    )
+
+
+def plot_fidelity_progress(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    *,
+    filename: str | Path | None = None,
+    fig_folder: str | Path = "figures",
+    save_path: str | Path | None = None,
+    show: bool = False,
+):
+    """Plot fidelity usage and target-fidelity objective progress by iteration."""
+    validate_campaign_data(config, df)
+    if config.fidelity is None:
+        raise ValueError("plot_fidelity_progress() requires a config with fidelity.")
+
+    observed = get_observed_data(config, df)
+    active = _active_fidelity_suggestions(config, df)
+    fidelity_name = config.fidelity.variable
+    objective = config.objective.name
+    target = float(config.fidelity.target)
+
+    configure_plot_style()
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(14, 5.5),
+        facecolor="white",
+        constrained_layout=True,
+    )
+    fidelity_ax, objective_ax = axes
+
+    if observed.empty:
+        fidelity_ax.text(
+            0.5,
+            0.5,
+            "No observed fidelity data yet.",
+            ha="center",
+            va="center",
+            transform=fidelity_ax.transAxes,
+        )
+    else:
+        qmfkg = observed["source"].astype(str) == "qmf_kg"
+        initial_or_manual = observed.loc[~qmfkg]
+        qmfkg_observed = observed.loc[qmfkg]
+        if not initial_or_manual.empty:
+            fidelity_ax.scatter(
+                pd.to_numeric(initial_or_manual["iteration"]),
+                pd.to_numeric(initial_or_manual[fidelity_name]),
+                color="#2563eb",
+                marker="o",
+                label="manual / initial observed",
+            )
+        if not qmfkg_observed.empty:
+            fidelity_ax.scatter(
+                pd.to_numeric(qmfkg_observed["iteration"]),
+                pd.to_numeric(qmfkg_observed[fidelity_name]),
+                color="#059669",
+                marker="s",
+                label="qMFKG observed",
+            )
+    if not active.empty:
+        fidelity_ax.scatter(
+            pd.to_numeric(active["iteration"]),
+            pd.to_numeric(active[fidelity_name]),
+            facecolors="none",
+            edgecolors="#dc2626",
+            linewidths=1.5,
+            marker="o",
+            label="active suggestions",
+        )
+    fidelity_ax.axhline(
+        target,
+        color="#d97706",
+        linestyle="--",
+        linewidth=2,
+        label=f"target fidelity = {target:g}",
+    )
+    if config.fidelity.levels is not None:
+        fidelity_ax.set_yticks(list(config.fidelity.levels))
+    set_title(fidelity_ax, "Fidelity by iteration")
+    set_axis_labels(fidelity_ax, "Campaign iteration", fidelity_name)
+    add_legend(fidelity_ax)
+
+    if observed.empty:
+        target_observed = observed
+    else:
+        target_mask = pd.to_numeric(observed[fidelity_name]).map(
+            lambda value: _is_target_fidelity(value, target)
+        )
+        target_observed = observed.loc[target_mask].copy()
+    if target_observed.empty:
+        objective_ax.text(
+            0.5,
+            0.5,
+            "No target-fidelity observations yet.",
+            ha="center",
+            va="center",
+            transform=objective_ax.transAxes,
+        )
+    else:
+        iterations = pd.to_numeric(target_observed["iteration"])
+        objective_values = pd.to_numeric(target_observed[objective])
+        objective_ax.scatter(
+            iterations,
+            objective_values,
+            color="#2563eb",
+            alpha=0.85,
+            label="target-fidelity observed",
+        )
+        per_iteration = (
+            target_observed.assign(
+                _iteration=iterations,
+                _objective=objective_values,
+            )
+            .groupby("_iteration", sort=True)["_objective"]
+            .agg("max" if config.objective.direction == "maximize" else "min")
+        )
+        best_so_far = (
+            per_iteration.cummax()
+            if config.objective.direction == "maximize"
+            else per_iteration.cummin()
+        )
+        objective_ax.plot(
+            best_so_far.index,
+            best_so_far.values,
+            color="#059669",
+            marker="o",
+            label="best so far",
+        )
+    set_title(objective_ax, "Target-fidelity objective progress")
+    set_axis_labels(objective_ax, "Campaign iteration", objective)
+    add_legend(objective_ax)
+
+    fig.suptitle(
+        f"{config.campaign_name}: fidelity progress",
         fontsize=18,
         fontweight="bold",
         color="black",

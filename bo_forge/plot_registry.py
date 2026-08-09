@@ -21,6 +21,7 @@ _PLOT_ROUTES = {
     "hypervolume": _PlotRoute("Hypervolume", "plot_hypervolume"),
     "stage_diagnostics": _PlotRoute("Stage Diagnostics", "plot_stage_diagnostics"),
     "fidelity_diagnostics": _PlotRoute("Fidelity Diagnostics", "plot_fidelity_diagnostics"),
+    "fidelity_progress": _PlotRoute("Fidelity Progress", "plot_fidelity_progress"),
     "context_diagnostics": _PlotRoute("Context Diagnostics", "plot_context_diagnostics"),
     "qlog_nei_diagnostics": _PlotRoute("qLogNEI Diagnostics", "plot_qlog_nei_diagnostics"),
     "model_diagnostics": _PlotRoute("Model Diagnostics", "plot_model_diagnostics"),

@@ -39,6 +39,7 @@ _SESSION_READ_HELPERS = {
     "suggestion_quality",
     "stage_summary",
     "fidelity_summary",
+    "fidelity_coverage",
     "context_summary",
     "qlog_nei_summary",
     "model_summary",
@@ -97,6 +98,7 @@ class CampaignViewData:
     replicate_summary: pd.DataFrame | None = None
     stage_summary: pd.DataFrame | None = None
     fidelity_summary: pd.DataFrame | None = None
+    fidelity_coverage: pd.DataFrame | None = None
     context_summary: pd.DataFrame | None = None
     qlog_nei_summary: pd.DataFrame | None = None
     model_summary: pd.DataFrame | None = None
@@ -220,6 +222,8 @@ class CampaignAppService:
             readers.append(("stage_summary", "stage_summary"))
         if panel in {"Overview", "Data", "Reports"} and self.config.fidelity is not None:
             readers.append(("fidelity_summary", "fidelity_summary"))
+        if panel in {"Data", "Reports"} and self.config.fidelity is not None:
+            readers.append(("fidelity_coverage", "fidelity_coverage"))
         if panel in {"Overview", "Data", "Reports"} and self.config.context is not None:
             readers.append(("context_summary", "context_summary"))
         if (

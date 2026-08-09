@@ -117,6 +117,23 @@ assert code == 0
     assert result["blocked"] == []
 
 
+def test_fidelity_coverage_path_avoids_heavy_dependencies() -> None:
+    result = _blocked_probe(
+        """
+from bo_forge import fidelity_coverage
+from bo_forge.cli import run
+assert callable(fidelity_coverage)
+code = run([
+    "fidelity-coverage",
+    "--config", "configs/22_discrete_multi_fidelity_qmfkg.yaml",
+    "--log", "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
+])
+assert code == 0
+"""
+    )
+    assert result["blocked"] == []
+
+
 def test_lazy_public_exports_preserve_star_import_and_dir() -> None:
     result = _probe(
         """

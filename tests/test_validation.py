@@ -235,6 +235,40 @@ def test_discrete_fidelity_rejects_off_grid_log_value() -> None:
         validate_campaign_data(cfg, df)
 
 
+def test_discrete_fidelity_rejects_value_matching_multiple_levels() -> None:
+    base = fidelity_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=base.objective,
+        variables=(
+            base.variables[0],
+            VariableConfig("fidelity", "continuous", 0.0, 1.0),
+        ),
+        bo=base.bo,
+        fidelity=FidelityConfig(
+            variable="fidelity",
+            target=1.8e-9,
+            levels=(0.0, 1.8e-9),
+        ),
+    )
+    row = {
+        "row_id": "ambiguous_grid",
+        "iteration": 0,
+        "status": "observed",
+        "source": "manual",
+        "x": 0.5,
+        "fidelity": 0.9e-9,
+        "activity": 1.0,
+        "predicted_mean": "",
+        "predicted_std": "",
+        "acquisition": "",
+    }
+    df = pd.DataFrame([row], columns=canonical_columns(cfg))
+
+    with pytest.raises(LogValidationError, match="ambiguous fidelity value"):
+        validate_campaign_data(cfg, df)
+
+
 def test_discrete_fidelity_design_keys_canonicalize_values_within_grid_tolerance() -> None:
     cfg = discrete_fidelity_config()
     row = {

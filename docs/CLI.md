@@ -237,11 +237,21 @@ bo-forge fidelity-summary \
   --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
   --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
+bo-forge fidelity-coverage \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
+
 bo-forge plot \
   --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
   --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
   --kind fidelity-diagnostics \
   --output reports/22_discrete_multi_fidelity_diagnostics.png
+
+bo-forge plot \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
+  --kind fidelity-progress \
+  --output reports/22_discrete_multi_fidelity_progress.png
 ```
 
 Continuous-fidelity batches use joint one-shot optimization. Ordered
@@ -458,6 +468,7 @@ bo-forge plot \
 | `bo-forge replicate-summary --config PATH --log PATH` | Print group-level replicate counts, mean, std, SEM, min, and max. |
 | `bo-forge stage-summary --config PATH --log PATH` | Print structured stage counts, active/inactive variables, warnings, and transition-readiness guidance. |
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
+| `bo-forge fidelity-coverage --config PATH --log PATH` | Print per-fidelity modeled cost, observed statistics, active suggestion counts, and direction-aware best rows. |
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
 | `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and process-local latest fit metadata when available. |
 | `bo-forge model-compare --config PATH --log PATH [--profile NAME ...]` | Compare model profiles on current observed fitting rows without changing CSV logs or the configured profile. |
@@ -469,7 +480,7 @@ bo-forge plot \
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |
-| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|model-diagnostics\|model-comparison\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|context-diagnostics\|qlog-nei-diagnostics --output PATH` | Export one progress, diagnostics, model-diagnostics, model-comparison, cost-progress, replicate-summary, Pareto, Pareto-parallel, hypervolume, structured stage-diagnostics, fidelity-diagnostics, context-diagnostics, or qLogNEI diagnostics figure. |
+| `bo-forge plot --config PATH --log PATH --kind progress\|diagnostics\|model-diagnostics\|model-comparison\|cost-progress\|replicates\|pareto\|pareto-parallel\|hypervolume\|stage-diagnostics\|fidelity-diagnostics\|fidelity-progress\|context-diagnostics\|qlog-nei-diagnostics --output PATH` | Export one supported campaign figure, including fidelity-distribution diagnostics or target-fidelity progress. |
 
 ## 🧯 CLI Error Output
 

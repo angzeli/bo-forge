@@ -9,8 +9,21 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from bo_forge.config import CampaignConfig, VariableConfig
+from bo_forge.config import CampaignConfig, VariableConfig, fidelity_values_match
 from bo_forge.validation import get_observed_data, validate_campaign_data
+
+FIDELITY_COVERAGE_COLUMNS = [
+    "fidelity",
+    "is_target",
+    "modeled_evaluation_cost",
+    "observed_rows",
+    "active_suggestions",
+    "objective_mean",
+    "objective_std",
+    "objective_best",
+    "best_row_id",
+    "latest_observed_iteration",
+]
 
 if TYPE_CHECKING:
     from botorch.models.cost import AffineFidelityCostModel
@@ -225,12 +238,125 @@ def fidelity_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(list(values.items()), columns=["field", "value"])
 
 
+def fidelity_coverage(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
+    """Return observed and active-suggestion coverage by fidelity value."""
+    if config.fidelity is None:
+        raise ValueError("fidelity_coverage() requires a config with a fidelity section.")
+    validate_campaign_data(config, df)
+
+    observed = get_observed_data(config, df)
+    active = _active_fidelity_suggestions(config, df)
+    fidelity_name = config.fidelity.variable
+    if config.fidelity.levels is not None:
+        fidelity_values = [float(level) for level in config.fidelity.levels]
+        observed_groups = _discrete_fidelity_groups(observed, fidelity_name, fidelity_values)
+        active_groups = _discrete_fidelity_groups(active, fidelity_name, fidelity_values)
+    else:
+        values = [
+            *pd.to_numeric(observed[fidelity_name]).tolist(),
+            *pd.to_numeric(active[fidelity_name]).tolist(),
+        ]
+        fidelity_values = sorted({float(item) for item in values})
+        observed_groups = pd.to_numeric(observed[fidelity_name])
+        active_groups = pd.to_numeric(active[fidelity_name])
+    if not fidelity_values:
+        return pd.DataFrame(columns=FIDELITY_COVERAGE_COLUMNS)
+
+    variable = fidelity_variable(config)
+    assert variable.lower is not None and variable.upper is not None
+    width = variable.upper - variable.lower
+    objective = config.objective.name
+    rows: list[dict[str, object]] = []
+    for index, fidelity in enumerate(fidelity_values):
+        observed_at_fidelity = observed.loc[observed_groups == fidelity]
+        active_at_fidelity = active.loc[active_groups == fidelity]
+        best = _best_fidelity_row(config, observed_at_fidelity)
+        objective_values = pd.to_numeric(observed_at_fidelity[objective])
+        rows.append(
+            {
+                "fidelity": fidelity,
+                "is_target": (
+                    index == len(fidelity_values) - 1
+                    if config.fidelity.levels is not None
+                    else _is_target_fidelity(fidelity, config.fidelity.target)
+                ),
+                "modeled_evaluation_cost": config.fidelity.fixed_cost
+                + config.fidelity.fidelity_cost_weight
+                * ((fidelity - variable.lower) / width),
+                "observed_rows": len(observed_at_fidelity),
+                "active_suggestions": len(active_at_fidelity),
+                "objective_mean": (
+                    None if observed_at_fidelity.empty else float(objective_values.mean())
+                ),
+                "objective_std": (
+                    None
+                    if len(observed_at_fidelity) < 2
+                    else float(objective_values.std(ddof=1))
+                ),
+                "objective_best": None if best is None else float(best[objective]),
+                "best_row_id": None if best is None else str(best["row_id"]),
+                "latest_observed_iteration": (
+                    None
+                    if observed_at_fidelity.empty
+                    else int(pd.to_numeric(observed_at_fidelity["iteration"]).max())
+                ),
+            }
+        )
+    result = pd.DataFrame(rows, columns=FIDELITY_COVERAGE_COLUMNS)
+    for column in (
+        "objective_mean",
+        "objective_std",
+        "objective_best",
+        "best_row_id",
+        "latest_observed_iteration",
+    ):
+        result[column] = result[column].astype(object)
+    result.loc[result["observed_rows"] == 0, "objective_mean"] = None
+    result.loc[result["observed_rows"] < 2, "objective_std"] = None
+    result.loc[result["observed_rows"] == 0, "objective_best"] = None
+    result.loc[result["observed_rows"] == 0, "best_row_id"] = None
+    result.loc[result["observed_rows"] == 0, "latest_observed_iteration"] = None
+    return result
+
+
+def _active_fidelity_suggestions(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return suggested rows that still represent active experiments."""
+    active = df["status"].astype(str) == "suggested"
+    if config.review.enabled:
+        active &= df["review_status"].isin({"pending", "accepted"})
+    return df.loc[active].copy()
+
+
+def _discrete_fidelity_groups(
+    df: pd.DataFrame,
+    fidelity_name: str,
+    levels: list[float],
+) -> pd.Series:
+    """Map validated discrete-fidelity rows to exactly one configured level."""
+    if df.empty:
+        return pd.Series(index=df.index, dtype=float)
+
+    def matched_level(value: object) -> float:
+        matches = [level for level in levels if fidelity_values_match(value, level)]
+        if len(matches) != 1:
+            raise ValueError(
+                "Discrete fidelity value must match exactly one configured level: "
+                f"value={value!r}, matching_levels={matches}."
+            )
+        return matches[0]
+
+    return pd.to_numeric(df[fidelity_name]).map(matched_level)
+
+
 def _is_target_fidelity(value: object, target: float) -> bool:
     try:
         numeric = float(value)
     except (TypeError, ValueError):
         return False
-    return math.isclose(numeric, target, rel_tol=1e-9, abs_tol=1e-9)
+    return fidelity_values_match(numeric, target)
 
 
 def _best_fidelity_row(

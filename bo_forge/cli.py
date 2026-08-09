@@ -109,6 +109,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(fidelity_summary_parser)
     fidelity_summary_parser.set_defaults(handler=_cmd_fidelity_summary)
 
+    fidelity_coverage_parser = subparsers.add_parser(
+        "fidelity-coverage",
+        help="Print observed and active-suggestion coverage by fidelity value.",
+    )
+    _add_config_log_arguments(fidelity_coverage_parser)
+    fidelity_coverage_parser.set_defaults(handler=_cmd_fidelity_coverage)
+
     context_summary_parser = subparsers.add_parser(
         "context-summary",
         help="Print contextual-campaign summary rows by context combination.",
@@ -238,6 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
             "hypervolume",
             "stage-diagnostics",
             "fidelity-diagnostics",
+            "fidelity-progress",
             "context-diagnostics",
             "qlog-nei-diagnostics",
             "model-diagnostics",
@@ -374,6 +382,15 @@ def _cmd_fidelity_summary(args: argparse.Namespace) -> int:
     if campaign.config.fidelity is None:
         raise ConfigError("fidelity-summary requires a multi-fidelity config.")
     _print_table(campaign.fidelity_summary())
+    return 0
+
+
+def _cmd_fidelity_coverage(args: argparse.Namespace) -> int:
+    campaign = _load_session(args)
+    if campaign.config.fidelity is None:
+        raise ConfigError("fidelity-coverage requires a multi-fidelity config.")
+    coverage = campaign.fidelity_coverage()
+    _print_table(coverage.where(pd.notna(coverage), ""))
     return 0
 
 
@@ -572,9 +589,9 @@ def _validate_cli_plot_request(config: CampaignConfig, kind: str) -> None:
         _validate_multi_objective_plot_request(config, kind)
     if kind == "stage-diagnostics" and not config.is_structured_campaign:
         raise ConfigError("plot --kind stage-diagnostics requires a structured config.")
-    if kind == "fidelity-diagnostics" and config.fidelity is None:
+    if kind in {"fidelity-diagnostics", "fidelity-progress"} and config.fidelity is None:
         raise ConfigError(
-            "plot --kind fidelity-diagnostics requires a multi-fidelity config."
+            f"plot --kind {kind} requires a multi-fidelity config."
         )
     if kind == "context-diagnostics" and config.context is None:
         raise ConfigError("plot --kind context-diagnostics requires a contextual config.")

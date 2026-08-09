@@ -78,7 +78,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.4.1"
+    assert payload["version"] == "2.4.2"
     assert payload["experimental"] is True
 
 
@@ -118,6 +118,8 @@ def test_api_summary_is_json_safe_and_read_only(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["summary"]["columns"] == ["field", "value"]
     assert "records" in payload["observed"]
+    assert payload["fidelity_summary"] == {"columns": [], "records": []}
+    assert payload["fidelity_coverage"] == {"columns": [], "records": []}
     assert log_path.read_bytes() == before
 
 
@@ -137,7 +139,22 @@ def test_api_validation_and_summary_accept_multi_fidelity_example(tmp_path: Path
     assert validation.status_code == 200
     assert validation.json()["validation"]["ok"] is True
     assert summary.status_code == 200
-    assert summary.json()["summary"]["columns"] == ["field", "value"]
+    payload = summary.json()
+    assert payload["summary"]["columns"] == ["field", "value"]
+    assert payload["fidelity_summary"]["columns"] == ["field", "value"]
+    assert payload["fidelity_coverage"]["columns"] == [
+        "fidelity",
+        "is_target",
+        "modeled_evaluation_cost",
+        "observed_rows",
+        "active_suggestions",
+        "objective_mean",
+        "objective_std",
+        "objective_best",
+        "best_row_id",
+        "latest_observed_iteration",
+    ]
+    assert payload["fidelity_coverage"]["records"]
     assert log_path.read_bytes() == before
 
 

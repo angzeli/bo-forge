@@ -501,6 +501,12 @@ class CampaignSession:
 
         return fidelity_summary(self.config, self.df)
 
+    def fidelity_coverage(self) -> pd.DataFrame:
+        """Return observed and active-suggestion coverage by fidelity value."""
+        from bo_forge.multifidelity import fidelity_coverage
+
+        return fidelity_coverage(self.config, self.df)
+
     def context_summary(self) -> pd.DataFrame:
         """Return contextual-campaign summary rows by context combination."""
         from bo_forge.contextual import context_summary
@@ -651,6 +657,12 @@ class CampaignSession:
 
         return _plot_fidelity_diagnostics(self.config, self.df, **kwargs)
 
+    def plot_fidelity_progress(self, **kwargs: Any) -> Any:
+        """Plot fidelity use and target-fidelity objective progress."""
+        from bo_forge.diagnostics import plot_fidelity_progress as _plot_fidelity_progress
+
+        return _plot_fidelity_progress(self.config, self.df, **kwargs)
+
     def plot_context_diagnostics(self, **kwargs: Any) -> Any:
         """Plot observed contextual diagnostics."""
         from bo_forge.diagnostics import (
@@ -726,6 +738,7 @@ def _optional_report_readers(session: CampaignSession) -> list[tuple[str, Any]]:
         options = [
             (config.is_structured_campaign, "stage_summary", session.stage_summary),
             (config.fidelity is not None, "fidelity_summary", session.fidelity_summary),
+            (config.fidelity is not None, "fidelity_coverage", session.fidelity_coverage),
             (config.context is not None, "context_summary", session.context_summary),
             (
                 config.bo.acquisition == "qlog_nei",
@@ -908,6 +921,17 @@ def _format_campaign_report(tables: dict[str, pd.DataFrame]) -> str:
                     )
                 ]
                 if "fidelity_summary" in tables
+                else []
+            ),
+            *(
+                [
+                    "Fidelity Coverage\n-----------------\n\n"
+                    + _format_report_table(
+                        tables["fidelity_coverage"],
+                        "No observed or active fidelity values.",
+                    )
+                ]
+                if "fidelity_coverage" in tables
                 else []
             ),
             *(

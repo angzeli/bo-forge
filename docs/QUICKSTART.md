@@ -189,7 +189,7 @@ The structured tutorial files are:
 ## 🧪 Multi-Fidelity qMFKG
 
 BO Forge supports single-objective qMFKG with either a continuous fidelity
-range or ordered numeric fidelity levels. v2.4.1 supports qMFKG batches
+range or ordered numeric fidelity levels. v2.4.2 supports qMFKG batches
 from one through four:
 
 ```yaml
@@ -243,11 +243,21 @@ bo-forge fidelity-summary \
   --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
   --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
 
+bo-forge fidelity-coverage \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv
+
 bo-forge plot \
   --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
   --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
   --kind fidelity-diagnostics \
   --output reports/22_discrete_multi_fidelity_diagnostics.png
+
+bo-forge plot \
+  --config configs/22_discrete_multi_fidelity_qmfkg.yaml \
+  --log examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv \
+  --kind fidelity-progress \
+  --output reports/22_discrete_multi_fidelity_progress.png
 ```
 
 From Python:
@@ -258,6 +268,7 @@ campaign = CampaignSession.from_files(
     "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
 )
 campaign.fidelity_summary()
+campaign.fidelity_coverage()
 ```
 
 The continuous baseline and discrete/batch tutorial notebooks are:
@@ -328,7 +339,7 @@ their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
 `notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
 create `Campaign kind = Contextual LogEI` configs with selected context
-variables and optional defaults. In v2.4.1, single-objective contextual
+variables and optional defaults. In v2.4.2, single-objective contextual
 `bo.acquisition: log_ei` campaigns can combine `context:` with review metadata,
 deterministic `cost:`, replicates, or all three. Contextual active repeats only
 target replicate groups matching the requested context; fitting still uses
@@ -359,7 +370,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.4.1; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.4.2; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -573,7 +584,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.4.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.4.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

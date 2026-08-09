@@ -609,13 +609,24 @@ def test_app_service_fidelity_summary_and_diagnostics_plot_routing(tmp_path: Pat
     )
 
     assert callable(service.fidelity_summary)
+    assert callable(service.fidelity_coverage)
     assert "fidelity_diagnostics" in service.available_plot_kinds()
+    assert "fidelity_progress" in service.available_plot_kinds()
+    assert service.collect_view_data("Overview").fidelity_coverage is None
+    assert service.collect_view_data("Data").fidelity_coverage is not None
+    assert service.collect_view_data("Reports").fidelity_coverage is not None
     plot_path = tmp_path / "plots" / "fidelity_diagnostics.png"
     result = service.plot("fidelity_diagnostics", save_path=plot_path)
 
     assert plot_path.exists()
     assert result.written_path == plot_path
     plt.close(result.figure)
+
+    progress_path = tmp_path / "plots" / "fidelity_progress.png"
+    progress = service.plot("fidelity_progress", save_path=progress_path)
+    assert progress_path.exists()
+    assert progress.written_path == progress_path
+    plt.close(progress.figure)
 
 
 def test_app_service_preserves_qmfkg_timeout_error_and_log_bytes(

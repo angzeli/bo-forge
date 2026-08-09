@@ -789,6 +789,7 @@ def test_fidelity_summary_and_report_include_fidelity_section() -> None:
     )
 
     summary = campaign.fidelity_summary()
+    coverage = campaign.fidelity_coverage()
     report = campaign.report()
     text = session_module._format_campaign_report(report)
 
@@ -798,7 +799,14 @@ def test_fidelity_summary_and_report_include_fidelity_section() -> None:
     assert summary_value(summary, "target_fidelity_observed_rows") == 1
     assert summary_value(summary, "best_observed_row_id") == "mf_seed_3"
     assert "fidelity_summary" in report
+    assert coverage.columns.tolist()[0:3] == [
+        "fidelity",
+        "is_target",
+        "modeled_evaluation_cost",
+    ]
+    assert "fidelity_coverage" in report
     assert "Fidelity Summary\n----------------" in text
+    assert "Fidelity Coverage\n-----------------" in text
 
 
 def test_qmfkg_timeout_before_optimization_leaves_csv_bytes_unchanged(
@@ -852,6 +860,10 @@ def test_fidelity_summary_rejects_non_fidelity_session(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="requires a config with a fidelity section"):
         campaign.fidelity_summary()
+    with pytest.raises(ValueError, match="requires a config with a fidelity section"):
+        campaign.fidelity_coverage()
+    with pytest.raises(ValueError, match="requires a config with fidelity"):
+        campaign.plot_fidelity_progress()
 
 
 def test_context_summary_and_report_include_context_section() -> None:

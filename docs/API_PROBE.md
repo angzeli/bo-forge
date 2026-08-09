@@ -99,6 +99,10 @@ curl -X POST http://127.0.0.1:8765/campaign/summary \
   -d '{"config_path":"configs/01_simple_2d_maximise_logei.yaml","log_path":"examples/01_simple_2d_maximise_logei_campaign_log.csv"}'
 ```
 
+For fidelity campaigns, the additive summary response includes both
+`fidelity_summary` and `fidelity_coverage` table payloads. Non-fidelity
+campaigns return empty payloads for those keys.
+
 Generate dry-run suggestions without mutating the CSV:
 
 ```bash

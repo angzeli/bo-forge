@@ -78,8 +78,8 @@ MULTI_REPORT_KEYS = (
         (
             "15_multi_fidelity_qmfkg",
             "15_multi_fidelity_qmfkg",
-            (*SINGLE_REPORT_KEYS, "fidelity_summary"),
-            ["progress", "diagnostics", "fidelity_diagnostics"],
+            (*SINGLE_REPORT_KEYS, "fidelity_summary", "fidelity_coverage"),
+            ["progress", "diagnostics", "fidelity_diagnostics", "fidelity_progress"],
         ),
         (
             "16_contextual_logei",

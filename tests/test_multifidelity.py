@@ -16,7 +16,9 @@ from bo_forge.config import (
     VariableConfig,
 )
 from bo_forge.multifidelity import (
+    FIDELITY_COVERAGE_COLUMNS,
     affine_fidelity_cost_model,
+    fidelity_coverage,
     fidelity_feature_index,
     fidelity_level_fixed_features,
     fidelity_level_unit_values,
@@ -481,6 +483,189 @@ def test_fidelity_summary_rejects_non_fidelity_config() -> None:
 
     with pytest.raises(ValueError, match="requires a config with a fidelity section"):
         fidelity_summary(cfg, df)
+
+
+def test_fidelity_coverage_reports_continuous_values_costs_and_statistics() -> None:
+    cfg = config()
+    df = observed_log(cfg)
+    df.loc[df["row_id"] == "target_0", "fidelity"] = 1.0
+    before = df.copy(deep=True)
+
+    coverage = fidelity_coverage(cfg, df)
+
+    assert coverage.columns.tolist() == FIDELITY_COVERAGE_COLUMNS
+    assert coverage["fidelity"].tolist() == pytest.approx([0.4, 0.7, 1.0])
+    assert coverage["is_target"].tolist() == [False, False, True]
+    assert coverage["modeled_evaluation_cost"].tolist() == pytest.approx(
+        [0.51, 1.26, 2.01]
+    )
+    assert coverage["observed_rows"].tolist() == [1, 0, 2]
+    assert coverage["active_suggestions"].tolist() == [0, 1, 0]
+    target = coverage.loc[coverage["is_target"]].iloc[0]
+    assert target["objective_mean"] == pytest.approx(1.5)
+    assert target["objective_std"] == pytest.approx(0.4242640687)
+    assert target["objective_best"] == pytest.approx(1.8)
+    assert target["best_row_id"] == "target_1"
+    assert target["latest_observed_iteration"] == 2
+    assert coverage.loc[coverage["fidelity"] == 0.4, "objective_std"].iloc[0] is None
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_fidelity_coverage_assigns_nearby_continuous_rows_exactly_once() -> None:
+    cfg = config()
+    fidelity_values = [0.2, 0.2000000009, 0.2000000018]
+    rows = [
+        {
+            "row_id": f"observed_{index}",
+            "iteration": index,
+            "status": "observed",
+            "source": "manual",
+            "x": 0.2 + 0.1 * index,
+            "fidelity": fidelity,
+            "activity": 1.0 + index,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        }
+        for index, fidelity in enumerate(fidelity_values)
+    ]
+    rows.append(
+        {
+            "row_id": "active_middle",
+            "iteration": 3,
+            "status": "suggested",
+            "source": "qmf_kg",
+            "x": 0.8,
+            "fidelity": fidelity_values[1],
+            "activity": "",
+            "predicted_mean": 2.5,
+            "predicted_std": 0.1,
+            "acquisition": 0.2,
+        }
+    )
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+    coverage = fidelity_coverage(cfg, df)
+
+    assert coverage["fidelity"].tolist() == fidelity_values
+    assert coverage["observed_rows"].tolist() == [1, 1, 1]
+    assert coverage["active_suggestions"].tolist() == [0, 1, 0]
+    assert int(coverage["observed_rows"].sum()) == 3
+    assert int(coverage["active_suggestions"].sum()) == 1
+
+
+def test_fidelity_coverage_preserves_discrete_level_order_and_empty_levels() -> None:
+    cfg = discrete_config()
+    df = observed_log(cfg)
+    df["fidelity"] = [0.25, 0.5, 1.0, 0.75]
+
+    coverage = fidelity_coverage(cfg, df)
+
+    assert coverage["fidelity"].tolist() == [0.25, 0.5, 0.75, 1.0]
+    assert coverage["observed_rows"].tolist() == [1, 1, 0, 1]
+    assert coverage["active_suggestions"].tolist() == [0, 0, 1, 0]
+    unused = coverage.loc[coverage["fidelity"] == 0.75].iloc[0]
+    assert unused["objective_mean"] is None
+    assert unused["best_row_id"] is None
+
+
+def test_fidelity_coverage_empty_campaign_behavior() -> None:
+    continuous = config()
+    discrete = discrete_config()
+
+    continuous_coverage = fidelity_coverage(
+        continuous,
+        pd.DataFrame(columns=canonical_columns(continuous)),
+    )
+    discrete_coverage = fidelity_coverage(
+        discrete,
+        pd.DataFrame(columns=canonical_columns(discrete)),
+    )
+
+    assert continuous_coverage.empty
+    assert continuous_coverage.columns.tolist() == FIDELITY_COVERAGE_COLUMNS
+    assert discrete_coverage["fidelity"].tolist() == [0.25, 0.5, 0.75, 1.0]
+    assert discrete_coverage["observed_rows"].tolist() == [0, 0, 0, 0]
+    assert discrete_coverage["active_suggestions"].tolist() == [0, 0, 0, 0]
+
+
+def test_fidelity_coverage_is_direction_aware_and_excludes_closed_review_rows() -> None:
+    base = discrete_config()
+    cfg = replace(
+        base,
+        objective=ObjectiveConfig(name="activity", direction="minimize"),
+        review=ReviewConfig(enabled=True),
+    )
+    rows = [
+        {
+            "row_id": "observed_high",
+            "iteration": 0,
+            "status": "observed",
+            "source": "manual",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": 0.2,
+            "fidelity": 1.0,
+            "activity": 2.0,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        },
+        {
+            "row_id": "observed_best",
+            "iteration": 0,
+            "status": "observed",
+            "source": "manual",
+            "review_status": "accepted",
+            "review_note": "",
+            "x": 0.3,
+            "fidelity": 1.0,
+            "activity": 1.0,
+            "predicted_mean": "",
+            "predicted_std": "",
+            "acquisition": "",
+        },
+        *[
+            {
+                "row_id": f"{review_status}_row",
+                "iteration": index,
+                "status": "suggested",
+                "source": "qmf_kg",
+                "review_status": review_status,
+                "review_note": "",
+                "x": 0.4 + index / 10,
+                "fidelity": 0.5,
+                "activity": "",
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.2,
+            }
+            for index, review_status in enumerate(
+                ["pending", "accepted", "rejected", "deferred"], start=1
+            )
+        ],
+    ]
+    df = pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+    coverage = fidelity_coverage(cfg, df)
+
+    target = coverage.loc[coverage["fidelity"] == 1.0].iloc[0]
+    assert target["objective_best"] == pytest.approx(1.0)
+    assert target["best_row_id"] == "observed_best"
+    active = coverage.loc[coverage["fidelity"] == 0.5, "active_suggestions"].iloc[0]
+    assert active == 2
+
+
+def test_fidelity_coverage_rejects_non_fidelity_config() -> None:
+    cfg = CampaignConfig(
+        campaign_name="plain",
+        objective=ObjectiveConfig(name="activity", direction="maximize"),
+        variables=(VariableConfig("x", "continuous", 0.0, 1.0),),
+        bo=BOConfig(),
+    )
+
+    with pytest.raises(ValueError, match="requires a config with a fidelity section"):
+        fidelity_coverage(cfg, pd.DataFrame(columns=canonical_columns(cfg)))
 
 
 def test_extract_qmfkg_candidates_accepts_already_extracted_result() -> None:

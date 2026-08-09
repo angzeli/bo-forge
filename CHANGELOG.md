@@ -1,5 +1,23 @@
 # 📝 BO Forge Changelog
 
+## v2.4.2 - Multi-Fidelity Diagnostic Polish
+
+This read-only diagnostics patch adds fidelity-level coverage and target-fidelity
+progress views without changing qMFKG models, optimization, configs, CSV schemas,
+suggestions, or supported campaign combinations.
+
+- Adds public `fidelity_coverage(config, df)` and
+  `CampaignSession.fidelity_coverage()` helpers.
+- Adds `bo-forge fidelity-coverage` with deterministic continuous/discrete
+  coverage rows, unique row membership, affine modeled costs, observed
+  statistics, and active counts.
+- Adds `CampaignSession.plot_fidelity_progress()` and
+  `plot --kind fidelity-progress` for fidelity-by-iteration and direction-aware
+  target-fidelity best-so-far progress.
+- Includes Fidelity Coverage in reports, Streamlit Data/Reports, the app service,
+  and the additive experimental API summary payload.
+- Keeps the existing Fidelity Summary and Fidelity Diagnostics contracts unchanged.
+
 ## v2.4.1 - qMFKG Performance And Startup Hardening
 
 This patch adds opt-in qMFKG runtime limits and removes unnecessary optimizer

@@ -22,6 +22,7 @@ from bo_forge.diagnostics import (
     plot_context_diagnostics,
     plot_diagnostics,
     plot_fidelity_diagnostics,
+    plot_fidelity_progress,
     plot_model_comparison,
     plot_model_diagnostics,
     plot_progress,
@@ -577,6 +578,113 @@ def test_plot_discrete_fidelity_diagnostics_handles_empty_observed_log() -> None
 def test_plot_fidelity_diagnostics_rejects_non_fidelity_config() -> None:
     with pytest.raises(ValueError, match="requires a config with fidelity"):
         plot_fidelity_diagnostics(config(), observed_log())
+
+
+def test_plot_fidelity_progress_writes_labels_target_and_batch_best(tmp_path: Path) -> None:
+    cfg = fidelity_config()
+    df = fidelity_log()
+    additions = pd.DataFrame(
+        [
+            {
+                "row_id": "mf_batch_0",
+                "iteration": 2,
+                "status": "observed",
+                "source": "qmf_kg",
+                "x": 0.4,
+                "fidelity": 1.0,
+                "activity": 1.1,
+                "predicted_mean": 1.0,
+                "predicted_std": 0.1,
+                "acquisition": 0.2,
+            },
+            {
+                "row_id": "mf_batch_1",
+                "iteration": 2,
+                "status": "observed",
+                "source": "qmf_kg",
+                "x": 0.5,
+                "fidelity": 1.0,
+                "activity": 1.8,
+                "predicted_mean": 1.2,
+                "predicted_std": 0.1,
+                "acquisition": 0.2,
+            },
+            {
+                "row_id": "mf_pending",
+                "iteration": 3,
+                "status": "suggested",
+                "source": "qmf_kg",
+                "x": 0.6,
+                "fidelity": 0.7,
+                "activity": "",
+                "predicted_mean": 1.4,
+                "predicted_std": 0.1,
+                "acquisition": 0.3,
+            },
+        ],
+        columns=canonical_columns(cfg),
+    )
+    df = pd.concat([df, additions], ignore_index=True)
+    before = df.copy(deep=True)
+    save_path = tmp_path / "reports" / "fidelity_progress.png"
+
+    fig, axes = plot_fidelity_progress(cfg, df, save_path=save_path)
+
+    assert save_path.exists()
+    assert axes[0].get_title() == "Fidelity by iteration"
+    assert axes[0].get_xlabel() == "Campaign iteration"
+    assert axes[0].get_ylabel() == "fidelity"
+    assert "target fidelity = 1" in axes[0].get_legend_handles_labels()[1]
+    assert "active suggestions" in axes[0].get_legend_handles_labels()[1]
+    active_markers = next(
+        collection
+        for collection in axes[0].collections
+        if collection.get_label() == "active suggestions"
+    )
+    assert active_markers.get_facecolors().size == 0
+    assert axes[1].get_title() == "Target-fidelity objective progress"
+    assert axes[1].get_ylabel() == "activity"
+    best_line = next(line for line in axes[1].lines if line.get_label() == "best so far")
+    assert best_line.get_xdata().tolist() == [1, 2]
+    assert best_line.get_ydata().tolist() == pytest.approx([1.4, 1.8])
+    pd.testing.assert_frame_equal(df, before)
+    plt.close(fig)
+
+
+def test_plot_fidelity_progress_uses_discrete_ticks_and_minimization() -> None:
+    base = discrete_fidelity_config()
+    cfg = CampaignConfig(
+        campaign_name=base.campaign_name,
+        objective=ObjectiveConfig(name="activity", direction="minimize"),
+        variables=base.variables,
+        bo=base.bo,
+        fidelity=base.fidelity,
+    )
+    df = discrete_fidelity_log()
+    df.loc[df["row_id"] == "mf_0", "fidelity"] = 1.0
+    df.loc[df["row_id"] == "mf_0", "activity"] = 0.8
+
+    fig, axes = plot_fidelity_progress(cfg, df)
+
+    assert axes[0].get_yticks().tolist() == pytest.approx([0.25, 0.5, 0.75, 1.0])
+    best_line = next(line for line in axes[1].lines if line.get_label() == "best so far")
+    assert best_line.get_ydata().tolist() == pytest.approx([0.8, 0.8])
+    plt.close(fig)
+
+
+def test_plot_fidelity_progress_handles_empty_log_and_rejects_plain_config() -> None:
+    cfg = fidelity_config()
+
+    fig, axes = plot_fidelity_progress(
+        cfg,
+        pd.DataFrame(columns=canonical_columns(cfg)),
+    )
+
+    assert "No observed fidelity data yet." in axes[0].texts[0].get_text()
+    assert "No target-fidelity observations yet." in axes[1].texts[0].get_text()
+    plt.close(fig)
+    with pytest.raises(ValueError, match="requires a config with fidelity"):
+        plot_fidelity_progress(config(), observed_log())
 
 
 def test_plot_context_diagnostics_writes_nested_output_and_labels(tmp_path: Path) -> None:

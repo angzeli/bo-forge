@@ -18,7 +18,7 @@ When `cost` is configured, add `cost_estimate,cost_actual` immediately after
 the objective column and add `utility` immediately after `acquisition`.
 Contextual cost campaigns use the same columns; context variables remain normal
 variable columns and cost is evaluated on the full candidate, including fixed
-context values. `stages:` cannot be combined with `cost:` in v2.4.1.
+context values. `stages:` cannot be combined with `cost:` in v2.4.2.
 
 When `fidelity:` is configured, no new CSV columns are added. The fidelity
 variable stays in the normal variable columns and stores the user-facing
@@ -129,7 +129,7 @@ Rules:
 - inactive variables must be blank.
 - constraints are evaluated for a row only when every variable referenced by the
   constraint is active in that row's stage;
-- `stages:` cannot be combined with `cost:` in v2.4.1.
+- `stages:` cannot be combined with `cost:` in v2.4.2.
 
 The blank-only inactive-variable rule is intentional. It keeps public CSV values
 editable and prevents ignored inactive values from being confused with active
@@ -153,7 +153,7 @@ campaign creation remain deferred.
 ## 🧪 Multi-Fidelity Rules
 
 Single-objective multi-fidelity workflows use an optional top-level
-`fidelity:` section. Ordered numeric levels remain supported in v2.4.1:
+`fidelity:` section. Ordered numeric levels remain supported in v2.4.2:
 
 ```yaml
 fidelity:
@@ -176,14 +176,19 @@ Rules:
 - all variables in multi-fidelity configs must be continuous;
 - `fidelity.target` must lie within that variable's bounds;
 - when supplied, `fidelity.levels` must contain at least two finite, strictly
-  increasing in-bounds values and the highest level must equal the target;
-- every populated CSV fidelity value must match a configured level within the
-  existing `1e-9` numeric tolerance;
+  increasing in-bounds values, must be separated enough for unambiguous
+  `1e-9`-tolerance matching, and the highest level must equal the target;
+- every populated CSV fidelity value must match exactly one configured level
+  within the existing `1e-9` numeric tolerance;
 - lower-fidelity observations are real measured objective values at that row's
   fidelity, not approximations stored in a separate column;
 - the target fidelity is the value BO Forge ultimately optimizes for;
 - qMFKG trades information gain against the configured affine fidelity cost
   model, evaluated on the normalized model-space fidelity coordinate;
+- `fidelity_coverage()` and the `fidelity-progress` plot are read-only views of
+  these existing rows and add no CSV columns; continuous coverage keeps exact
+  user-space fidelity values as separate sorted rows, while discrete coverage
+  maps each row to exactly one configured level;
 - fidelity cost is separate from BO Forge's `cost:` budget/ranking feature;
 - `fidelity.optimizer_maxiter` defaults to `200` and applies to both
   target-value and qMFKG candidate optimization;
@@ -207,7 +212,7 @@ combinations remain intentional: `fidelity:` cannot be combined with
 
 ## 🌐 Contextual BO Rules
 
-v2.4.1 supports a conservative single-objective contextual LogEI/qLogEI workflow:
+v2.4.2 supports a conservative single-objective contextual LogEI/qLogEI workflow:
 
 ```yaml
 context:
@@ -330,7 +335,7 @@ For multi-objective campaigns, constraints apply to every row in the same way. q
 
 ## 🎯 Multi-Objective Rules
 
-BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.4.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports `m >= 2` objectives with coupled evaluation. The primary tested range for v2.4.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 - A config uses `objectives:` instead of `objective:`.
 - Each objective requires `name`, `direction`, and a finite numeric `reference_point`.
@@ -368,7 +373,7 @@ Replicates are explicit CSV metadata, not silently inferred.
 - Generated exploration suggestions avoid existing designs, set `replicate_group=row_id`, and set `replicate_index=0`.
 - For single-objective replicate campaigns with `suggestion_policy: uncertain_best`, BO Forge may intentionally suggest another observation in the current best replicate group. Those repeat suggestions reuse the existing `replicate_group` and use the next zero-based `replicate_index`.
 - If an active repeat fills only part of the requested batch, remaining rows are normal exploration suggestions when budget and design-space constraints allow.
-- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.4.1, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
+- Multi-objective replicate campaigns use group means plus replicate-derived `train_Yvar` for qLogEHVI fitting. Active repeat selection remains single-objective only in v2.4.2, so MO replicate configs default to `suggestion_policy: new_only` and explicit `uncertain_best` fails clearly.
 
 Replicate summaries are group-level. Cost and review summaries remain row-level when those features are also enabled.
 
@@ -400,7 +405,7 @@ row_id,iteration,status,source,<variables...>,<objective>,predicted_mean,predict
 ```
 
 Non-default model profiles are rejected for multi-objective, multi-fidelity,
-and structured campaigns in v2.4.1.
+and structured campaigns in v2.4.2.
 
 ## 🧪 Variable Value Rules
 
