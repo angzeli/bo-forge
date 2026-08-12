@@ -23,6 +23,8 @@ from bo_forge.config import CampaignConfig
 from bo_forge.errors import (
     BOForgeError,
     ConfigError,
+    LogBusyError,
+    LogConflictError,
     LogValidationError,
     LogWriteError,
     SuggestionError,
@@ -706,6 +708,10 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
         return "Hint: Check the YAML config path and campaign settings."
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
+    if isinstance(exc, LogConflictError):
+        return "Hint: Reload the campaign, inspect the latest log, and retry the mutation."
+    if isinstance(exc, LogBusyError):
+        return "Hint: Another local writer is active; wait briefly and retry."
     if isinstance(exc, SuggestionError):
         message = str(exc)
         if "review_status='pending'" in message and "qLogNEI" in message:

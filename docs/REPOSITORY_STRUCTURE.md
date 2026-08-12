@@ -56,7 +56,7 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 - `costs.py`: safe deterministic cost expressions, effective-cost accounting, and budget summaries.
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
-- `logs.py`: CSV loading, `append_suggestions()`, `review_suggestion()`, and `mark_observed()`.
+- `logs.py`: CSV loading plus locked, fingerprint-aware `append_suggestions()`, `review_suggestion()`, and `mark_observed()` transitions.
 - `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
 - `multifidelity.py`: BoTorch multi-fidelity helper translations for qMFKG campaigns.
 - `replicates.py`: explicit replicate aggregation, replicate-derived observation variance, summaries, and best group selection.
@@ -79,6 +79,10 @@ Most users should start with the `bo-forge` CLI, `CampaignSession`, or the publi
 `bo_forge_app/service.py` is an internal, non-HTTP app service layer. It wraps `CampaignSession` for Streamlit-facing workflow operations such as validation, staged suggestions, append, review, mark-observed, reports, and plot routing. It is not a stable public API.
 
 `bo_forge_app/api.py` and `bo_forge_app/api_cli.py` contain an experimental optional FastAPI probe behind the `bo-forge-api` command and `[api]` extra. The probe is root-bound, local/trusted-network only, and not a production backend.
+
+`bo_forge_app/stages.py` contains the bounded, thread-safe, process-local stage
+store used by the experimental API. Stages are ephemeral and disappear when
+the launcher process restarts.
 
 ## 🚀 How To Use The Repository
 

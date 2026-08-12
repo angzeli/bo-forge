@@ -18,7 +18,7 @@ from bo_forge.config import (
     StageConfig,
     VariableConfig,
 )
-from bo_forge.errors import LogValidationError, SuggestionError
+from bo_forge.errors import LogConflictError, LogValidationError, SuggestionError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import append_suggestions, mark_observed
 from bo_forge.validation import canonical_columns
@@ -1864,10 +1864,17 @@ def test_session_append_suggestions_uses_config_aware_low_level_validation(
     )
     captured: dict[str, object] = {}
 
-    def fake_append(log_path, appended, config=None):
+    def fake_append(
+        log_path,
+        appended,
+        config=None,
+        *,
+        expected_log_fingerprint=None,
+    ):
         captured["log_path"] = log_path
         captured["appended"] = appended
         captured["config"] = config
+        captured["expected_log_fingerprint"] = expected_log_fingerprint
 
     monkeypatch.setattr(session_module, "_append_suggestions", fake_append)
     monkeypatch.setattr(campaign, "reload", lambda: campaign.df)
@@ -1877,6 +1884,7 @@ def test_session_append_suggestions_uses_config_aware_low_level_validation(
     assert captured["log_path"] == campaign.log_path
     assert captured["appended"] is suggestions
     assert captured["config"] is cfg
+    assert captured["expected_log_fingerprint"] is None
 
 
 def test_reload_reflects_disk_changes(tmp_path: Path) -> None:
@@ -1894,6 +1902,48 @@ def test_reload_reflects_disk_changes(tmp_path: Path) -> None:
     assert reloaded is campaign.df
     assert len(campaign.observed_data()) == 1
     assert float(campaign.df.loc[0, "score"]) == pytest.approx(0.8)
+
+
+def test_long_lived_session_rejects_stale_append_and_recovers_after_reload(
+    tmp_path: Path,
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=2)
+    cfg = config(initial_design_size=2)
+    log_path = write_log(tmp_path / "campaign.csv", cfg)
+    first = CampaignSession.from_files(config_path, log_path)
+    stale = CampaignSession.from_files(config_path, log_path)
+    first_suggestion = first.suggest_next(batch_size=1)
+    stale_suggestion = stale.suggest_next(batch_size=1).copy()
+    stale_suggestion.loc[:, "row_id"] = "stale_session_row"
+
+    first.append_suggestions(first_suggestion)
+    before = log_path.read_bytes()
+    with pytest.raises(LogConflictError, match="changed after it was loaded"):
+        stale.append_suggestions(stale_suggestion)
+    assert log_path.read_bytes() == before
+
+    stale.reload()
+    stale_suggestion.loc[:, "x"] = 0.123456
+    stale.append_suggestions(stale_suggestion)
+    assert "stale_session_row" in stale.df["row_id"].tolist()
+
+
+def test_session_loaded_before_log_creation_detects_external_creation(
+    tmp_path: Path,
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml", initial_design_size=2)
+    log_path = tmp_path / "campaign.csv"
+    campaign = CampaignSession.from_files(config_path, log_path)
+    suggestions = campaign.suggest_next(batch_size=1)
+    external = suggestions.copy()
+    external.loc[:, "row_id"] = "external_row"
+    append_suggestions(log_path, external, config=campaign.config)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogConflictError, match="changed after it was loaded"):
+        campaign.append_suggestions(suggestions)
+
+    assert log_path.read_bytes() == before
 
 
 def test_plot_methods_return_figure_and_axes_like_objects(tmp_path: Path) -> None:

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import math
 import sys
 from pathlib import Path
 
 DEFAULT_API_HOST = "127.0.0.1"
 DEFAULT_API_PORT = 8765
+DEFAULT_STAGE_TTL_SECONDS = 1800.0
+DEFAULT_MAX_STAGED_BATCHES = 128
 API_INSTALL_HINT = 'pip install "bo-forge[api]"'
 
 
@@ -35,6 +38,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=_parse_port,
         default=DEFAULT_API_PORT,
         help="Port for Uvicorn.",
+    )
+    parser.add_argument(
+        "--stage-ttl-seconds",
+        type=_parse_positive_float,
+        default=DEFAULT_STAGE_TTL_SECONDS,
+        help="Lifetime of an in-memory server-managed staged batch.",
+    )
+    parser.add_argument(
+        "--max-staged-batches",
+        type=_parse_positive_int,
+        default=DEFAULT_MAX_STAGED_BATCHES,
+        help="Maximum active in-memory staged batches.",
     )
     return parser
 
@@ -63,7 +78,11 @@ def run(argv: list[str] | None = None) -> int:
                 )
                 return 1
             raise
-        app = create_app(root)
+        app = create_app(
+            root,
+            stage_ttl_seconds=float(args.stage_ttl_seconds),
+            max_staged_batches=int(args.max_staged_batches),
+        )
     except ApiLauncherError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -83,6 +102,10 @@ def print_startup_messages(args: argparse.Namespace, root: Path) -> None:
     host = str(args.host)
     print(f"Starting BO Forge API probe on http://{_url_host(host)}:{args.port}")
     print(f"Root: {root}")
+    print(
+        "Server staging: "
+        f"TTL={args.stage_ttl_seconds:g}s, max active batches={args.max_staged_batches}"
+    )
     if _host_requires_network_warning(host):
         print("Network safety: BO Forge API probe has no built-in authentication.")
         print("Use only on localhost, a trusted LAN, VPN, or SSH tunnel.")
@@ -118,6 +141,26 @@ def _parse_port(value: str) -> int:
     if not 1 <= port <= 65535:
         raise argparse.ArgumentTypeError("port must be between 1 and 65535")
     return port
+
+
+def _parse_positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a finite positive number") from exc
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a finite positive number")
+    return parsed
+
+
+def _parse_positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive integer")
+    return parsed
 
 
 if __name__ == "__main__":

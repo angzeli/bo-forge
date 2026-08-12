@@ -8,9 +8,10 @@ Do not expose it directly to the public internet.
 For the supported and deferred workflow combinations around the API probe, see
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
-The API has no built-in auth, no database, no multi-user state coordination,
-and no persistent staged server state. Do not expose it directly to the public
-internet.
+The API has no built-in auth, no database, and no multi-user state
+coordination. v2.5.0 adds bounded in-memory suggestion stages, but they are not
+persistent and disappear whenever the API process restarts. Do not expose the
+probe directly to the public internet.
 
 ## Install
 
@@ -30,6 +31,15 @@ Local-only:
 
 ```bash
 bo-forge-api --root . --host 127.0.0.1 --port 8765
+```
+
+The bundled launcher runs one API process. Server-managed stages default to a
+30-minute lifetime and 128 active batches:
+
+```bash
+bo-forge-api --root . \
+  --stage-ttl-seconds 1800 \
+  --max-staged-batches 128
 ```
 
 Trusted LAN or lab server:
@@ -124,15 +134,54 @@ Contextual campaigns pass context values in the same dry-run request:
 }
 ```
 
-The dry-run response includes a stateless staged bundle:
+The dry-run response includes both the compatibility staged bundle and
+preferred server-managed stage metadata:
 
 ```json
 {
+  "stage": {
+    "stage_id": "opaque-server-id",
+    "status": "active",
+    "created_at": "...",
+    "expires_at": "..."
+  },
   "staged_bundle": {
     "...": "exact dry-run staged_bundle"
   }
 }
 ```
+
+The preferred workflow keeps the exact batch in the API process:
+
+```text
+GET    /campaign/stages/{stage_id}
+POST   /campaign/stages/{stage_id}/append
+DELETE /campaign/stages/{stage_id}
+```
+
+`GET` recovers stage metadata, suggestions, and quality. `POST .../append`
+atomically claims and appends the server-held batch, so concurrent attempts can
+produce only one successful write. `DELETE` discards an active batch. Stages
+expire lazily and terminal states return structured `stage_*` errors. A full
+store rejects a dry-run before BO suggestion generation begins. An append claim
+is not expired while its request is running because releasing it could permit a
+duplicate write; a stuck in-flight claim remains visible in `/health` until the
+request returns or the process restarts. `/health` reports active/appending
+and in-progress reservation counts plus configured limits.
+
+Suggestion generation is bound to the config and log snapshots loaded before
+optimization. If either file changes during optimization, the dry-run fails and
+does not create a stage. Append failures restore a stage to `active` only when
+both files still have the staged fingerprints. If the log changed before the
+failure was returned, the stage becomes `stale` because retry safety cannot be
+proven.
+
+Stage IDs are opaque but are not authentication credentials. Anyone who can
+reach the API remains within the probe's no-auth
+trust boundary. Stages are process-local, are not shared across Uvicorn workers,
+and disappear on restart.
+
+## Client-Carried Compatibility Append
 
 Send that exact bundle to `/campaign/suggestions/append` to append through the
 existing `CampaignAppService.append_staged()` path:
@@ -153,17 +202,39 @@ separate `expected_log_fingerprint`. Contextual dry-runs also record
 the supplied `context_values` in the staged bundle so trusted clients can retain
 the context used to generate the suggestions.
 
-Staged bundles are fingerprint and integrity checked. They are not
-authenticated, signed, or server-issued. A trusted client can craft a
-schema-valid staged bundle, so this probe must only be used with trusted clients
-on localhost or trusted networks. Signed staged bundles and server-side staged
-state are out of scope for this experimental probe.
+Client-carried staged bundles are fingerprint and integrity checked. They are
+not authenticated or signed, and a trusted client can craft a schema-valid
+bundle. This compatibility path remains operational through v2.5.x, but
+server-managed staging is preferred because the append payload is retained by
+the API process. A successful compatibility append consumes the matching
+server-held stage and marks other stages from the replaced log snapshot stale,
+so compatibility clients do not leak stage capacity. Signed bundles remain
+deferred.
 
 Review and observation mutations require `expected_log_fingerprint`. If the log
 changed since the caller last read it, or if the fingerprint is missing, the
 mutation fails without writing. Use the `log_fingerprint` returned by
 validation, summary, dry-run, append, review, or observation responses before
 the next mutation.
+
+Fingerprint checks run inside the same cross-process lock as CSV validation,
+mutation, atomic replacement, and post-write validation. Append, review, and
+observation therefore reject stale callers rather than overwriting a newer
+same-machine write. A busy lock returns `log_busy`. Locks do not coordinate
+different hosts writing the same network filesystem.
+
+Server-stage lifecycle errors use these codes:
+
+| Code | HTTP status | Meaning |
+| --- | ---: | --- |
+| `stage_not_found` | 404 | The stage is unknown, including after restart or tombstone eviction. |
+| `stage_expired` | 410 | The stage exceeded its configured lifetime. |
+| `stage_consumed` | 409 | The batch was already appended. |
+| `stage_discarded` | 409 | The batch was explicitly discarded. |
+| `stage_stale` | 409 | Config/log fingerprints changed before or during append, so retry is unsafe. |
+| `stage_in_use` | 409 | Another request currently owns the append claim. |
+| `stage_capacity` | 503 | The process-local active-stage limit is full. |
+| `log_busy` | 409 | Another local process held the campaign log lock too long. |
 
 Multi-objective observation requests use coupled objective values:
 
@@ -200,7 +271,7 @@ are converted to strings.
 ## Scope
 
 The API probe does not add BO behavior, schemas, auth, CORS broadening, report
-or plot endpoints, a database, remote Streamlit mode, or production deployment
-infrastructure.
+or plot endpoints, a database, persistent jobs, multi-worker stage sharing,
+remote Streamlit mode, or production deployment infrastructure.
 
 Streamlit remains the recommended local UI.

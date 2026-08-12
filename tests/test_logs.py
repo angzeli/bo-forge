@@ -1,8 +1,17 @@
+import multiprocessing
+import os
+import subprocess
+import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
+from filelock import FileLock
 
+import bo_forge.logs as logs_module
 from bo_forge.config import (
     BOConfig,
     CampaignConfig,
@@ -14,7 +23,7 @@ from bo_forge.config import (
     StageConfig,
     VariableConfig,
 )
-from bo_forge.errors import LogValidationError, LogWriteError
+from bo_forge.errors import LogBusyError, LogConflictError, LogValidationError, LogWriteError
 from bo_forge.logs import append_suggestions, load_campaign_log, mark_observed, review_suggestion
 from bo_forge.validation import canonical_columns
 
@@ -96,7 +105,7 @@ def structured_config(*, review: bool = False) -> CampaignConfig:
     )
 
 
-def suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
+def suggestion(row_id: str = "suggested_1", *, x: float = 0.4) -> pd.DataFrame:
     cfg = config()
     return pd.DataFrame(
         [
@@ -105,7 +114,7 @@ def suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
                 "iteration": 0,
                 "status": "suggested",
                 "source": "sobol",
-                "x": 0.4,
+                "x": x,
                 "activity": "",
                 "predicted_mean": "",
                 "predicted_std": "",
@@ -114,6 +123,22 @@ def suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
         ],
         columns=canonical_columns(cfg),
     )
+
+
+def _append_in_process(
+    log_path: str,
+    row_id: str,
+    barrier: Any,
+    results: Any,
+) -> None:
+    try:
+        barrier.wait(timeout=10)
+        x = 0.2 if row_id == "process_1" else 0.8
+        append_suggestions(log_path, suggestion(row_id, x=x), config=config())
+    except Exception as exc:  # pragma: no cover - child-process failure reporting
+        results.put((row_id, type(exc).__name__, str(exc)))
+    else:
+        results.put((row_id, "ok", ""))
 
 
 def cost_review_suggestion(row_id: str = "suggested_1") -> pd.DataFrame:
@@ -613,3 +638,219 @@ def test_mark_observed_rejects_already_observed_row(tmp_path: Path) -> None:
 
     with pytest.raises(LogWriteError, match="status is 'observed', not 'suggested'"):
         mark_observed(log_path, "row_1", 1.2)
+
+
+def test_append_rejects_stale_expected_fingerprint_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = config()
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing").to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogConflictError, match="changed after it was loaded"):
+        append_suggestions(
+            log_path,
+            suggestion("new"),
+            config=cfg,
+            expected_log_fingerprint="stale",
+        )
+
+    assert log_path.read_bytes() == before
+
+
+def test_review_rejects_stale_expected_fingerprint_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = cost_review_config()
+    log_path = tmp_path / "campaign.csv"
+    cost_review_suggestion().to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogConflictError, match="changed after it was loaded"):
+        review_suggestion(
+            log_path,
+            "suggested_1",
+            "accept",
+            config=cfg,
+            expected_log_fingerprint="stale",
+        )
+
+    assert log_path.read_bytes() == before
+
+
+def test_mark_observed_rejects_stale_expected_fingerprint_without_mutation(
+    tmp_path: Path,
+) -> None:
+    cfg = cost_review_config()
+    log_path = tmp_path / "campaign.csv"
+    cost_review_suggestion().to_csv(log_path, index=False)
+    review_suggestion(log_path, "suggested_1", "accept", config=cfg)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogConflictError, match="changed after it was loaded"):
+        mark_observed(
+            log_path,
+            "suggested_1",
+            1.2,
+            config=cfg,
+            expected_log_fingerprint="stale",
+        )
+
+    assert log_path.read_bytes() == before
+
+
+def test_log_lock_timeout_leaves_csv_unchanged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing").to_csv(log_path, index=False)
+    before = log_path.read_bytes()
+    monkeypatch.setattr(logs_module, "LOG_LOCK_TIMEOUT_SECONDS", 0.01)
+
+    with FileLock(logs_module._log_lock_path(log_path)):
+        with pytest.raises(LogBusyError, match="is busy"):
+            append_suggestions(log_path, suggestion("new"), config=config())
+
+    assert log_path.read_bytes() == before
+    append_suggestions(log_path, suggestion("after_release", x=0.8), config=config())
+    assert len(pd.read_csv(log_path, keep_default_na=False)) == 2
+
+
+def test_symlinked_and_canonical_logs_share_one_lock(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing").to_csv(log_path, index=False)
+    linked = tmp_path / "linked.csv"
+    linked.symlink_to(log_path)
+
+    assert logs_module._log_lock_path(linked) == logs_module._log_lock_path(log_path)
+
+
+def test_separate_process_appends_without_expected_fingerprint_preserve_both(
+    tmp_path: Path,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    pd.DataFrame(columns=canonical_columns(config())).to_csv(log_path, index=False)
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(2)
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_append_in_process,
+            args=(str(log_path), row_id, barrier, results),
+        )
+        for row_id in ("process_1", "process_2")
+    ]
+
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=20)
+        assert process.exitcode == 0
+
+    outcomes = sorted(results.get(timeout=2) for _ in processes)
+    assert outcomes == [("process_1", "ok", ""), ("process_2", "ok", "")]
+    written = pd.read_csv(log_path, keep_default_na=False)
+    assert sorted(written["row_id"].tolist()) == ["process_1", "process_2"]
+
+
+def test_same_process_threads_serialize_appends_without_lost_rows(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    pd.DataFrame(columns=canonical_columns(config())).to_csv(log_path, index=False)
+    barrier = threading.Barrier(2)
+
+    def append(row_id: str, x: float) -> None:
+        barrier.wait(timeout=5)
+        append_suggestions(log_path, suggestion(row_id, x=x), config=config())
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(append, "thread_1", 0.2),
+            executor.submit(append, "thread_2", 0.8),
+        ]
+        for future in futures:
+            future.result(timeout=10)
+
+    written = pd.read_csv(log_path, keep_default_na=False)
+    assert sorted(written["row_id"].tolist()) == ["thread_1", "thread_2"]
+
+
+def test_log_lock_directory_is_stable_across_tmpdir_environments(tmp_path: Path) -> None:
+    script = (
+        "from bo_forge.logs import _log_lock_path; "
+        "print(_log_lock_path('/private/tmp/shared-campaign.csv'))"
+    )
+    outputs = []
+    for temporary_directory in (tmp_path / "one", tmp_path / "two"):
+        temporary_directory.mkdir()
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, "TMPDIR": str(temporary_directory)},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        outputs.append(completed.stdout.strip())
+
+    assert outputs[0] == outputs[1]
+
+
+def test_log_lock_releases_after_validation_and_write_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = config()
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing", x=0.2).to_csv(log_path, index=False)
+
+    with pytest.raises(LogValidationError, match="same design"):
+        append_suggestions(log_path, suggestion("duplicate", x=0.2), config=cfg)
+
+    real_atomic_write = logs_module._atomic_write_and_validate
+    monkeypatch.setattr(
+        logs_module,
+        "_atomic_write_and_validate",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(LogWriteError("write failed")),
+    )
+    with pytest.raises(LogWriteError, match="write failed"):
+        append_suggestions(log_path, suggestion("write_failure", x=0.5), config=cfg)
+
+    monkeypatch.setattr(logs_module, "_atomic_write_and_validate", real_atomic_write)
+    append_suggestions(log_path, suggestion("after_failures", x=0.8), config=cfg)
+    assert pd.read_csv(log_path, keep_default_na=False)["row_id"].tolist() == [
+        "existing",
+        "after_failures",
+    ]
+
+
+def test_log_lock_releases_after_post_write_validation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = config()
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing", x=0.2).to_csv(log_path, index=False)
+    real_read_csv = logs_module._read_csv
+    canonical_reads = 0
+
+    def fail_post_write_read(path: Path) -> pd.DataFrame:
+        nonlocal canonical_reads
+        if path == log_path.resolve():
+            canonical_reads += 1
+            if canonical_reads == 2:
+                raise LogWriteError("post-write read failed")
+        return real_read_csv(path)
+
+    monkeypatch.setattr(logs_module, "_read_csv", fail_post_write_read)
+    with pytest.raises(LogWriteError, match="Post-write validation failed"):
+        append_suggestions(log_path, suggestion("written_before_failure", x=0.5), config=cfg)
+
+    monkeypatch.setattr(logs_module, "_read_csv", real_read_csv)
+    append_suggestions(log_path, suggestion("after_post_failure", x=0.8), config=cfg)
+    assert pd.read_csv(log_path, keep_default_na=False)["row_id"].tolist() == [
+        "existing",
+        "written_before_failure",
+        "after_post_failure",
+    ]

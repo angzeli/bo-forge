@@ -31,6 +31,10 @@ def test_version_and_production_complexity_gate_match_project_metadata() -> None
     assert "C901" in lint["select"]
     assert lint["mccabe"]["max-complexity"] == 15
     assert lint["per-file-ignores"]["tests/**/*.py"] == ["C901"]
+    assert "LogBusyError" in bo_forge.__all__
+    assert "LogConflictError" in bo_forge.__all__
+    assert issubclass(bo_forge.LogBusyError, bo_forge.LogWriteError)
+    assert issubclass(bo_forge.LogConflictError, bo_forge.LogWriteError)
 
 
 def test_license_file_exists() -> None:
@@ -237,16 +241,18 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/INSTALLATION.md" in readme
 
 
-def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
+def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.4.3" in readme
-    assert "v2.4.3 closes the v2.4.x multi-fidelity line" in readme
-    assert "## v2.4.3 - Multi-Fidelity Release Closeout" in changelog
+    assert "# 🧪 BO Forge v2.5.0" in readme
+    assert "v2.5.0 opens the operational-hardening line" in readme
+    assert "## v2.5.0 - Server-Managed Staging And Concurrent Write Safety" in changelog
+    assert "server-managed staging is preferred" in readme
+    assert "coordinated append, review, and observation writes" in readme
     assert "## v2.4.2 - Multi-Fidelity Diagnostic Polish" in changelog
     assert "## v2.4.1 - qMFKG Performance And Startup Hardening" in changelog
     assert "## v2.4.0 - Discrete And Batch Multi-Fidelity qMFKG" in changelog
@@ -281,7 +287,7 @@ def test_v2_4_docs_describe_discrete_batch_qmfkg_release_scope() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.4.3 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.5.0 provides a local Streamlit workbench" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -375,7 +381,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.4.3",
+        "BO Forge v2.5.0",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -453,7 +459,7 @@ def test_streamlit_deployment_guide_exists_and_covers_safety_model() -> None:
         "no safe unauthenticated public internet exposure",
         "host filesystem access",
         "Back up CSV logs",
-        "Avoid simultaneous writes",
+        "simultaneous writes from different hosts",
         "dedicated campaign working directory",
     ]
     for phrase in required_phrases:
@@ -487,6 +493,17 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
         "SSH tunnel",
         "Do not expose it directly to the public internet",
         "Streamlit remains the recommended local UI",
+        "server-managed staging is preferred",
+        "--stage-ttl-seconds",
+        "--max-staged-batches",
+        "GET    /campaign/stages/{stage_id}",
+        "POST   /campaign/stages/{stage_id}/append",
+        "DELETE /campaign/stages/{stage_id}",
+        "disappear on restart",
+        "authentication credentials",
+        "multi-worker stage sharing",
+        "Client-Carried Compatibility Append",
+        "log_busy",
     ]
     for phrase in required_phrases:
         assert phrase in guide
@@ -541,8 +558,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.4.3`" in roadmap
-    assert "v2.4.3 release closes the v2.4.x line" in roadmap
+    assert "Current baseline: `v2.5.0`" in roadmap
+    assert "v2.5.0 release opens the operational-hardening" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -561,18 +578,23 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v241["v2.4.1<br/>Performance hardening"]' in roadmap
     assert 'v242["v2.4.2<br/>Diagnostic polish"]' in roadmap
     assert 'v243["v2.4.3<br/>Release closeout"]' in roadmap
+    assert 'v250["v2.5.0<br/>Server staging + write coordination"]' in roadmap
+    assert 'v251["v2.5.1<br/>Stage lifecycle diagnostics + polish"]' in roadmap
+    assert 'v252["v2.5.2<br/>Security + deployment feasibility"]' in roadmap
+    assert 'v253["v2.5.3<br/>Operational closeout"]' in roadmap
     assert "class v20,v21,v22,v23,v24 majorDone" in roadmap
-    assert "class v25 majorFuture" in roadmap
+    assert "class v25 majorActive" in roadmap
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
     assert "class v240,v241,v242,v243 patchDone" in roadmap
+    assert "class v250 patchActive" in roadmap
+    assert "class v251,v252,v253 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
-    assert "classDef majorFuture" in roadmap
+    assert "classDef majorActive" in roadmap
     assert "classDef patchDone" in roadmap
-    assert "classDef majorActive" not in roadmap
-    assert "classDef patchActive" not in roadmap
-    assert "classDef patchFuture" not in roadmap
+    assert "classDef patchActive" in roadmap
+    assert "classDef patchFuture" in roadmap
     assert "v2.0.x - Stable v2 Baseline" in roadmap
     assert "Status: completed" in roadmap
     assert "v2.1.x - Model Profiles And Advanced Surrogates" in roadmap
@@ -607,6 +629,12 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "ordered numeric fidelity levels" in roadmap
     assert "batches from one through four" in roadmap
     assert "v2.5.x - App/API Operational Hardening" in roadmap
+    assert re.search(
+        r"## v2\.5\.x - App/API Operational Hardening\s+Status: active",
+        roadmap,
+    )
+    assert "exactly-once append claims" in roadmap
+    assert "same-machine append, review, and observation mutations" in roadmap
     assert "No mandatory database" in roadmap
     assert "No unrestricted feature cross-product" in roadmap
     assert "No raw low-level kernel API as the first modeling extension" in roadmap
@@ -676,7 +704,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.4.3" in requirements_lock
+    assert "BO Forge v2.5.0" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -728,7 +756,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.4.3." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.5.0." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -1074,6 +1102,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge_app/service.py" in names
     assert "bo_forge_app/api.py" in names
     assert "bo_forge_app/api_cli.py" in names
+    assert "bo_forge_app/stages.py" in names
     assert "bo_forge_app/__main__.py" in names
     assert f"{DIST_INFO_ROOT}/entry_points.txt" in names
     assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
@@ -1084,6 +1113,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert 'Requires-Dist: streamlit>=1.57; extra == "app"' in metadata
     assert 'Requires-Dist: fastapi>=0.115; extra == "api"' in metadata
     assert 'Requires-Dist: uvicorn>=0.30; extra == "api"' in metadata
+    assert "Requires-Dist: filelock<4,>=3.16" in metadata
     assert 'Requires-Dist: streamlit>=1.57\n' not in metadata
     assert 'Requires-Dist: fastapi>=0.115\n' not in metadata
 

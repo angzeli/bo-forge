@@ -20,6 +20,7 @@ from bo_forge.config import (
     ReviewConfig,
     VariableConfig,
 )
+from bo_forge.errors import LogBusyError, LogConflictError
 from bo_forge.io import empty_campaign_log
 from bo_forge.logs import load_campaign_log
 from bo_forge.validation import canonical_columns
@@ -683,7 +684,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 2.4.3\n"
+    assert captured.out == "bo-forge 2.5.0\n"
     assert captured.err == ""
 
 
@@ -692,7 +693,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 2.4.3\n"
+    assert completed.stdout == "bo-forge 2.5.0\n"
     assert completed.stderr == ""
 
 
@@ -2052,6 +2053,15 @@ def test_mark_observed_missing_row_returns_hint(
     assert (
         "Hint: Check the row_id, pending status, campaign log path, and file permissions."
         in captured.err
+    )
+
+
+def test_log_coordination_errors_have_specific_cli_hints() -> None:
+    assert cli._hint_for_error(LogConflictError("stale")) == (
+        "Hint: Reload the campaign, inspect the latest log, and retry the mutation."
+    )
+    assert cli._hint_for_error(LogBusyError("busy")) == (
+        "Hint: Another local writer is active; wait briefly and retry."
     )
 
 

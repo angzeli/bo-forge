@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
+import os
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import pandas as pd
+from filelock import FileLock, Timeout
 
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import LogValidationError, LogWriteError
+from bo_forge.errors import (
+    LogBusyError,
+    LogConflictError,
+    LogValidationError,
+    LogWriteError,
+)
 from bo_forge.io import empty_campaign_log
 from bo_forge.validation import (
     BASE_COLUMNS,
@@ -26,6 +37,12 @@ from bo_forge.validation import (
     validate_campaign_data,
 )
 
+LOG_LOCK_TIMEOUT_SECONDS = 10.0
+_SYSTEM_TEMP_DIRECTORY = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
+_LOCK_OWNER = str(os.getuid()) if hasattr(os, "getuid") else "default"
+_LOG_LOCK_DIRECTORY = _SYSTEM_TEMP_DIRECTORY / f"bo-forge-{_LOCK_OWNER}-log-locks"
+_MISSING_LOG_FINGERPRINT = "<missing-log>"
+
 
 def load_campaign_log(path: str | Path, config: CampaignConfig) -> pd.DataFrame:
     """Load and validate a campaign log, returning an empty canonical log if missing."""
@@ -38,59 +55,75 @@ def load_campaign_log(path: str | Path, config: CampaignConfig) -> pd.DataFrame:
     return df
 
 
+def _load_campaign_log_snapshot(
+    path: str | Path,
+    config: CampaignConfig,
+) -> tuple[pd.DataFrame, str | None]:
+    """Load a session-consistent log and byte fingerprint under its mutation lock."""
+    log_path = _canonical_log_path(path)
+    with _campaign_log_lock(log_path):
+        df = load_campaign_log(log_path, config)
+        return df, _log_file_fingerprint(log_path) or _MISSING_LOG_FINGERPRINT
+
+
 def append_suggestions(
     log_path: str | Path,
     suggestions: pd.DataFrame,
     config: CampaignConfig | None = None,
+    *,
+    expected_log_fingerprint: str | None = None,
 ) -> None:
     """Append suggested rows to a campaign log and validate the written file."""
-    path = Path(log_path)
+    path = _canonical_log_path(log_path)
     if suggestions.empty:
         raise LogWriteError("append_suggestions() received an empty suggestions DataFrame.")
 
     _validate_suggestions_for_append(suggestions)
+    with _campaign_log_lock(path):
+        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        if path.exists():
+            existing = _read_csv(path)
+            _validate_structural_log(existing)
+            if list(existing.columns) != list(suggestions.columns):
+                raise LogWriteError(
+                    "Suggestions columns do not match existing log columns: "
+                    f"expected={list(existing.columns)}, actual={list(suggestions.columns)}."
+                )
+        else:
+            existing = pd.DataFrame(columns=suggestions.columns)
 
-    if path.exists():
-        existing = _read_csv(path)
-        _validate_structural_log(existing)
-        if list(existing.columns) != list(suggestions.columns):
+        duplicated = set(existing["row_id"].astype(str)) & set(
+            suggestions["row_id"].astype(str)
+        )
+        if duplicated:
+            row_id = sorted(duplicated)[0]
+            raise LogWriteError(f"Cannot append suggestions with duplicate row_id '{row_id}'.")
+
+        combined = pd.concat([existing, suggestions], ignore_index=True)
+        _validate_structural_log(combined)
+        if config is not None:
+            validate_campaign_data(config, combined)
+        elif _has_stage_column(combined.columns):
             raise LogWriteError(
-                "Suggestions columns do not match existing log columns: "
-                f"expected={list(existing.columns)}, actual={list(suggestions.columns)}."
+                "Structured campaign append requires config-aware validation; use "
+                "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
             )
-    else:
-        existing = pd.DataFrame(columns=suggestions.columns)
-
-    duplicated = set(existing["row_id"].astype(str)) & set(suggestions["row_id"].astype(str))
-    if duplicated:
-        row_id = sorted(duplicated)[0]
-        raise LogWriteError(f"Cannot append suggestions with duplicate row_id '{row_id}'.")
-
-    combined = pd.concat([existing, suggestions], ignore_index=True)
-    _validate_structural_log(combined)
-    if config is not None:
-        validate_campaign_data(config, combined)
-    elif _has_stage_column(combined.columns):
-        raise LogWriteError(
-            "Structured campaign append requires config-aware validation; use "
-            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
-        )
-    elif _has_replicate_columns(combined.columns):
-        raise LogWriteError(
-            "Replicate append requires config-aware validation; use "
-            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
-        )
-    elif _has_qmfkg_source(combined):
-        raise LogWriteError(
-            "qMFKG append requires config-aware validation; use "
-            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
-        )
-    elif _has_qlog_nehvi_source(combined):
-        raise LogWriteError(
-            "qLogNEHVI append requires config-aware validation; use "
-            "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
-        )
-    _atomic_write_and_validate(path, combined)
+        elif _has_replicate_columns(combined.columns):
+            raise LogWriteError(
+                "Replicate append requires config-aware validation; use "
+                "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+            )
+        elif _has_qmfkg_source(combined):
+            raise LogWriteError(
+                "qMFKG append requires config-aware validation; use "
+                "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+            )
+        elif _has_qlog_nehvi_source(combined):
+            raise LogWriteError(
+                "qLogNEHVI append requires config-aware validation; use "
+                "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
+            )
+        _atomic_write_and_validate(path, combined, config=config)
 
 
 def mark_observed(
@@ -100,44 +133,48 @@ def mark_observed(
     objective_values: dict[str, float] | None = None,
     actual_cost: float | None = None,
     config: CampaignConfig | None = None,
+    *,
+    expected_log_fingerprint: str | None = None,
 ) -> None:
     """Mark a suggested row as observed by filling the objective value in place."""
-    path = Path(log_path)
-    if not path.exists():
-        raise LogWriteError(
-            f"Cannot mark row '{row_id}' observed because log '{path}' does not exist."
-        )
+    path = _canonical_log_path(log_path)
     if not isinstance(row_id, str) or not row_id.strip():
         raise LogWriteError("row_id must be a non-empty string.")
 
-    df = _read_csv(path)
-    objective_columns = _variable_and_objective_columns(df.columns)[1]
-    parsed_objective_values = _parse_mark_observed_objective_values(
-        row_id=row_id,
-        objective_columns=objective_columns,
-        objective_value=objective_value,
-        objective_values=objective_values,
-    )
-    actual_cost_text = _parse_actual_cost(row_id, actual_cost)
-    _validate_log_for_mark_observed(df, config)
-    index = _mark_observed_row_index(df, row_id)
-    _validate_mark_observed_transition(
-        df,
-        index=index,
-        row_id=row_id,
-        objective_columns=objective_columns,
-        actual_cost_text=actual_cost_text,
-    )
-    _apply_observation(
-        df,
-        index=index,
-        objective_values=parsed_objective_values,
-        actual_cost_text=actual_cost_text,
-    )
-    _validate_structural_log(df)
-    if config is not None:
-        validate_campaign_data(config, df)
-    _atomic_write_and_validate(path, df)
+    with _campaign_log_lock(path):
+        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        if not path.exists():
+            raise LogWriteError(
+                f"Cannot mark row '{row_id}' observed because log '{path}' does not exist."
+            )
+        df = _read_csv(path)
+        objective_columns = _variable_and_objective_columns(df.columns)[1]
+        parsed_objective_values = _parse_mark_observed_objective_values(
+            row_id=row_id,
+            objective_columns=objective_columns,
+            objective_value=objective_value,
+            objective_values=objective_values,
+        )
+        actual_cost_text = _parse_actual_cost(row_id, actual_cost)
+        _validate_log_for_mark_observed(df, config)
+        index = _mark_observed_row_index(df, row_id)
+        _validate_mark_observed_transition(
+            df,
+            index=index,
+            row_id=row_id,
+            objective_columns=objective_columns,
+            actual_cost_text=actual_cost_text,
+        )
+        _apply_observation(
+            df,
+            index=index,
+            objective_values=parsed_objective_values,
+            actual_cost_text=actual_cost_text,
+        )
+        _validate_structural_log(df)
+        if config is not None:
+            validate_campaign_data(config, df)
+        _atomic_write_and_validate(path, df, config=config)
 
 
 def _parse_actual_cost(row_id: str, actual_cost: float | None) -> str | None:
@@ -318,13 +355,11 @@ def review_suggestion(
     decision: str,
     note: str = "",
     config: CampaignConfig | None = None,
+    *,
+    expected_log_fingerprint: str | None = None,
 ) -> None:
     """Record a human review decision for one suggested row."""
-    path = Path(log_path)
-    if not path.exists():
-        raise LogWriteError(
-            f"Cannot review row '{row_id}' because log '{path}' does not exist."
-        )
+    path = _canonical_log_path(log_path)
     if not isinstance(row_id, str) or not row_id.strip():
         raise LogWriteError("row_id must be a non-empty string.")
 
@@ -342,37 +377,43 @@ def review_suggestion(
     if "\n" in cleaned_note or "\r" in cleaned_note:
         raise LogWriteError("review_note cannot contain newline characters.")
 
-    df = _read_csv(path)
-    _validate_structural_log(df)
-    if config is not None:
-        validate_campaign_data(config, df)
-    elif _has_stage_column(df.columns):
-        raise LogWriteError(
-            "Structured campaign review_suggestion requires config-aware validation; use "
-            "review_suggestion(..., config=config) or CampaignSession.review_suggestion()."
-        )
-    if not _has_review_columns(df.columns):
-        raise LogWriteError("Cannot review suggestions because review is not enabled.")
+    with _campaign_log_lock(path):
+        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        if not path.exists():
+            raise LogWriteError(
+                f"Cannot review row '{row_id}' because log '{path}' does not exist."
+            )
+        df = _read_csv(path)
+        _validate_structural_log(df)
+        if config is not None:
+            validate_campaign_data(config, df)
+        elif _has_stage_column(df.columns):
+            raise LogWriteError(
+                "Structured campaign review_suggestion requires config-aware validation; use "
+                "review_suggestion(..., config=config) or CampaignSession.review_suggestion()."
+            )
+        if not _has_review_columns(df.columns):
+            raise LogWriteError("Cannot review suggestions because review is not enabled.")
 
-    matches = df["row_id"].astype(str) == row_id
-    if not matches.any():
-        raise LogWriteError(f"Cannot review row '{row_id}' because row_id was not found.")
-    if matches.sum() > 1:
-        raise LogWriteError(f"Cannot review row '{row_id}' because row_id is duplicated.")
+        matches = df["row_id"].astype(str) == row_id
+        if not matches.any():
+            raise LogWriteError(f"Cannot review row '{row_id}' because row_id was not found.")
+        if matches.sum() > 1:
+            raise LogWriteError(f"Cannot review row '{row_id}' because row_id is duplicated.")
 
-    index = matches[matches].index[0]
-    status = str(df.at[index, "status"])
-    if status != "suggested":
-        raise LogWriteError(
-            f"Cannot review row '{row_id}' because status is '{status}', not 'suggested'."
-        )
+        index = matches[matches].index[0]
+        status = str(df.at[index, "status"])
+        if status != "suggested":
+            raise LogWriteError(
+                f"Cannot review row '{row_id}' because status is '{status}', not 'suggested'."
+            )
 
-    df.at[index, "review_status"] = decision_map[decision]
-    df.at[index, "review_note"] = cleaned_note
-    _validate_structural_log(df)
-    if config is not None:
-        validate_campaign_data(config, df)
-    _atomic_write_and_validate(path, df)
+        df.at[index, "review_status"] = decision_map[decision]
+        df.at[index, "review_note"] = cleaned_note
+        _validate_structural_log(df)
+        if config is not None:
+            validate_campaign_data(config, df)
+        _atomic_write_and_validate(path, df, config=config)
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
@@ -384,7 +425,12 @@ def _read_csv(path: Path) -> pd.DataFrame:
         raise LogWriteError(f"Could not parse campaign log '{path}': {exc}") from exc
 
 
-def _atomic_write_and_validate(path: Path, df: pd.DataFrame) -> None:
+def _atomic_write_and_validate(
+    path: Path,
+    df: pd.DataFrame,
+    *,
+    config: CampaignConfig | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(
         mode="w",
@@ -401,9 +447,13 @@ def _atomic_write_and_validate(path: Path, df: pd.DataFrame) -> None:
     try:
         temp_df = _read_csv(temp_path)
         _validate_structural_log(temp_df)
+        if config is not None:
+            validate_campaign_data(config, temp_df)
         temp_path.replace(path)
         post_write_df = _read_csv(path)
         _validate_structural_log(post_write_df)
+        if config is not None:
+            validate_campaign_data(config, post_write_df)
     except (OSError, LogValidationError, LogWriteError) as exc:
         try:
             temp_path.unlink(missing_ok=True)
@@ -412,6 +462,60 @@ def _atomic_write_and_validate(path: Path, df: pd.DataFrame) -> None:
         raise LogWriteError(
             f"Post-write validation failed for campaign log '{path}': {exc}"
         ) from exc
+
+
+def _canonical_log_path(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def _log_lock_path(path: str | Path) -> Path:
+    canonical = _canonical_log_path(path)
+    digest = hashlib.sha256(str(canonical).encode("utf-8")).hexdigest()
+    return _LOG_LOCK_DIRECTORY / f"{digest}.lock"
+
+
+@contextmanager
+def _campaign_log_lock(path: str | Path) -> Iterator[None]:
+    canonical = _canonical_log_path(path)
+    lock_path = _log_lock_path(canonical)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(lock_path, timeout=LOG_LOCK_TIMEOUT_SECONDS)
+    try:
+        lock.acquire()
+    except Timeout as exc:
+        raise LogBusyError(
+            f"Campaign log '{canonical}' is busy; another process is writing it. "
+            f"Try again after {LOG_LOCK_TIMEOUT_SECONDS:g} seconds."
+        ) from exc
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+def _log_file_fingerprint(path: str | Path) -> str | None:
+    canonical = _canonical_log_path(path)
+    if not canonical.exists():
+        return None
+    digest = hashlib.sha256()
+    try:
+        with canonical.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise LogWriteError(f"Could not fingerprint campaign log '{canonical}': {exc}") from exc
+    return digest.hexdigest()
+
+
+def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> None:
+    if expected is None:
+        return
+    current = _log_file_fingerprint(path) or _MISSING_LOG_FINGERPRINT
+    if current != expected:
+        raise LogConflictError(
+            "Campaign log changed after it was loaded. Reload the campaign before retrying "
+            f"the mutation: log='{path}'."
+        )
 
 
 def _validate_suggestions_for_append(suggestions: pd.DataFrame) -> None:

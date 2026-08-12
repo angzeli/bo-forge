@@ -13,8 +13,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from bo_forge import __version__
-from bo_forge.errors import BOForgeError
+from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError
 from bo_forge_app.service import CampaignAppService, ValidationResult
+from bo_forge_app.stages import InMemoryStageStore, StageSnapshot, StageStoreError
 from bo_forge_app.streamlit_helpers import file_fingerprint, staged_suggestions_from_bundle
 
 
@@ -46,6 +47,7 @@ class DryRunRequest(CampaignRef):
     """Request for non-mutating suggestion generation."""
 
     batch_size: int | None = Field(default=None, ge=1)
+    stage: str | None = None
     context_values: dict[str, object] | None = None
 
 
@@ -61,6 +63,7 @@ class StagedBundlePayload(BaseModel):
     appended: bool = False
     context_values: dict[str, object] | None = None
     context_values_fingerprint: str | None = None
+    stage: str | None = None
 
 
 class AppendRequest(CampaignRef):
@@ -89,7 +92,12 @@ class ObservationRequest(CampaignRef):
     expected_log_fingerprint: str
 
 
-def create_app(root: str | Path) -> FastAPI:
+def create_app(
+    root: str | Path,
+    *,
+    stage_ttl_seconds: float = 1800.0,
+    max_staged_batches: int = 128,
+) -> FastAPI:
     """Create the experimental BO Forge FastAPI app rooted at one directory."""
     resolved_root = Path(root).expanduser().resolve()
     if not resolved_root.is_dir():
@@ -101,43 +109,22 @@ def create_app(root: str | Path) -> FastAPI:
         description="Experimental local/trusted-network API probe around CampaignAppService.",
     )
     app.state.root = resolved_root
+    stage_store = InMemoryStageStore(
+        ttl_seconds=stage_ttl_seconds,
+        max_active_stages=max_staged_batches,
+    )
+    app.state.stage_store = stage_store
 
-    @app.exception_handler(ApiError)
-    async def _api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
-        return _error_response(exc.code, exc.message, exc.status_code)
-
-    @app.exception_handler(BOForgeError)
-    async def _bo_forge_error_handler(_request: Request, exc: BOForgeError) -> JSONResponse:
-        return _error_response("bo_forge_error", str(exc), 400)
-
-    @app.exception_handler(ValueError)
-    async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
-        return _error_response("value_error", str(exc), 400)
-
-    @app.exception_handler(RequestValidationError)
-    async def _validation_error_handler(
-        _request: Request,
-        exc: RequestValidationError,
-    ) -> JSONResponse:
-        details = [
-            {"loc": list(error.get("loc", [])), "message": str(error.get("msg", ""))}
-            for error in exc.errors()
-        ]
-        return JSONResponse(
-            status_code=422,
-            content={
-                "ok": False,
-                "error": {
-                    "code": "request_validation",
-                    "message": "Invalid request.",
-                    "details": details,
-                },
-            },
-        )
+    _register_error_handlers(app)
 
     @app.get("/health")
     def health() -> dict[str, object]:
-        return {"status": "ok", "version": __version__, "experimental": True}
+        return {
+            "status": "ok",
+            "version": __version__,
+            "experimental": True,
+            "staging": stage_store.stats(),
+        }
 
     @app.post("/campaign/validation")
     def validation(request: CampaignRef) -> dict[str, object]:
@@ -176,15 +163,33 @@ def create_app(root: str | Path) -> FastAPI:
     @app.post("/campaign/suggestions/dry-run")
     def dry_run(request: DryRunRequest) -> dict[str, object]:
         service = _load_service(resolved_root, request)
-        batch_size = request.batch_size or service.config.bo.batch_size
-        result = service.suggest_dry_run(
-            batch_size=batch_size,
-            context_values=request.context_values,
-        )
+        _prune_invalid_server_stages(stage_store)
+        reservation = stage_store.reserve_capacity()
+        try:
+            batch_size = request.batch_size or service.config.bo.batch_size
+            result = service.suggest_dry_run(
+                batch_size=batch_size,
+                stage=request.stage,
+                context_values=request.context_values,
+            )
+            staged = stage_store.create(
+                suggestions=result.suggestions,
+                quality=result.quality,
+                bundle=result.bundle,
+                config_path=service.config_path,
+                log_path=service.log_path,
+                stage_selection=request.stage,
+                context_values=request.context_values,
+                reservation_token=reservation,
+            )
+        except Exception:
+            stage_store.release_reservation(reservation)
+            raise
         return {
             "suggestions": _table_payload(result.suggestions),
             "quality": _table_payload(result.quality),
             "staged_bundle": _staged_bundle_payload(result.bundle, resolved_root),
+            "stage": _stage_metadata_payload(staged, resolved_root),
             "log_fingerprint": file_fingerprint(service.log_path),
         }
 
@@ -196,6 +201,13 @@ def create_app(root: str | Path) -> FastAPI:
             bundle,
             last_appended_fingerprint=request.last_appended_fingerprint,
         )
+        stage_store.retire_for_log_change(
+            log_path=result.service.log_path,
+            previous_log_fingerprint=request.staged_bundle.log_fingerprint,
+            consumed_suggestions_fingerprint=(
+                request.staged_bundle.suggestions_fingerprint
+            ),
+        )
         return {
             "validation": _validation_payload(result.validation),
             "appended_fingerprint": result.appended_fingerprint,
@@ -204,9 +216,17 @@ def create_app(root: str | Path) -> FastAPI:
 
     @app.post("/campaign/review")
     def review(request: ReviewRequest) -> dict[str, object]:
-        _assert_expected_log_fingerprint(resolved_root, request)
         service = _load_service(resolved_root, request)
-        result = service.review(request.row_id, request.decision, request.note)
+        result = service.review(
+            request.row_id,
+            request.decision,
+            request.note,
+            expected_log_fingerprint=request.expected_log_fingerprint,
+        )
+        stage_store.retire_for_log_change(
+            log_path=result.service.log_path,
+            previous_log_fingerprint=request.expected_log_fingerprint,
+        )
         return {
             "validation": _validation_payload(result.validation),
             "log_fingerprint": file_fingerprint(result.service.log_path),
@@ -214,20 +234,146 @@ def create_app(root: str | Path) -> FastAPI:
 
     @app.post("/campaign/observations")
     def observations(request: ObservationRequest) -> dict[str, object]:
-        _assert_expected_log_fingerprint(resolved_root, request)
         service = _load_service(resolved_root, request)
         result = service.mark_observed(
             request.row_id,
             objective_value=request.objective_value,
             objective_values=request.objective_values,
             actual_cost=request.actual_cost,
+            expected_log_fingerprint=request.expected_log_fingerprint,
+        )
+        stage_store.retire_for_log_change(
+            log_path=result.service.log_path,
+            previous_log_fingerprint=request.expected_log_fingerprint,
         )
         return {
             "validation": _validation_payload(result.validation),
             "log_fingerprint": file_fingerprint(result.service.log_path),
         }
 
+    _register_server_stage_routes(app, resolved_root, stage_store)
+
     return app
+
+
+def _register_error_handlers(app: FastAPI) -> None:
+
+    @app.exception_handler(ApiError)
+    async def _api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
+        return _error_response(exc.code, exc.message, exc.status_code)
+
+    @app.exception_handler(StageStoreError)
+    async def _stage_store_error_handler(
+        _request: Request,
+        exc: StageStoreError,
+    ) -> JSONResponse:
+        return _error_response(exc.code, exc.message, exc.status_code)
+
+    @app.exception_handler(LogBusyError)
+    async def _log_busy_error_handler(_request: Request, exc: LogBusyError) -> JSONResponse:
+        return _error_response("log_busy", str(exc), 409)
+
+    @app.exception_handler(LogConflictError)
+    async def _log_conflict_error_handler(
+        _request: Request,
+        exc: LogConflictError,
+    ) -> JSONResponse:
+        return _error_response("stale_log", str(exc), 400)
+
+    @app.exception_handler(BOForgeError)
+    async def _bo_forge_error_handler(_request: Request, exc: BOForgeError) -> JSONResponse:
+        return _error_response("bo_forge_error", str(exc), 400)
+
+    @app.exception_handler(ValueError)
+    async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
+        return _error_response("value_error", str(exc), 400)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(
+        _request: Request,
+        exc: RequestValidationError,
+    ) -> JSONResponse:
+        details = [
+            {"loc": list(error.get("loc", [])), "message": str(error.get("msg", ""))}
+            for error in exc.errors()
+        ]
+        return JSONResponse(
+            status_code=422,
+            content={
+                "ok": False,
+                "error": {
+                    "code": "request_validation",
+                    "message": "Invalid request.",
+                    "details": details,
+                },
+            },
+        )
+
+def _register_server_stage_routes(
+    app: FastAPI,
+    root: Path,
+    stage_store: InMemoryStageStore,
+) -> None:
+    @app.get("/campaign/stages/{stage_id}")
+    def get_stage(stage_id: str) -> dict[str, object]:
+        staged = stage_store.get(stage_id)
+        stale_reason = _server_stage_file_invalidation_reason(staged)
+        if stale_reason is not None and stage_store.mark_stale_if_active(stage_id):
+            raise StageStoreError("stage_stale", stale_reason, 409)
+        return _server_stage_payload(staged, root)
+
+    @app.post("/campaign/stages/{stage_id}/append")
+    def append_server_stage(stage_id: str) -> dict[str, object]:
+        staged = stage_store.claim(stage_id)
+        stale_reason = _server_stage_file_invalidation_reason(staged)
+        if stale_reason is not None:
+            stage_store.complete(stage_id, "stale")
+            raise StageStoreError("stage_stale", stale_reason, 409)
+        try:
+            service = CampaignAppService.load(staged.config_path, staged.log_path)
+            result = service.append_staged(
+                staged.bundle,
+                stage=staged.stage_selection,
+                context_values=staged.context_values,
+            )
+        except (LogConflictError, ValueError) as exc:
+            stage_store.complete(stage_id, "stale")
+            raise StageStoreError(
+                "stage_stale",
+                f"Staged batch is stale and cannot be appended: {exc}",
+                409,
+            ) from exc
+        except LogBusyError:
+            stage_store.restore(stage_id)
+            raise
+        except Exception as exc:
+            stale_reason = _server_stage_file_invalidation_reason(staged)
+            if stale_reason is None:
+                stage_store.restore(stage_id)
+                raise
+            stage_store.complete(stage_id, "stale")
+            raise StageStoreError(
+                "stage_stale",
+                "The campaign files changed during append, so this stage cannot be "
+                f"retried safely: {exc}",
+                409,
+            ) from exc
+        stage_store.retire_for_log_change(
+            log_path=staged.log_path,
+            previous_log_fingerprint=str(staged.bundle.get("log_fingerprint", "")),
+        )
+        terminal = stage_store.complete(stage_id, "consumed")
+        return {
+            "stage": _stage_metadata_payload(terminal, root),
+            "validation": _validation_payload(result.validation),
+            "appended_fingerprint": result.appended_fingerprint,
+            "log_fingerprint": file_fingerprint(result.service.log_path),
+        }
+
+    @app.delete("/campaign/stages/{stage_id}")
+    def discard_server_stage(stage_id: str) -> dict[str, object]:
+        discarded = stage_store.discard(stage_id)
+        return {"stage": _stage_metadata_payload(discarded, root)}
 
 
 def _load_service(root: Path, request: CampaignRef) -> CampaignAppService:
@@ -260,16 +406,6 @@ def _relative_to_root(root: Path, path_value: object) -> str:
         return path.relative_to(root).as_posix()
     except ValueError as exc:
         raise ApiError("path_outside_root", "Staged bundle path is outside API root.") from exc
-
-
-def _assert_expected_log_fingerprint(root: Path, request: CampaignRef) -> None:
-    expected = getattr(request, "expected_log_fingerprint", None)
-    if expected is None:
-        return
-    _, log_path = _resolve_campaign_paths(root, request)
-    current = file_fingerprint(log_path)
-    if current != expected:
-        raise ApiError("stale_log", "Log file changed before this mutation.")
 
 
 def _table_payload(df: pd.DataFrame | None) -> dict[str, object]:
@@ -318,6 +454,7 @@ def _staged_bundle_payload(bundle: dict[str, object], root: Path) -> dict[str, o
         "appended": bool(bundle.get("appended", False)),
         "context_values": bundle.get("context_values"),
         "context_values_fingerprint": bundle.get("context_values_fingerprint"),
+        "stage": bundle.get("stage"),
     }
 
 
@@ -334,7 +471,49 @@ def _rehydrate_staged_bundle(payload: StagedBundlePayload, root: Path) -> dict[s
     if payload.context_values is not None:
         bundle["context_values"] = payload.context_values
         bundle["context_values_fingerprint"] = payload.context_values_fingerprint
+    if payload.stage is not None:
+        bundle["stage"] = payload.stage
     return bundle
+
+
+def _stage_metadata_payload(staged: StageSnapshot, root: Path) -> dict[str, object]:
+    return {
+        "stage_id": staged.stage_id,
+        "status": staged.status,
+        "created_at": staged.created_at.isoformat(),
+        "expires_at": staged.expires_at.isoformat(),
+        "config_path": _relative_to_root(root, staged.config_path),
+        "log_path": _relative_to_root(root, staged.log_path),
+        "stage_selection": staged.stage_selection,
+        "context_values": staged.context_values,
+    }
+
+
+def _server_stage_payload(staged: StageSnapshot, root: Path) -> dict[str, object]:
+    return {
+        "stage": _stage_metadata_payload(staged, root),
+        "suggestions": _table_payload(staged.suggestions),
+        "quality": _table_payload(staged.quality),
+    }
+
+
+def _server_stage_file_invalidation_reason(staged: StageSnapshot) -> str | None:
+    try:
+        config_fingerprint = file_fingerprint(staged.config_path)
+        log_fingerprint = file_fingerprint(staged.log_path)
+    except OSError as exc:
+        return f"Staged batch files cannot be read: {exc}"
+    if config_fingerprint != staged.bundle.get("config_fingerprint"):
+        return "Config file changed after suggestions were staged."
+    if log_fingerprint != staged.bundle.get("log_fingerprint"):
+        return "Log file changed after suggestions were staged."
+    return None
+
+
+def _prune_invalid_server_stages(stage_store: InMemoryStageStore) -> None:
+    for staged in stage_store.active_snapshots():
+        if _server_stage_file_invalidation_reason(staged) is not None:
+            stage_store.mark_stale_if_active(staged.stage_id)
 
 
 def _validation_payload(result: ValidationResult) -> dict[str, object]:

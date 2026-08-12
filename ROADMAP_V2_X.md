@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.4.3`. The v2.4.3 release closes the v2.4.x line with
-regression hardening, tutorial alignment, documentation cleanup, and package
-verification while preserving qMFKG numerical behavior and schemas. Broader
-fidelity combinations remain deferred.
+Current baseline: `v2.5.0`. The v2.5.0 release opens the operational-hardening
+line with preferred server-managed API staging and same-machine CSV mutation
+coordination while preserving BO behavior, schemas, and supported campaign
+combinations.
 
 ## Roadmap So Far
 
@@ -31,6 +31,10 @@ flowchart LR
     v241["v2.4.1<br/>Performance hardening"]
     v242["v2.4.2<br/>Diagnostic polish"]
     v243["v2.4.3<br/>Release closeout"]
+    v250["v2.5.0<br/>Server staging + write coordination"]
+    v251["v2.5.1<br/>Stage lifecycle diagnostics + polish"]
+    v252["v2.5.2<br/>Security + deployment feasibility"]
+    v253["v2.5.3<br/>Operational closeout"]
 
     v21 -.-> v210
     v21 -.-> v211
@@ -48,17 +52,26 @@ flowchart LR
     v24 -.-> v241
     v24 -.-> v242
     v24 -.-> v243
+    v25 -.-> v250
+    v25 -.-> v251
+    v25 -.-> v252
+    v25 -.-> v253
 
     class v20,v21,v22,v23,v24 majorDone
-    class v25 majorFuture
+    class v25 majorActive
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
     class v240,v241,v242,v243 patchDone
+    class v250 patchActive
+    class v251,v252,v253 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
+    classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
     classDef majorFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#111827;
     classDef patchDone fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#111827;
+    classDef patchActive fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
+    classDef patchFuture fill:#f3f4f6,stroke:#6b7280,stroke-width:1.5px,color:#111827;
 ```
 
 ## v2.0.x - Stable v2 Baseline
@@ -154,13 +167,20 @@ Status: completed
 
 ## v2.5.x - App/API Operational Hardening
 
-Status: planned
+Status: active
 
-- Consider server-side staged API state.
-- Consider signed staged bundles.
-- Improve safeguards around concurrent writes.
-- Keep any production app/API direction explicit about auth, persistence, and
-  deployment boundaries.
+- `v2.5.0` adds bounded process-local server-managed API stages with
+  exactly-once append claims, lifecycle errors, and launcher-configured TTL and
+  capacity.
+- `v2.5.0` coordinates same-machine append, review, and observation mutations
+  with canonical-path file locks and stale-session fingerprints.
+- `v2.5.1` is reserved for stage lifecycle diagnostics and usability polish.
+- `v2.5.2` will decide whether signed bundles, authentication, or deployment
+  hardening has a conservative place in this experimental API line.
+- `v2.5.3` is reserved for operational release closeout.
+- Keep the compatibility client-carried bundle path through v2.5.x.
+- Keep production auth, persistent stage storage, multi-worker coordination,
+  and public-internet claims out of v2.5.0.
 
 ## Not Yet
 

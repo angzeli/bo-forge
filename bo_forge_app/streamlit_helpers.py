@@ -226,6 +226,8 @@ def make_staged_suggestion_bundle(
     *,
     stage: str | None = None,
     context_values: dict[str, object] | None = None,
+    config_fingerprint: str | None = None,
+    log_fingerprint: str | None = None,
 ) -> dict[str, object]:
     """Create a staged suggestion bundle tied to the current config/log files."""
     resolved_config_path = Path(config_path).expanduser().resolve()
@@ -235,9 +237,13 @@ def make_staged_suggestion_bundle(
         "suggestions": staged_suggestions,
         "suggestions_fingerprint": dataframe_fingerprint(staged_suggestions),
         "config_path": str(resolved_config_path),
-        "config_fingerprint": file_fingerprint(resolved_config_path),
+        "config_fingerprint": config_fingerprint
+        if config_fingerprint is not None
+        else file_fingerprint(resolved_config_path),
         "log_path": str(resolved_log_path),
-        "log_fingerprint": file_fingerprint(resolved_log_path),
+        "log_fingerprint": log_fingerprint
+        if log_fingerprint is not None
+        else file_fingerprint(resolved_log_path),
         "appended": False,
     }
     if stage is not None:

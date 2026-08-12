@@ -512,3 +512,12 @@ The commands that can change files are:
 For review-enabled campaigns, the explicit rhythm is:
 
 > suggest → append → review → run accepted experiment → mark-observed
+
+v2.5.0 serializes append, review, and observation mutations with the same
+canonical-log lock used by sessions, Streamlit, and the API on one machine.
+Each CLI mutation loads a current fingerprint before writing. A conflicting or
+busy log fails clearly without overwriting newer rows; multi-host shared-file
+coordination remains unsupported.
+
+Conflict errors tell the user to reload and inspect the latest campaign before
+retrying. Busy errors tell the user to wait briefly for the active local writer.

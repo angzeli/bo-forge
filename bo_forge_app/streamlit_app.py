@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from bo_forge.errors import BOForgeError
+from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError
 from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge_app.service import CampaignAppService
 from bo_forge_app.streamlit_helpers import (
@@ -1923,6 +1923,8 @@ def _render_append_staged_suggestions(
             request_state,
         )
     except (BOForgeError, ValueError) as exc:
+        if _handle_log_mutation_error(st, campaign, exc):
+            return
         st.error(str(exc))
         return
     st.session_state[LAST_APPENDED_FINGERPRINT_KEY] = appended_fingerprint
@@ -2157,6 +2159,8 @@ def _render_review_workflow(
         else:
             campaign.review_suggestion(row_id, decision, note)
     except BOForgeError as exc:
+        if _handle_log_mutation_error(st, campaign, exc):
+            return
         st.error(str(exc))
         return
     _complete_resolve_mutation(st, campaign, "Review decision recorded.")
@@ -2267,6 +2271,8 @@ def _record_observation(
             campaign = _record_single_objective_observation(campaign, form_values)
             success_message = "Observation recorded."
     except (BOForgeError, ValueError) as exc:
+        if _handle_log_mutation_error(st, campaign, exc):
+            return
         st.error(str(exc))
         return
     _complete_resolve_mutation(st, campaign, success_message)
@@ -2309,6 +2315,37 @@ def _complete_resolve_mutation(st: Any, campaign: Any, message: str) -> None:
     config_path, log_path = _current_paths(st)
     _refresh_validation_cache(st, campaign, config_path, log_path)
     _flash_and_rerun(st, message)
+
+
+def _handle_log_mutation_error(st: Any, campaign: Any, exc: Exception) -> bool:
+    if isinstance(exc, LogBusyError):
+        st.error(
+            "The campaign log is busy because another process is writing it. "
+            "Wait briefly, then retry."
+        )
+        return True
+    if not isinstance(exc, LogConflictError):
+        return False
+
+    _clear_staged_suggestions(st)
+    _clear_observation_inputs(st)
+    _clear_report_preview(st)
+    config_path, log_path = _current_paths(st)
+    try:
+        if isinstance(campaign, CampaignAppService) or hasattr(campaign, "session"):
+            campaign = CampaignAppService.load(config_path, log_path)
+        else:
+            campaign.reload()
+    except (BOForgeError, OSError, ValueError) as reload_exc:
+        st.error(f"Campaign log changed in another process, and reload failed: {reload_exc}")
+        return True
+    st.session_state[SESSION_KEY] = campaign
+    _refresh_validation_cache(st, campaign, config_path, log_path)
+    _flash_and_rerun(
+        st,
+        "Campaign log changed in another process. The latest log was reloaded; retry the action.",
+    )
+    return True
 
 
 def _render_actual_cost_input(

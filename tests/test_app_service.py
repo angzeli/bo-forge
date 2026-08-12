@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 
 import bo_forge.suggestions as suggestions_module
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import LogWriteError, SuggestionError
+from bo_forge.errors import LogConflictError, LogWriteError, SuggestionError
 from bo_forge.session import CampaignSession
 from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
@@ -55,6 +55,54 @@ print("ok")
     )
 
     assert completed.stdout == "ok\n"
+
+
+@pytest.mark.parametrize("changed_source", ["config", "log"])
+def test_suggest_dry_run_rejects_source_change_during_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    changed_source: str,
+) -> None:
+    config_path = copy_example_config(tmp_path, "01_simple_2d_maximise_logei.yaml")
+    log_path = copy_example_log(
+        tmp_path,
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    service = CampaignAppService.load(config_path, log_path)
+    suggestions = service.session.suggest_next(batch_size=1)
+    changed_path = config_path if changed_source == "config" else log_path
+    changed_bytes = changed_path.read_bytes() + b"\n"
+
+    def change_source_then_return(**_kwargs: object) -> pd.DataFrame:
+        changed_path.write_bytes(changed_bytes)
+        return suggestions.copy(deep=True)
+
+    monkeypatch.setattr(service.session, "suggest_next", change_source_then_return)
+
+    with pytest.raises(LogConflictError, match="while suggestions were being generated"):
+        service.suggest_dry_run(batch_size=1)
+
+    assert changed_path.read_bytes() == changed_bytes
+
+
+def test_append_staged_rejects_bundle_not_generated_from_loaded_session(
+    tmp_path: Path,
+) -> None:
+    config_path = copy_example_config(tmp_path, "01_simple_2d_maximise_logei.yaml")
+    log_path = copy_example_log(
+        tmp_path,
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    service = CampaignAppService.load(config_path, log_path)
+    suggestions = service.session.suggest_next(batch_size=1)
+    log_path.write_bytes(log_path.read_bytes() + b"\n")
+    bundle = make_staged_suggestion_bundle(suggestions, config_path, log_path)
+    before = log_path.read_bytes()
+
+    with pytest.raises(LogConflictError, match="does not match the staged suggestions"):
+        service.append_staged(bundle)
+
+    assert log_path.read_bytes() == before
 
 
 @pytest.mark.parametrize(

@@ -54,6 +54,12 @@ Confirm:
   representative qMFKG `q=1/2/4` medians without machine-dependent CI
   thresholds.
 - `docs/API_PROBE.md` describes the experimental API probe, root-bound paths, and no-auth safety model.
+- API stage lifecycle tests cover create, recover, discard, expiration,
+  early capacity rejection, compatibility retirement, exactly-once append,
+  stale/ambiguous outcomes, campaign-kind round trips, and process restart loss.
+- Cross-process log tests cover stale fingerprints, lock timeouts, canonical
+  path locking, process-stable lock roots, and serialized same-process and
+  cross-process appends without expected fingerprints.
 - No tracked caches, working logs, latest-suggestion CSVs, notebook outputs, or runtime reports are present.
 - `docs/QLOGNEHVI_FEASIBILITY.md` states that qLogNEHVI is implemented only
   for coupled `2 <= m <= 4` objective campaigns and that cost, replicates,
@@ -113,7 +119,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.4.3-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.5.0-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -130,7 +136,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.4.3-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.5.0-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -147,7 +153,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.4.3-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.5.0-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -160,7 +166,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.4.3.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.5.0.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -180,6 +186,9 @@ bo-forge-app
 python -m bo_forge_app --help
 bo-forge-api --help
 ```
+
+Confirm `--stage-ttl-seconds` and `--max-staged-batches` are documented in API
+help and that `/health` reports the configured process-local staging limits.
 
 Optional trusted-LAN smoke from a controlled network:
 
@@ -234,8 +243,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.4.3`.
-- Tag the release as `v2.4.3`.
+  install paths, and the release tag all agree on `v2.5.0`.
+- Tag the release as `v2.5.0`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

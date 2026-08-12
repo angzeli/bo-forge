@@ -20,3 +20,10 @@ class SuggestionError(BOForgeError):
 class LogWriteError(BOForgeError):
     """Raised when writing or post-write validation of a campaign log fails."""
 
+
+class LogConflictError(LogWriteError):
+    """Raised when a campaign log changed after a caller captured its state."""
+
+
+class LogBusyError(LogWriteError):
+    """Raised when a campaign log mutation cannot acquire its process lock."""

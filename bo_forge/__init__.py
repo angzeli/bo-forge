@@ -1,8 +1,8 @@
-"""BO Forge v2.4.3."""
+"""BO Forge v2.5.0."""
 
 from importlib import import_module
 
-__version__ = "2.4.3"
+__version__ = "2.5.0"
 
 from bo_forge.config import (
     BOConfig,
@@ -24,6 +24,8 @@ from bo_forge.config import (
 from bo_forge.errors import (
     BOForgeError,
     ConfigError,
+    LogBusyError,
+    LogConflictError,
     LogValidationError,
     LogWriteError,
     SuggestionError,
@@ -39,6 +41,8 @@ __all__ = [
     "ContextConfig",
     "CostConfig",
     "FidelityConfig",
+    "LogBusyError",
+    "LogConflictError",
     "LogValidationError",
     "LogWriteError",
     "ModelConfig",

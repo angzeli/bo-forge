@@ -1,5 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v2.5.0 - Server-Managed Staging And Concurrent Write Safety
+
+This operational patch makes server-managed staging the preferred experimental
+FastAPI workflow and coordinates same-machine CSV mutations without changing
+BO models, acquisitions, configs, CSV schemas, or supported combinations.
+
+- Adds bounded, thread-safe, in-memory API stages with opaque IDs, expiration,
+  capacity limits, lifecycle tombstones, and exactly-once append claims.
+- Keeps the existing client-carried staged-bundle append path as a
+  fingerprint-checked trusted-client compatibility workflow and retires the
+  corresponding server-held stage after a successful compatibility append.
+- Binds dry-run results to the exact pre-optimization config/log snapshots and
+  makes ambiguous write-then-error outcomes terminal instead of retryable.
+- Adds canonical-path file locks around append, review, and observation reads,
+  fingerprint checks, validation, atomic replacement, and post-write checks.
+- Adds public `LogConflictError` and `LogBusyError` and stale-fingerprint
+  support in low-level, session, service, API, and Streamlit mutation paths.
+- Makes long-lived sessions reject externally changed logs and refresh their
+  snapshot after successful writes or explicit reload.
+- Adds API launcher controls for stage lifetime and active-stage capacity, plus
+  additive active, appending, and reserved stage counts in `/health`.
+- Documents that stages are process-local, disappear on restart, and do not
+  provide authentication or multi-worker coordination.
+
 ## v2.4.3 - Multi-Fidelity Release Closeout
 
 This closeout patch freezes the completed v2.4.x multi-fidelity contracts,

@@ -14,11 +14,10 @@ from bo_forge.costs import (
     budget_remaining,
     observed_effective_cost,
 )
+from bo_forge.errors import LogConflictError
+from bo_forge.logs import _load_campaign_log_snapshot, _log_file_fingerprint
 from bo_forge.logs import (
     append_suggestions as _append_suggestions,
-)
-from bo_forge.logs import (
-    load_campaign_log,
 )
 from bo_forge.logs import (
     mark_observed as _mark_observed,
@@ -55,24 +54,40 @@ class CampaignSession:
     log_path: Path
     config: CampaignConfig
     df: pd.DataFrame
+    log_fingerprint: str | None = None
+    config_fingerprint: str | None = None
 
     @classmethod
     def from_files(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
         """Create a campaign session from a YAML config and CSV campaign log."""
         parsed_config_path = Path(config_path)
         parsed_log_path = Path(log_path)
+        config_fingerprint = _log_file_fingerprint(parsed_config_path)
         config = CampaignConfig.from_yaml(parsed_config_path)
-        df = load_campaign_log(parsed_log_path, config)
+        if _log_file_fingerprint(parsed_config_path) != config_fingerprint:
+            raise LogConflictError(
+                "Campaign config changed while it was being loaded. Reload the campaign."
+            )
+        df, fingerprint = _load_campaign_log_snapshot(parsed_log_path, config)
+        if _log_file_fingerprint(parsed_config_path) != config_fingerprint:
+            raise LogConflictError(
+                "Campaign config changed while it was being loaded. Reload the campaign."
+            )
         return cls(
             config_path=parsed_config_path,
             log_path=parsed_log_path,
             config=config,
             df=df,
+            log_fingerprint=fingerprint,
+            config_fingerprint=config_fingerprint,
         )
 
     def reload(self) -> pd.DataFrame:
         """Reload the campaign log from disk into the session."""
-        self.df = load_campaign_log(self.log_path, self.config)
+        self.df, self.log_fingerprint = _load_campaign_log_snapshot(
+            self.log_path,
+            self.config,
+        )
         return self.df
 
     def validate(self) -> None:
@@ -568,9 +583,24 @@ class CampaignSession:
             suggestions.copy(deep=True),
         )
 
-    def append_suggestions(self, suggestions: pd.DataFrame) -> pd.DataFrame:
+    def append_suggestions(
+        self,
+        suggestions: pd.DataFrame,
+        *,
+        expected_log_fingerprint: str | None = None,
+    ) -> pd.DataFrame:
         """Append suggestions to disk, reload the session, and return the refreshed log."""
-        _append_suggestions(self.log_path, suggestions, config=self.config)
+        expected = (
+            self.log_fingerprint
+            if expected_log_fingerprint is None
+            else expected_log_fingerprint
+        )
+        _append_suggestions(
+            self.log_path,
+            suggestions,
+            config=self.config,
+            expected_log_fingerprint=expected,
+        )
         return self.reload()
 
     def mark_observed(
@@ -579,6 +609,8 @@ class CampaignSession:
         objective_value: float | None = None,
         objective_values: dict[str, float] | None = None,
         actual_cost: float | None = None,
+        *,
+        expected_log_fingerprint: str | None = None,
     ) -> pd.DataFrame:
         """Mark one pending suggestion observed, reload, and return the refreshed log."""
         _mark_observed(
@@ -588,6 +620,11 @@ class CampaignSession:
             objective_values=objective_values,
             actual_cost=actual_cost,
             config=self.config,
+            expected_log_fingerprint=(
+                self.log_fingerprint
+                if expected_log_fingerprint is None
+                else expected_log_fingerprint
+            ),
         )
         return self.reload()
 
@@ -596,9 +633,22 @@ class CampaignSession:
         row_id: str,
         decision: str,
         note: str = "",
+        *,
+        expected_log_fingerprint: str | None = None,
     ) -> pd.DataFrame:
         """Review one pending suggestion, reload, and return the refreshed log."""
-        _review_suggestion(self.log_path, row_id, decision, note, config=self.config)
+        _review_suggestion(
+            self.log_path,
+            row_id,
+            decision,
+            note,
+            config=self.config,
+            expected_log_fingerprint=(
+                self.log_fingerprint
+                if expected_log_fingerprint is None
+                else expected_log_fingerprint
+            ),
+        )
         return self.reload()
 
     def plot_progress(self, **kwargs: Any) -> Any:

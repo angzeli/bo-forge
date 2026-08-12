@@ -1,10 +1,10 @@
-# 🧪 BO Forge v2.4.3
+# 🧪 BO Forge v2.5.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.4.3 closes the v2.4.x multi-fidelity line with regression hardening,
-tutorial alignment, documentation cleanup, and final package verification. It
-keeps the v2.4.2 diagnostics, qMFKG behavior, config, and CSV schemas unchanged.
+v2.5.0 opens the operational-hardening line with server-managed API staging and
+cross-process CSV write coordination. It keeps BO models, acquisitions,
+configuration, CSV schemas, and supported campaign combinations unchanged.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -32,7 +32,9 @@ BO Forge deliberately supports only:
 - a small `bo-forge` CLI workflow
 - a local Streamlit workbench
 - an internal app service layer that delegates BO behavior to `CampaignSession`
-- an optional experimental FastAPI probe for local/trusted-network exploration
+- an optional experimental FastAPI probe with preferred server-managed staging
+  for local/trusted-network exploration
+- coordinated append, review, and observation writes across local processes
 
 It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, or qLogNEI/qLogNEHVI, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, named fidelity sources, per-level fidelity costs, qMFKG batches above four, automatic stage transitions, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
@@ -107,7 +109,18 @@ Launch the experimental API probe:
 bo-forge-api --root . --host 127.0.0.1 --port 8765
 ```
 
-The API probe has no built-in authentication and is not a production backend.
+Server-managed API stages are held in memory for 30 minutes by default. Limits
+can be changed for one launcher process:
+
+```bash
+bo-forge-api --root . --stage-ttl-seconds 1800 --max-staged-batches 128
+```
+
+For API clients, server-managed staging is preferred. The API probe has no
+built-in authentication and is not a production backend.
+Stages disappear when the API process restarts, and stage IDs are not
+authentication credentials. The earlier client-carried staged-bundle append
+path remains available as a trusted-client compatibility workflow.
 See [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md)
 before using it beyond localhost.
 
@@ -249,7 +262,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.4.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.5.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

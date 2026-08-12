@@ -9,13 +9,14 @@ from typing import Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import BOForgeError
+from bo_forge.errors import BOForgeError, LogConflictError
 from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge.session import CampaignSession, _format_campaign_report
 from bo_forge_app.streamlit_helpers import (
     available_plot_kinds,
     export_staged_suggestions_csv,
     extract_matplotlib_figure,
+    file_fingerprint,
     make_staged_suggestion_bundle,
     observable_rows,
     staged_bundle_invalidation_reason,
@@ -247,19 +248,30 @@ class CampaignAppService:
         context_values: dict[str, object] | None = None,
     ) -> StagedSuggestionResult:
         """Generate non-mutating suggestions and return staged app state."""
+        config_fingerprint, log_fingerprint = self._verified_source_fingerprints()
         suggestions = self.session.suggest_next(
             batch_size=batch_size,
             stage=stage,
             context_values=context_values,
         )
+        quality = self.session.suggestion_quality(suggestions)
+        if (
+            file_fingerprint(self.config_path) != config_fingerprint
+            or file_fingerprint(self.log_path) != log_fingerprint
+        ):
+            raise LogConflictError(
+                "Campaign config or log changed while suggestions were being generated. "
+                "Reload the campaign and generate a new batch."
+            )
         bundle = make_staged_suggestion_bundle(
             suggestions,
             self.config_path,
             self.log_path,
             stage=stage,
             context_values=context_values,
+            config_fingerprint=config_fingerprint,
+            log_fingerprint=log_fingerprint,
         )
-        quality = self.session.suggestion_quality(suggestions)
         return StagedSuggestionResult(suggestions, bundle, quality)
 
     def append_staged(
@@ -280,18 +292,61 @@ class CampaignAppService:
         )
         if reason is not None:
             raise ValueError(reason)
+        if (
+            self.session.config_fingerprint is not None
+            and self.session.config_fingerprint != bundle.get("config_fingerprint")
+        ) or (
+            self.session.log_fingerprint is not None
+            and self.session.log_fingerprint != bundle.get("log_fingerprint")
+        ):
+            raise LogConflictError(
+                "The loaded campaign state does not match the staged suggestions. "
+                "Reload the campaign and generate a new batch."
+            )
         suggestions = staged_suggestions_from_bundle(bundle)
-        self.session.append_suggestions(suggestions)
+        self.session.append_suggestions(
+            suggestions,
+            expected_log_fingerprint=str(bundle.get("log_fingerprint", "")),
+        )
         appended_fingerprint = str(bundle.get("suggestions_fingerprint", ""))
         return AppendResult(self, self.validate(), appended_fingerprint)
+
+    def _verified_source_fingerprints(self) -> tuple[str, str]:
+        """Return current source fingerprints only when they match loaded state."""
+        config_fingerprint = file_fingerprint(self.config_path)
+        log_fingerprint = file_fingerprint(self.log_path)
+        if (
+            self.session.config_fingerprint is not None
+            and config_fingerprint != self.session.config_fingerprint
+        ) or (
+            self.session.log_fingerprint is not None
+            and log_fingerprint != self.session.log_fingerprint
+        ):
+            raise LogConflictError(
+                "Campaign config or log changed after it was loaded. Reload the campaign "
+                "before generating suggestions."
+            )
+        return config_fingerprint, log_fingerprint
 
     def export_staged_suggestions(self, bundle: dict[str, object], path: str | Path) -> Path:
         """Export staged suggestions without mutating campaign state."""
         return export_staged_suggestions_csv(staged_suggestions_from_bundle(bundle), path)
 
-    def review(self, row_id: str, decision: str, note: str = "") -> MutationResult:
+    def review(
+        self,
+        row_id: str,
+        decision: str,
+        note: str = "",
+        *,
+        expected_log_fingerprint: str | None = None,
+    ) -> MutationResult:
         """Apply a review decision and return refreshed service state."""
-        self.session.review_suggestion(row_id, decision, note)
+        self.session.review_suggestion(
+            row_id,
+            decision,
+            note,
+            expected_log_fingerprint=expected_log_fingerprint,
+        )
         return MutationResult(self, self.validate())
 
     def mark_observed(
@@ -300,6 +355,8 @@ class CampaignAppService:
         objective_value: float | None = None,
         objective_values: dict[str, float] | None = None,
         actual_cost: float | None = None,
+        *,
+        expected_log_fingerprint: str | None = None,
     ) -> MutationResult:
         """Mark one suggestion observed and return refreshed service state."""
         self.session.mark_observed(
@@ -307,6 +364,7 @@ class CampaignAppService:
             objective_value=objective_value,
             objective_values=objective_values,
             actual_cost=actual_cost,
+            expected_log_fingerprint=expected_log_fingerprint,
         )
         return MutationResult(self, self.validate())
 

@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.4.3 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.5.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.4.3 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.5.0 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -290,7 +290,7 @@ fidelity:
 
 ### `fidelity cannot be combined with ...`
 
-v2.4.3 multi-fidelity support remains deliberately conservative.
+v2.5.0 multi-fidelity support remains deliberately conservative.
 
 Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `context:`,
 `cost:`, or `replicates.enabled: true`. Multi-objective, structured,
@@ -299,7 +299,7 @@ deferred.
 
 ### `qMFKG supports batch_size from 1 through 4`
 
-v2.4.3 supports qMFKG batches up to four candidates. Larger batches are
+v2.5.0 supports qMFKG batches up to four candidates. Larger batches are
 intentionally rejected because runtime and memory grow quickly. Continuous
 batches use joint one-shot optimization; ordered discrete batches use
 conditioned greedy mixed optimization.
@@ -516,6 +516,37 @@ Fix: check `campaign.cost_summary()`, the configured `cost.budget`, and the cost
 
 Initial-design failures also report `minimum_rejected_candidate_cost` and
 `available_for_next_candidate` when candidates were rejected by the budget.
+
+### `Campaign log changed after it was loaded`
+
+Another process changed the CSV after the current `CampaignSession` or app
+loaded it. BO Forge rejects the stale mutation instead of overwriting newer
+campaign state.
+
+Fix: reload the campaign, inspect the latest rows, then retry the intended
+append, review, or observation transition.
+
+The same protection applies to suggestion generation. If the config or log
+changes while an app/API dry-run is optimizing candidates, BO Forge discards
+the result instead of staging candidates computed from an older snapshot.
+
+### `Campaign log ... is busy`
+
+Another same-machine BO Forge process held the campaign log mutation lock for
+longer than the 10-second wait limit.
+
+Fix: wait for the other write to finish and retry. Do not remove lock files or
+edit the CSV during an active write. BO Forge does not coordinate writers on
+different hosts sharing a network filesystem.
+
+### `Staged batch is stale`
+
+The API stage was created from config/log bytes that are no longer current, or
+an append returned an error after the log changed and retry safety could not be
+proven.
+
+Fix: inspect the current campaign log and generate a new dry-run batch. Do not
+retry the stale stage.
 
 ## 🔢 Numeric And Bounds Errors
 

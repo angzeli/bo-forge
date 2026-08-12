@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 
 import bo_forge.suggestions as suggestions_module
 from bo_forge.config import BOConfig, CampaignConfig, CostConfig, ObjectiveConfig, VariableConfig
+from bo_forge.errors import LogBusyError, LogConflictError
 from bo_forge.io import empty_campaign_log
 from bo_forge.session import CampaignSession
 from bo_forge.validation import canonical_columns
@@ -2550,6 +2551,85 @@ def test_loading_campaign_clears_previous_observation_inputs(
     assert "actual_cost_old" not in FakeStreamlit.session_state
     assert FakeStreamlit.session_state["unrelated"] == "keep"
     assert FakeStreamlit.session_state[streamlit_app.SESSION_KEY] is loaded_service
+
+
+def test_streamlit_log_conflict_clears_stale_state_and_reloads_campaign(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    refreshed = SimpleNamespace(config_path=config_path, log_path=log_path)
+    messages: list[str] = []
+
+    class FakeStreamlit:
+        session_state = {
+            streamlit_app.CONFIG_PATH_KEY: str(config_path),
+            streamlit_app.LOG_PATH_KEY: str(log_path),
+            streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY: {"suggestions": "stale"},
+            "observed_objective_old": 0.7,
+            "actual_cost_old": "4.2",
+            streamlit_app.REPORT_PREVIEW_KEY: "stale report",
+        }
+
+        @staticmethod
+        def error(message: str) -> None:
+            raise AssertionError(message)
+
+    monkeypatch.setattr(
+        streamlit_app.CampaignAppService,
+        "load",
+        lambda *_args, **_kwargs: refreshed,
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_refresh_validation_cache",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        streamlit_app,
+        "_flash_and_rerun",
+        lambda _st, message: messages.append(message),
+    )
+
+    handled = streamlit_app._handle_log_mutation_error(
+        FakeStreamlit,
+        SimpleNamespace(session=object()),
+        LogConflictError("stale"),
+    )
+
+    assert handled is True
+    assert FakeStreamlit.session_state[streamlit_app.SESSION_KEY] is refreshed
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in FakeStreamlit.session_state
+    assert streamlit_app.REPORT_PREVIEW_KEY not in FakeStreamlit.session_state
+    assert "observed_objective_old" not in FakeStreamlit.session_state
+    assert "actual_cost_old" not in FakeStreamlit.session_state
+    assert messages == [
+        "Campaign log changed in another process. The latest log was reloaded; retry the action."
+    ]
+
+
+def test_streamlit_log_busy_keeps_retryable_staged_state() -> None:
+    errors: list[str] = []
+
+    class FakeStreamlit:
+        session_state = {
+            streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY: {"suggestions": "keep"},
+        }
+
+        @staticmethod
+        def error(message: str) -> None:
+            errors.append(message)
+
+    handled = streamlit_app._handle_log_mutation_error(
+        FakeStreamlit,
+        SimpleNamespace(),
+        LogBusyError("busy"),
+    )
+
+    assert handled is True
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY in FakeStreamlit.session_state
+    assert "another process" in errors[0]
 
 
 def test_streamlit_load_refreshes_source_bar_and_does_not_leak_metric_html() -> None:

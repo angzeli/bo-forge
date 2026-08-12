@@ -78,8 +78,11 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.4.3"
+    assert payload["version"] == "2.5.0"
     assert payload["experimental"] is True
+    assert payload["staging"]["active_stages"] == 0
+    assert payload["staging"]["stage_ttl_seconds"] == pytest.approx(1800)
+    assert payload["staging"]["max_staged_batches"] == 128
 
 
 def test_api_validation_success_and_failure(tmp_path: Path) -> None:
@@ -248,8 +251,9 @@ def test_api_discrete_qmfkg_rejects_batch_above_four_without_mutation(
     )
     log_path = tmp_path / ref["log_path"]
     before = log_path.read_bytes()
+    api_client = client(tmp_path)
 
-    response = client(tmp_path).post(
+    response = api_client.post(
         "/campaign/suggestions/dry-run",
         json={**ref, "batch_size": 5},
     )
@@ -309,6 +313,7 @@ def test_api_dry_run_returns_staged_bundle_without_mutating(tmp_path: Path) -> N
     assert payload["quality"]["records"]
     assert payload["staged_bundle"]["config_path"] == ref["config_path"]
     assert payload["staged_bundle"]["log_path"] == ref["log_path"]
+    assert payload["stage"]["status"] == "active"
     assert log_path.read_bytes() == before
 
 
@@ -417,8 +422,9 @@ def test_api_contextual_dry_run_accepts_context_values_without_mutating(
     )
     log_path = tmp_path / ref["log_path"]
     before = log_path.read_bytes()
+    api_client = client(tmp_path)
 
-    response = client(tmp_path).post(
+    response = api_client.post(
         "/campaign/suggestions/dry-run",
         json={
             **ref,
@@ -431,6 +437,14 @@ def test_api_contextual_dry_run_accepts_context_values_without_mutating(
     payload = response.json()
     assert payload["staged_bundle"]["context_values"] == {"feedstock_acidity": 0.25}
     assert payload["suggestions"]["records"][0]["feedstock_acidity"] == 0.25
+    assert payload["stage"]["context_values"] == {"feedstock_acidity": 0.25}
+    recovered = api_client.get(
+        f"/campaign/stages/{payload['stage']['stage_id']}"
+    )
+    assert recovered.status_code == 200
+    assert recovered.json()["stage"]["context_values"] == {
+        "feedstock_acidity": 0.25
+    }
     assert log_path.read_bytes() == before
 
 
@@ -1054,6 +1068,8 @@ def test_api_cli_help_without_importing_api_dependencies() -> None:
     )
 
     assert "bo-forge-api" in completed.stdout
+    assert "--stage-ttl-seconds" in completed.stdout
+    assert "--max-staged-batches" in completed.stdout
 
 
 def test_api_cli_missing_dependencies_show_install_hint(
@@ -1098,3 +1114,38 @@ def test_api_launcher_startup_message_warns_for_network_host(
     output = capsys.readouterr().out
     assert "no built-in authentication" in output
     assert "Do not expose this API directly to the public internet." in output
+
+
+def test_api_launcher_stage_limits_parse_and_render(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    args = api_cli.parse_args(
+        [
+            "--root",
+            str(tmp_path),
+            "--stage-ttl-seconds",
+            "45",
+            "--max-staged-batches",
+            "7",
+        ]
+    )
+
+    assert args.stage_ttl_seconds == pytest.approx(45)
+    assert args.max_staged_batches == 7
+    api_cli.print_startup_messages(args, tmp_path)
+    assert "TTL=45s, max active batches=7" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("--stage-ttl-seconds", "0"),
+        ("--stage-ttl-seconds", "nan"),
+        ("--max-staged-batches", "0"),
+        ("--max-staged-batches", "abc"),
+    ],
+)
+def test_api_launcher_rejects_invalid_stage_limits(option: str, value: str) -> None:
+    with pytest.raises(SystemExit):
+        api_cli.parse_args([option, value])
