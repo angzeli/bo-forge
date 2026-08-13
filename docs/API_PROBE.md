@@ -9,7 +9,7 @@ For the supported and deferred workflow combinations around the API probe, see
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
 The API has no built-in auth, no database, and no multi-user state
-coordination. v2.5.0 adds bounded in-memory suggestion stages, but they are not
+coordination. v2.5.1 uses bounded in-memory suggestion stages, but they are not
 persistent and disappear whenever the API process restarts. Do not expose the
 probe directly to the public internet.
 
@@ -154,12 +154,15 @@ preferred server-managed stage metadata:
 The preferred workflow keeps the exact batch in the API process:
 
 ```text
+GET    /campaign/stages
 GET    /campaign/stages/{stage_id}
+POST   /campaign/stages/{stage_id}/renew
 POST   /campaign/stages/{stage_id}/append
 DELETE /campaign/stages/{stage_id}
 ```
 
-`GET` recovers stage metadata, suggestions, and quality. `POST .../append`
+`GET /campaign/stages/{stage_id}` recovers stage metadata, suggestions, and
+quality. `POST .../append`
 atomically claims and appends the server-held batch, so concurrent attempts can
 produce only one successful write. `DELETE` discards an active batch. Stages
 expire lazily and terminal states return structured `stage_*` errors. A full
@@ -168,6 +171,56 @@ is not expired while its request is running because releasing it could permit a
 duplicate write; a stuck in-flight claim remains visible in `/health` until the
 request returns or the process restarts. `/health` reports active/appending
 and in-progress reservation counts plus configured limits.
+
+### List Stage Lifecycles
+
+`GET /campaign/stages` returns metadata only. It never returns suggestion rows,
+quality tables, fingerprints, staged bundles, or context values.
+
+```bash
+curl "http://127.0.0.1:8765/campaign/stages?include_terminal=true&status=active&status=stale&limit=50"
+```
+
+Query parameters:
+
+- `include_terminal=false` omits consumed, discarded, stale, and expired
+  tombstones by default;
+- repeatable `status=` filters accept `active`, `appending`, `consumed`,
+  `discarded`, `stale`, and `expired`;
+- `limit=50` accepts values from 1 through 200.
+
+Results are ordered by newest lifecycle transition, then stage ID. Listing
+lazily expires old active stages and marks active stages stale when their config
+or log fingerprint no longer matches. A summary includes only lifecycle times,
+remaining TTL, suggestion count, root-relative config/log paths, structured
+stage selection, configured context variable names, renewal count, and a concise
+status reason. Defaults and safely inferred single-stage selections are reported
+after backend resolution. Terminal tombstones retain only this metadata, so completed stages do
+not keep DataFrames, bundles, fingerprints, or context values in memory.
+
+### Renew An Active Stage
+
+Renewal is explicit:
+
+```bash
+curl -X POST http://127.0.0.1:8765/campaign/stages/STAGE_ID/renew
+```
+
+Renewal works only while a stage is active and its config/log fingerprints are
+still valid. It resets expiry to the configured TTL from the renewal time,
+increments `renewal_count`, and preserves the original suggestions, quality,
+creation time, fingerprints, context, and structured-stage selection. Reads do
+not extend TTL. Expired or terminal stages cannot be revived; a claimed append
+returns `stage_in_use`, and changed campaign files make the stage `stale`.
+
+### Health Diagnostics
+
+The additive `staging` object in `/health` reports active, appending, reserved,
+and remaining capacity; oldest active/appending ages; retained terminal
+tombstone counts by status; and process-local totals for created, claimed, restored, renewed,
+consumed, discarded, stale, expired, and capacity-rejected stages. Health is
+cheap and does not hash campaign files. Lifecycle totals reset whenever the API
+process restarts and are operational diagnostics, not a persistent audit log.
 
 Suggestion generation is bound to the config and log snapshots loaded before
 optimization. If either file changes during optimization, the dry-run fails and
@@ -235,6 +288,27 @@ Server-stage lifecycle errors use these codes:
 | `stage_in_use` | 409 | Another request currently owns the append claim. |
 | `stage_capacity` | 503 | The process-local active-stage limit is full. |
 | `log_busy` | 409 | Another local process held the campaign log lock too long. |
+
+Errors retain the existing `code`, `message`, HTTP status, and request
+validation `details`, and add recovery fields:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "stage_stale",
+    "message": "...",
+    "retryable": false,
+    "suggested_action": "Refresh campaign state and generate a new dry-run."
+  }
+}
+```
+
+`stage_in_use`, `stage_capacity`, and `log_busy` can be retried after waiting or
+freeing capacity. Expired, consumed, discarded, stale, or unknown stage IDs
+cannot be retried with the same stage. `stale_log` requires refreshing campaign
+state and resubmitting with the new fingerprint. Path, request-validation, and
+general BO errors require correcting the request or campaign first.
 
 Multi-objective observation requests use coupled objective values:
 

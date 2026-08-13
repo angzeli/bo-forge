@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import pandas as pd
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -15,7 +16,14 @@ from pydantic import BaseModel, Field
 from bo_forge import __version__
 from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError
 from bo_forge_app.service import CampaignAppService, ValidationResult
-from bo_forge_app.stages import InMemoryStageStore, StageSnapshot, StageStoreError
+from bo_forge_app.stages import (
+    STAGE_STATUSES,
+    InMemoryStageStore,
+    StageSnapshot,
+    StageStoreError,
+    StageSummary,
+    StageValidationSnapshot,
+)
 from bo_forge_app.streamlit_helpers import file_fingerprint, staged_suggestions_from_bundle
 
 
@@ -172,14 +180,19 @@ def create_app(
                 stage=request.stage,
                 context_values=request.context_values,
             )
+            resolved_stage = _resolved_stage_selection(service, result.suggestions)
+            resolved_context_values = _resolved_context_values(
+                service,
+                result.suggestions,
+            )
             staged = stage_store.create(
                 suggestions=result.suggestions,
                 quality=result.quality,
                 bundle=result.bundle,
                 config_path=service.config_path,
                 log_path=service.log_path,
-                stage_selection=request.stage,
-                context_values=request.context_values,
+                stage_selection=resolved_stage,
+                context_values=resolved_context_values,
                 reservation_token=reservation,
             )
         except Exception:
@@ -297,6 +310,7 @@ def _register_error_handlers(app: FastAPI) -> None:
             {"loc": list(error.get("loc", [])), "message": str(error.get("msg", ""))}
             for error in exc.errors()
         ]
+        retryable, suggested_action = _error_recovery("request_validation")
         return JSONResponse(
             status_code=422,
             content={
@@ -304,6 +318,8 @@ def _register_error_handlers(app: FastAPI) -> None:
                 "error": {
                     "code": "request_validation",
                     "message": "Invalid request.",
+                    "retryable": retryable,
+                    "suggested_action": suggested_action,
                     "details": details,
                 },
             },
@@ -314,33 +330,80 @@ def _register_server_stage_routes(
     root: Path,
     stage_store: InMemoryStageStore,
 ) -> None:
+    @app.get("/campaign/stages")
+    def list_server_stages(
+        include_terminal: bool = False,
+        status: Annotated[list[str] | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> dict[str, object]:
+        requested_statuses = status or list(STAGE_STATUSES)
+        unknown = set(requested_statuses).difference(STAGE_STATUSES)
+        if unknown:
+            allowed = ", ".join(STAGE_STATUSES)
+            raise ApiError(
+                "request_validation",
+                f"Unknown stage status '{sorted(unknown)[0]}'. Expected one of: {allowed}.",
+                422,
+            )
+        listing = stage_store.list_summaries(
+            include_terminal=include_terminal,
+            statuses=requested_statuses,
+            limit=limit,
+            validator=_server_stage_file_invalidation_reason,
+        )
+        return {
+            "stages": [_stage_summary_payload(item, root) for item in listing.stages],
+            "total": listing.total,
+            "returned": listing.returned,
+            "truncated": listing.truncated,
+            "status_counts": listing.status_counts,
+        }
+
     @app.get("/campaign/stages/{stage_id}")
     def get_stage(stage_id: str) -> dict[str, object]:
         staged = stage_store.get(stage_id)
         stale_reason = _server_stage_file_invalidation_reason(staged)
-        if stale_reason is not None and stage_store.mark_stale_if_active(stage_id):
+        if stale_reason is not None and stage_store.mark_stale_if_active(
+            stage_id, stale_reason
+        ):
             raise StageStoreError("stage_stale", stale_reason, 409)
         return _server_stage_payload(staged, root)
+
+    @app.post("/campaign/stages/{stage_id}/renew")
+    def renew_server_stage(stage_id: str) -> dict[str, object]:
+        renewed = stage_store.renew(
+            stage_id,
+            validator=_server_stage_file_invalidation_reason,
+        )
+        return {"stage": _stage_metadata_payload(renewed, root)}
 
     @app.post("/campaign/stages/{stage_id}/append")
     def append_server_stage(stage_id: str) -> dict[str, object]:
         staged = stage_store.claim(stage_id)
         stale_reason = _server_stage_file_invalidation_reason(staged)
         if stale_reason is not None:
-            stage_store.complete(stage_id, "stale")
+            stage_store.complete(stage_id, "stale", reason=stale_reason)
             raise StageStoreError("stage_stale", stale_reason, 409)
         try:
             service = CampaignAppService.load(staged.config_path, staged.log_path)
+            bundled_context_values = staged.bundle.get("context_values")
             result = service.append_staged(
                 staged.bundle,
                 stage=staged.stage_selection,
-                context_values=staged.context_values,
+                context_values=(
+                    bundled_context_values
+                    if isinstance(bundled_context_values, dict)
+                    else None
+                ),
             )
         except (LogConflictError, ValueError) as exc:
-            stage_store.complete(stage_id, "stale")
+            stale_message = (
+                "Staged batch failed append integrity checks and cannot be retried."
+            )
+            stage_store.complete(stage_id, "stale", reason=stale_message)
             raise StageStoreError(
                 "stage_stale",
-                f"Staged batch is stale and cannot be appended: {exc}",
+                stale_message,
                 409,
             ) from exc
         except LogBusyError:
@@ -351,11 +414,13 @@ def _register_server_stage_routes(
             if stale_reason is None:
                 stage_store.restore(stage_id)
                 raise
-            stage_store.complete(stage_id, "stale")
+            stale_message = (
+                "Campaign files changed during append, so retry safety cannot be proven."
+            )
+            stage_store.complete(stage_id, "stale", reason=stale_message)
             raise StageStoreError(
                 "stage_stale",
-                "The campaign files changed during append, so this stage cannot be "
-                f"retried safely: {exc}",
+                stale_message,
                 409,
             ) from exc
         stage_store.retire_for_log_change(
@@ -482,10 +547,37 @@ def _stage_metadata_payload(staged: StageSnapshot, root: Path) -> dict[str, obje
         "status": staged.status,
         "created_at": staged.created_at.isoformat(),
         "expires_at": staged.expires_at.isoformat(),
+        "last_transition_at": staged.last_transition_at.isoformat(),
+        "remaining_ttl_seconds": max(
+            0.0,
+            (staged.expires_at - datetime.now(UTC)).total_seconds(),
+        ),
+        "suggestion_count": len(staged.suggestions),
         "config_path": _relative_to_root(root, staged.config_path),
         "log_path": _relative_to_root(root, staged.log_path),
         "stage_selection": staged.stage_selection,
         "context_values": staged.context_values,
+        "context_variable_names": sorted((staged.context_values or {}).keys()),
+        "renewal_count": staged.renewal_count,
+        "status_reason": staged.status_reason,
+    }
+
+
+def _stage_summary_payload(staged: StageSummary, root: Path) -> dict[str, object]:
+    return {
+        "stage_id": staged.stage_id,
+        "status": staged.status,
+        "created_at": staged.created_at.isoformat(),
+        "expires_at": staged.expires_at.isoformat(),
+        "last_transition_at": staged.last_transition_at.isoformat(),
+        "remaining_ttl_seconds": staged.remaining_ttl_seconds,
+        "suggestion_count": staged.suggestion_count,
+        "config_path": _relative_to_root(root, staged.config_path),
+        "log_path": _relative_to_root(root, staged.log_path),
+        "stage_selection": staged.stage_selection,
+        "context_variable_names": list(staged.context_variable_names),
+        "renewal_count": staged.renewal_count,
+        "status_reason": staged.status_reason,
     }
 
 
@@ -497,23 +589,62 @@ def _server_stage_payload(staged: StageSnapshot, root: Path) -> dict[str, object
     }
 
 
-def _server_stage_file_invalidation_reason(staged: StageSnapshot) -> str | None:
+def _server_stage_file_invalidation_reason(
+    staged: StageValidationSnapshot | StageSnapshot,
+) -> str | None:
     try:
         config_fingerprint = file_fingerprint(staged.config_path)
         log_fingerprint = file_fingerprint(staged.log_path)
-    except OSError as exc:
-        return f"Staged batch files cannot be read: {exc}"
-    if config_fingerprint != staged.bundle.get("config_fingerprint"):
+    except OSError:
+        return "Staged batch files cannot be read."
+    expected_config_fingerprint = (
+        staged.config_fingerprint
+        if isinstance(staged, StageValidationSnapshot)
+        else staged.bundle.get("config_fingerprint")
+    )
+    expected_log_fingerprint = (
+        staged.log_fingerprint
+        if isinstance(staged, StageValidationSnapshot)
+        else staged.bundle.get("log_fingerprint")
+    )
+    if config_fingerprint != expected_config_fingerprint:
         return "Config file changed after suggestions were staged."
-    if log_fingerprint != staged.bundle.get("log_fingerprint"):
+    if log_fingerprint != expected_log_fingerprint:
         return "Log file changed after suggestions were staged."
     return None
 
 
 def _prune_invalid_server_stages(stage_store: InMemoryStageStore) -> None:
-    for staged in stage_store.active_snapshots():
-        if _server_stage_file_invalidation_reason(staged) is not None:
-            stage_store.mark_stale_if_active(staged.stage_id)
+    for staged in stage_store.validation_snapshots():
+        stale_reason = _server_stage_file_invalidation_reason(staged)
+        if stale_reason is not None:
+            stage_store.mark_stale_if_active(staged.stage_id, stale_reason)
+
+
+def _resolved_stage_selection(
+    service: CampaignAppService,
+    suggestions: pd.DataFrame,
+) -> str | None:
+    if not service.config.is_structured_campaign:
+        return None
+    stages = suggestions["stage"].dropna().astype(str).unique().tolist()
+    if len(stages) != 1:
+        raise ValueError("Structured suggestions must resolve to exactly one stage.")
+    return stages[0]
+
+
+def _resolved_context_values(
+    service: CampaignAppService,
+    suggestions: pd.DataFrame,
+) -> dict[str, object] | None:
+    context_names = service.config.context_variable_names
+    if not context_names:
+        return None
+    first = suggestions.iloc[0]
+    return {
+        name: _json_safe_value(first[name])
+        for name in context_names
+    }
 
 
 def _validation_payload(result: ValidationResult) -> dict[str, object]:
@@ -528,7 +659,59 @@ def _safe_file_fingerprint(path: Path) -> str | None:
 
 
 def _error_response(code: str, message: str, status_code: int) -> JSONResponse:
+    retryable, suggested_action = _error_recovery(code)
     return JSONResponse(
         status_code=status_code,
-        content={"ok": False, "error": {"code": code, "message": message}},
+        content={
+            "ok": False,
+            "error": {
+                "code": code,
+                "message": message,
+                "retryable": retryable,
+                "suggested_action": suggested_action,
+            },
+        },
+    )
+
+
+def _error_recovery(code: str) -> tuple[bool, str]:
+    recovery = {
+        "stage_in_use": (
+            True,
+            "Wait for the current append attempt to finish, then retry.",
+        ),
+        "stage_capacity": (
+            True,
+            "Append or discard an active stage, wait for expiry, then retry.",
+        ),
+        "log_busy": (True, "Wait briefly for the other local writer, then retry."),
+        "stage_expired": (
+            False,
+            "Generate a new dry-run; an expired stage cannot be renewed or appended.",
+        ),
+        "stage_consumed": (False, "Refresh campaign state before generating a new dry-run."),
+        "stage_discarded": (False, "Generate a new dry-run if suggestions are still needed."),
+        "stage_stale": (
+            False,
+            "Refresh campaign state and generate a new dry-run.",
+        ),
+        "stage_not_found": (
+            False,
+            "Check the stage ID or generate a new dry-run in this API process.",
+        ),
+        "stale_log": (
+            False,
+            "Refresh campaign state and resubmit with the new log fingerprint.",
+        ),
+        "path_outside_root": (
+            False,
+            "Use config and log paths that resolve inside the configured API root.",
+        ),
+        "request_validation": (False, "Correct the request fields before retrying."),
+        "bo_forge_error": (False, "Correct the campaign state or request before retrying."),
+        "value_error": (False, "Correct the request or campaign before retrying."),
+    }
+    return recovery.get(
+        code,
+        (False, "Correct the request or campaign state before retrying."),
     )

@@ -78,7 +78,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.5.0"
+    assert payload["version"] == "2.5.1"
     assert payload["experimental"] is True
     assert payload["staging"]["active_stages"] == 0
     assert payload["staging"]["stage_ttl_seconds"] == pytest.approx(1800)
@@ -289,6 +289,8 @@ def test_api_translates_qmfkg_timeout_without_mutating_log(
     assert response.json()["error"] == {
         "code": "bo_forge_error",
         "message": "qMFKG acquisition optimization timed out",
+        "retryable": False,
+        "suggested_action": "Correct the campaign state or request before retrying.",
     }
     assert log_path.read_bytes() == before
 
@@ -445,7 +447,41 @@ def test_api_contextual_dry_run_accepts_context_values_without_mutating(
     assert recovered.json()["stage"]["context_values"] == {
         "feedstock_acidity": 0.25
     }
+    listed = api_client.get("/campaign/stages").json()["stages"]
+    listed_stage = next(
+        item for item in listed if item["stage_id"] == payload["stage"]["stage_id"]
+    )
+    assert listed_stage["context_variable_names"] == ["feedstock_acidity"]
+    assert "context_values" not in listed_stage
     assert log_path.read_bytes() == before
+
+
+def test_api_contextual_stage_metadata_uses_resolved_default_values(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "16_contextual_logei.yaml",
+        "16_contextual_logei_campaign_log.csv",
+    )
+    api_client = client(tmp_path)
+
+    response = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "batch_size": 1},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["suggestions"]["records"][0]["feedstock_acidity"] == pytest.approx(
+        0.5
+    )
+    assert payload["stage"]["context_values"] == {"feedstock_acidity": 0.5}
+    listing = api_client.get("/campaign/stages").json()["stages"]
+    listed_stage = next(
+        item for item in listing if item["stage_id"] == payload["stage"]["stage_id"]
+    )
+    assert listed_stage["context_variable_names"] == ["feedstock_acidity"]
 
 
 def test_api_contextual_replicate_dry_run_is_context_matched_and_non_mutating(
@@ -816,7 +852,10 @@ def test_api_review_works_and_stale_fingerprint_fails(
         json={**ref, "row_id": row_id, "decision": "accept", "expected_log_fingerprint": "old"},
     )
     assert stale.status_code == 400
-    assert stale.json()["error"]["code"] == "stale_log"
+    stale_error = stale.json()["error"]
+    assert stale_error["code"] == "stale_log"
+    assert stale_error["retryable"] is False
+    assert "new log fingerprint" in stale_error["suggested_action"]
     assert log_path.read_bytes() == before
 
     current = file_fingerprint(log_path)
@@ -1045,8 +1084,11 @@ def test_api_rejects_absolute_and_outside_root_paths(tmp_path: Path) -> None:
 
     assert absolute.status_code == 400
     assert outside.status_code == 400
-    assert absolute.json()["error"]["code"] == "path_outside_root"
-    assert outside.json()["error"]["code"] == "path_outside_root"
+    for response in (absolute, outside):
+        error = response.json()["error"]
+        assert error["code"] == "path_outside_root"
+        assert error["retryable"] is False
+        assert "inside the configured API root" in error["suggested_action"]
 
 
 def test_api_request_errors_are_structured_json(tmp_path: Path) -> None:
@@ -1056,6 +1098,9 @@ def test_api_request_errors_are_structured_json(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["ok"] is False
     assert payload["error"]["code"] == "request_validation"
+    assert payload["error"]["retryable"] is False
+    assert "Correct the request fields" in payload["error"]["suggested_action"]
+    assert payload["error"]["details"]
     assert "Traceback" not in response.text
 
 

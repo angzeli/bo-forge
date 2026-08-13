@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.5.0`. The v2.5.0 release opens the operational-hardening
-line with preferred server-managed API staging and same-machine CSV mutation
-coordination while preserving BO behavior, schemas, and supported campaign
-combinations.
+Current baseline: `v2.5.1`. The v2.5.1 release adds lifecycle listings,
+explicit renewal, health diagnostics, and recovery guidance to preferred
+server-managed API staging while preserving BO behavior, schemas, mutation
+semantics, and supported campaign combinations.
 
 ## Roadmap So Far
 
@@ -63,8 +63,9 @@ flowchart LR
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
     class v240,v241,v242,v243 patchDone
-    class v250 patchActive
-    class v251,v252,v253 patchFuture
+    class v250 patchDone
+    class v251 patchActive
+    class v252,v253 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -174,13 +175,15 @@ Status: active
   capacity.
 - `v2.5.0` coordinates same-machine append, review, and observation mutations
   with canonical-path file locks and stale-session fingerprints.
-- `v2.5.1` is reserved for stage lifecycle diagnostics and usability polish.
+- `v2.5.1` adds metadata-only lifecycle listings, explicit active-stage
+  renewal, richer cheap health diagnostics, metadata-only terminal tombstones,
+  and machine-readable API recovery guidance.
 - `v2.5.2` will decide whether signed bundles, authentication, or deployment
   hardening has a conservative place in this experimental API line.
 - `v2.5.3` is reserved for operational release closeout.
 - Keep the compatibility client-carried bundle path through v2.5.x.
 - Keep production auth, persistent stage storage, multi-worker coordination,
-  and public-internet claims out of v2.5.0.
+  and public-internet claims out of v2.5.x.
 
 ## Not Yet
 

@@ -1,8 +1,8 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.5.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v2.5.1.
 
-Top-level exports are resolved lazily in v2.5.0. Names, signatures, `__all__`,
+Top-level exports are resolved lazily in v2.5.1. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
 does not load optimizer or plotting dependencies.
 
@@ -69,7 +69,7 @@ Replicate-enabled model fitting keeps raw CSV rows as the source of truth, but t
 
 For append safety, prefer `CampaignSession.append_suggestions()` or `append_suggestions(log_path, suggestions, config=config)`. The config-aware path validates the combined CSV log before writing. Calling `append_suggestions(log_path, suggestions)` without a config remains supported for simple non-replicate, non-structured logs, but replicate, structured, qMFKG, and qLogNEHVI generated rows require config-aware append validation. Structured logs also require config-aware `mark_observed()` and `review_suggestion()` transitions; use the `CampaignSession` methods or pass `config=config` to the low-level helpers.
 
-v2.5.0 serializes append, review, and observation mutations with one
+v2.5.1 serializes append, review, and observation mutations with one
 same-machine file lock per canonical resolved log path. `CampaignSession`
 captures a log fingerprint at load/reload and passes it to later mutations;
 stale sessions raise `LogConflictError`, while lock acquisition timeouts raise
@@ -96,7 +96,7 @@ Multi-fidelity campaigns expose `FidelityConfig`, `fidelity_summary`, and
 `fidelity_coverage` through
 the top-level package for config construction and read-only inspection.
 `FidelityConfig.levels` optionally constrains the continuous fidelity variable
-to ordered numeric levels. v2.5.0 supports qMFKG batches from one through four.
+to ordered numeric levels. v2.5.1 supports qMFKG batches from one through four.
 `FidelityConfig.optimizer_maxiter` defaults to `200`, while
 `optimizer_timeout_seconds` defaults to `None`; omitting both preserves the
 v2.4.0 numerical path. The timeout is one acquisition deadline after model
@@ -121,7 +121,7 @@ Contextual campaigns expose `ContextConfig` and `context_summary` through the
 top-level package for config construction and read-only inspection.
 `CampaignConfig.context_variable_names` and
 `CampaignConfig.decision_variable_names` identify fixed-at-suggestion-time
-context variables and optimized decision variables. v2.5.0 contextual support
+context variables and optimized decision variables. v2.5.1 contextual support
 is single-objective LogEI/qLogEI only; `bo.acquisition: log_ei` may combine
 with `review.enabled: true`, deterministic `cost:`, replicates, or all three. Use
 `suggest_next(config, df, context_values={...})` or
@@ -138,7 +138,7 @@ columns.
 
 Model profiles expose `ModelConfig`, `model_summary`, and
 `model_profile_comparison` through the top-level package for config construction
-and read-only inspection. v2.5.0 supports `default`, `smooth`, `rough`, and
+and read-only inspection. v2.5.1 supports `default`, `smooth`, `rough`, and
 `robust` profiles; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
 Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect

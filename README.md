@@ -1,10 +1,11 @@
-# 🧪 BO Forge v2.5.0
+# 🧪 BO Forge v2.5.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.5.0 opens the operational-hardening line with server-managed API staging and
-cross-process CSV write coordination. It keeps BO models, acquisitions,
-configuration, CSV schemas, and supported campaign combinations unchanged.
+v2.5.1 adds stage lifecycle listing, explicit renewal, health diagnostics, and
+machine-readable recovery guidance to the server-managed API staging opened in
+v2.5.0. It keeps BO models, acquisitions, configuration, CSV schemas, and
+supported campaign combinations unchanged.
 
 Existing single-objective, multi-objective, structured, multi-fidelity, cost,
 review, replicate, contextual, CLI, notebook, Streamlit, service, and
@@ -118,6 +119,8 @@ bo-forge-api --root . --stage-ttl-seconds 1800 --max-staged-batches 128
 
 For API clients, server-managed staging is preferred. The API probe has no
 built-in authentication and is not a production backend.
+API clients can list active or terminal stage metadata and explicitly renew a
+file-valid active stage; reads never extend a stage lifetime automatically.
 Stages disappear when the API process restarts, and stage IDs are not
 authentication credentials. The earlier client-carried staged-bundle append
 path remains available as a trusted-client compatibility workflow.
@@ -262,7 +265,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.5.0 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.5.1 environment is recorded in `requirements-lock.txt`.
 
 ---
 

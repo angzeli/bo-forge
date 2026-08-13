@@ -248,8 +248,9 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.5.0" in readme
-    assert "v2.5.0 opens the operational-hardening line" in readme
+    assert "# 🧪 BO Forge v2.5.1" in readme
+    assert "v2.5.1 adds stage lifecycle listing" in readme
+    assert "## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish" in changelog
     assert "## v2.5.0 - Server-Managed Staging And Concurrent Write Safety" in changelog
     assert "server-managed staging is preferred" in readme
     assert "coordinated append, review, and observation writes" in readme
@@ -287,7 +288,7 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.5.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.5.1 provides a local Streamlit workbench" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -381,7 +382,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.5.0",
+        "BO Forge v2.5.1",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -496,9 +497,17 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
         "server-managed staging is preferred",
         "--stage-ttl-seconds",
         "--max-staged-batches",
+        "GET    /campaign/stages",
         "GET    /campaign/stages/{stage_id}",
+        "POST   /campaign/stages/{stage_id}/renew",
         "POST   /campaign/stages/{stage_id}/append",
         "DELETE /campaign/stages/{stage_id}",
+        "remaining TTL",
+        "Defaults and safely inferred single-stage selections are reported",
+        "retained terminal",
+        "Lifecycle totals reset",
+        '"retryable": false',
+        '"suggested_action"',
         "disappear on restart",
         "authentication credentials",
         "multi-worker stage sharing",
@@ -558,8 +567,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.5.0`" in roadmap
-    assert "v2.5.0 release opens the operational-hardening" in roadmap
+    assert "Current baseline: `v2.5.1`" in roadmap
+    assert "v2.5.1 release adds lifecycle listings" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -588,8 +597,9 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
     assert "class v240,v241,v242,v243 patchDone" in roadmap
-    assert "class v250 patchActive" in roadmap
-    assert "class v251,v252,v253 patchFuture" in roadmap
+    assert "class v250 patchDone" in roadmap
+    assert "class v251 patchActive" in roadmap
+    assert "class v252,v253 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorActive" in roadmap
     assert "classDef patchDone" in roadmap
@@ -704,7 +714,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.5.0" in requirements_lock
+    assert "BO Forge v2.5.1" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -756,7 +766,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.5.0." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.5.1." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 

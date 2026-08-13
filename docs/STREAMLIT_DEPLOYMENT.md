@@ -1,6 +1,6 @@
 # Streamlit Deployment And Safety Guide
 
-BO Forge v2.5.0 documents local and trusted-network use of the existing
+BO Forge v2.5.1 documents local and trusted-network use of the existing
 Streamlit workbench. This guide covers deployment choices only. It does not
 change BO behavior, YAML/CSV semantics, launcher behavior, authentication,
 storage, or app workflow logic.
@@ -13,7 +13,7 @@ local UI.
 
 BO Forge is a local-first workbench:
 
-- BO Forge v2.5.0 has no built-in auth.
+- BO Forge v2.5.1 has no built-in auth.
 - It has no multi-user state coordination.
 - It has no database or server-side campaign store.
 - It is not hardened for direct public internet exposure.
@@ -28,7 +28,7 @@ Use these operating rules for any shared or remote session:
 - Use a dedicated campaign working directory.
 - Work on copied CSV logs, not seed example logs.
 - Back up CSV logs before shared or remote sessions.
-- Same-machine BO Forge v2.5.0 mutations are serialized, but avoid simultaneous
+- Same-machine BO Forge v2.5.1 mutations are serialized, but avoid simultaneous
   writes from multiple hosts or tools that bypass BO Forge's mutation helpers.
 - Prefer VPN, SSH tunnel, or reverse proxy auth for remote access.
 - Do not expose an unauthenticated BO Forge app directly to the public internet.
@@ -74,7 +74,7 @@ same launcher warning. Examples include:
 - a LAN IP such as `192.168.1.25`
 - a LAN hostname such as `lab-workstation.local`
 
-Use a dedicated campaign working directory and copied CSV logs. BO Forge v2.5.0
+Use a dedicated campaign working directory and copied CSV logs. BO Forge v2.5.1
 serializes same-machine append, review, and observation calls, but it does not
 coordinate multi-user UI state or multi-host shared-filesystem writers. Avoid
 simultaneous writes from different hosts and external tools.

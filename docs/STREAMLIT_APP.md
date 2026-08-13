@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.5.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v2.5.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
 
@@ -40,7 +40,7 @@ v2.4.3 closes the multi-fidelity line with regression and campaign-switch
 coverage. It keeps these tables and plots lazy and adds no Streamlit workflow
 or support-status change.
 
-v2.5.0 coordinates Streamlit CSV mutations with CLI, notebook, and API
+v2.5.1 coordinates Streamlit CSV mutations with CLI, notebook, and API
 processes on the same machine. If another process changes the log, the app
 clears stale staged/observation state, reloads the latest campaign, and asks the
 user to retry. A busy log remains retryable and is never overwritten.

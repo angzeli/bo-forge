@@ -1,5 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish
+
+This operational follow-up makes process-local server stages easier to inspect
+and recover without changing CSV writes, BO behavior, API mutation semantics,
+or the trusted-network/no-auth boundary.
+
+- Adds metadata-only `GET /campaign/stages` lifecycle listings with status
+  filters, deterministic ordering, bounded results, and lazy stale/expiry
+  transitions.
+- Adds explicit `POST /campaign/stages/{stage_id}/renew` for active,
+  file-valid stages; reads never renew stages automatically.
+- Tracks transition timestamps, renewal counts, concise status reasons, and
+  process-local lifecycle totals through centralized store transitions.
+- Converts terminal tombstones to bounded metadata-only records that release
+  suggestion, quality, bundle, fingerprint, and context-value payloads.
+- Extends `/health` with remaining capacity, oldest active/appending ages,
+  terminal status counts, and restart-reset lifecycle totals without hashing
+  campaign files.
+- Adds machine-readable `retryable` and `suggested_action` fields to structured
+  API errors while preserving status codes, codes, messages, and validation
+  details.
+- Keeps existing stage retrieval/append/discard and client-carried compatibility
+  append contracts operational.
+
 ## v2.5.0 - Server-Managed Staging And Concurrent Write Safety
 
 This operational patch makes server-managed staging the preferred experimental

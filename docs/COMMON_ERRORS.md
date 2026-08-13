@@ -132,7 +132,7 @@ bo-forge suggest \
 
 ### `context cannot be combined with ...`
 
-v2.5.0 contextual BO support allows single-objective `bo.acquisition: log_ei`
+v2.5.1 contextual BO support allows single-objective `bo.acquisition: log_ei`
 campaigns to combine `context:` with `review.enabled: true`, deterministic
 `cost:`, replicates, or all three.
 
@@ -161,7 +161,7 @@ non-contextual, non-fidelity, non-cost campaigns. Replicate campaigns must use
 
 ### `bo.acquisition='qlog_nehvi' cannot be combined with ...`
 
-v2.5.0 qLogNEHVI support is deliberately narrow. It is only supported for
+v2.5.1 qLogNEHVI support is deliberately narrow. It is only supported for
 coupled multi-objective campaigns with `2 <= m <= 4`.
 
 Fix: remove `cost:`, `replicates:`, `stages:`, `context:`, or `fidelity:`
@@ -290,7 +290,7 @@ fidelity:
 
 ### `fidelity cannot be combined with ...`
 
-v2.5.0 multi-fidelity support remains deliberately conservative.
+v2.5.1 multi-fidelity support remains deliberately conservative.
 
 Fix: do not combine `fidelity:` with `objectives:`, `stages:`, `context:`,
 `cost:`, or `replicates.enabled: true`. Multi-objective, structured,
@@ -299,7 +299,7 @@ deferred.
 
 ### `qMFKG supports batch_size from 1 through 4`
 
-v2.5.0 supports qMFKG batches up to four candidates. Larger batches are
+v2.5.1 supports qMFKG batches up to four candidates. Larger batches are
 intentionally rejected because runtime and memory grow quickly. Continuous
 batches use joint one-shot optimization; ordered discrete batches use
 conditioned greedy mixed optimization.

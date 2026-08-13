@@ -513,7 +513,7 @@ For review-enabled campaigns, the explicit rhythm is:
 
 > suggest → append → review → run accepted experiment → mark-observed
 
-v2.5.0 serializes append, review, and observation mutations with the same
+v2.5.1 serializes append, review, and observation mutations with the same
 canonical-log lock used by sessions, Streamlit, and the API on one machine.
 Each CLI mutation loads a current fingerprint before writing. A conflicting or
 busy log fails clearly without overwriting newer rows; multi-host shared-file
