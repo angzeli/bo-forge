@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.5.1`. The v2.5.1 release adds lifecycle listings,
-explicit renewal, health diagnostics, and recovery guidance to preferred
-server-managed API staging while preserving BO behavior, schemas, mutation
-semantics, and supported campaign combinations.
+Current baseline: `v2.5.2`. The v2.5.2 release adds explicit network-bind
+acknowledgement, optional server-stage-only append, optional API documentation
+disablement, and cheap deployment metadata while preserving BO behavior,
+schemas, mutation semantics, and supported campaign combinations.
 
 ## Roadmap So Far
 
@@ -33,7 +33,7 @@ flowchart LR
     v243["v2.4.3<br/>Release closeout"]
     v250["v2.5.0<br/>Server staging + write coordination"]
     v251["v2.5.1<br/>Stage lifecycle diagnostics + polish"]
-    v252["v2.5.2<br/>Security + deployment feasibility"]
+    v252["v2.5.2<br/>Trusted deployment hardening"]
     v253["v2.5.3<br/>Operational closeout"]
 
     v21 -.-> v210
@@ -63,9 +63,8 @@ flowchart LR
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
     class v240,v241,v242,v243 patchDone
-    class v250 patchDone
-    class v251 patchActive
-    class v252,v253 patchFuture
+    class v250,v251,v252 patchDone
+    class v253 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -178,8 +177,12 @@ Status: active
 - `v2.5.1` adds metadata-only lifecycle listings, explicit active-stage
   renewal, richer cheap health diagnostics, metadata-only terminal tombstones,
   and machine-readable API recovery guidance.
-- `v2.5.2` will decide whether signed bundles, authentication, or deployment
-  hardening has a conservative place in this experimental API line.
+- `v2.5.2` requires explicit acknowledgement for non-loopback app/API binds,
+  adds optional server-stage-only append and documentation disablement, and
+  publishes cheap deployment metadata plus a canonical API security guide.
+- Built-in authentication and signed client-carried bundles remain deferred:
+  neither would by itself supply the TLS, identity, authorization, rotation,
+  and audit boundaries required for a production service.
 - `v2.5.3` is reserved for operational release closeout.
 - Keep the compatibility client-carried bundle path through v2.5.x.
 - Keep production auth, persistent stage storage, multi-worker coordination,

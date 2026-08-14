@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--host", default=DEFAULT_API_HOST, help="Host address for Uvicorn.")
     parser.add_argument(
+        "--allow-network-access",
+        action="store_true",
+        help="Acknowledge the risks of binding the API to a non-loopback host.",
+    )
+    parser.add_argument(
         "--port",
         type=_parse_port,
         default=DEFAULT_API_PORT,
@@ -51,6 +56,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_STAGED_BATCHES,
         help="Maximum active in-memory staged batches.",
     )
+    parser.add_argument(
+        "--server-stages-only",
+        action="store_true",
+        help="Disable client-carried staged-bundle append.",
+    )
+    parser.add_argument(
+        "--no-docs",
+        action="store_true",
+        help="Disable interactive API docs and the OpenAPI document.",
+    )
     return parser
 
 
@@ -63,6 +78,7 @@ def run(argv: list[str] | None = None) -> int:
     """Run the experimental API launcher."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
+        _require_network_access_acknowledgement(args)
         root = Path(args.root).expanduser().resolve()
         if not root.is_dir():
             raise ApiLauncherError(f"API root must be an existing directory: {root}")
@@ -82,6 +98,8 @@ def run(argv: list[str] | None = None) -> int:
             root,
             stage_ttl_seconds=float(args.stage_ttl_seconds),
             max_staged_batches=int(args.max_staged_batches),
+            server_stages_only=bool(args.server_stages_only),
+            interactive_docs=not bool(args.no_docs),
         )
     except ApiLauncherError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -106,6 +124,11 @@ def print_startup_messages(args: argparse.Namespace, root: Path) -> None:
         "Server staging: "
         f"TTL={args.stage_ttl_seconds:g}s, max active batches={args.max_staged_batches}"
     )
+    print(
+        "Client-carried bundle append: "
+        f"{'disabled' if args.server_stages_only else 'enabled'}"
+    )
+    print(f"Interactive API docs: {'disabled' if args.no_docs else 'enabled'}")
     if _host_requires_network_warning(host):
         print("Network safety: BO Forge API probe has no built-in authentication.")
         print("Use only on localhost, a trusted LAN, VPN, or SSH tunnel.")
@@ -161,6 +184,17 @@ def _parse_positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("value must be a positive integer")
     return parsed
+
+
+def _require_network_access_acknowledgement(args: argparse.Namespace) -> None:
+    host = str(args.host)
+    if _host_requires_network_warning(host) and not args.allow_network_access:
+        raise ApiLauncherError(
+            "Binding to a wildcard or non-loopback host requires "
+            "--allow-network-access. Use --host 127.0.0.1 for local-only access. "
+            "The acknowledgement flag only acknowledges network exposure; "
+            "it does not add authentication or other protection."
+        )
 
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ python -m bo_forge_app
 For trusted LAN access:
 
 ```bash
-bo-forge-app --host 0.0.0.0 --port 8501
+bo-forge-app --host 0.0.0.0 --port 8501 --allow-network-access
 ```
 
 BO Forge has no built-in authentication. For local-only, trusted-LAN, SSH/VPN,
@@ -117,7 +117,8 @@ bo-forge-api --root . --host 127.0.0.1 --port 8765
 
 The probe is experimental, root-bound, unauthenticated, and intended only for
 local or trusted-network exploration. Streamlit remains the recommended local
-UI. See [API_PROBE.md](API_PROBE.md) before using it beyond localhost.
+UI. See [API_PROBE.md](API_PROBE.md) and [API_SECURITY.md](API_SECURITY.md)
+before using it beyond localhost.
 
 ## 🧩 Structured Campaign Configs
 
@@ -189,7 +190,7 @@ The structured tutorial files are:
 ## 🧪 Multi-Fidelity qMFKG
 
 BO Forge supports single-objective qMFKG with either a continuous fidelity
-range or ordered numeric fidelity levels. v2.5.1 supports qMFKG batches
+range or ordered numeric fidelity levels. v2.5.2 supports qMFKG batches
 from one through four:
 
 ```yaml
@@ -339,7 +340,7 @@ their existing variable columns, and suggested rows fill those columns with the
 fixed context values. The tutorial notebook is
 `notebooks/16_contextual_logei_campaign.ipynb`. The Streamlit app can also
 create `Campaign kind = Contextual LogEI` configs with selected context
-variables and optional defaults. In v2.5.1, single-objective contextual
+variables and optional defaults. In v2.5.2, single-objective contextual
 `bo.acquisition: log_ei` campaigns can combine `context:` with review metadata,
 deterministic `cost:`, replicates, or all three. Contextual active repeats only
 target replicate groups matching the requested context; fitting still uses
@@ -370,7 +371,7 @@ model:
 
 Supported values are `default`, `smooth`, `rough`, and `robust`. Non-default
 profiles are intentionally limited to supported single-objective workflows configured
-with `bo.acquisition: log_ei` or `qlog_nei` in v2.5.1; multi-objective, multi-fidelity, and
+with `bo.acquisition: log_ei` or `qlog_nei` in v2.5.2; multi-objective, multi-fidelity, and
 structured campaigns should use the default profile.
 
 Try the bundled model-profile example:
@@ -584,7 +585,7 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
-BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.5.1 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range for v2.5.2 is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ```yaml
 objectives:

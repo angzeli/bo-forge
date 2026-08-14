@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v2.5.2 - Trusted Deployment Hardening
+
+This operational security-boundary patch makes deliberate trusted-network
+launches explicit without claiming production authentication or changing BO
+behavior.
+
+- Requires `--allow-network-access` before either packaged launcher binds to a
+  wildcard or non-loopback host; loopback defaults remain unchanged.
+- Adds API `--server-stages-only` mode to disable trusted-client carried-bundle
+  append while preserving preferred server-managed stage append.
+- Adds API `--no-docs` mode for disabling `/docs`, `/redoc`, and
+  `/openapi.json` without affecting health or campaign endpoints.
+- Adds cheap `/health` deployment metadata describing the no-auth,
+  process-memory, single-worker trust boundary and enabled compatibility modes.
+- Adds `docs/API_SECURITY.md` and aligns deployment guidance around localhost,
+  SSH/VPN, trusted LAN, and externally authenticated TLS proxy use.
+- Keeps BO behavior, YAML/CSV schemas, API payload defaults, stage lifecycle,
+  locking semantics, and supported campaign combinations unchanged.
+
 ## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish
 
 This operational follow-up makes process-local server stages easier to inspect

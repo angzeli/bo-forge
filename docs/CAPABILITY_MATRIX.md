@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v2.5.1 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v2.5.2 keeps the v1 YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while adding process-local API staging and
 same-machine CSV write coordination. BO capability statuses are unchanged from
 v2.4.3.
@@ -80,7 +80,7 @@ Legend:
 | Example notebooks | supported | Teaching wrappers; committed notebooks stay output-free. |
 | Streamlit workbench | supported | Local wrapper around `CampaignSession` and app service. |
 | Internal app service layer | supported internally | Not documented as stable public API. |
-| Experimental FastAPI probe | supported experimentally | Optional, local/trusted-network only, no built-in auth. |
+| Experimental FastAPI probe | supported experimentally | Optional, local/trusted-network only, no built-in auth; non-loopback launch requires acknowledgement and may disable compatibility append/docs. |
 | Production API/auth/database | deferred | No production SaaS backend, auth system, or database store in v2.x. |
 
 ## Safety Boundaries

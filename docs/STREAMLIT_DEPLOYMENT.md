@@ -1,9 +1,9 @@
 # Streamlit Deployment And Safety Guide
 
-BO Forge v2.5.1 documents local and trusted-network use of the existing
-Streamlit workbench. This guide covers deployment choices only. It does not
-change BO behavior, YAML/CSV semantics, launcher behavior, authentication,
-storage, or app workflow logic.
+BO Forge v2.5.2 documents local and trusted-network use of the existing
+Streamlit workbench. This guide covers deployment choices only. v2.5.2 requires
+explicit acknowledgement for non-loopback launcher binds, but does not change
+BO behavior, YAML/CSV semantics, authentication, storage, or app workflow logic.
 
 The experimental FastAPI probe has separate guidance in
 [API_PROBE.md](API_PROBE.md). The Streamlit workbench remains the recommended
@@ -13,7 +13,7 @@ local UI.
 
 BO Forge is a local-first workbench:
 
-- BO Forge v2.5.1 has no built-in auth.
+- BO Forge v2.5.2 has no built-in auth.
 - It has no multi-user state coordination.
 - It has no database or server-side campaign store.
 - It is not hardened for direct public internet exposure.
@@ -28,7 +28,7 @@ Use these operating rules for any shared or remote session:
 - Use a dedicated campaign working directory.
 - Work on copied CSV logs, not seed example logs.
 - Back up CSV logs before shared or remote sessions.
-- Same-machine BO Forge v2.5.1 mutations are serialized, but avoid simultaneous
+- Same-machine BO Forge v2.5.2 mutations are serialized, but avoid simultaneous
   writes from multiple hosts or tools that bypass BO Forge's mutation helpers.
 - Prefer VPN, SSH tunnel, or reverse proxy auth for remote access.
 - Do not expose an unauthenticated BO Forge app directly to the public internet.
@@ -57,7 +57,7 @@ Use this only on a trusted LAN, lab network, VPN-backed subnet, or similarly
 controlled environment:
 
 ```bash
-bo-forge-app --host 0.0.0.0 --port 8501 --no-browser
+bo-forge-app --host 0.0.0.0 --port 8501 --no-browser --allow-network-access
 ```
 
 Open from another trusted device:
@@ -74,10 +74,20 @@ same launcher warning. Examples include:
 - a LAN IP such as `192.168.1.25`
 - a LAN hostname such as `lab-workstation.local`
 
-Use a dedicated campaign working directory and copied CSV logs. BO Forge v2.5.1
+The launcher refuses these binds unless `--allow-network-access` is supplied.
+That flag records deliberate acknowledgement only; it does not add
+authentication, TLS, authorization, or other protection.
+
+This acknowledgement is enforced by `bo-forge-app`. Starting Streamlit through
+another command bypasses the launcher check and does not make the listener safe.
+
+Use a dedicated campaign working directory and copied CSV logs. BO Forge v2.5.2
 serializes same-machine append, review, and observation calls, but it does not
 coordinate multi-user UI state or multi-host shared-filesystem writers. Avoid
 simultaneous writes from different hosts and external tools.
+
+See [API_SECURITY.md](API_SECURITY.md) for the equivalent experimental API
+trust boundary and the requirements that remain deferred for production use.
 
 ## Mode 3: SSH Tunnel Or VPN
 

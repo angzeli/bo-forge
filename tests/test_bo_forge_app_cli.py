@@ -43,6 +43,7 @@ def test_custom_host_port_no_browser_and_passthrough_are_preserved(
             [
                 "--host",
                 "0.0.0.0",
+                "--allow-network-access",
                 "--port",
                 "9001",
                 "--no-browser",
@@ -76,6 +77,60 @@ def test_browser_flag_maps_to_streamlit_headless_false(monkeypatch: pytest.Monke
     assert app_cli.run(["--browser"]) == 0
 
     assert captured_argv["argv"][-2:] == ["--server.headless", "false"]
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "192.168.1.25", "dev-box.local"])
+def test_network_bind_requires_acknowledgement_before_streamlit_import(
+    host: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _block_streamlit_imports(monkeypatch)
+
+    assert app_cli.run(["--host", host]) == 1
+
+    captured = capsys.readouterr()
+    assert "requires --allow-network-access" in captured.err
+    assert "--host 127.0.0.1" in captured.err
+    assert "Streamlit is not installed" not in captured.err
+
+
+def test_network_bind_rejection_does_not_create_macos_launcher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    launcher_path = tmp_path / "BO-Forge.command"
+    _block_streamlit_imports(monkeypatch)
+
+    assert (
+        app_cli.run(
+            [
+                "--host",
+                "0.0.0.0",
+                "--make-launcher",
+                str(launcher_path),
+            ]
+        )
+        == 1
+    )
+
+    assert not launcher_path.exists()
+    assert "requires --allow-network-access" in capsys.readouterr().err
+
+
+def test_acknowledged_network_bind_starts_and_retains_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured_argv = _install_fake_streamlit(monkeypatch)
+
+    assert app_cli.run(["--host", "0.0.0.0", "--allow-network-access"]) == 0
+
+    assert captured_argv["argv"][4] == "0.0.0.0"
+    output = capsys.readouterr().out
+    assert "no built-in authentication" in output
+    assert "Do not expose this app directly to the public internet." in output
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
@@ -233,6 +288,7 @@ def test_write_macos_launcher_writes_executable_command(
         [
             "--host",
             "0.0.0.0",
+            "--allow-network-access",
             "--port",
             "8502",
             "--no-browser",
@@ -251,6 +307,7 @@ def test_write_macos_launcher_writes_executable_command(
     assert "cd " in text
     assert "/opt/bin/bo-forge-app" in text
     assert "--host 0.0.0.0" in text
+    assert "--allow-network-access" in text
     assert "--port 8502" in text
     assert "--no-browser" in text
     assert "--theme.base=light" in text

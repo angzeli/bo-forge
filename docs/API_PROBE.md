@@ -7,9 +7,11 @@ Do not expose it directly to the public internet.
 
 For the supported and deferred workflow combinations around the API probe, see
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
+For the complete trust-boundary and deployment decision, see
+[API_SECURITY.md](API_SECURITY.md).
 
 The API has no built-in auth, no database, and no multi-user state
-coordination. v2.5.1 uses bounded in-memory suggestion stages, but they are not
+coordination. v2.5.2 uses bounded in-memory suggestion stages, but they are not
 persistent and disappear whenever the API process restarts. Do not expose the
 probe directly to the public internet.
 
@@ -45,13 +47,29 @@ bo-forge-api --root . \
 Trusted LAN or lab server:
 
 ```bash
-bo-forge-api --root . --host 0.0.0.0 --port 8765
+bo-forge-api --root . --host 0.0.0.0 --port 8765 --allow-network-access
 ```
 
 Wildcard or non-loopback hosts expose the probe to the network. Use only on a
 trusted LAN, VPN, or SSH tunnel. Anyone who can reach the API can read and write
 campaign files under the configured root directory through the exposed campaign
-operations.
+operations. `--allow-network-access` is required for these binds, but it only
+acknowledges the exposure; it does not add authentication, TLS, or authorization.
+
+To require the preferred server-managed append workflow and remove interactive
+documentation routes:
+
+```bash
+bo-forge-api --root . --server-stages-only --no-docs
+```
+
+`--server-stages-only` leaves `/campaign/suggestions/append` defined for API
+compatibility but returns `403 client_bundle_append_disabled`; server-managed
+`/campaign/stages/{stage_id}/append` remains available. `--no-docs` disables
+`/docs`, `/redoc`, and `/openapi.json`. Neither option provides authentication.
+The startup banner confirms whether client-carried append and interactive docs
+are enabled. A malformed compatibility-append request still receives the normal
+structured `422 request_validation` response before route handling.
 
 SSH tunnel:
 
@@ -221,6 +239,10 @@ tombstone counts by status; and process-local totals for created, claimed, resto
 consumed, discarded, stale, expired, and capacity-rejected stages. Health is
 cheap and does not hash campaign files. Lifecycle totals reset whenever the API
 process restarts and are operational diagnostics, not a persistent audit log.
+The additive `deployment` object reports that authentication is absent, stage
+storage is process memory, multi-worker staging is unsupported, and whether
+client-carried bundles and interactive docs are enabled. Health remains cheap
+and does not inspect campaign files or expose secrets.
 
 Suggestion generation is bound to the config and log snapshots loaded before
 optimization. If either file changes during optimization, the dry-run fails and
@@ -263,6 +285,10 @@ the API process. A successful compatibility append consumes the matching
 server-held stage and marks other stages from the replaced log snapshot stale,
 so compatibility clients do not leak stage capacity. Signed bundles remain
 deferred.
+Deployments started with `--server-stages-only` disable this compatibility
+append path and return `403 client_bundle_append_disabled` without touching the
+CSV. Dry-run still returns the compatibility bundle so default response shapes
+remain additive and stable.
 
 Review and observation mutations require `expected_log_fingerprint`. If the log
 changed since the caller last read it, or if the fingerprint is missing, the
@@ -288,6 +314,7 @@ Server-stage lifecycle errors use these codes:
 | `stage_in_use` | 409 | Another request currently owns the append claim. |
 | `stage_capacity` | 503 | The process-local active-stage limit is full. |
 | `log_busy` | 409 | Another local process held the campaign log lock too long. |
+| `client_bundle_append_disabled` | 403 | This deployment requires server-managed stage append. |
 
 Errors retain the existing `code`, `message`, HTTP status, and request
 validation `details`, and add recovery fields:

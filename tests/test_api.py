@@ -14,6 +14,7 @@ from bo_forge.config import CampaignConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.session import CampaignSession
 from bo_forge.transforms import values_to_unit_cube
+from bo_forge_app import api as api_module
 from bo_forge_app import api_cli
 from bo_forge_app.api import create_app
 from bo_forge_app.streamlit_helpers import file_fingerprint, make_staged_suggestion_bundle
@@ -78,11 +79,69 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.5.1"
+    assert payload["version"] == "2.5.2"
     assert payload["experimental"] is True
     assert payload["staging"]["active_stages"] == 0
     assert payload["staging"]["stage_ttl_seconds"] == pytest.approx(1800)
     assert payload["staging"]["max_staged_batches"] == 128
+    assert payload["deployment"] == {
+        "authentication": "none",
+        "trusted_network_only": True,
+        "stage_storage": "process_memory",
+        "client_carried_bundles": True,
+        "interactive_docs": True,
+        "multi_worker_safe": False,
+    }
+
+
+def test_api_health_reports_strict_deployment_modes(tmp_path: Path) -> None:
+    response = TestClient(
+        create_app(tmp_path, server_stages_only=True, interactive_docs=False)
+    ).get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["deployment"] == {
+        "authentication": "none",
+        "trusted_network_only": True,
+        "stage_storage": "process_memory",
+        "client_carried_bundles": False,
+        "interactive_docs": False,
+        "multi_worker_safe": False,
+    }
+
+
+def test_api_no_docs_disables_all_documentation_routes_but_keeps_health(
+    tmp_path: Path,
+) -> None:
+    api_client = TestClient(create_app(tmp_path, interactive_docs=False))
+
+    assert api_client.get("/docs").status_code == 404
+    assert api_client.get("/redoc").status_code == 404
+    assert api_client.get("/openapi.json").status_code == 404
+    assert api_client.get("/health").status_code == 200
+
+
+def test_api_does_not_add_permissive_cors_headers(tmp_path: Path) -> None:
+    response = client(tmp_path).get(
+        "/health",
+        headers={"Origin": "https://untrusted.example"},
+    )
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_api_does_not_answer_cors_preflight_permissively(tmp_path: Path) -> None:
+    response = client(tmp_path).options(
+        "/health",
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 405
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_api_validation_success_and_failure(tmp_path: Path) -> None:
@@ -1104,6 +1163,27 @@ def test_api_request_errors_are_structured_json(tmp_path: Path) -> None:
     assert "Traceback" not in response.text
 
 
+def test_server_stages_only_keeps_request_validation_for_malformed_append(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "01_simple_2d_maximise_logei.yaml",
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    before = log_path.read_bytes()
+
+    response = TestClient(create_app(tmp_path, server_stages_only=True)).post(
+        "/campaign/suggestions/append",
+        json=ref,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "request_validation"
+    assert log_path.read_bytes() == before
+
+
 def test_api_cli_help_without_importing_api_dependencies() -> None:
     completed = subprocess.run(
         [sys.executable, "-m", "bo_forge_app.api_cli", "--help"],
@@ -1115,6 +1195,9 @@ def test_api_cli_help_without_importing_api_dependencies() -> None:
     assert "bo-forge-api" in completed.stdout
     assert "--stage-ttl-seconds" in completed.stdout
     assert "--max-staged-batches" in completed.stdout
+    assert "--allow-network-access" in completed.stdout
+    assert "--server-stages-only" in completed.stdout
+    assert "--no-docs" in completed.stdout
 
 
 def test_api_cli_missing_dependencies_show_install_hint(
@@ -1161,6 +1244,74 @@ def test_api_launcher_startup_message_warns_for_network_host(
     assert "Do not expose this API directly to the public internet." in output
 
 
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "192.168.1.10", "lab-server.local"])
+def test_api_network_bind_requires_acknowledgement_before_dependency_import(
+    host: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_import = builtins.__import__
+
+    def block_api_dependencies(name: str, *args: object, **kwargs: object) -> object:
+        if name == "uvicorn" or name.startswith("fastapi"):
+            raise AssertionError("API dependencies must not be imported")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", block_api_dependencies)
+
+    assert api_cli.run(["--root", str(tmp_path), "--host", host]) == 1
+    error = capsys.readouterr().err
+    assert "requires --allow-network-access" in error
+    assert "--host 127.0.0.1" in error
+
+
+def test_api_launcher_forwards_deployment_controls_after_network_acknowledgement(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeUvicorn:
+        @staticmethod
+        def run(app: object, *, host: str, port: int) -> None:
+            captured.update({"app": app, "host": host, "port": port})
+
+    def fake_create_app(root: Path, **kwargs: object) -> object:
+        captured.update({"root": root, "kwargs": kwargs})
+        return object()
+
+    monkeypatch.setitem(sys.modules, "uvicorn", FakeUvicorn())
+    monkeypatch.setattr(api_module, "create_app", fake_create_app)
+
+    assert (
+        api_cli.run(
+            [
+                "--root",
+                str(tmp_path),
+                "--host",
+                "0.0.0.0",
+                "--allow-network-access",
+                "--server-stages-only",
+                "--no-docs",
+            ]
+        )
+        == 0
+    )
+    assert captured["host"] == "0.0.0.0"
+    assert captured["kwargs"] == {
+        "stage_ttl_seconds": 1800.0,
+        "max_staged_batches": 128,
+        "server_stages_only": True,
+        "interactive_docs": False,
+    }
+    output = capsys.readouterr().out
+    assert "Client-carried bundle append: disabled" in output
+    assert "Interactive API docs: disabled" in output
+    assert "no built-in authentication" in output
+
+
 def test_api_launcher_stage_limits_parse_and_render(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1179,7 +1330,10 @@ def test_api_launcher_stage_limits_parse_and_render(
     assert args.stage_ttl_seconds == pytest.approx(45)
     assert args.max_staged_batches == 7
     api_cli.print_startup_messages(args, tmp_path)
-    assert "TTL=45s, max active batches=7" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "TTL=45s, max active batches=7" in output
+    assert "Client-carried bundle append: enabled" in output
+    assert "Interactive API docs: enabled" in output
 
 
 @pytest.mark.parametrize(

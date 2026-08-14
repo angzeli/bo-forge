@@ -237,6 +237,7 @@ def test_readme_contains_current_install_commands() -> None:
     assert "python -m bo_forge_app" in readme
     assert "docs/STREAMLIT_DEPLOYMENT.md" in readme
     assert "docs/API_PROBE.md" in readme
+    assert "docs/API_SECURITY.md" in readme
     assert "docs/CAPABILITY_MATRIX.md" in readme
     assert "docs/INSTALLATION.md" in readme
 
@@ -248,8 +249,9 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.5.1" in readme
-    assert "v2.5.1 adds stage lifecycle listing" in readme
+    assert "# 🧪 BO Forge v2.5.2" in readme
+    assert "v2.5.2 hardens deliberate trusted-network deployment" in readme
+    assert "## v2.5.2 - Trusted Deployment Hardening" in changelog
     assert "## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish" in changelog
     assert "## v2.5.0 - Server-Managed Staging And Concurrent Write Safety" in changelog
     assert "server-managed staging is preferred" in readme
@@ -274,7 +276,8 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "bo-forge plot --kind model-comparison" in readme
     assert "does not automatically select a model" in readme
     assert "single-objective contextual LogEI/qLogEI" in readme
-    assert "backward compatible with prior v1.x baselines" in readme
+    assert "Non-loopback app and API launcher commands now require" in readme
+    assert "backward compatible with prior v1.x baselines" not in readme
     assert "ROADMAP_V2_X.md" in readme
     assert "CAPABILITY_MATRIX.md" in readme
     assert "configs/16_contextual_logei.yaml" in readme
@@ -288,7 +291,7 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.5.1 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.5.2 provides a local Streamlit workbench" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -382,7 +385,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.5.1",
+        "BO Forge v2.5.2",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -462,6 +465,7 @@ def test_streamlit_deployment_guide_exists_and_covers_safety_model() -> None:
         "Back up CSV logs",
         "simultaneous writes from different hosts",
         "dedicated campaign working directory",
+        "bypasses the launcher check",
     ]
     for phrase in required_phrases:
         assert phrase in guide
@@ -513,11 +517,54 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
         "multi-worker stage sharing",
         "Client-Carried Compatibility Append",
         "log_busy",
+        "--allow-network-access",
+        "--server-stages-only",
+        "--no-docs",
+        "client_bundle_append_disabled",
+        "structured `422 request_validation`",
+        "deployment",
     ]
     for phrase in required_phrases:
         assert phrase in guide
 
     assert "v1.2.3" not in guide
+
+
+def test_api_security_guide_covers_trust_boundary_and_deferred_controls() -> None:
+    guide = (PROJECT_ROOT / "docs" / "API_SECURITY.md").read_text(encoding="utf-8")
+    normalized = " ".join(guide.split())
+
+    required_phrases = [
+        "no built-in authentication",
+        "campaign YAML files",
+        "host compute time",
+        "root-bound",
+        "Unauthorized callers can mutate campaign logs and consume compute",
+        "server-managed stages",
+        "Stage IDs are opaque but are not credentials",
+        "process restart",
+        "not shared across workers",
+        "--allow-network-access",
+        "acknowledgement only",
+        "--server-stages-only",
+        "--no-docs",
+        "SSH tunnel or VPN",
+        "externally authenticated",
+        "Signed client bundles are also deferred",
+        "Do not expose this unauthenticated listener directly to the public internet",
+    ]
+    for phrase in required_phrases:
+        assert phrase in normalized
+
+
+def test_release_checklist_requires_clean_tracked_security_docs() -> None:
+    checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "git status --short" in checklist
+    assert "git ls-files --error-unmatch docs/API_SECURITY.md" in checklist
+    assert "all intended files are committed" in checklist
 
 
 def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> None:
@@ -567,8 +614,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.5.1`" in roadmap
-    assert "v2.5.1 release adds lifecycle listings" in roadmap
+    assert "Current baseline: `v2.5.2`" in roadmap
+    assert "v2.5.2 release adds explicit network-bind" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -589,7 +636,7 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v243["v2.4.3<br/>Release closeout"]' in roadmap
     assert 'v250["v2.5.0<br/>Server staging + write coordination"]' in roadmap
     assert 'v251["v2.5.1<br/>Stage lifecycle diagnostics + polish"]' in roadmap
-    assert 'v252["v2.5.2<br/>Security + deployment feasibility"]' in roadmap
+    assert 'v252["v2.5.2<br/>Trusted deployment hardening"]' in roadmap
     assert 'v253["v2.5.3<br/>Operational closeout"]' in roadmap
     assert "class v20,v21,v22,v23,v24 majorDone" in roadmap
     assert "class v25 majorActive" in roadmap
@@ -597,9 +644,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
     assert "class v240,v241,v242,v243 patchDone" in roadmap
-    assert "class v250 patchDone" in roadmap
-    assert "class v251 patchActive" in roadmap
-    assert "class v252,v253 patchFuture" in roadmap
+    assert "class v250,v251,v252 patchDone" in roadmap
+    assert "class v253 patchFuture" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorActive" in roadmap
     assert "classDef patchDone" in roadmap
@@ -714,7 +760,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.5.1" in requirements_lock
+    assert "BO Forge v2.5.2" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -766,7 +812,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.5.1." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:` in v2.5.2." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -1142,6 +1188,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "docs/PUBLIC_API.md",
         "docs/STREAMLIT_DEPLOYMENT.md",
         "docs/API_PROBE.md",
+        "docs/API_SECURITY.md",
         "docs/CAPABILITY_MATRIX.md",
         "docs/QLOGNEHVI_FEASIBILITY.md",
         "examples/quickstart.py",
@@ -1268,7 +1315,7 @@ def _install_distribution_and_probe(
         capture_output=True,
     )
     assert completed.stdout == f"bo-forge {PROJECT_VERSION}\n"
-    subprocess.run(
+    api_help = subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
         cwd=probe_dir,
         env=env,
@@ -1276,6 +1323,8 @@ def _install_distribution_and_probe(
         text=True,
         capture_output=True,
     )
+    for option in ("--allow-network-access", "--server-stages-only", "--no-docs"):
+        assert option in api_help.stdout
 
     source_root = str(PROJECT_ROOT.resolve())
     script = f"""
@@ -1365,7 +1414,7 @@ assert streamlit.__version__
         check=True,
         text=True,
     )
-    subprocess.run(
+    module_help = subprocess.run(
         [str(python), "-m", "bo_forge_app", "--help"],
         cwd=probe_dir,
         env=env,
@@ -1373,7 +1422,7 @@ assert streamlit.__version__
         text=True,
         capture_output=True,
     )
-    subprocess.run(
+    script_help = subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-app"), "--help"],
         cwd=probe_dir,
         env=env,
@@ -1381,6 +1430,8 @@ assert streamlit.__version__
         text=True,
         capture_output=True,
     )
+    assert "--allow-network-access" in module_help.stdout
+    assert "--allow-network-access" in script_help.stdout
 
 
 def _install_api_extra_and_probe(
@@ -1438,7 +1489,7 @@ assert uvicorn.__version__
         check=True,
         text=True,
     )
-    subprocess.run(
+    api_help = subprocess.run(
         [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
         cwd=probe_dir,
         env=env,
@@ -1446,6 +1497,8 @@ assert uvicorn.__version__
         text=True,
         capture_output=True,
     )
+    for option in ("--allow-network-access", "--server-stages-only", "--no-docs"):
+        assert option in api_help.stdout
 
 
 def _venv_create_command(

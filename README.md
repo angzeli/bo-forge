@@ -1,15 +1,17 @@
-# 🧪 BO Forge v2.5.1
+# 🧪 BO Forge v2.5.2
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.5.1 adds stage lifecycle listing, explicit renewal, health diagnostics, and
-machine-readable recovery guidance to the server-managed API staging opened in
-v2.5.0. It keeps BO models, acquisitions, configuration, CSV schemas, and
-supported campaign combinations unchanged.
+v2.5.2 hardens deliberate trusted-network deployment with explicit network-bind
+acknowledgement, optional server-stage-only append, optional API documentation
+disablement, and additive deployment metadata. It keeps BO models,
+acquisitions, configuration, CSV schemas, and supported campaign combinations
+unchanged.
 
-Existing single-objective, multi-objective, structured, multi-fidelity, cost,
-review, replicate, contextual, CLI, notebook, Streamlit, service, and
-experimental API workflows remain backward compatible with prior v1.x baselines.
+Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
+notebooks, Streamlit workflows after launch, service calls, and API payloads
+remain compatible. Non-loopback app and API launcher commands now require the
+explicit `--allow-network-access` acknowledgement.
 
 BO Forge deliberately supports only:
 
@@ -90,7 +92,7 @@ python -m bo_forge_app
 For trusted LAN access:
 
 ```bash
-bo-forge-app --host 0.0.0.0 --port 8501
+bo-forge-app --host 0.0.0.0 --port 8501 --allow-network-access
 ```
 
 BO Forge has no built-in authentication. Use network access only on a trusted
@@ -117,6 +119,19 @@ can be changed for one launcher process:
 bo-forge-api --root . --stage-ttl-seconds 1800 --max-staged-batches 128
 ```
 
+Network binds require explicit acknowledgement:
+
+```bash
+bo-forge-api --root . --host 0.0.0.0 --port 8765 --allow-network-access
+```
+
+Trusted deployments can require server-managed append and disable interactive
+API documentation:
+
+```bash
+bo-forge-api --root . --server-stages-only --no-docs
+```
+
 For API clients, server-managed staging is preferred. The API probe has no
 built-in authentication and is not a production backend.
 API clients can list active or terminal stage metadata and explicitly renew a
@@ -125,6 +140,7 @@ Stages disappear when the API process restarts, and stage IDs are not
 authentication credentials. The earlier client-carried staged-bundle append
 path remains available as a trusted-client compatibility workflow.
 See [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md)
+and [docs/API_SECURITY.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_SECURITY.md)
 before using it beyond localhost.
 
 ---
@@ -246,6 +262,7 @@ bo-forge/
 - [docs/STREAMLIT_APP.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_APP.md): local Streamlit app setup and workflow.
 - [docs/STREAMLIT_DEPLOYMENT.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_DEPLOYMENT.md): safe local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy deployment guidance.
 - [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md): experimental optional FastAPI probe usage and safety model.
+- [docs/API_SECURITY.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_SECURITY.md): API assets, trust boundaries, deployment safeguards, and deferred production requirements.
 - [docs/CAPABILITY_MATRIX.md](https://github.com/angzeli/bo-forge/blob/main/docs/CAPABILITY_MATRIX.md): supported, read-only, rejected, and deferred feature combinations.
 - [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](https://github.com/angzeli/bo-forge/blob/main/docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
 - [docs/CLI_ERROR_EXAMPLES.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.
@@ -265,7 +282,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.5.1 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v2.5.2 environment is recorded in `requirements-lock.txt`.
 
 ---
 

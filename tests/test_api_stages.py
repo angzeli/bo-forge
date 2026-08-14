@@ -863,6 +863,53 @@ def test_client_carried_append_retires_server_stage_and_releases_capacity(
     assert api_client.post("/campaign/suggestions/dry-run", json=ref).status_code == 200
 
 
+def test_server_stages_only_rejects_client_bundle_without_mutating_log(
+    tmp_path: Path,
+) -> None:
+    ref = _copy_campaign(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    api_client = TestClient(create_app(tmp_path, server_stages_only=True))
+    dry_run = api_client.post("/campaign/suggestions/dry-run", json=ref).json()
+    before = log_path.read_bytes()
+
+    response = api_client.post(
+        "/campaign/suggestions/append",
+        json={**ref, "staged_bundle": dry_run["staged_bundle"]},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == {
+        "code": "client_bundle_append_disabled",
+        "message": (
+            "Client-carried staged-bundle append is disabled for this deployment. "
+            "Use a server-managed stage append instead."
+        ),
+        "retryable": False,
+        "suggested_action": (
+            "Generate a dry-run and append its server-managed stage ID instead."
+        ),
+    }
+    assert log_path.read_bytes() == before
+
+
+def test_server_stages_only_keeps_server_managed_append_operational(
+    tmp_path: Path,
+) -> None:
+    ref = _copy_campaign(tmp_path)
+    log_path = tmp_path / ref["log_path"]
+    before_rows = len(pd.read_csv(log_path, keep_default_na=False))
+    api_client = TestClient(create_app(tmp_path, server_stages_only=True))
+    stage_id = api_client.post("/campaign/suggestions/dry-run", json=ref).json()["stage"][
+        "stage_id"
+    ]
+
+    response = api_client.post(f"/campaign/stages/{stage_id}/append")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["stage"]["status"] == "consumed"
+    assert len(pd.read_csv(log_path, keep_default_na=False)) == before_rows + 1
+
+
 def test_concurrent_server_stage_append_writes_exactly_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1066,6 +1113,7 @@ def test_get_stale_stage_releases_capacity_after_external_log_change(
         ("stage_not_found", False, "stage ID"),
         ("stale_log", False, "new log fingerprint"),
         ("path_outside_root", False, "inside"),
+        ("client_bundle_append_disabled", False, "server-managed stage ID"),
         ("request_validation", False, "Correct"),
         ("bo_forge_error", False, "Correct"),
     ],

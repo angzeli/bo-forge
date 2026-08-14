@@ -105,6 +105,8 @@ def create_app(
     *,
     stage_ttl_seconds: float = 1800.0,
     max_staged_batches: int = 128,
+    server_stages_only: bool = False,
+    interactive_docs: bool = True,
 ) -> FastAPI:
     """Create the experimental BO Forge FastAPI app rooted at one directory."""
     resolved_root = Path(root).expanduser().resolve()
@@ -115,6 +117,9 @@ def create_app(
         title="BO Forge API Probe",
         version=__version__,
         description="Experimental local/trusted-network API probe around CampaignAppService.",
+        docs_url="/docs" if interactive_docs else None,
+        redoc_url="/redoc" if interactive_docs else None,
+        openapi_url="/openapi.json" if interactive_docs else None,
     )
     app.state.root = resolved_root
     stage_store = InMemoryStageStore(
@@ -132,6 +137,14 @@ def create_app(
             "version": __version__,
             "experimental": True,
             "staging": stage_store.stats(),
+            "deployment": {
+                "authentication": "none",
+                "trusted_network_only": True,
+                "stage_storage": "process_memory",
+                "client_carried_bundles": not server_stages_only,
+                "interactive_docs": interactive_docs,
+                "multi_worker_safe": False,
+            },
         }
 
     @app.post("/campaign/validation")
@@ -208,6 +221,13 @@ def create_app(
 
     @app.post("/campaign/suggestions/append")
     def append(request: AppendRequest) -> dict[str, object]:
+        if server_stages_only:
+            raise ApiError(
+                "client_bundle_append_disabled",
+                "Client-carried staged-bundle append is disabled for this deployment. "
+                "Use a server-managed stage append instead.",
+                403,
+            )
         service = _load_service(resolved_root, request)
         bundle = _rehydrate_staged_bundle(request.staged_bundle, resolved_root)
         result = service.append_staged(
@@ -706,6 +726,10 @@ def _error_recovery(code: str) -> tuple[bool, str]:
         "path_outside_root": (
             False,
             "Use config and log paths that resolve inside the configured API root.",
+        ),
+        "client_bundle_append_disabled": (
+            False,
+            "Generate a dry-run and append its server-managed stage ID instead.",
         ),
         "request_validation": (False, "Correct the request fields before retrying."),
         "bo_forge_error": (False, "Correct the campaign state or request before retrying."),

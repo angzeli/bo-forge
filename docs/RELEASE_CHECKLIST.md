@@ -39,6 +39,8 @@ Use this checklist before publishing a GitHub release or PyPI package.
 ./.venv/bin/python -m bo_forge suggest --config configs/19_multi_objective_qlognehvi.yaml --log examples/19_multi_objective_qlognehvi_campaign_log.csv --batch-size 1
 ./.venv/bin/python -m streamlit --version
 git diff --check
+git status --short
+git ls-files --error-unmatch docs/API_SECURITY.md
 ```
 
 Confirm:
@@ -54,6 +56,13 @@ Confirm:
   representative qMFKG `q=1/2/4` medians without machine-dependent CI
   thresholds.
 - `docs/API_PROBE.md` describes the experimental API probe, root-bound paths, and no-auth safety model.
+- `docs/API_SECURITY.md` documents API assets, trust boundaries, deployment safeguards, and deferred production requirements.
+- The release worktree is clean, all intended files are committed, and
+  `docs/API_SECURITY.md` is tracked before building or tagging.
+- Network launcher tests require `--allow-network-access` for wildcard and
+  non-loopback binds before Streamlit or Uvicorn imports.
+- API tests verify `--server-stages-only`, `--no-docs`, additive deployment
+  health metadata, and the absence of permissive wildcard CORS headers.
 - API stage lifecycle tests cover create, recover, list/filter, explicit
   renewal, discard, expiration, metadata-only tombstones, early capacity
   rejection, compatibility retirement, exactly-once append, stale/ambiguous
@@ -121,7 +130,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.5.1-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.5.2-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -138,7 +147,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.5.1-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.5.2-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -155,7 +164,7 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.5.1-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.5.2-py3-none-any.whl[api]"
 cd /tmp
 /tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
@@ -168,7 +177,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.5.1.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.5.2.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -197,7 +206,7 @@ tombstone counts, and restart-reset lifecycle totals without reading campaign fi
 Optional trusted-LAN smoke from a controlled network:
 
 ```bash
-bo-forge-app --host 0.0.0.0 --port 8501 --no-browser
+bo-forge-app --host 0.0.0.0 --port 8501 --no-browser --allow-network-access
 ```
 
 Confirm the startup output warns that the app has no built-in authentication,
@@ -205,7 +214,7 @@ is for trusted LAN/VPN/SSH tunnel use only, and reads/writes host files. Do not
 expose the app directly to the public internet.
 
 Review [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) and
-[API_PROBE.md](API_PROBE.md) before release and
+[API_PROBE.md](API_PROBE.md) and [API_SECURITY.md](API_SECURITY.md) before release and
 confirm the trusted-LAN manual smoke matches the documented safety guidance.
 
 Optional macOS launcher smoke:
@@ -247,8 +256,8 @@ Confirm the full local loop still works:
 
 - Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
   `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.5.1`.
-- Tag the release as `v2.5.1`.
+  install paths, and the release tag all agree on `v2.5.2`.
+- Tag the release as `v2.5.2`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 

@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v2.5.1.
+This page shows the recommended `pip install` paths for BO Forge v2.5.2.
 
 Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench. Use the API extra only when you want the experimental FastAPI probe.
 
@@ -56,7 +56,7 @@ uses the same launcher path when console scripts are less visible.
 For trusted LAN access:
 
 ```bash
-bo-forge-app --host 0.0.0.0 --port 8501
+bo-forge-app --host 0.0.0.0 --port 8501 --allow-network-access
 ```
 
 BO Forge has no built-in authentication. Read
@@ -92,8 +92,8 @@ bo-forge-api --root . --host 127.0.0.1 --port 8765
 ```
 
 The API probe is experimental, has no built-in authentication, and is not a
-production backend. Read [API_PROBE.md](API_PROBE.md) before exposing it beyond
-localhost.
+production backend. Read [API_PROBE.md](API_PROBE.md) and
+[API_SECURITY.md](API_SECURITY.md) before exposing it beyond localhost.
 
 ## 🛠️ Option 4: Development From A Clone
 
@@ -137,7 +137,7 @@ Install the wheel in a fresh environment:
 
 ```bash
 python3 -m venv /tmp/bo_forge_probe
-/tmp/bo_forge_probe/bin/pip install dist/bo_forge-2.5.1-py3-none-any.whl
+/tmp/bo_forge_probe/bin/pip install dist/bo_forge-2.5.2-py3-none-any.whl
 /tmp/bo_forge_probe/bin/bo-forge doctor
 /tmp/bo_forge_probe/bin/pip check
 ```
@@ -146,7 +146,7 @@ Install the source distribution similarly:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_probe
-/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-2.5.1.tar.gz
+/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-2.5.2.tar.gz
 /tmp/bo_forge_sdist_probe/bin/bo-forge doctor
 /tmp/bo_forge_sdist_probe/bin/pip check
 ```

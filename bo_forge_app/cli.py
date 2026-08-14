@@ -40,6 +40,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--host", default=DEFAULT_HOST, help="Host address for Streamlit.")
     parser.add_argument(
+        "--allow-network-access",
+        action="store_true",
+        help="Acknowledge the risks of binding Streamlit to a non-loopback host.",
+    )
+    parser.add_argument(
         "--port",
         type=_parse_port,
         default=DEFAULT_PORT,
@@ -195,6 +200,11 @@ def write_macos_launcher(
 def run(argv: list[str] | None = None) -> int:
     """Run the BO Forge app launcher."""
     args, passthrough = parse_launcher_args(sys.argv[1:] if argv is None else argv)
+    try:
+        _require_network_access_acknowledgement(args)
+    except LauncherError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     if args.make_launcher is not None:
         try:
             launcher_path = write_macos_launcher(args.make_launcher, args, passthrough)
@@ -238,12 +248,25 @@ def _conflicting_passthrough_options(passthrough: list[str]) -> list[str]:
 
 def _launcher_command_args(args: argparse.Namespace, passthrough: list[str]) -> list[str]:
     command_args = ["--host", str(args.host), "--port", str(args.port)]
+    if args.allow_network_access:
+        command_args.append("--allow-network-access")
     if args.no_browser:
         command_args.append("--no-browser")
     elif args.browser:
         command_args.append("--browser")
     command_args.extend(passthrough)
     return command_args
+
+
+def _require_network_access_acknowledgement(args: argparse.Namespace) -> None:
+    host = str(args.host)
+    if _host_requires_network_warning(host) and not args.allow_network_access:
+        raise LauncherError(
+            "Binding to a wildcard or non-loopback host requires "
+            "--allow-network-access. Use --host 127.0.0.1 for local-only access. "
+            "The acknowledgement flag only acknowledges network exposure; "
+            "it does not add authentication or other protection."
+        )
 
 
 def _detect_lan_ip() -> str | None:
