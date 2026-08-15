@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -369,7 +370,7 @@ def _register_server_stage_routes(
             include_terminal=include_terminal,
             statuses=requested_statuses,
             limit=limit,
-            validator=_server_stage_file_invalidation_reason,
+            validator=_server_stage_file_validator(),
         )
         return {
             "stages": [_stage_summary_payload(item, root) for item in listing.stages],
@@ -611,11 +612,18 @@ def _server_stage_payload(staged: StageSnapshot, root: Path) -> dict[str, object
 
 def _server_stage_file_invalidation_reason(
     staged: StageValidationSnapshot | StageSnapshot,
+    *,
+    fingerprint_cache: dict[Path, tuple[str | None, bool]] | None = None,
 ) -> str | None:
-    try:
-        config_fingerprint = file_fingerprint(staged.config_path)
-        log_fingerprint = file_fingerprint(staged.log_path)
-    except OSError:
+    config_fingerprint, config_unreadable = _cached_stage_file_fingerprint(
+        staged.config_path,
+        fingerprint_cache,
+    )
+    log_fingerprint, log_unreadable = _cached_stage_file_fingerprint(
+        staged.log_path,
+        fingerprint_cache,
+    )
+    if config_unreadable or log_unreadable:
         return "Staged batch files cannot be read."
     expected_config_fingerprint = (
         staged.config_fingerprint
@@ -634,9 +642,40 @@ def _server_stage_file_invalidation_reason(
     return None
 
 
+def _cached_stage_file_fingerprint(
+    path: Path,
+    cache: dict[Path, tuple[str | None, bool]] | None,
+) -> tuple[str | None, bool]:
+    cache_key = path.resolve()
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    try:
+        result = (file_fingerprint(cache_key), False)
+    except OSError:
+        result = (None, True)
+    if cache is not None:
+        cache[cache_key] = result
+    return result
+
+
+def _server_stage_file_validator() -> Callable[
+    [StageValidationSnapshot | StageSnapshot], str | None
+]:
+    fingerprint_cache: dict[Path, tuple[str | None, bool]] = {}
+
+    def validate(staged: StageValidationSnapshot | StageSnapshot) -> str | None:
+        return _server_stage_file_invalidation_reason(
+            staged,
+            fingerprint_cache=fingerprint_cache,
+        )
+
+    return validate
+
+
 def _prune_invalid_server_stages(stage_store: InMemoryStageStore) -> None:
+    validate = _server_stage_file_validator()
     for staged in stage_store.validation_snapshots():
-        stale_reason = _server_stage_file_invalidation_reason(staged)
+        stale_reason = validate(staged)
         if stale_reason is not None:
             stage_store.mark_stale_if_active(staged.stage_id, stale_reason)
 

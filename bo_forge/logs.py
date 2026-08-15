@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import shutil
+import stat
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -444,24 +446,79 @@ def _atomic_write_and_validate(
         temp_path = Path(handle.name)
         df.to_csv(handle, index=False, float_format="%.17g")
 
+    backup_path: Path | None = None
     try:
         temp_df = _read_csv(temp_path)
         _validate_structural_log(temp_df)
         if config is not None:
             validate_campaign_data(config, temp_df)
+        if path.exists():
+            temp_path.chmod(stat.S_IMODE(path.stat().st_mode))
+            backup_path = _copy_log_backup(path)
         temp_path.replace(path)
+    except (OSError, LogValidationError, LogWriteError) as exc:
+        _remove_temporary_file(temp_path)
+        _remove_temporary_file(backup_path)
+        raise LogWriteError(
+            f"Campaign log write failed before replacement for '{path}': {exc}"
+        ) from exc
+
+    try:
         post_write_df = _read_csv(path)
         _validate_structural_log(post_write_df)
         if config is not None:
             validate_campaign_data(config, post_write_df)
     except (OSError, LogValidationError, LogWriteError) as exc:
-        try:
-            temp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        rollback_error = _restore_replaced_log(path, backup_path)
+        _remove_temporary_file(temp_path)
+        _remove_temporary_file(backup_path)
+        if rollback_error is not None:
+            raise LogWriteError(
+                f"Post-write validation failed for campaign log '{path}', and the "
+                f"previous file could not be restored; campaign state is uncertain: "
+                f"validation_error={exc}; rollback_error={rollback_error}"
+            ) from exc
         raise LogWriteError(
-            f"Post-write validation failed for campaign log '{path}': {exc}"
+            f"Post-write validation failed for campaign log '{path}'; the previous "
+            f"file was restored: {exc}"
         ) from exc
+    _remove_temporary_file(backup_path)
+
+
+def _copy_log_backup(path: Path) -> Path:
+    with NamedTemporaryFile(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".bak",
+        delete=False,
+    ) as handle:
+        backup_path = Path(handle.name)
+    try:
+        shutil.copy2(path, backup_path)
+    except OSError:
+        _remove_temporary_file(backup_path)
+        raise
+    return backup_path
+
+
+def _restore_replaced_log(path: Path, backup_path: Path | None) -> OSError | None:
+    try:
+        if backup_path is None:
+            path.unlink(missing_ok=True)
+        else:
+            backup_path.replace(path)
+    except OSError as exc:
+        return exc
+    return None
+
+
+def _remove_temporary_file(path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _canonical_log_path(path: str | Path) -> Path:

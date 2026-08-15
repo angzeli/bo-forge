@@ -4,10 +4,10 @@ This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.5.2`. The v2.5.2 release adds explicit network-bind
-acknowledgement, optional server-stage-only append, optional API documentation
-disablement, and cheap deployment metadata while preserving BO behavior,
-schemas, mutation semantics, and supported campaign combinations.
+Current baseline: `v2.5.3`. The v2.5.3 release closes v2.5.x with operational
+behavior-freeze coverage, documentation alignment, and package verification
+while preserving BO behavior, schemas, mutation semantics, launcher/API
+contracts, and supported campaign combinations.
 
 ## Roadmap So Far
 
@@ -57,14 +57,12 @@ flowchart LR
     v25 -.-> v252
     v25 -.-> v253
 
-    class v20,v21,v22,v23,v24 majorDone
-    class v25 majorActive
+    class v20,v21,v22,v23,v24,v25 majorDone
     class v210,v211,v212,v213 patchDone
     class v220,v221,v222,v223 patchDone
     class v230,v231,v232,v233 patchDone
     class v240,v241,v242,v243 patchDone
-    class v250,v251,v252 patchDone
-    class v253 patchFuture
+    class v250,v251,v252,v253 patchDone
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -167,7 +165,7 @@ Status: completed
 
 ## v2.5.x - App/API Operational Hardening
 
-Status: active
+Status: completed
 
 - `v2.5.0` adds bounded process-local server-managed API stages with
   exactly-once append claims, lifecycle errors, and launcher-configured TTL and
@@ -183,7 +181,9 @@ Status: active
 - Built-in authentication and signed client-carried bundles remain deferred:
   neither would by itself supply the TLS, identity, authorization, rotation,
   and audit boundaries required for a production service.
-- `v2.5.3` is reserved for operational release closeout.
+- `v2.5.3` closes the line with deployment-mode and network-access behavior
+  freezes, mutation failure atomicity checks, documentation alignment, and
+  package/clean-install verification.
 - Keep the compatibility client-carried bundle path through v2.5.x.
 - Keep production auth, persistent stage storage, multi-worker coordination,
   and public-internet claims out of v2.5.x.

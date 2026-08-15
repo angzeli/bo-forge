@@ -832,6 +832,7 @@ def test_log_lock_releases_after_post_write_validation_failure(
     cfg = config()
     log_path = tmp_path / "campaign.csv"
     suggestion("existing", x=0.2).to_csv(log_path, index=False)
+    before = log_path.read_bytes()
     real_read_csv = logs_module._read_csv
     canonical_reads = 0
 
@@ -846,11 +847,43 @@ def test_log_lock_releases_after_post_write_validation_failure(
     monkeypatch.setattr(logs_module, "_read_csv", fail_post_write_read)
     with pytest.raises(LogWriteError, match="Post-write validation failed"):
         append_suggestions(log_path, suggestion("written_before_failure", x=0.5), config=cfg)
+    assert log_path.read_bytes() == before
 
     monkeypatch.setattr(logs_module, "_read_csv", real_read_csv)
     append_suggestions(log_path, suggestion("after_post_failure", x=0.8), config=cfg)
     assert pd.read_csv(log_path, keep_default_na=False)["row_id"].tolist() == [
         "existing",
-        "written_before_failure",
         "after_post_failure",
     ]
+
+
+def test_post_write_validation_failure_removes_new_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    real_read_csv = logs_module._read_csv
+
+    def fail_post_write_read(path: Path) -> pd.DataFrame:
+        if path == log_path.resolve():
+            raise LogWriteError("post-write read failed")
+        return real_read_csv(path)
+
+    monkeypatch.setattr(logs_module, "_read_csv", fail_post_write_read)
+
+    with pytest.raises(LogWriteError, match="previous file was restored"):
+        append_suggestions(log_path, suggestion("new_log"), config=config())
+
+    assert not log_path.exists()
+    assert list(tmp_path.glob(".campaign.csv.*")) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes are not portable to Windows")
+def test_atomic_replacement_preserves_existing_file_mode(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    suggestion("existing", x=0.2).to_csv(log_path, index=False)
+    log_path.chmod(0o640)
+
+    append_suggestions(log_path, suggestion("appended", x=0.8), config=config())
+
+    assert log_path.stat().st_mode & 0o777 == 0o640

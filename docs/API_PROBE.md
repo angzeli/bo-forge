@@ -11,7 +11,7 @@ For the complete trust-boundary and deployment decision, see
 [API_SECURITY.md](API_SECURITY.md).
 
 The API has no built-in auth, no database, and no multi-user state
-coordination. v2.5.2 uses bounded in-memory suggestion stages, but they are not
+coordination. BO Forge uses bounded in-memory suggestion stages, but they are not
 persistent and disappear whenever the API process restarts. Do not expose the
 probe directly to the public internet.
 
@@ -300,7 +300,10 @@ Fingerprint checks run inside the same cross-process lock as CSV validation,
 mutation, atomic replacement, and post-write validation. Append, review, and
 observation therefore reject stale callers rather than overwriting a newer
 same-machine write. A busy lock returns `log_busy`. Locks do not coordinate
-different hosts writing the same network filesystem.
+different hosts writing the same network filesystem. If post-write validation
+fails, BO Forge restores the prior CSV bytes before reporting failure; if that
+rollback cannot be confirmed, the error states that campaign file state is
+uncertain.
 
 Server-stage lifecycle errors use these codes:
 

@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import sys
 import sysconfig
@@ -249,8 +250,9 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.5.2" in readme
-    assert "v2.5.2 hardens deliberate trusted-network deployment" in readme
+    assert "# 🧪 BO Forge v2.5.3" in readme
+    assert "v2.5.3 closes the v2.5.x app/API operational-hardening line" in readme
+    assert "## v2.5.3 - App And API Operational Closeout" in changelog
     assert "## v2.5.2 - Trusted Deployment Hardening" in changelog
     assert "## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish" in changelog
     assert "## v2.5.0 - Server-Managed Staging And Concurrent Write Safety" in changelog
@@ -291,7 +293,7 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.5.2 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v2.5.3 provides a local Streamlit workbench" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -385,7 +387,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v2.5.2",
+        "BO Forge v2.5.3",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -614,8 +616,8 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.5.2`" in roadmap
-    assert "v2.5.2 release adds explicit network-bind" in roadmap
+    assert "Current baseline: `v2.5.3`" in roadmap
+    assert "v2.5.3 release closes v2.5.x" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -638,14 +640,12 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert 'v251["v2.5.1<br/>Stage lifecycle diagnostics + polish"]' in roadmap
     assert 'v252["v2.5.2<br/>Trusted deployment hardening"]' in roadmap
     assert 'v253["v2.5.3<br/>Operational closeout"]' in roadmap
-    assert "class v20,v21,v22,v23,v24 majorDone" in roadmap
-    assert "class v25 majorActive" in roadmap
+    assert "class v20,v21,v22,v23,v24,v25 majorDone" in roadmap
     assert "class v210,v211,v212,v213 patchDone" in roadmap
     assert "class v220,v221,v222,v223 patchDone" in roadmap
     assert "class v230,v231,v232,v233 patchDone" in roadmap
     assert "class v240,v241,v242,v243 patchDone" in roadmap
-    assert "class v250,v251,v252 patchDone" in roadmap
-    assert "class v253 patchFuture" in roadmap
+    assert "class v250,v251,v252,v253 patchDone" in roadmap
     assert "classDef majorDone" in roadmap
     assert "classDef majorActive" in roadmap
     assert "classDef patchDone" in roadmap
@@ -686,11 +686,12 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "batches from one through four" in roadmap
     assert "v2.5.x - App/API Operational Hardening" in roadmap
     assert re.search(
-        r"## v2\.5\.x - App/API Operational Hardening\s+Status: active",
+        r"## v2\.5\.x - App/API Operational Hardening\s+Status: completed",
         roadmap,
     )
     assert "exactly-once append claims" in roadmap
     assert "same-machine append, review, and observation mutations" in roadmap
+    assert "deployment-mode and network-access behavior" in roadmap
     assert "No mandatory database" in roadmap
     assert "No unrestricted feature cross-product" in roadmap
     assert "No raw low-level kernel API as the first modeling extension" in roadmap
@@ -753,6 +754,37 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in checklist
     assert "--batch-size 2" in checklist
     assert "--batch-size 4" in checklist
+    assert "/tmp/bo_forge_quickstart_probe" in checklist
+    assert 'REPO_ROOT="$(pwd)"' in checklist
+    assert 'PYTHONPATH="$REPO_ROOT"' in checklist
+
+
+def test_release_checklist_isolated_quickstart_recipe_works(tmp_path: Path) -> None:
+    probe_root = tmp_path / "bo_forge_quickstart_probe"
+    shutil.copytree(PROJECT_ROOT / "configs", probe_root / "configs")
+    shutil.copytree(
+        PROJECT_ROOT / "examples",
+        probe_root / "examples",
+        ignore=shutil.ignore_patterns(
+            "quickstart_working_log*.csv",
+            "*latest_suggestions*.csv",
+        ),
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(PROJECT_ROOT)
+
+    completed = subprocess.run(
+        [sys.executable, "examples/quickstart.py"],
+        cwd=probe_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert (probe_root / "examples" / "quickstart_working_log.csv").is_file()
 
 
 def test_requirements_lock_matches_current_release_snapshot() -> None:
@@ -760,7 +792,7 @@ def test_requirements_lock_matches_current_release_snapshot() -> None:
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.5.2" in requirements_lock
+    assert "BO Forge v2.5.3" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
 
 
@@ -812,7 +844,7 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "manually staged rows" not in quickstart
     assert "manually staged rows" not in repository_structure
     normalized_csv_schema = " ".join(csv_schema.split())
-    assert "`stages:` cannot be combined with `cost:` in v2.5.2." in normalized_csv_schema
+    assert "`stages:` cannot be combined with `cost:`." in normalized_csv_schema
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
@@ -1231,6 +1263,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "notebooks/20_contextual_cost_review_logei_campaign.ipynb",
         "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb",
         "tests/conftest.py",
+        "tests/test_v253_operational_freeze.py",
     }
     assert {f"{SDIST_ROOT}/{path}" for path in required_paths}.issubset(names)
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)

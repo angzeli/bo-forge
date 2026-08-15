@@ -1,6 +1,6 @@
 # Experimental API Security And Trust Boundaries
 
-BO Forge v2.5.2 includes deployment safeguards for deliberate local and
+BO Forge v2.5.3 includes deployment safeguards for deliberate local and
 trusted-network use of the experimental FastAPI probe. These safeguards do not
 make the probe a production service. The API has no built-in authentication,
 authorization, user identity, TLS termination, or persistent audit log.
@@ -26,7 +26,8 @@ BO Forge currently provides:
 - server-managed staged batches with opaque random IDs, TTL, capacity limits,
   lifecycle state, and exactly-once append claims;
 - same-machine file locks around append, review, and observation mutations;
-- temporary-file replacement and post-write validation for CSV updates;
+- mode-preserving temporary-file replacement, post-write validation, and
+  rollback to the prior CSV bytes when validation fails;
 - structured errors and recovery guidance;
 - no permissive wildcard CORS configuration;
 - launcher warnings and required acknowledgement for non-loopback binds.
@@ -103,4 +104,4 @@ server-managed stages already provide the preferred payload-integrity path.
 Any future production API would require an explicit threat model, authenticated
 identity, authorization policy, TLS, credential lifecycle, rate limits,
 persistent multi-worker state, audit logging, deployment guidance, and security
-review. None of those guarantees are claimed by v2.5.2.
+review. None of those guarantees are claimed by this experimental probe.

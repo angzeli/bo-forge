@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from filelock import FileLock
 
 import bo_forge.logs as logs_module
+import bo_forge_app.api as api_module
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import LogWriteError
 from bo_forge.io import empty_campaign_log
@@ -479,6 +480,33 @@ def test_api_stage_listing_validates_status_and_limit(tmp_path: Path) -> None:
     assert unknown.json()["error"]["code"] == "request_validation"
     assert too_large.status_code == 422
     assert too_large.json()["error"]["code"] == "request_validation"
+
+
+def test_api_stage_listing_hashes_shared_campaign_files_once_per_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ref = _copy_campaign(tmp_path)
+    api_client = TestClient(create_app(tmp_path, max_staged_batches=2))
+    for _ in range(2):
+        response = api_client.post("/campaign/suggestions/dry-run", json=ref)
+        assert response.status_code == 200, response.text
+
+    original_fingerprint = api_module.file_fingerprint
+    fingerprinted_paths: list[Path] = []
+
+    def count_fingerprint(path: Path) -> str:
+        fingerprinted_paths.append(path.resolve())
+        return original_fingerprint(path)
+
+    monkeypatch.setattr(api_module, "file_fingerprint", count_fingerprint)
+
+    listing = api_client.get("/campaign/stages")
+
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["returned"] == 2
+    assert fingerprinted_paths.count((tmp_path / ref["config_path"]).resolve()) == 1
+    assert fingerprinted_paths.count((tmp_path / ref["log_path"]).resolve()) == 1
 
 
 def test_api_stage_renewal_is_explicit_and_preserves_payload(tmp_path: Path) -> None:

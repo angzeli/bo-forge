@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v2.5.3 - App And API Operational Closeout
+
+This behavior-preserving closeout freezes and verifies the completed v2.5.x
+app/API operational contracts without changing BO behavior, schemas, routes,
+payloads, launcher flags, or supported campaign combinations.
+
+- Adds a compact deployment-mode and network-acknowledgement behavior-freeze
+  matrix for default, strict, loopback, wildcard, LAN-IP, and hostname cases.
+- Locks structured recovery fields and status codes for stale, expired,
+  consumed, discarded, busy, and conflicting operations.
+- Strengthens no-mutation coverage for failed review and observation writes and
+  confirms `/health` remains free of campaign loading and file fingerprinting.
+- Restores prior CSV bytes when post-write validation fails and preserves an
+  existing log's file mode during atomic replacement.
+- Aligns API security, deployment, installation, public API, and release
+  guidance with the completed trusted-network/no-auth boundary.
+- Completes v2.5.x package and clean-install verification while retaining
+  process-memory stages, same-machine locking, and compatibility bundle support.
+- Adds no BO capability, config key, CSV column, command, endpoint, or notebook.
+
 ## v2.5.2 - Trusted Deployment Hardening
 
 This operational security-boundary patch makes deliberate trusted-network
