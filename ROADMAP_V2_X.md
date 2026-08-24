@@ -1,13 +1,16 @@
-# BO Forge v2.x Roadmap
+# BO Forge v2.x Roadmap - Completed History
 
 This roadmap begins with the v2.0.0 hardening baseline. It is directional, not
 a release promise. BO Forge v2.x should be a line of coherence and controlled expansion,
 not a rewrite of the CSV-backed campaign model.
 
-Current baseline: `v2.5.3`. The v2.5.3 release closes v2.5.x with operational
+Final v2 baseline: `v2.5.3`. The v2.5.3 release closed v2.5.x with operational
 behavior-freeze coverage, documentation alignment, and package verification
 while preserving BO behavior, schemas, mutation semantics, launcher/API
 contracts, and supported campaign combinations.
+
+Active planning moved to [ROADMAP_V3_X.md](ROADMAP_V3_X.md) with the v3.0.0
+architecture and scientific-UX baseline.
 
 ## Roadmap So Far
 

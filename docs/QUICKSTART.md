@@ -94,7 +94,12 @@ Suggestions are generated as a dry run and staged in app session state. They are
 
 The app can also export staged suggestions to a separate CSV without changing the staged suggestions or the campaign log.
 
-The app uses a Forge Suite-inspired workbench layout with a compact campaign source bar, a `Create Campaign` flow, and stateful `Overview`, `Suggest`, `Resolve`, `Reports`, and `Data` panels. v1.3.4 adds structured-campaign stage display, stage-aware dry-run suggestions, and stage diagnostics in the app while keeping BO logic in `CampaignSession`. Staged suggestions are blocked from append if the selected stage, config, or log changes after staging.
+The v3 workbench uses a compact campaign source bar, a `Create Campaign` flow,
+and three stateful areas: `Campaign`, `Run`, and `Analyze`. Structured-campaign
+stage display, stage-aware dry-run suggestions, and stage diagnostics remain
+backend-owned through `CampaignSession`. Staged suggestions are blocked from
+append if the selected stage, context, config, log, or payload changes after
+staging.
 
 Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
 

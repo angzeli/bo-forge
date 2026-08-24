@@ -1,6 +1,6 @@
 # Experimental API Security And Trust Boundaries
 
-BO Forge v2.5.3 includes deployment safeguards for deliberate local and
+BO Forge v3.0.0 includes deployment safeguards for deliberate local and
 trusted-network use of the experimental FastAPI probe. These safeguards do not
 make the probe a production service. The API has no built-in authentication,
 authorization, user identity, TLS termination, or persistent audit log.

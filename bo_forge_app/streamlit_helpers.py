@@ -265,51 +265,17 @@ def staged_bundle_invalidation_reason(
     stage: str | None = None,
     context_values: dict[str, object] | None = None,
 ) -> str | None:
-    """Return a reason staged suggestions cannot be appended, or None."""
-    if bundle is None:
-        return "No staged suggestions."
+    """Return the shared application-layer staged-bundle invalidation reason."""
+    from bo_forge.application import staged_bundle_invalidation_reason as application_reason
 
-    suggestions = bundle.get("suggestions")
-    if not isinstance(suggestions, pd.DataFrame) or suggestions.empty:
-        return "No staged suggestions."
-
-    suggestions_fingerprint = str(bundle.get("suggestions_fingerprint", ""))
-    if dataframe_fingerprint(suggestions) != suggestions_fingerprint:
-        return "Staged suggestions changed after they were staged."
-    if bool(bundle.get("appended", False)) or (
-        last_appended_fingerprint is not None
-        and suggestions_fingerprint == last_appended_fingerprint
-    ):
-        return "Staged suggestions were already appended."
-
-    resolved_config_path = Path(config_path).expanduser().resolve()
-    resolved_log_path = Path(log_path).expanduser().resolve()
-    if str(resolved_config_path) != bundle.get("config_path"):
-        return "Config path changed after suggestions were staged."
-    if str(resolved_log_path) != bundle.get("log_path"):
-        return "Log path changed after suggestions were staged."
-    if "stage" in bundle and stage != bundle.get("stage"):
-        return "Stage selection changed after suggestions were staged."
-    if "context_values" in bundle:
-        bundled_context_values = bundle.get("context_values")
-        if not isinstance(bundled_context_values, dict):
-            return "Context values changed after suggestions were staged."
-        if (
-            context_values_fingerprint(bundled_context_values)
-            != bundle.get("context_values_fingerprint")
-        ):
-            return "Context values changed after suggestions were staged."
-    if (
-        "context_values" in bundle
-        and context_values is not None
-        and dict(context_values) != bundle.get("context_values")
-    ):
-        return "Context values changed after suggestions were staged."
-    if file_fingerprint(resolved_config_path) != bundle.get("config_fingerprint"):
-        return "Config file changed after suggestions were staged."
-    if file_fingerprint(resolved_log_path) != bundle.get("log_fingerprint"):
-        return "Log file changed after suggestions were staged."
-    return None
+    return application_reason(
+        bundle,
+        config_path,
+        log_path,
+        last_appended_fingerprint,
+        stage,
+        context_values,
+    )
 
 
 def staged_bundle_is_appendable(
@@ -511,7 +477,7 @@ def empty_state_message(kind: str) -> tuple[str, str]:
         ),
         "pending_suggestions": (
             "No pending suggestions.",
-            "Generate candidates in the Suggest tab when the campaign is ready.",
+            "Generate candidates in Run when the campaign is ready.",
         ),
         "review_queue": (
             "No rows awaiting review.",

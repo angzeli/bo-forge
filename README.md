@@ -1,16 +1,17 @@
-# 🧪 BO Forge v2.5.3
+# 🧪 BO Forge v3.0.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v2.5.3 closes the v2.5.x app/API operational-hardening line with behavior-freeze
-coverage, documentation alignment, and package verification. It keeps BO
-models, acquisitions, configuration, CSV schemas, routes, payloads, launcher
-flags, and supported campaign combinations unchanged.
+v3.0.0 resets internal architecture and scientific UX without changing BO
+capabilities or durable campaign files. Focused configuration, campaign,
+optimization, diagnostics, application, Streamlit, and optional API ownership
+replace oversized modules behind compatibility facades.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
-notebooks, Streamlit workflows after launch, service calls, and API payloads
-remain compatible. Non-loopback app and API launcher commands now require the
-explicit `--allow-network-access` acknowledgement.
+notebooks, service calls, API payloads, and launcher safeguards remain
+compatible. The Streamlit workbench now organizes work into `Campaign`, `Run`,
+and `Analyze`, with native Day/Night theme state and the same explicit mutation
+and staged-suggestion safeguards.
 
 BO Forge deliberately supports only:
 
@@ -244,6 +245,7 @@ the GP still trains on group means from every context.
 bo-forge/
 ├── bo_forge/       # reusable backend package
 ├── bo_forge_app/   # local Streamlit wrapper
+├── bo_forge_api/   # optional FastAPI transport package
 ├── configs/        # YAML campaign configs
 ├── examples/       # seed CSV logs and runnable scripts
 ├── notebooks/      # notebook-first campaign workflows and deeper simulated demos
@@ -268,12 +270,14 @@ bo-forge/
 - [docs/CSV_SCHEMA.md](https://github.com/angzeli/bo-forge/blob/main/docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
 - [docs/COMMON_ERRORS.md](https://github.com/angzeli/bo-forge/blob/main/docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
 - [docs/PUBLIC_API.md](https://github.com/angzeli/bo-forge/blob/main/docs/PUBLIC_API.md): stable public imports supported by the `bo_forge` package.
+- [docs/MIGRATION_V3.md](https://github.com/angzeli/bo-forge/blob/main/docs/MIGRATION_V3.md): v3 module facades, UI mapping, API isolation, and figure changes.
 - [docs/RELEASE_CHECKLIST.md](https://github.com/angzeli/bo-forge/blob/main/docs/RELEASE_CHECKLIST.md): GitHub and PyPI release checklist.
 - [docs/REPOSITORY_STRUCTURE.md](https://github.com/angzeli/bo-forge/blob/main/docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
 - [CHANGELOG.md](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md): release history.
 - [ROADMAP_V0_TO_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V0_TO_V1.md): completed milestones through v1.0.0.
 - [ROADMAP_V1_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md): completed v1.x roadmap.
-- [ROADMAP_V2_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md): active v2.x direction.
+- [ROADMAP_V2_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md): completed v2.x history.
+- [ROADMAP_V3_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md): active v3 baseline.
 
 ---
 
@@ -281,7 +285,7 @@ bo-forge/
 
 The primary dependency source is `pyproject.toml`.
 
-A direct-dependency snapshot from the v2.5.3 environment is recorded in `requirements-lock.txt`.
+A direct-dependency snapshot from the v3.0.0 environment is recorded in `requirements-lock.txt`.
 
 ---
 

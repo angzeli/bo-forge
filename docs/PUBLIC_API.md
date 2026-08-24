@@ -1,12 +1,21 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v2.5.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.0.0.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
 does not load optimizer or plotting dependencies.
 
-Implementation modules such as `bo_forge.transforms`, `bo_forge.models`, and `bo_forge.diagnostics` remain importable for development, but their private helpers are not part of the stable public surface.
+Implementation modules such as `bo_forge.config`, `bo_forge.logs`,
+`bo_forge.validation`, `bo_forge.suggestions`, `bo_forge.diagnostics`, and
+`bo_forge.session` remain importable through compatibility facades. Their
+private helpers and the `_config`, `_campaign`, `_optimization`, and
+`_diagnostics` packages are not part of the stable public surface.
+
+`bo_forge.application` is the shared internal non-HTTP workflow layer. The
+optional FastAPI implementation belongs to `bo_forge_api`; existing
+`bo_forge_app.api`, `api_cli`, `stages`, and `service` imports remain available
+for v3 compatibility but are not public BO APIs.
 
 For supported and intentionally deferred workflow combinations, see
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
@@ -163,6 +172,11 @@ new helper. Use `pareto_front`, `pareto_summary`, `hypervolume`,
 configs with `bo.acquisition: qlog_nehvi`.
 
 `hypervolume` returns the current multi-objective hypervolume for the observed state, using replicate group means when replicates are enabled. `hypervolume_progress` returns cumulative best-so-far hypervolume progress with `observation`, `row_id`, `iteration`, and `hypervolume` columns.
+
+CampaignSession plot methods preserve their existing signatures and one-path,
+one-file behavior. v3 figures use scoped Matplotlib settings, a shared semantic
+color registry, white opaque backgrounds, and 600 dpi PNG export. Plot data,
+direction conventions, and PDF support are unchanged.
 
 ## 🧪 Example
 

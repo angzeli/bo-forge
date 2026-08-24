@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "2.5.3"
+version = "3.0.0"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,6 +25,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -42,13 +43,13 @@ dependencies = [
 [project.scripts]
 bo-forge = "bo_forge.cli:main"
 bo-forge-app = "bo_forge_app.cli:main"
-bo-forge-api = "bo_forge_app.api_cli:main"
+bo-forge-api = "bo_forge_api.cli:main"
 
 [project.urls]
 Repository = "https://github.com/angzeli/bo-forge"
 Issues = "https://github.com/angzeli/bo-forge/issues"
 Documentation = "https://github.com/angzeli/bo-forge/tree/main/docs"
-Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md"
+Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md"
 
 [project.optional-dependencies]
 app = [
@@ -76,7 +77,14 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["bo_forge", "bo_forge.*", "bo_forge_app", "bo_forge_app.*"]
+include = [
+    "bo_forge",
+    "bo_forge.*",
+    "bo_forge_app",
+    "bo_forge_app.*",
+    "bo_forge_api",
+    "bo_forge_api.*",
+]
 
 [tool.setuptools]
 include-package-data = false
@@ -91,13 +99,19 @@ filterwarnings = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-include = ["bo_forge/**/*.py", "bo_forge_app/**/*.py", "examples/**/*.py", "tests/**/*.py"]
+include = [
+    "bo_forge/**/*.py",
+    "bo_forge_app/**/*.py",
+    "bo_forge_api/**/*.py",
+    "examples/**/*.py",
+    "tests/**/*.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C901"]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["C901"]

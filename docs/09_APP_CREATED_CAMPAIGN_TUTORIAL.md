@@ -130,7 +130,7 @@ Expected result:
 - the YAML config file is created;
 - the empty canonical CSV log is created;
 - the campaign is loaded immediately;
-- the source bar and `Overview` panel show the campaign as valid;
+- the source bar and `Campaign` area show the campaign as valid;
 - the log contains headers only and no observed rows yet.
 
 The canonical CSV columns will include review, replicate, cost, and utility fields because those sections are enabled in the YAML.
@@ -139,11 +139,11 @@ The canonical CSV columns will include review, replicate, cost, and utility fiel
 
 Use the normal app workflow:
 
-1. Open `Suggest`.
+1. Open `Run`.
 2. Click `Generate suggestions (dry run)`.
 3. Review the staged suggestions and `Suggestion Quality`.
 4. Click `Append staged suggestions`.
-5. Open `Resolve`.
+5. Continue in `Run`.
 6. Review pending suggestions.
 7. Accept one suggested row.
 8. Run that experiment outside BO Forge.

@@ -1,28 +1,30 @@
-import os
+"""Distribution, installation, and release-document readiness tests."""
+
+import ast
 import re
-import shutil
-import subprocess
-import sys
-import sysconfig
-import tarfile
-import tomllib
-import zipfile
-from pathlib import Path
 
-import pandas as pd
-
-import bo_forge
-from bo_forge.session import CampaignSession
-from bo_forge_app.cli import packaged_streamlit_app_path
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PYPROJECT = tomllib.loads(
-    (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+from tests._release_readiness_support import (
+    PROJECT_ROOT,
+    PROJECT_VERSION,
+    PYPROJECT,
+    RELEASE_DEPENDENCY_PROBE_ENV,
+    CampaignSession,
+    Path,
+    _assert_sdist_contains_release_assets,
+    _assert_sdist_test_fixture_works,
+    _assert_wheel_package_boundaries,
+    _install_api_extra_and_probe,
+    _install_app_extra_and_probe,
+    _install_core_only_app_missing_streamlit_probe,
+    _install_distribution_and_probe,
+    bo_forge,
+    os,
+    packaged_streamlit_app_path,
+    pd,
+    shutil,
+    subprocess,
+    sys,
 )
-PROJECT_VERSION = PYPROJECT["project"]["version"]
-SDIST_ROOT = f"bo_forge-{PROJECT_VERSION}"
-DIST_INFO_ROOT = f"bo_forge-{PROJECT_VERSION}.dist-info"
-RELEASE_DEPENDENCY_PROBE_ENV = "BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES"
 
 
 def test_version_and_production_complexity_gate_match_project_metadata() -> None:
@@ -30,17 +32,16 @@ def test_version_and_production_complexity_gate_match_project_metadata() -> None
 
     assert bo_forge.__version__ == PROJECT_VERSION
     assert "C901" in lint["select"]
-    assert lint["mccabe"]["max-complexity"] == 15
+    assert lint["mccabe"]["max-complexity"] == 12
     assert lint["per-file-ignores"]["tests/**/*.py"] == ["C901"]
     assert "LogBusyError" in bo_forge.__all__
     assert "LogConflictError" in bo_forge.__all__
     assert issubclass(bo_forge.LogBusyError, bo_forge.LogWriteError)
     assert issubclass(bo_forge.LogConflictError, bo_forge.LogWriteError)
-
+    assert "Programming Language :: Python :: 3.12" in PYPROJECT["project"]["classifiers"]
 
 def test_license_file_exists() -> None:
     assert (PROJECT_ROOT / "LICENSE").is_file()
-
 
 def test_no_duplicate_release_artifacts_in_worktree() -> None:
     duplicate_artifacts = [
@@ -51,13 +52,11 @@ def test_no_duplicate_release_artifacts_in_worktree() -> None:
 
     assert duplicate_artifacts == []
 
-
 def test_manifest_does_not_reference_removed_screenshot_assets() -> None:
     manifest = (PROJECT_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
 
     assert "recursive-include docs *.md" in manifest
     assert "*.png" not in manifest
-
 
 def test_manifest_uses_expected_release_directives() -> None:
     manifest = (PROJECT_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
@@ -74,6 +73,7 @@ def test_manifest_uses_expected_release_directives() -> None:
         "include ROADMAP_V0_TO_V1.md",
         "include ROADMAP_V1_X.md",
         "include ROADMAP_V2_X.md",
+        "include ROADMAP_V3_X.md",
         "include requirements-lock.txt",
         "recursive-include configs *.yaml",
         "recursive-include docs *.md",
@@ -86,7 +86,6 @@ def test_manifest_uses_expected_release_directives() -> None:
     assert set(lines) == expected
     assert all(line.split()[0] in {"include", "recursive-include"} for line in lines)
     assert not any(line.startswith("inclgitude") for line in lines)
-
 
 def test_structured_tutorial_assets_are_tracked_release_files() -> None:
     release_assets = [
@@ -106,7 +105,6 @@ def test_structured_tutorial_assets_are_tracked_release_files() -> None:
     )
     assert completed.returncode == 0, completed.stderr
 
-
 def test_multi_fidelity_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/15_multi_fidelity_qmfkg.yaml",
@@ -124,7 +122,6 @@ def test_multi_fidelity_assets_are_tracked_release_files() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-
 
 def test_contextual_assets_are_tracked_release_files() -> None:
     release_assets = [
@@ -144,7 +141,6 @@ def test_contextual_assets_are_tracked_release_files() -> None:
     )
     assert completed.returncode == 0, completed.stderr
 
-
 def test_model_profile_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/17_model_profile_logei.yaml",
@@ -163,7 +159,6 @@ def test_model_profile_assets_are_tracked_release_files() -> None:
     )
     assert completed.returncode == 0, completed.stderr
 
-
 def test_qlog_nei_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/18_noisy_pending_qlognei.yaml",
@@ -181,7 +176,6 @@ def test_qlog_nei_assets_are_tracked_release_files() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-
 
 def test_qlog_nehvi_assets_and_scope_doc_are_release_files() -> None:
     release_assets = [
@@ -225,7 +219,6 @@ def test_qlog_nehvi_assets_and_scope_doc_are_release_files() -> None:
     )
     assert completed.returncode == 0, completed.stderr
 
-
 def test_readme_contains_current_install_commands() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -242,16 +235,16 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/CAPABILITY_MATRIX.md" in readme
     assert "docs/INSTALLATION.md" in readme
 
-
-def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
+def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v2.5.3" in readme
-    assert "v2.5.3 closes the v2.5.x app/API operational-hardening line" in readme
+    assert "# 🧪 BO Forge v3.0.0" in readme
+    assert "v3.0.0 resets internal architecture and scientific UX" in readme
+    assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
     assert "## v2.5.3 - App And API Operational Closeout" in changelog
     assert "## v2.5.2 - Trusted Deployment Hardening" in changelog
     assert "## v2.5.1 - Stage Lifecycle Diagnostics And Usability Polish" in changelog
@@ -278,9 +271,11 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "bo-forge plot --kind model-comparison" in readme
     assert "does not automatically select a model" in readme
     assert "single-objective contextual LogEI/qLogEI" in readme
-    assert "Non-loopback app and API launcher commands now require" in readme
+    assert "--allow-network-access" in readme
     assert "backward compatible with prior v1.x baselines" not in readme
     assert "ROADMAP_V2_X.md" in readme
+    assert "ROADMAP_V3_X.md" in readme
+    assert "docs/MIGRATION_V3.md" in readme
     assert "CAPABILITY_MATRIX.md" in readme
     assert "configs/16_contextual_logei.yaml" in readme
     assert "configs/20_contextual_cost_review_logei.yaml" in readme
@@ -293,7 +288,8 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v2.5.3 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v3.0.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "`Campaign`, `Run`, and `Analyze`" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
@@ -344,12 +340,10 @@ def test_v2_5_docs_describe_server_staging_and_write_coordination() -> None:
     assert stale_streamlit_scope not in streamlit_app_docs
     assert "no Streamlit multi-fidelity campaign creation" not in streamlit_app_docs
 
-
 def test_botorch_minor_version_is_bounded_for_optimizer_compatibility() -> None:
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"botorch>=0.17,<0.18"' in pyproject
-
 
 def test_v2_4_1_docs_cover_qmfkg_runtime_controls_and_lazy_startup() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
@@ -380,14 +374,13 @@ def test_v2_4_1_docs_cover_qmfkg_runtime_controls_and_lazy_startup() -> None:
     assert "Discrete qMFKG `q=2` suggestion" in performance
     assert "Discrete qMFKG `q=4` suggestion" in performance
 
-
 def test_capability_matrix_documents_supported_and_deferred_combinations() -> None:
     matrix = (PROJECT_ROOT / "docs" / "CAPABILITY_MATRIX.md").read_text(
         encoding="utf-8"
     )
 
     required_phrases = [
-        "BO Forge v2.5.3",
+        "BO Forge v3.0.0",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -419,7 +412,6 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
         assert phrase in matrix
     assert "| Contextual + replicates | supported |" in matrix
 
-
 def test_contextual_replicate_assets_are_tracked_release_files() -> None:
     release_assets = [
         "configs/21_contextual_replicate_logei.yaml",
@@ -437,7 +429,6 @@ def test_contextual_replicate_assets_are_tracked_release_files() -> None:
     )
     assert completed.returncode == 0, completed.stderr
 
-
 def test_core_docs_link_capability_matrix() -> None:
     docs = [
         PROJECT_ROOT / "README.md",
@@ -450,7 +441,6 @@ def test_core_docs_link_capability_matrix() -> None:
 
     for path in docs:
         assert "CAPABILITY_MATRIX.md" in path.read_text(encoding="utf-8")
-
 
 def test_streamlit_deployment_guide_exists_and_covers_safety_model() -> None:
     guide = (PROJECT_ROOT / "docs" / "STREAMLIT_DEPLOYMENT.md").read_text(
@@ -472,7 +462,6 @@ def test_streamlit_deployment_guide_exists_and_covers_safety_model() -> None:
     for phrase in required_phrases:
         assert phrase in guide
 
-
 def test_core_docs_link_streamlit_deployment_guide() -> None:
     docs = [
         PROJECT_ROOT / "README.md",
@@ -484,7 +473,6 @@ def test_core_docs_link_streamlit_deployment_guide() -> None:
 
     for path in docs:
         assert "STREAMLIT_DEPLOYMENT.md" in path.read_text(encoding="utf-8")
-
 
 def test_api_probe_guide_exists_and_covers_safety_model() -> None:
     guide = (PROJECT_ROOT / "docs" / "API_PROBE.md").read_text(encoding="utf-8")
@@ -531,7 +519,6 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
 
     assert "v1.2.3" not in guide
 
-
 def test_api_security_guide_covers_trust_boundary_and_deferred_controls() -> None:
     guide = (PROJECT_ROOT / "docs" / "API_SECURITY.md").read_text(encoding="utf-8")
     normalized = " ".join(guide.split())
@@ -558,7 +545,6 @@ def test_api_security_guide_covers_trust_boundary_and_deferred_controls() -> Non
     for phrase in required_phrases:
         assert phrase in normalized
 
-
 def test_release_checklist_requires_clean_tracked_security_docs() -> None:
     checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(
         encoding="utf-8"
@@ -567,7 +553,6 @@ def test_release_checklist_requires_clean_tracked_security_docs() -> None:
     assert "git status --short" in checklist
     assert "git ls-files --error-unmatch docs/API_SECURITY.md" in checklist
     assert "all intended files are committed" in checklist
-
 
 def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
@@ -611,13 +596,13 @@ def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> Non
         roadmap,
     )
 
-
-def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
+def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
+    v3_roadmap = (PROJECT_ROOT / "ROADMAP_V3_X.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert "Current baseline: `v2.5.3`" in roadmap
-    assert "v2.5.3 release closes v2.5.x" in roadmap
+    assert "Final v2 baseline: `v2.5.3`" in roadmap
+    assert "ROADMAP_V3_X.md" in roadmap
     assert "coherence and controlled expansion" in roadmap
     assert "docs/CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
@@ -696,10 +681,12 @@ def test_v2_roadmap_is_active_hardening_and_controlled_expansion_plan() -> None:
     assert "No unrestricted feature cross-product" in roadmap
     assert "No raw low-level kernel API as the first modeling extension" in roadmap
     expected_roadmap_url = (
-        'Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md"'
+        'Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md"'
     )
     assert expected_roadmap_url in pyproject
-
+    assert "Current baseline: `v3.0.0`" in v3_roadmap
+    assert 'v30["v3.0.0<br/>Architecture + scientific UX reset"]' in v3_roadmap
+    assert "docs/MIGRATION_V3.md" in v3_roadmap
 
 def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
     repository_structure = (PROJECT_ROOT / "docs" / "REPOSITORY_STRUCTURE.md").read_text(
@@ -710,13 +697,12 @@ def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
     )
     public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
 
-    assert "bo_forge_app/service.py" in repository_structure
+    assert "bo_forge.application" in repository_structure
     assert "internal, non-HTTP app service layer" in repository_structure
-    assert "not a stable public API" in repository_structure
+    assert "compatibility shim" in repository_structure
     assert "internal non-HTTP service layer" in streamlit_app_docs
-    assert "CampaignAppService" not in public_api
-    assert "bo_forge_app.api" not in public_api
-
+    assert "bo_forge.application" in public_api
+    assert "bo_forge_api" in public_api
 
 def test_release_checklist_includes_fresh_install_pip_check() -> None:
     checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(encoding="utf-8")
@@ -726,7 +712,10 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "/tmp/bo_forge_api_release_probe/bin/pip check" in checklist
     assert "/tmp/bo_forge_sdist_release_probe/bin/pip check" in checklist
     assert "BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES=1" in checklist
-    assert "test_built_distributions_install_from_outside_source_tree" in checklist
+    assert (
+        "tests/test_release_artifacts.py::"
+        "test_built_distributions_install_from_outside_source_tree"
+    ) in checklist
     assert "fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
     assert "fidelity-coverage --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
     assert "--kind fidelity-diagnostics" in checklist
@@ -737,6 +726,32 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "model-compare --config configs/17_model_profile_logei.yaml" in checklist
     assert "--kind model-diagnostics" in checklist
     assert "--kind model-comparison" in checklist
+
+
+def test_release_checklist_pytest_nodes_reference_existing_tests() -> None:
+    checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(
+        encoding="utf-8"
+    )
+    nodes = re.findall(r"(tests/[A-Za-z0-9_./-]+\.py)::([A-Za-z0-9_]+)", checklist)
+
+    assert nodes
+    for relative_path, test_name in nodes:
+        test_path = PROJECT_ROOT / relative_path
+        assert test_path.is_file(), relative_path
+        tree = ast.parse(test_path.read_text(encoding="utf-8"), filename=str(test_path))
+        assert any(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == test_name
+            for node in tree.body
+        ), f"{relative_path}::{test_name}"
+
+
+def test_release_checklist_names_all_runtime_wheel_packages() -> None:
+    checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "`bo_forge`, `bo_forge_app`, and\n  `bo_forge_api` packages" in checklist
     assert "configs/18_noisy_pending_qlognei.yaml" in checklist
     assert "examples/18_noisy_pending_qlognei_campaign_log.csv" in checklist
     assert "qlog-nei-summary --config configs/18_noisy_pending_qlognei.yaml" in checklist
@@ -757,7 +772,6 @@ def test_release_checklist_includes_fresh_install_pip_check() -> None:
     assert "/tmp/bo_forge_quickstart_probe" in checklist
     assert 'REPO_ROOT="$(pwd)"' in checklist
     assert 'PYTHONPATH="$REPO_ROOT"' in checklist
-
 
 def test_release_checklist_isolated_quickstart_recipe_works(tmp_path: Path) -> None:
     probe_root = tmp_path / "bo_forge_quickstart_probe"
@@ -786,15 +800,13 @@ def test_release_checklist_isolated_quickstart_recipe_works(tmp_path: Path) -> N
     assert completed.returncode == 0, completed.stderr
     assert (probe_root / "examples" / "quickstart_working_log.csv").is_file()
 
-
 def test_requirements_lock_matches_current_release_snapshot() -> None:
     requirements_lock = (PROJECT_ROOT / "requirements-lock.txt").read_text(
         encoding="utf-8"
     )
 
-    assert "BO Forge v2.5.3" in requirements_lock
+    assert "BO Forge v3.0.0" in requirements_lock
     assert "v1.4.0 release" not in requirements_lock
-
 
 def test_installation_tutorial_covers_pip_install_paths() -> None:
     tutorial = (PROJECT_ROOT / "docs" / "INSTALLATION.md").read_text(encoding="utf-8")
@@ -807,7 +819,6 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert f"dist/bo_forge-{PROJECT_VERSION}.tar.gz" in tutorial
     assert "pip check" in tutorial
 
-
 def test_quickstart_has_no_stale_v0_4_current_feature_wording() -> None:
     quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
 
@@ -818,7 +829,6 @@ def test_quickstart_has_no_stale_v0_4_current_feature_wording() -> None:
     ]
     for phrase in stale_phrases:
         assert phrase not in quickstart
-
 
 def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     cli_docs = (PROJECT_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
@@ -848,7 +858,6 @@ def test_structured_stage_docs_use_working_log_suggestion_flow() -> None:
     assert "contextual cost suggestions evaluate cost on the full candidate" in csv_schema
     assert "source,[stage],review_status" not in csv_schema
 
-
 def test_app_created_campaign_tutorial_uses_current_streamlit_labels() -> None:
     tutorial = (PROJECT_ROOT / "docs" / "09_APP_CREATED_CAMPAIGN_TUTORIAL.md").read_text(
         encoding="utf-8"
@@ -858,12 +867,11 @@ def test_app_created_campaign_tutorial_uses_current_streamlit_labels() -> None:
     assert "Create Campaign" in tutorial
     assert "Contextual LogEI" in tutorial
     assert "Update YAML preview from form" in tutorial
-    assert "Overview" in tutorial
+    assert "`Campaign` area" in tutorial
     assert "Campaign Files" not in tutorial
     assert "`Campaign` panel" not in tutorial
     assert "Create Campaign tab" not in tutorial
     assert "Regenerate YAML from structured fields" not in tutorial
-
 
 def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
@@ -903,7 +911,6 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     assert "must match exactly one configured level" in csv_schema
     assert "maps each row to exactly one configured level" in csv_schema
 
-
 def test_contextual_docs_reference_example_and_context_contract() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     cli_docs = (PROJECT_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
@@ -930,7 +937,6 @@ def test_contextual_docs_reference_example_and_context_contract() -> None:
     assert "context variables are stored as normal CSV variable columns" in csv_schema
     assert "Contextual suggestions require values" in common_errors
     assert "context cannot be combined with" in common_errors
-
 
 def test_model_profile_docs_reference_example_and_contract() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
@@ -968,7 +974,6 @@ def test_model_profile_docs_reference_example_and_contract() -> None:
     assert "qlog_nei" in common_errors
     assert "model_profile_comparison() does not support" in common_errors
 
-
 def test_qlog_nei_docs_reference_summary_diagnostics_and_notebook() -> None:
     cli_docs = (PROJECT_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
     quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(
@@ -986,7 +991,6 @@ def test_qlog_nei_docs_reference_summary_diagnostics_and_notebook() -> None:
     assert "X_pending" in public_api
     assert "notebooks/18_noisy_pending_qlognei_campaign.ipynb" in quickstart
 
-
 def test_cost_aware_multi_objective_notebook_uses_current_version_wording() -> None:
     notebook_text = (
         PROJECT_ROOT / "notebooks" / "12_cost_aware_multi_objective_qlogehvi_campaign.ipynb"
@@ -995,7 +999,6 @@ def test_cost_aware_multi_objective_notebook_uses_current_version_wording() -> N
     assert "v1.1 backend workflow" in notebook_text
     assert "v1.1.3 backend workflow" not in notebook_text
 
-
 def test_replicate_ready_cli_demo_exercises_repeat_path() -> None:
     quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
 
@@ -1003,7 +1006,6 @@ def test_replicate_ready_cli_demo_exercises_repeat_path() -> None:
     assert "uncertain_best" in quickstart
     assert "rep_seed_3a" in quickstart
     assert "configs/08_replicate_aware_logei.yaml" in quickstart
-
 
 def test_replicate_ready_demo_executes_repeat_path(tmp_path: Path) -> None:
     config_path = PROJECT_ROOT / "configs" / "08_replicate_aware_logei.yaml"
@@ -1058,7 +1060,6 @@ def test_replicate_ready_demo_executes_repeat_path(tmp_path: Path) -> None:
     assert exploration["replicate_group"] == exploration["row_id"]
     assert int(exploration["replicate_index"]) == 0
 
-
 def test_public_api_exports_are_importable() -> None:
     public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
     section = public_api.split("## ✅ Public Package Exports", maxsplit=1)[1].split(
@@ -1071,14 +1072,12 @@ def test_public_api_exports_are_importable() -> None:
     for export in exports:
         assert hasattr(bo_forge, export), f"Missing public export from bo_forge: {export}"
 
-
 def test_app_console_entrypoint_resolves_packaged_script() -> None:
     app_path = packaged_streamlit_app_path()
 
     assert app_path.name == "streamlit_app.py"
     assert app_path.is_file()
     assert app_path.parent.name == "bo_forge_app"
-
 
 def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"
@@ -1146,475 +1145,3 @@ def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) ->
         install_args=["--no-build-isolation"],
         resolve_dependencies=resolve_dependencies,
     )
-
-
-def test_release_dependency_probe_commands_are_isolated_when_enabled(tmp_path: Path) -> None:
-    venv_dir = tmp_path / "venv"
-    pip = venv_dir / "bin" / "pip"
-    wheel = tmp_path / "bo_forge.whl"
-
-    assert "--system-site-packages" not in _venv_create_command(
-        venv_dir,
-        resolve_dependencies=True,
-    )
-    assert "--no-deps" not in _pip_install_command(
-        pip,
-        wheel,
-        install_args=[],
-        resolve_dependencies=True,
-    )
-    assert "--system-site-packages" in _venv_create_command(
-        venv_dir,
-        resolve_dependencies=False,
-    )
-    assert "--no-deps" in _pip_install_command(
-        pip,
-        wheel,
-        install_args=[],
-        resolve_dependencies=False,
-    )
-
-
-def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
-    with zipfile.ZipFile(wheel_path) as wheel:
-        names = set(wheel.namelist())
-        metadata = wheel.read(f"{DIST_INFO_ROOT}/METADATA").decode("utf-8")
-
-    assert "bo_forge/__init__.py" in names
-    assert "bo_forge/contextual.py" in names
-    assert "bo_forge/multifidelity.py" in names
-    assert "bo_forge/plot_registry.py" in names
-    assert "bo_forge/structured.py" in names
-    assert "bo_forge_app/streamlit_app.py" in names
-    assert "bo_forge_app/cli.py" in names
-    assert "bo_forge_app/service.py" in names
-    assert "bo_forge_app/api.py" in names
-    assert "bo_forge_app/api_cli.py" in names
-    assert "bo_forge_app/stages.py" in names
-    assert "bo_forge_app/__main__.py" in names
-    assert f"{DIST_INFO_ROOT}/entry_points.txt" in names
-    assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
-    excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
-    assert not any(name.startswith(excluded_prefixes) for name in names)
-    assert "Provides-Extra: app" in metadata
-    assert "Provides-Extra: api" in metadata
-    assert 'Requires-Dist: streamlit>=1.57; extra == "app"' in metadata
-    assert 'Requires-Dist: fastapi>=0.115; extra == "api"' in metadata
-    assert 'Requires-Dist: uvicorn>=0.30; extra == "api"' in metadata
-    assert "Requires-Dist: filelock<4,>=3.16" in metadata
-    assert 'Requires-Dist: streamlit>=1.57\n' not in metadata
-    assert 'Requires-Dist: fastapi>=0.115\n' not in metadata
-
-
-def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
-    with tarfile.open(sdist_path) as sdist:
-        names = set(sdist.getnames())
-
-    required_paths = {
-        "README.md",
-        "LICENSE",
-        "requirements-lock.txt",
-        "ROADMAP_V0_TO_V1.md",
-        "ROADMAP_V1_X.md",
-        "ROADMAP_V2_X.md",
-        "docs/PUBLIC_API.md",
-        "docs/STREAMLIT_DEPLOYMENT.md",
-        "docs/API_PROBE.md",
-        "docs/API_SECURITY.md",
-        "docs/CAPABILITY_MATRIX.md",
-        "docs/QLOGNEHVI_FEASIBILITY.md",
-        "examples/quickstart.py",
-        "examples/01_simple_2d_maximise_logei_campaign_log.csv",
-        "examples/10_multi_objective_mixed_constrained_campaign_log.csv",
-        "examples/11_four_objective_mixed_constrained_campaign_log.csv",
-        "examples/12_cost_aware_multi_objective_campaign_log.csv",
-        "examples/13_structured_campaign_core_campaign_log.csv",
-        "examples/14_structured_campaign_tutorial_campaign_log.csv",
-        "examples/15_multi_fidelity_qmfkg_campaign_log.csv",
-        "examples/16_contextual_logei_campaign_log.csv",
-        "examples/17_model_profile_campaign_log.csv",
-        "examples/18_noisy_pending_qlognei_campaign_log.csv",
-        "examples/19_multi_objective_qlognehvi_campaign_log.csv",
-        "examples/20_contextual_cost_review_campaign_log.csv",
-        "examples/21_contextual_replicate_campaign_log.csv",
-        "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv",
-        "configs/10_multi_objective_mixed_constrained_qlogehvi.yaml",
-        "configs/11_four_objective_mixed_constrained_qlogehvi.yaml",
-        "configs/12_cost_aware_multi_objective_qlogehvi.yaml",
-        "configs/13_structured_campaign_core.yaml",
-        "configs/14_structured_campaign_tutorial.yaml",
-        "configs/15_multi_fidelity_qmfkg.yaml",
-        "configs/16_contextual_logei.yaml",
-        "configs/17_model_profile_logei.yaml",
-        "configs/18_noisy_pending_qlognei.yaml",
-        "configs/19_multi_objective_qlognehvi.yaml",
-        "configs/20_contextual_cost_review_logei.yaml",
-        "configs/21_contextual_replicate_logei.yaml",
-        "configs/22_discrete_multi_fidelity_qmfkg.yaml",
-        "notebooks/01_maximisation_logei_campaign.ipynb",
-        "notebooks/10_multi_objective_qlogehvi_campaign.ipynb",
-        "notebooks/11_four_objective_qlogehvi_campaign.ipynb",
-        "notebooks/12_cost_aware_multi_objective_qlogehvi_campaign.ipynb",
-        "notebooks/14_structured_campaign_tutorial.ipynb",
-        "notebooks/15_multi_fidelity_qmfkg_campaign.ipynb",
-        "notebooks/16_contextual_logei_campaign.ipynb",
-        "notebooks/17_model_profile_logei_campaign.ipynb",
-        "notebooks/18_noisy_pending_qlognei_campaign.ipynb",
-        "notebooks/20_contextual_cost_review_logei_campaign.ipynb",
-        "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb",
-        "tests/conftest.py",
-        "tests/test_v253_operational_freeze.py",
-    }
-    assert {f"{SDIST_ROOT}/{path}" for path in required_paths}.issubset(names)
-    assert not any("working_log" in name or "latest_suggestions" in name for name in names)
-
-
-def _assert_sdist_test_fixture_works(
-    sdist_path: Path,
-    extract_root: Path,
-    env: dict[str, str],
-) -> None:
-    with tarfile.open(sdist_path) as sdist:
-        sdist.extractall(extract_root)
-    source_root = extract_root / SDIST_ROOT
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-p",
-            "no:cacheprovider",
-            "-q",
-            "tests/test_app_service.py::test_app_service_review_and_single_objective_mark_observed",
-        ],
-        cwd=source_root,
-        env=env,
-        check=True,
-        text=True,
-    )
-
-
-def _install_distribution_and_probe(
-    *,
-    artifact: Path,
-    probe_root: Path,
-    env: dict[str, str],
-    install_args: list[str],
-    resolve_dependencies: bool,
-) -> None:
-    venv_dir = probe_root / "venv"
-    probe_dir = probe_root / "probe"
-    probe_dir.mkdir(parents=True)
-
-    subprocess.run(
-        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
-        env=env,
-        check=True,
-        text=True,
-    )
-    python = venv_dir / "bin" / "python"
-    pip = venv_dir / "bin" / "pip"
-    effective_install_args = list(install_args)
-    if resolve_dependencies:
-        effective_install_args = [
-            argument
-            for argument in effective_install_args
-            if argument != "--no-build-isolation"
-        ]
-    install_env = env
-    if "--no-build-isolation" in effective_install_args:
-        install_env = dict(env)
-        install_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
-    subprocess.run(
-        _pip_install_command(
-            pip,
-            artifact,
-            install_args=effective_install_args,
-            resolve_dependencies=resolve_dependencies,
-        ),
-        cwd=probe_dir,
-        env=install_env,
-        check=True,
-        text=True,
-    )
-    if resolve_dependencies:
-        _run_pip_check(pip, probe_dir, env)
-    completed = subprocess.run(
-        [str(venv_dir / "bin" / "bo-forge"), "--version"],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    assert completed.stdout == f"bo-forge {PROJECT_VERSION}\n"
-    api_help = subprocess.run(
-        [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    for option in ("--allow-network-access", "--server-stages-only", "--no-docs"):
-        assert option in api_help.stdout
-
-    source_root = str(PROJECT_ROOT.resolve())
-    script = f"""
-import builtins
-from pathlib import Path
-from importlib.metadata import entry_points
-import bo_forge
-import bo_forge_app
-
-source_root = Path({source_root!r})
-scripts = {{ep.name: ep.value for ep in entry_points(group="console_scripts")}}
-assert scripts["bo-forge-app"] == "bo_forge_app.cli:main"
-assert scripts["bo-forge-api"] == "bo_forge_app.api_cli:main"
-for module in (bo_forge, bo_forge_app):
-    module_path = Path(module.__file__).resolve()
-    assert source_root not in module_path.parents, module_path
-assert bo_forge.__version__ == {PROJECT_VERSION!r}
-
-real_import = builtins.__import__
-def block_optional_app_deps(name, *args, **kwargs):
-    if name == "streamlit" or name.startswith("streamlit."):
-        raise AssertionError("doctor imported optional Streamlit dependencies")
-    if name in {{"fastapi", "uvicorn"}} or name.startswith(("fastapi.", "uvicorn.")):
-        raise AssertionError("doctor imported optional API dependencies")
-    return real_import(name, *args, **kwargs)
-builtins.__import__ = block_optional_app_deps
-from bo_forge.cli import run
-assert run(["doctor"]) == 0
-"""
-    subprocess.run(
-        [str(python), "-c", script],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-    )
-
-
-def _install_app_extra_and_probe(
-    *,
-    wheel: Path,
-    probe_root: Path,
-    env: dict[str, str],
-    resolve_dependencies: bool,
-) -> None:
-    venv_dir = probe_root / "venv"
-    probe_dir = probe_root / "probe"
-    probe_dir.mkdir(parents=True)
-    subprocess.run(
-        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
-        env=env,
-        check=True,
-        text=True,
-    )
-    python = venv_dir / "bin" / "python"
-    pip = venv_dir / "bin" / "pip"
-    subprocess.run(
-        _pip_install_command(
-            pip,
-            f"{wheel}[app]",
-            install_args=[],
-            resolve_dependencies=resolve_dependencies,
-        ),
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-    )
-    if resolve_dependencies:
-        _run_pip_check(pip, probe_dir, env)
-    source_root = str(PROJECT_ROOT.resolve())
-    script = f"""
-from pathlib import Path
-import streamlit
-from bo_forge_app.cli import packaged_streamlit_app_path
-
-source_root = Path({source_root!r})
-app_path = packaged_streamlit_app_path()
-assert app_path.name == "streamlit_app.py"
-assert source_root not in app_path.resolve().parents, app_path
-assert streamlit.__version__
-"""
-    subprocess.run(
-        [str(python), "-c", script],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-    )
-    module_help = subprocess.run(
-        [str(python), "-m", "bo_forge_app", "--help"],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    script_help = subprocess.run(
-        [str(venv_dir / "bin" / "bo-forge-app"), "--help"],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    assert "--allow-network-access" in module_help.stdout
-    assert "--allow-network-access" in script_help.stdout
-
-
-def _install_api_extra_and_probe(
-    *,
-    wheel: Path,
-    probe_root: Path,
-    env: dict[str, str],
-    resolve_dependencies: bool,
-) -> None:
-    venv_dir = probe_root / "venv"
-    probe_dir = probe_root / "probe"
-    probe_dir.mkdir(parents=True)
-    subprocess.run(
-        _venv_create_command(venv_dir, resolve_dependencies=resolve_dependencies),
-        env=env,
-        check=True,
-        text=True,
-    )
-    python = venv_dir / "bin" / "python"
-    pip = venv_dir / "bin" / "pip"
-    subprocess.run(
-        _pip_install_command(
-            pip,
-            f"{wheel}[api]",
-            install_args=[],
-            resolve_dependencies=resolve_dependencies,
-        ),
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-    )
-    if resolve_dependencies:
-        _run_pip_check(pip, probe_dir, env)
-    source_root = str(PROJECT_ROOT.resolve())
-    probe_env = dict(env)
-    if not resolve_dependencies:
-        probe_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
-    script = f"""
-from pathlib import Path
-import fastapi
-import uvicorn
-import bo_forge_app.api
-
-source_root = Path({source_root!r})
-api_path = Path(bo_forge_app.api.__file__).resolve()
-assert source_root not in api_path.parents, api_path
-assert fastapi.__version__
-assert uvicorn.__version__
-"""
-    subprocess.run(
-        [str(python), "-c", script],
-        cwd=probe_dir,
-        env=probe_env,
-        check=True,
-        text=True,
-    )
-    api_help = subprocess.run(
-        [str(venv_dir / "bin" / "bo-forge-api"), "--help"],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    for option in ("--allow-network-access", "--server-stages-only", "--no-docs"):
-        assert option in api_help.stdout
-
-
-def _venv_create_command(
-    venv_dir: Path,
-    *,
-    resolve_dependencies: bool,
-) -> list[str]:
-    command = [sys.executable, "-m", "venv"]
-    if not resolve_dependencies:
-        command.append("--system-site-packages")
-    return [*command, str(venv_dir)]
-
-
-def _pip_install_command(
-    pip: Path,
-    artifact: str | Path,
-    *,
-    install_args: list[str],
-    resolve_dependencies: bool,
-) -> list[str]:
-    command = [str(pip), "install"]
-    if not resolve_dependencies:
-        command.append("--no-deps")
-    return [*command, *install_args, str(artifact)]
-
-
-def _run_pip_check(pip: Path, cwd: Path, env: dict[str, str]) -> None:
-    subprocess.run(
-        [str(pip), "check"],
-        cwd=cwd,
-        env=env,
-        check=True,
-        text=True,
-    )
-
-
-def _install_core_only_app_missing_streamlit_probe(
-    *,
-    wheel: Path,
-    probe_root: Path,
-    env: dict[str, str],
-) -> None:
-    venv_dir = probe_root / "venv"
-    probe_dir = probe_root / "probe"
-    probe_dir.mkdir(parents=True)
-    subprocess.run(
-        [sys.executable, "-m", "venv", str(venv_dir)],
-        env=env,
-        check=True,
-        text=True,
-    )
-    subprocess.run(
-        [str(venv_dir / "bin" / "pip"), "install", "--no-deps", str(wheel)],
-        cwd=probe_dir,
-        env=env,
-        check=True,
-        text=True,
-    )
-    for command in [
-        [str(venv_dir / "bin" / "bo-forge-app")],
-        [str(venv_dir / "bin" / "python"), "-m", "bo_forge_app"],
-    ]:
-        completed = subprocess.run(
-            command,
-            cwd=probe_dir,
-            env=env,
-            check=False,
-            text=True,
-            capture_output=True,
-        )
-
-        assert completed.returncode == 1
-        assert 'pip install "bo-forge[app]"' in completed.stderr
-        assert "Traceback" not in completed.stderr
-    completed = subprocess.run(
-        [str(venv_dir / "bin" / "bo-forge-api")],
-        cwd=probe_dir,
-        env=env,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-
-    assert completed.returncode == 1
-    assert 'pip install "bo-forge[api]"' in completed.stderr
-    assert "Traceback" not in completed.stderr

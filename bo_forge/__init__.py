@@ -1,8 +1,8 @@
-"""BO Forge v2.5.3."""
+"""BO Forge v3.0.0."""
 
 from importlib import import_module
 
-__version__ = "2.5.3"
+__version__ = "3.0.0"
 
 from bo_forge.config import (
     BOConfig,

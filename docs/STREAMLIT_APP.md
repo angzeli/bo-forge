@@ -1,8 +1,16 @@
 # 🖥️ Streamlit App
 
-BO Forge v2.5.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.0.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
-The app is intentionally thin: it loads a YAML config and CSV log from local paths, then calls an internal non-HTTP service layer that delegates BO behavior to the same `CampaignSession` methods used by notebooks and the CLI.
+The app is intentionally thin: it loads a YAML config and CSV log from local
+paths, then calls `bo_forge.application`, an internal non-HTTP service layer
+that delegates BO behavior to the same `CampaignSession` methods used by
+notebooks and the CLI.
+
+v3.0.0 organizes the workbench into `Campaign`, `Run`, and `Analyze`. A native
+Day/Night segmented control persists explicit choices in session state and the
+`theme=day|night` URL query parameter. Theme and navigation changes do not
+invalidate staged suggestions.
 
 For the current support boundary across backend, CLI, Streamlit, service, and
 API workflows, see [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
@@ -26,15 +34,15 @@ use conditioned greedy mixed optimization and display a joint post-selection
 acquisition value.
 
 v2.4.1 adds advanced `Max optimizer iterations` and opt-in acquisition timeout
-controls. The Suggest panel displays both configured values. The timeout is one
+controls. The Run area displays both configured values. The timeout is one
 deadline after model fitting, and candidate batches returned after it are
 rejected. BoTorch initial-condition generation and in-flight calls cannot be
 cancelled immediately, so a failed dry run can finish after the configured
 limit. The timeout does not guarantee candidate quality.
 
-v2.4.2 keeps the compact Fidelity Summary in Overview and adds the wider
-Fidelity Coverage table to Data and Reports. Reports also exposes Fidelity Progress
-lazily alongside the existing Fidelity Diagnostics plot.
+The v3 `Campaign` area keeps the compact Fidelity Summary and wider
+Fidelity Coverage table together. `Analyze` exposes Fidelity Progress lazily alongside
+the existing Fidelity Diagnostics plot.
 
 v2.4.3 closes the multi-fidelity line with regression and campaign-switch
 coverage. It keeps these tables and plots lazy and adds no Streamlit workflow
@@ -48,16 +56,16 @@ user to retry. A busy log remains retryable and is never overwritten.
 The completed v1.5.x line closed the Streamlit-facing contextual BO workflow.
 The app can create
 single-objective Contextual LogEI configs with selected context variables and
-optional defaults. When a loaded config defines `context:`, the `Suggest` panel
+optional defaults. When a loaded config defines `context:`, the `Run` area
 renders one input per context variable, passes those values to
 `CampaignSession.suggest_next(context_values=...)`, and records the values in
 the staged suggestion bundle before explicit append. Contextual campaigns also
-show Context Summary tables and expose Context Diagnostics in `Reports`.
+show Context Summary tables and expose Context Diagnostics in `Analyze`.
 
 v2.3.2 extends the contextual Streamlit path for app-created or loaded
 single-objective contextual LogEI configs with optional review metadata,
-deterministic cost, replicates, or their combinations. The Suggest and Resolve
-panels surface active context, budget, estimated cost, and review state;
+deterministic cost, replicates, or their combinations. The `Run` area surfaces
+active context, budget, estimated cost, and review state;
 campaign-scoped observation inputs and staged-bundle fingerprints prevent state
 from leaking across campaign or context changes. Cost estimates are still
 computed from the full candidate, including fixed context values.
@@ -72,20 +80,20 @@ campaigns configured with `bo.acquisition: log_ei`; loaded `qlog_nei` configs
 use the same model-summary visibility. Multi-objective, multi-fidelity, and
 structured create/load paths keep the default model profile.
 Loaded campaigns show Model Summary tables and expose Model Diagnostics plus
-read-only Model Comparison controls in `Reports` when the backend supports
+read-only Model Comparison controls in `Analyze` when the backend supports
 them. Model comparison is diagnostic only and does not change the configured
 profile.
 
 v2.2.1 adds Streamlit-facing qLogNEI diagnostics for supported loaded
 single-objective configs with `bo.acquisition: qlog_nei`. The app shows
-qLogNEI Summary tables in `Overview` and `Data`, exposes lazy
-qLogNEI Diagnostics in `Reports`, and can create a conservative `Campaign kind =
+qLogNEI Summary tables in `Campaign` and `Campaign`, exposes lazy
+qLogNEI Diagnostics in `Analyze`, and can create a conservative `Campaign kind =
 Single-objective qLogNEI` config. Review rows still marked `pending` block
 new suggestions; accepted review rows are active pending experiments that the
 backend can pass to qLogNEI as `X_pending`.
 
 v2.2.3 adds backend qLogNEHVI support for loaded coupled multi-objective
-configs with `bo.acquisition: qlog_nehvi`. Existing multi-objective Resolve,
+configs with `bo.acquisition: qlog_nehvi`. Existing multi-objective `Run`,
 Pareto, hypervolume, report, and plot panels continue to apply because the CSV
 schema is unchanged. Review rows still marked `pending` block new suggestions;
 accepted review rows are active pending designs that the backend can pass to
@@ -99,13 +107,13 @@ does not implement automatic stage transitions or a second campaign engine.
 
 When a loaded config defines `stages:`, the app:
 
-- shows configured stages and active/inactive variables in the `Suggest` panel;
+- shows configured stages and active/inactive variables in the `Run` area;
 - requires a stage selection before stage-aware dry-run suggestions;
 - stages suggestions with the selected stage recorded in the app bundle;
 - blocks append if the config, log, staged suggestions, or selected stage changed
   after staging;
-- shows stage summary tables in `Overview` and `Data`;
-- exposes the backend stage-diagnostics plot in `Reports`.
+- shows stage summary tables in `Campaign` and `Campaign`;
+- exposes the backend stage-diagnostics plot in `Analyze`.
 
 Mutations remain explicit. Generating suggestions does not write to the CSV log;
 append, review, and observation actions still run through the backend service
@@ -159,18 +167,18 @@ When `Create Campaign` uses `Campaign kind = Contextual LogEI`, the app:
 
 When a loaded config defines `context:`, the app:
 
-- shows context inputs in the `Suggest` panel;
+- shows context inputs in the `Run` area;
 - uses YAML `context.default_values` as initial widget values when present;
 - passes those values to backend dry-run suggestions;
 - stages suggestions with the selected context values recorded in the app
   bundle;
 - blocks append if the config, log, staged suggestions, selected stage, or
   context values changed after staging;
-- shows Context Summary tables in `Overview` and `Data`;
+- shows Context Summary tables in `Campaign` and `Campaign`;
 - exposes the backend Context Diagnostics (`context-diagnostics`) plot in
-  `Reports`.
+  `Analyze`.
 - shows replicate metadata and summaries when replicates are enabled and also
-  exposes Replicate Diagnostics (`replicates`) in `Reports`.
+  exposes Replicate Diagnostics (`replicates`) in `Analyze`.
 
 v2.3.x app support is limited to single-objective contextual LogEI/qLogEI
 campaigns, with optional review, deterministic cost, and replicates for LogEI configs.
@@ -292,15 +300,22 @@ Generated suggestions are staged in Streamlit session state. They are not append
 
 Exporting staged suggestions writes a separate CSV file only. It does not modify the staged suggestions, append fingerprint, selected campaign log, or loaded session state.
 
-## 🧭 Panels
+## 🧭 Workbench Areas
 
-The app keeps file selection in the source bar, followed by five practical campaign panels. Only the active panel renders on each Streamlit rerun:
+The source bar is followed by three task-oriented areas. Only the active area
+collects and renders its data on each Streamlit rerun:
 
-- `Overview`: validation, campaign status, next action, compact metrics, best-observation or Pareto summary, and compact cost/replicate/fidelity summaries.
-- `Suggest`: dry-run generation, staged suggestions, staged CSV export, suggestion quality, and explicit append.
-- `Resolve`: review queue, observable suggestions, single-objective mark-observed, coupled multi-objective objective entry, and actual-cost entry when configured.
-- `Reports`: report preview/export and supported plot controls. Report text and figures are generated only after explicit actions.
-- `Data`: raw summary and next-action tables, observed rows, pending rows, Pareto tables, cost/replicate/fidelity summaries, and the full raw log.
+- `Campaign`: validation, campaign status, next action, compact feature
+  summaries, observed and pending rows, backend tables, and the full raw CSV
+  log.
+- `Run`: stage/context-aware dry-run generation, staged-batch inspection and
+  export, explicit append, review decisions, objective entry, and optional
+  actual-cost entry.
+- `Analyze`: lazy report preview/export and one selected plot at a time. Reports
+  and figures are generated only after explicit actions.
+
+Stored v2 panel state maps automatically: `Overview` and `Data` become
+`Campaign`; `Suggest` and `Resolve` become `Run`; `Reports` becomes `Analyze`.
 
 ## ⚠️ Write Actions
 

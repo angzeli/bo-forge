@@ -1,7 +1,9 @@
 # Experimental FastAPI Probe
 
 BO Forge includes an experimental optional FastAPI probe around the internal
-`CampaignAppService`. It is for local or trusted-network API exploration only.
+`CampaignAppService`. In v3, the implementation belongs to the optional
+`bo_forge_api` package; the older `bo_forge_app.api` imports remain
+compatibility shims. It is for local or trusted-network API exploration only.
 It is not a stable public API and does not replace the Streamlit workbench.
 Do not expose it directly to the public internet.
 

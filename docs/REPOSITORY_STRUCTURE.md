@@ -8,6 +8,7 @@ This repository is organised around one rule: the Bayesian optimisation engine l
 bo-forge/
 ├── bo_forge/                         # Reusable backend package
 ├── bo_forge_app/                     # Local Streamlit wrapper
+├── bo_forge_api/                     # Optional FastAPI transport package
 ├── configs/                          # YAML campaign definitions
 ├── examples/                         # Seed CSV logs and runnable scripts
 ├── notebooks/                        # Notebook-first campaign workflows
@@ -28,13 +29,15 @@ bo-forge/
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   ├── PUBLIC_API.md
+│   ├── MIGRATION_V3.md
 │   ├── RELEASE_CHECKLIST.md
 │   └── REPOSITORY_STRUCTURE.md
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
 ├── ROADMAP_V0_TO_V1.md               # Milestones through v1.0.0
 ├── ROADMAP_V1_X.md                   # Completed v1.x roadmap
-├── ROADMAP_V2_X.md                   # Active v2.x roadmap
+├── ROADMAP_V2_X.md                   # Completed v2.x history
+├── ROADMAP_V3_X.md                   # Active v3 baseline
 ├── CHANGELOG.md                      # Release history
 ├── MANIFEST.in                       # Source distribution file inclusion rules
 ├── pyproject.toml                    # Package metadata and dependencies
@@ -49,41 +52,58 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 
 ## 📦 Backend Package
 
-`bo_forge/` contains the reusable campaign engine:
+`bo_forge/` contains the reusable campaign engine. The familiar public modules
+are thin compatibility facades over focused ownership packages:
 
-- `config.py`: dataclasses and strict YAML parsing.
+- `_config/`: YAML parsing and feature-combination validation;
+- `_campaign/`: schema, validation, reports, and persistence/session support;
+- `_optimization/`: suggestion routing, initial design, single/multi-objective,
+  replicate, and qMFKG candidate paths;
+- `_diagnostics/`: standard, Pareto, fidelity, contextual, model, structured,
+  and replicate figure implementations;
+- `application.py`: non-HTTP workflow coordination shared by app adapters.
+
+The compatibility facades and remaining focused modules include:
+
+- `config.py`: public dataclasses and strict-parser compatibility facade.
 - `constraints.py`: safe constraint expression validation and row feasibility checks.
 - `contextual.py`: context-value resolution, fixed-feature translation, and read-only summaries for contextual suggestions.
 - `costs.py`: safe deterministic cost expressions, effective-cost accounting, and budget summaries.
 - `cli.py`: terminal command wrappers around `CampaignSession`.
 - `errors.py`: custom exception types used across the package.
-- `logs.py`: CSV loading plus locked, fingerprint-aware `append_suggestions()`, `review_suggestion()`, and `mark_observed()` transitions.
+- `logs.py`: CSV compatibility facade plus locked, fingerprint-aware mutations.
 - `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
 - `multifidelity.py`: BoTorch multi-fidelity helper translations for qMFKG campaigns.
 - `replicates.py`: explicit replicate aggregation, replicate-derived observation variance, summaries, and best group selection.
 - `structured.py`: read-only structured-campaign stage summaries and transition-readiness guidance.
-- `session.py`: notebook-oriented `CampaignSession` workflow wrapper.
-- `validation.py`: schema, bounds, status, source, and objective-state validation.
+- `session.py`: notebook-oriented `CampaignSession` compatibility facade.
+- `validation.py`: validation compatibility facade.
 - `transforms.py`: internal user-space to model-space transforms, including one-hot categorical encoding.
 - `models.py`: conversion from campaign logs to tensors, model-profile summaries, and GP fitting.
 - `acquisition.py`: LogEI, qLogEI, qLogEHVI, and qMFKG acquisition optimisation.
-- `suggestions.py`: Sobol, LogEI/qLogEI, qLogEHVI, and qMFKG candidate generation.
-- `diagnostics.py`: user-facing diagnostic plots.
+- `suggestions.py`: candidate-generation compatibility facade.
+- `diagnostics.py`: user-facing diagnostic compatibility facade.
 - `plot_registry.py`: internal plot labels and `CampaignSession` method routing shared by adapters.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 
-`bo_forge_app/` contains the local Streamlit wrapper. `cli.py` resolves the packaged app script for the `bo-forge-app` command, and `__main__.py` supports `python -m bo_forge_app`. The launcher owns host, port, browser, explicit network-access acknowledgement, and optional macOS `.command` startup concerns. Deployment guidance lives in `docs/STREAMLIT_DEPLOYMENT.md`; API trust boundaries live in `docs/API_SECURITY.md`. The app should call `CampaignSession` and helper functions rather than reimplementing BO logic.
+`bo_forge_app/` contains the local Streamlit wrapper. `streamlit_app.py` is a
+small compatibility entrypoint; task-oriented views live in `views/` and
+shared controls, theme, form, and state ownership live in `ui/`. `cli.py`
+resolves the packaged app script for `bo-forge-app`, and `__main__.py` supports
+`python -m bo_forge_app`.
 
-`bo_forge_app/service.py` is an internal, non-HTTP app service layer. It wraps `CampaignSession` for Streamlit-facing workflow operations such as validation, staged suggestions, append, review, mark-observed, reports, and plot routing. It is not a stable public API.
+`bo_forge.application` is the internal, non-HTTP app service layer.
+`bo_forge_app/service.py` remains a compatibility shim and is not a stable
+public API.
 
-`bo_forge_app/api.py` and `bo_forge_app/api_cli.py` contain an experimental optional FastAPI probe behind the `bo-forge-api` command and `[api]` extra. The probe is root-bound, local/trusted-network only, and not a production backend.
-
-`bo_forge_app/stages.py` contains the bounded, thread-safe, process-local stage
-store used by the experimental API. Stages are ephemeral and disappear when
-the launcher process restarts.
+`bo_forge_api/` owns the experimental optional FastAPI app, launcher, transport
+contracts, and bounded process-local stage store behind `bo-forge-api` and the
+`[api]` extra. `bo_forge_app.api`, `api_cli`, and `stages` remain compatibility
+shims. The probe is root-bound, local/trusted-network only, and not a
+production backend; stages disappear when the launcher process restarts.
 
 ## 🚀 How To Use The Repository
 

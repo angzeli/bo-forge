@@ -79,7 +79,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "2.5.3"
+    assert payload["version"] == "3.0.0"
     assert payload["experimental"] is True
     assert payload["staging"]["active_stages"] == 0
     assert payload["staging"]["stage_ttl_seconds"] == pytest.approx(1800)
@@ -1206,6 +1206,7 @@ def test_api_cli_missing_dependencies_show_install_hint(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.delitem(sys.modules, "bo_forge_app.api", raising=False)
+    monkeypatch.delitem(sys.modules, "bo_forge_api.api", raising=False)
     real_import = builtins.__import__
 
     def block_fastapi(name: str, *args: object, **kwargs: object) -> object:

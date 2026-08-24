@@ -1,228 +1,35 @@
-from dataclasses import replace
-from pathlib import Path
+"""Multi-objective config, validation, suggestion, report, and plot tests."""
 
-import matplotlib.pyplot as plt
-import pandas as pd
-import pytest
-
-from bo_forge.config import (
-    BOConfig,
+from tests._multi_objective_support import (
     CampaignConfig,
-    ConstraintConfig,
-    CostConfig,
-    ObjectiveConfig,
-    ReplicateConfig,
-    ReviewConfig,
-    VariableConfig,
-)
-from bo_forge.errors import ConfigError, LogValidationError, LogWriteError
-from bo_forge.logs import append_suggestions, mark_observed, review_suggestion
-from bo_forge.multi_objective import (
-    hypervolume,
-    hypervolume_progress,
-    objectives_to_model_space,
-    pareto_front,
-    reference_point_to_model_space,
-)
-from bo_forge.session import CampaignSession
-from bo_forge.suggestions import suggest_next
-from bo_forge.validation import (
+    CampaignSession,
+    ConfigError,
+    LogValidationError,
+    LogWriteError,
+    Path,
+    append_suggestions,
     canonical_columns,
     design_key_for_values,
     design_tuples,
+    four_objective_config,
     has_pending_suggestions,
+    hypervolume,
+    hypervolume_progress,
+    mark_observed,
+    multi_config,
+    objectives_to_model_space,
+    observed_four_objective_log,
+    observed_multi_log,
+    pareto_front,
+    pd,
+    pd_to_tensor,
+    pytest,
+    qlog_nehvi_config,
+    reference_point_to_model_space,
+    review_suggestion,
+    suggest_next,
     validate_campaign_data,
 )
-
-
-@pytest.fixture(autouse=True)
-def close_matplotlib_figures() -> None:
-    yield
-    plt.close("all")
-
-
-def multi_config(
-    batch_size: int = 2,
-    initial_design_size: int = 3,
-    *,
-    cost: bool = False,
-    review: bool = False,
-    replicates: bool = False,
-) -> CampaignConfig:
-    return CampaignConfig(
-        campaign_name="multi",
-        objective=ObjectiveConfig("yield_score", "maximize", 40.0),
-        objectives=(
-            ObjectiveConfig("yield_score", "maximize", 40.0),
-            ObjectiveConfig("waste_score", "minimize", 25.0),
-        ),
-        variables=(
-            VariableConfig("temperature", "continuous", 20.0, 100.0),
-            VariableConfig("solvent", "categorical", values=("MeCN", "Water")),
-        ),
-        bo=BOConfig(
-            batch_size=batch_size,
-            initial_design_size=initial_design_size,
-            acquisition="qlog_ehvi",
-            random_seed=4,
-            raw_samples=8,
-            num_restarts=2,
-            mc_samples=8,
-        ),
-        cost=CostConfig(
-            expression="1.0 + 0.02 * temperature + 2.0 * (solvent == 'Water')",
-            weight=0.5,
-            budget=20.0,
-            candidate_pool_size=16,
-            top_k=8,
-        )
-        if cost
-        else None,
-        review=ReviewConfig(enabled=review),
-        replicates=ReplicateConfig(enabled=replicates),
-    )
-
-
-def qlog_nehvi_config(
-    batch_size: int = 1,
-    initial_design_size: int = 3,
-    *,
-    review: bool = False,
-) -> CampaignConfig:
-    cfg = multi_config(
-        batch_size=batch_size,
-        initial_design_size=initial_design_size,
-        review=review,
-    )
-    return replace(
-        cfg,
-        campaign_name="qlog_nehvi_multi",
-        bo=BOConfig(
-            batch_size=batch_size,
-            initial_design_size=initial_design_size,
-            acquisition="qlog_nehvi",
-            random_seed=9,
-            raw_samples=8,
-            num_restarts=1,
-            mc_samples=8,
-        ),
-    )
-
-
-def four_objective_config(
-    batch_size: int = 1,
-    initial_design_size: int = 4,
-) -> CampaignConfig:
-    return CampaignConfig(
-        campaign_name="four_objective",
-        objective=ObjectiveConfig("yield", "maximize", 0.2),
-        objectives=(
-            ObjectiveConfig("yield", "maximize", 0.2),
-            ObjectiveConfig("selectivity", "maximize", 0.2),
-            ObjectiveConfig("waste", "minimize", 0.9),
-            ObjectiveConfig("energy_use", "minimize", 0.9),
-        ),
-        variables=(
-            VariableConfig("catalyst_loading", "continuous", 0.02, 0.20),
-            VariableConfig("reaction_time", "integer", 20.0, 90.0),
-            VariableConfig("base_equivalents", "discrete", values=(0.5, 1.0, 1.5)),
-            VariableConfig("solvent", "categorical", values=("MeCN", "DMF", "Water")),
-        ),
-        constraints=(
-            ConstraintConfig(
-                "water_needs_time",
-                "solvent != 'Water' or reaction_time >= 30",
-            ),
-        ),
-        bo=BOConfig(
-            batch_size=batch_size,
-            initial_design_size=initial_design_size,
-            acquisition="qlog_ehvi",
-            random_seed=7,
-            raw_samples=8,
-            num_restarts=2,
-            mc_samples=8,
-        ),
-    )
-
-
-def observed_multi_log(cfg: CampaignConfig) -> pd.DataFrame:
-    rows = []
-    for index, (temperature, solvent, yield_score, waste_score) in enumerate(
-        [
-            (30.0, "MeCN", 50.0, 20.0),
-            (45.0, "Water", 65.0, 18.0),
-            (65.0, "MeCN", 58.0, 12.0),
-            (85.0, "Water", 72.0, 16.0),
-        ]
-    ):
-        row = {
-            "row_id": f"obs_{index}",
-            "iteration": index,
-            "status": "observed",
-            "source": "manual",
-            "temperature": temperature,
-            "solvent": solvent,
-            "yield_score": yield_score,
-            "waste_score": waste_score,
-            "predicted_mean_yield_score": "",
-            "predicted_std_yield_score": "",
-            "predicted_mean_waste_score": "",
-            "predicted_std_waste_score": "",
-            "acquisition": "",
-        }
-        if cfg.review.enabled:
-            row["review_status"] = "accepted"
-            row["review_note"] = ""
-        if cfg.replicates.enabled:
-            row["replicate_group"] = f"group_{index}"
-            row["replicate_index"] = 0
-        if cfg.cost is not None:
-            cost_estimate = 1.0 + 0.02 * temperature + (2.0 if solvent == "Water" else 0.0)
-            row["cost_estimate"] = cost_estimate
-            row["cost_actual"] = ""
-            row["utility"] = ""
-        rows.append(row)
-    return pd.DataFrame(rows, columns=canonical_columns(cfg))
-
-
-def observed_four_objective_log(cfg: CampaignConfig) -> pd.DataFrame:
-    data = [
-        ("obs_a", 0, 0.05, 30, 0.5, "MeCN", 0.55, 0.40, 0.65, 0.35),
-        ("obs_b", 1, 0.12, 60, 1.0, "MeCN", 0.82, 0.68, 0.48, 0.62),
-        ("obs_c", 2, 0.16, 80, 1.5, "DMF", 0.74, 0.75, 0.55, 0.82),
-        ("obs_d", 3, 0.08, 50, 1.0, "Water", 0.58, 0.82, 0.30, 0.40),
-        ("obs_e", 4, 0.18, 70, 0.5, "DMF", 0.68, 0.62, 0.72, 0.78),
-        ("obs_f", 5, 0.11, 45, 1.5, "Water", 0.61, 0.88, 0.38, 0.58),
-    ]
-    rows = []
-    for row_id, iteration, loading, time, base, solvent, yld, sel, waste, energy in data:
-        rows.append(
-            {
-                "row_id": row_id,
-                "iteration": iteration,
-                "status": "observed",
-                "source": "manual",
-                "catalyst_loading": loading,
-                "reaction_time": time,
-                "base_equivalents": base,
-                "solvent": solvent,
-                "yield": yld,
-                "selectivity": sel,
-                "waste": waste,
-                "energy_use": energy,
-                "predicted_mean_yield": "",
-                "predicted_std_yield": "",
-                "predicted_mean_selectivity": "",
-                "predicted_std_selectivity": "",
-                "predicted_mean_waste": "",
-                "predicted_std_waste": "",
-                "predicted_mean_energy_use": "",
-                "predicted_std_energy_use": "",
-                "acquisition": "",
-            }
-        )
-    return pd.DataFrame(rows, columns=canonical_columns(cfg))
 
 
 def test_two_objective_config_parses_reference_points(tmp_path: Path) -> None:
@@ -255,7 +62,6 @@ bo:
         assert config.replicates.suggestion_policy == "new_only"
     assert config.objective_names == ["yield_score", "waste_score"]
     assert [objective.reference_point for objective in config.objectives] == [40.0, 25.0]
-
 
 @pytest.mark.parametrize(
     "yaml_text, message",
@@ -328,7 +134,6 @@ def test_invalid_multi_objective_configs_fail(
     with pytest.raises(ConfigError, match=message):
         CampaignConfig.from_yaml(path)
 
-
 @pytest.mark.parametrize(
     "extra_yaml",
     [
@@ -376,7 +181,6 @@ variables:
     config = CampaignConfig.from_yaml(path)
 
     assert config.is_multi_objective
-
 
 @pytest.mark.parametrize(
     "extra_yaml",
@@ -437,7 +241,6 @@ variables:
     assert cfg.is_multi_objective
     assert cfg.cost is not None
 
-
 @pytest.mark.parametrize(
     "objective_name, variable_name, message",
     [
@@ -478,7 +281,6 @@ bo:
     with pytest.raises(ConfigError, match=message):
         CampaignConfig.from_yaml(path)
 
-
 def test_multi_objective_canonical_schema_and_validation() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg)
@@ -500,7 +302,6 @@ def test_multi_objective_canonical_schema_and_validation() -> None:
     ]
     validate_campaign_data(cfg, df)
 
-
 def test_multi_objective_log_rejects_qlog_nehvi_source() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg)
@@ -509,7 +310,6 @@ def test_multi_objective_log_rejects_qlog_nehvi_source() -> None:
     with pytest.raises(LogValidationError, match="invalid source 'qlog_nehvi'"):
         validate_campaign_data(cfg, df)
 
-
 def test_qlog_nehvi_multi_objective_log_accepts_qlog_nehvi_source() -> None:
     cfg = qlog_nehvi_config()
     df = observed_multi_log(cfg)
@@ -517,14 +317,12 @@ def test_qlog_nehvi_multi_objective_log_accepts_qlog_nehvi_source() -> None:
 
     validate_campaign_data(cfg, df)
 
-
 def test_qlog_nehvi_multi_objective_log_accepts_historical_qlog_ehvi_source() -> None:
     cfg = qlog_nehvi_config()
     df = observed_multi_log(cfg)
     df.loc[0, "source"] = "qlog_ehvi"
 
     validate_campaign_data(cfg, df)
-
 
 def test_multi_objective_review_and_replicate_canonical_schema() -> None:
     cfg = multi_config(review=True, replicates=True)
@@ -550,7 +348,6 @@ def test_multi_objective_review_and_replicate_canonical_schema() -> None:
         "acquisition",
     ]
     validate_campaign_data(cfg, df)
-
 
 def test_multi_objective_cost_review_replicate_canonical_schema() -> None:
     cfg = multi_config(cost=True, review=True, replicates=True)
@@ -579,7 +376,6 @@ def test_multi_objective_cost_review_replicate_canonical_schema() -> None:
         "utility",
     ]
     validate_campaign_data(cfg, df)
-
 
 def test_four_objective_canonical_schema_and_validation() -> None:
     cfg = four_objective_config()
@@ -610,7 +406,6 @@ def test_four_objective_canonical_schema_and_validation() -> None:
     ]
     validate_campaign_data(cfg, df)
 
-
 def test_cost_aware_multi_objective_example_config_and_log_validate() -> None:
     cfg = CampaignConfig.from_yaml(
         "configs/12_cost_aware_multi_objective_qlogehvi.yaml"
@@ -626,7 +421,6 @@ def test_cost_aware_multi_objective_example_config_and_log_validate() -> None:
     assert list(df.columns) == canonical_columns(cfg)
     validate_campaign_data(cfg, df)
 
-
 def test_qlog_nehvi_example_config_and_log_validate() -> None:
     cfg = CampaignConfig.from_yaml("configs/19_multi_objective_qlognehvi.yaml")
     df = pd.read_csv(
@@ -640,7 +434,6 @@ def test_qlog_nehvi_example_config_and_log_validate() -> None:
     assert list(df.columns) == canonical_columns(cfg)
     validate_campaign_data(cfg, df)
 
-
 def test_multi_objective_prediction_metadata_must_be_finite_when_filled() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg).astype(object)
@@ -648,7 +441,6 @@ def test_multi_objective_prediction_metadata_must_be_finite_when_filled() -> Non
 
     with pytest.raises(LogValidationError, match="predicted_mean_yield"):
         validate_campaign_data(cfg, df)
-
 
 def test_multi_objective_example_config_and_log_validate() -> None:
     cfg = CampaignConfig.from_yaml(
@@ -662,7 +454,6 @@ def test_multi_objective_example_config_and_log_validate() -> None:
     validate_campaign_data(cfg, df)
     assert cfg.is_multi_objective
     assert cfg.objective_names == ["yield_score", "waste_score"]
-
 
 def test_four_objective_example_config_and_log_validate() -> None:
     cfg = CampaignConfig.from_yaml(
@@ -678,7 +469,6 @@ def test_four_objective_example_config_and_log_validate() -> None:
     assert cfg.objective_names == ["yield", "selectivity", "waste", "energy_use"]
     assert list(df.columns) == canonical_columns(cfg)
 
-
 def test_observed_rows_require_both_objectives() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg).astype(object)
@@ -687,7 +477,6 @@ def test_observed_rows_require_both_objectives() -> None:
     with pytest.raises(LogValidationError, match="waste_score.*blank"):
         validate_campaign_data(cfg, df)
 
-
 def test_suggested_rows_require_blank_objectives() -> None:
     cfg = multi_config()
     row = observed_multi_log(cfg).iloc[[0]].copy()
@@ -695,7 +484,6 @@ def test_suggested_rows_require_blank_objectives() -> None:
 
     with pytest.raises(LogValidationError, match="yield_score.*filled"):
         validate_campaign_data(cfg, row)
-
 
 def test_multi_objective_direction_and_reference_transforms() -> None:
     cfg = multi_config()
@@ -711,7 +499,6 @@ def test_multi_objective_direction_and_reference_transforms() -> None:
     assert tensor.tolist() == [[55.0, -20.0]]
     assert reference_point_to_model_space(cfg).tolist() == [40.0, -25.0]
 
-
 def test_pareto_front_and_hypervolume() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg)
@@ -723,7 +510,6 @@ def test_pareto_front_and_hypervolume() -> None:
     assert hypervolume(cfg, df) > 0.0
     assert list(progress.columns) == ["observation", "row_id", "iteration", "hypervolume"]
     assert progress["observation"].tolist() == [1, 2, 3, 4]
-
 
 def test_multi_objective_replicate_pareto_uses_group_mean_vectors() -> None:
     cfg = multi_config(replicates=True)
@@ -746,7 +532,6 @@ def test_multi_objective_replicate_pareto_uses_group_mean_vectors() -> None:
     progress = hypervolume_progress(cfg, df)
     assert progress["hypervolume"].is_monotonic_increasing
 
-
 def test_multi_objective_replicate_hypervolume_progress_is_best_so_far() -> None:
     cfg = multi_config(replicates=True)
     df = observed_multi_log(cfg).iloc[:3].copy()
@@ -764,7 +549,6 @@ def test_multi_objective_replicate_hypervolume_progress_is_best_so_far() -> None
     expected = pd.Series(raw_prefix_values).cummax().tolist()
     assert progress["hypervolume"].tolist() == pytest.approx(expected)
     assert progress["hypervolume"].is_monotonic_increasing
-
 
 def test_four_objective_pareto_front_uses_full_space_and_stable_order() -> None:
     cfg = four_objective_config()
@@ -788,7 +572,6 @@ def test_four_objective_pareto_front_uses_full_space_and_stable_order() -> None:
         ),
     )
 
-
 def test_hypervolume_returns_zero_when_no_observation_dominates_reference() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg)
@@ -796,7 +579,6 @@ def test_hypervolume_returns_zero_when_no_observation_dominates_reference() -> N
     df["waste_score"] = 30.0
 
     assert hypervolume(cfg, df) == 0.0
-
 
 def test_empty_multi_objective_utilities_have_stable_shapes(tmp_path: Path) -> None:
     cfg = four_objective_config()
@@ -819,7 +601,6 @@ def test_empty_multi_objective_utilities_have_stable_shapes(tmp_path: Path) -> N
         "hypervolume",
     ]
 
-
 def test_hypervolume_progress_repeats_for_dominated_rows() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg).iloc[:2].copy()
@@ -841,7 +622,6 @@ def test_hypervolume_progress_repeats_for_dominated_rows() -> None:
     assert progress["hypervolume"].is_monotonic_increasing
     assert progress["hypervolume"].iloc[-1] == progress["hypervolume"].iloc[-2]
 
-
 def test_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> None:
     cfg = multi_config()
     df = observed_multi_log(cfg)
@@ -854,7 +634,6 @@ def test_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> None:
     assert set(suggestions["source"]) == {"qlog_ehvi"}
     assert suggestions[["yield_score", "waste_score"]].map(lambda value: value == "").all().all()
 
-
 def test_initial_multi_objective_cost_suggestions_fill_cost_and_leave_utility_blank() -> None:
     cfg = multi_config(cost=True, initial_design_size=6)
     df = observed_multi_log(cfg)
@@ -866,7 +645,6 @@ def test_initial_multi_objective_cost_suggestions_fill_cost_and_leave_utility_bl
     assert suggestions["cost_estimate"].map(lambda value: float(value) >= 0).all()
     assert suggestions["cost_actual"].map(lambda value: value == "").all()
     assert suggestions["utility"].map(lambda value: value == "").all()
-
 
 def test_cost_aware_multi_objective_qlog_ehvi_suggestions_fill_batch_utility() -> None:
     cfg = multi_config(cost=True)
@@ -894,7 +672,6 @@ def test_cost_aware_multi_objective_qlog_ehvi_suggestions_fill_batch_utility() -
     ]
     assert suggestions[prediction_columns].apply(pd.to_numeric).map(pd.notna).all().all()
 
-
 def test_four_objective_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg)
@@ -913,7 +690,6 @@ def test_four_objective_qlog_ehvi_suggestions_are_valid_and_non_mutating() -> No
     ]
     assert suggestions[prediction_columns].apply(pd.to_numeric).map(pd.notna).all().all()
 
-
 def test_multi_objective_qlog_ehvi_suggestions_fill_review_and_replicate_fields() -> None:
     cfg = multi_config(review=True, replicates=True)
     df = observed_multi_log(cfg)
@@ -928,7 +704,6 @@ def test_multi_objective_qlog_ehvi_suggestions_fill_review_and_replicate_fields(
     assert row["replicate_group"] == row["row_id"]
     assert row["replicate_group"] not in set(df["replicate_group"].astype(str))
     assert int(row["replicate_index"]) == 0
-
 
 def test_multi_objective_cost_summary_report_and_cost_progress_plot(tmp_path: Path) -> None:
     cfg = multi_config(cost=True)
@@ -955,7 +730,6 @@ def test_multi_objective_cost_summary_report_and_cost_progress_plot(tmp_path: Pa
     campaign.plot_cost_progress(save_path=output_path)
     assert output_path.is_file()
 
-
 @pytest.mark.parametrize(
     ("review_status", "blocks"),
     [
@@ -977,7 +751,6 @@ def test_multi_objective_review_status_controls_suggestion_blocking(
 
     assert has_pending_suggestions(combined, cfg) is blocks
 
-
 def test_multi_objective_next_action_uses_objective_values_for_pending_rows(
     tmp_path: Path,
 ) -> None:
@@ -994,7 +767,6 @@ def test_multi_objective_next_action_uses_objective_values_for_pending_rows(
     assert "objective_values" in campaign.next_action()["suggested_call"].iloc[0]
     assert "objective_value)" not in campaign.next_action()["suggested_call"].iloc[0]
 
-
 def test_rejected_multi_objective_suggestions_remain_duplicate_protected() -> None:
     cfg = multi_config(review=True)
     df = observed_multi_log(cfg)
@@ -1004,7 +776,6 @@ def test_rejected_multi_objective_suggestions_remain_duplicate_protected() -> No
     candidate = tuple(suggestions.iloc[0][variable.name] for variable in cfg.variables)
 
     assert design_key_for_values(cfg, candidate) in design_tuples(cfg, combined)
-
 
 def test_mark_observed_writes_both_objectives(tmp_path: Path) -> None:
     cfg = multi_config(initial_design_size=10)
@@ -1025,7 +796,6 @@ def test_mark_observed_writes_both_objectives(tmp_path: Path) -> None:
     assert row["status"] == "observed"
     assert float(row["yield_score"]) == 61.0
     assert float(row["waste_score"]) == 14.0
-
 
 def test_multi_objective_review_append_and_mark_observed_round_trip(tmp_path: Path) -> None:
     cfg = multi_config(review=True, initial_design_size=10)
@@ -1056,7 +826,6 @@ def test_multi_objective_review_append_and_mark_observed_round_trip(tmp_path: Pa
     assert row["review_status"] == "accepted"
     assert row["review_note"] == "ready"
 
-
 def test_multi_objective_replicate_append_and_mark_observed_round_trip(
     tmp_path: Path,
 ) -> None:
@@ -1081,7 +850,6 @@ def test_multi_objective_replicate_append_and_mark_observed_round_trip(
     assert int(row["replicate_index"]) == 0
     assert float(row["yield_score"]) == 61.0
     assert float(row["waste_score"]) == 14.0
-
 
 def test_multi_objective_review_replicate_append_and_mark_observed_round_trip(
     tmp_path: Path,
@@ -1115,7 +883,6 @@ def test_multi_objective_review_replicate_append_and_mark_observed_round_trip(
     assert row["replicate_group"] == row_id
     assert int(row["replicate_index"]) == 0
 
-
 def test_mark_observed_rejects_single_objective_value_for_multi(tmp_path: Path) -> None:
     cfg = multi_config(initial_design_size=10)
     log_path = tmp_path / "campaign.csv"
@@ -1125,7 +892,6 @@ def test_mark_observed_rejects_single_objective_value_for_multi(tmp_path: Path) 
 
     with pytest.raises(LogWriteError, match="objective_value is not valid"):
         mark_observed(log_path, str(suggestions["row_id"].iloc[0]), objective_value=1.0)
-
 
 @pytest.mark.parametrize(
     "objective_values",
@@ -1154,7 +920,6 @@ def test_failed_multi_objective_mark_observed_leaves_csv_unchanged(
         )
 
     assert log_path.read_bytes() == before
-
 
 def test_session_multi_objective_helpers(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
@@ -1193,7 +958,6 @@ bo:
     with pytest.raises(ValueError, match="pareto_front"):
         campaign.best_observation()
 
-
 def test_multi_objective_review_replicate_report_includes_sections(tmp_path: Path) -> None:
     cfg = multi_config(review=True, replicates=True)
     df = observed_multi_log(cfg)
@@ -1214,7 +978,6 @@ def test_multi_objective_review_replicate_report_includes_sections(tmp_path: Pat
     assert "objective_values" in campaign.next_action()["suggested_call"].iloc[0] or (
         campaign.campaign_status() != "has_pending_suggestions"
     )
-
 
 def test_four_objective_session_report_and_plots(tmp_path: Path) -> None:
     cfg = four_objective_config()
@@ -1281,7 +1044,6 @@ bo:
     assert parallel_path.exists()
     assert hypervolume_path.exists()
 
-
 def test_pairwise_pareto_plot_projects_full_space_membership(tmp_path: Path) -> None:
     cfg = four_objective_config()
     df = observed_four_objective_log(cfg)
@@ -1309,7 +1071,6 @@ def test_pairwise_pareto_plot_projects_full_space_membership(tmp_path: Path) -> 
         for x, y in pareto_offsets
     )
 
-
 def test_multi_objective_plot_replicates_labels_every_objective(tmp_path: Path) -> None:
     cfg = multi_config(replicates=True)
     df = observed_multi_log(cfg)
@@ -1326,7 +1087,6 @@ def test_multi_objective_plot_replicates_labels_every_objective(tmp_path: Path) 
     titles = [axis.get_title() for axis in axes.flat if axis.get_visible()]
     assert any("yield_score" in title for title in titles)
     assert any("waste_score" in title for title in titles)
-
 
 def test_pareto_parallel_plot_handles_mixed_directions_and_constant_objective(
     tmp_path: Path,
@@ -1350,7 +1110,6 @@ def test_pareto_parallel_plot_handles_mixed_directions_and_constant_objective(
     for line in ax.lines:
         assert float(line.get_ydata()[2]) == pytest.approx(0.5)
 
-
 def test_pareto_parallel_plot_empty_state(tmp_path: Path) -> None:
     cfg = four_objective_config()
     campaign = CampaignSession(
@@ -1364,304 +1123,3 @@ def test_pareto_parallel_plot_empty_state(tmp_path: Path) -> None:
 
     assert (tmp_path / "empty_parallel.png").exists()
     assert any("No Pareto-front rows" in text.get_text() for text in ax.texts)
-
-
-def test_pareto_parallel_plot_single_row(tmp_path: Path) -> None:
-    cfg = four_objective_config()
-    df = observed_four_objective_log(cfg).iloc[[0]].copy()
-    campaign = CampaignSession(
-        config_path=tmp_path / "config.yaml",
-        log_path=tmp_path / "log.csv",
-        config=cfg,
-        df=df,
-    )
-
-    _, ax = campaign.plot_pareto_parallel(save_path=tmp_path / "single_parallel.png")
-
-    assert (tmp_path / "single_parallel.png").exists()
-    assert len(ax.lines) == 1
-    assert list(ax.lines[0].get_ydata()) == pytest.approx([0.5, 0.5, 0.5, 0.5])
-
-
-def test_empty_four_objective_plots_export(tmp_path: Path) -> None:
-    cfg = four_objective_config()
-    campaign = CampaignSession(
-        config_path=tmp_path / "config.yaml",
-        log_path=tmp_path / "log.csv",
-        config=cfg,
-        df=pd.DataFrame(columns=canonical_columns(cfg)),
-    )
-
-    for name, plotter in [
-        ("pareto.png", campaign.plot_pareto),
-        ("parallel.png", campaign.plot_pareto_parallel),
-        ("hypervolume.png", campaign.plot_hypervolume),
-    ]:
-        path = tmp_path / name
-        plotter(save_path=path)
-        assert path.exists()
-
-
-def test_cli_multi_objective_mark_observed_errors(tmp_path: Path) -> None:
-    from bo_forge.cli import run
-
-    cfg = multi_config(initial_design_size=10)
-    config_path = tmp_path / "config.yaml"
-    log_path = tmp_path / "campaign.csv"
-    config_path.write_text(
-        """
-campaign_name: multi
-objectives:
-  - name: yield_score
-    direction: maximize
-    reference_point: 40
-  - name: waste_score
-    direction: minimize
-    reference_point: 25
-variables:
-  - name: temperature
-    type: continuous
-    lower: 20
-    upper: 100
-  - name: solvent
-    type: categorical
-    values: [MeCN, Water]
-bo:
-  acquisition: qlog_ehvi
-  initial_design_size: 10
-""",
-        encoding="utf-8",
-    )
-    df = observed_multi_log(cfg)
-    suggestions = suggest_next(cfg, df, batch_size=1)
-    pd.concat([df, suggestions], ignore_index=True).to_csv(log_path, index=False)
-    row_id = str(suggestions["row_id"].iloc[0])
-
-    assert run(
-        [
-            "mark-observed",
-            "--config",
-            str(config_path),
-            "--log",
-            str(log_path),
-            "--row-id",
-            row_id,
-            "--objective-value",
-            "1.0",
-        ]
-    ) == 1
-    assert run(
-        [
-            "mark-observed",
-            "--config",
-            str(config_path),
-            "--log",
-            str(log_path),
-            "--row-id",
-            row_id,
-            "--objective",
-            "yield_score=60",
-        ]
-    ) == 1
-    assert run(
-        [
-            "mark-observed",
-            "--config",
-            str(config_path),
-            "--log",
-            str(log_path),
-            "--row-id",
-            row_id,
-            "--objective",
-            "yield_score=60",
-            "--objective",
-            "waste_score=12",
-        ]
-    ) == 0
-
-
-def test_cli_pareto_commands_and_plots(tmp_path: Path) -> None:
-    from bo_forge.cli import run
-
-    cfg = four_objective_config()
-    config_path = tmp_path / "config.yaml"
-    log_path = tmp_path / "campaign.csv"
-    config_path.write_text(
-        """
-campaign_name: four_objective
-objectives:
-  - name: yield
-    direction: maximize
-    reference_point: 0.2
-  - name: selectivity
-    direction: maximize
-    reference_point: 0.2
-  - name: waste
-    direction: minimize
-    reference_point: 0.9
-  - name: energy_use
-    direction: minimize
-    reference_point: 0.9
-variables:
-  - name: catalyst_loading
-    type: continuous
-    lower: 0.02
-    upper: 0.20
-  - name: reaction_time
-    type: integer
-    lower: 20
-    upper: 90
-  - name: base_equivalents
-    type: discrete
-    values: [0.5, 1.0, 1.5]
-  - name: solvent
-    type: categorical
-    values: [MeCN, DMF, Water]
-constraints:
-  - name: water_needs_time
-    expression: "solvent != 'Water' or reaction_time >= 45"
-bo:
-  acquisition: qlog_ehvi
-  initial_design_size: 4
-  raw_samples: 8
-  num_restarts: 2
-  mc_samples: 8
-""",
-        encoding="utf-8",
-    )
-    observed_four_objective_log(cfg).to_csv(log_path, index=False)
-
-    pareto_path = tmp_path / "plots" / "pareto.png"
-    parallel_path = tmp_path / "plots" / "parallel.png"
-
-    common = ["--config", str(config_path), "--log", str(log_path)]
-    assert run(["pareto-front", *common]) == 0
-    assert run(["pareto-summary", *common]) == 0
-    assert run(["plot", *common, "--kind", "pareto", "--output", str(pareto_path)]) == 0
-    assert (
-        run(["plot", *common, "--kind", "pareto-parallel", "--output", str(parallel_path)])
-        == 0
-    )
-    assert pareto_path.exists()
-    assert parallel_path.exists()
-
-
-def test_cli_multi_objective_review_replicate_workflow(tmp_path: Path) -> None:
-    from bo_forge.cli import run
-
-    cfg = multi_config(review=True, replicates=True, initial_design_size=10)
-    config_path = tmp_path / "config.yaml"
-    log_path = tmp_path / "campaign.csv"
-    config_path.write_text(
-        """
-campaign_name: multi
-objectives:
-  - name: yield_score
-    direction: maximize
-    reference_point: 40
-  - name: waste_score
-    direction: minimize
-    reference_point: 25
-variables:
-  - name: temperature
-    type: continuous
-    lower: 20
-    upper: 100
-  - name: solvent
-    type: categorical
-    values: [MeCN, Water]
-review:
-  enabled: true
-replicates:
-  enabled: true
-bo:
-  acquisition: qlog_ehvi
-  initial_design_size: 10
-  raw_samples: 8
-  num_restarts: 2
-  mc_samples: 8
-""",
-        encoding="utf-8",
-    )
-    df = observed_multi_log(cfg)
-    df.to_csv(log_path, index=False)
-
-    common = ["--config", str(config_path), "--log", str(log_path)]
-    assert run(["suggest", *common, "--batch-size", "1", "--append"]) == 0
-    written = pd.read_csv(log_path, keep_default_na=False)
-    row_id = str(written.loc[written["status"] == "suggested", "row_id"].iloc[0])
-    assert run(["review", *common, "--row-id", row_id, "--decision", "accept"]) == 0
-    assert (
-        run(
-            [
-                "mark-observed",
-                *common,
-                "--row-id",
-                row_id,
-                "--objective",
-                "yield_score=62",
-                "--objective",
-                "waste_score=13",
-            ]
-        )
-        == 0
-    )
-    assert run(["replicate-summary", *common]) == 0
-    assert run(["pareto-front", *common]) == 0
-    assert run(["pareto-summary", *common]) == 0
-
-
-def test_cli_pareto_parallel_requires_three_objectives(tmp_path: Path) -> None:
-    from bo_forge.cli import run
-
-    cfg = multi_config()
-    config_path = tmp_path / "config.yaml"
-    log_path = tmp_path / "campaign.csv"
-    config_path.write_text(
-        """
-campaign_name: multi
-objectives:
-  - name: yield_score
-    direction: maximize
-    reference_point: 40
-  - name: waste_score
-    direction: minimize
-    reference_point: 25
-variables:
-  - name: temperature
-    type: continuous
-    lower: 20
-    upper: 100
-  - name: solvent
-    type: categorical
-    values: [MeCN, Water]
-bo:
-  acquisition: qlog_ehvi
-  initial_design_size: 3
-""",
-        encoding="utf-8",
-    )
-    observed_multi_log(cfg).to_csv(log_path, index=False)
-
-    assert (
-        run(
-            [
-                "plot",
-                "--config",
-                str(config_path),
-                "--log",
-                str(log_path),
-                "--kind",
-                "pareto-parallel",
-                "--output",
-                str(tmp_path / "parallel.png"),
-            ]
-        )
-        == 1
-    )
-
-
-def pd_to_tensor(df: pd.DataFrame):
-    import torch
-
-    return torch.tensor(df.astype(float).to_numpy(), dtype=torch.double)

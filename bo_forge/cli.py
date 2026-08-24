@@ -54,6 +54,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"bo-forge {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    _register_environment_commands(subparsers)
+    _register_read_commands(subparsers)
+    _register_mutation_commands(subparsers)
+    _register_plot_command(subparsers)
+    return parser
+
+
+def _register_environment_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Register environment and log-initialization commands."""
+
     doctor_parser = subparsers.add_parser("doctor", help="Check the active BO Forge environment.")
     doctor_parser.set_defaults(handler=_cmd_doctor)
 
@@ -64,6 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_log_arguments(init_log_parser)
     init_log_parser.set_defaults(handler=_cmd_init_log)
 
+
+def _register_read_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Register read-only campaign inspection commands."""
     validate_parser = subparsers.add_parser("validate", help="Validate a campaign CSV log.")
     _add_config_log_arguments(validate_parser)
     validate_parser.set_defaults(handler=_cmd_validate)
@@ -171,6 +184,9 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
     report_parser.set_defaults(handler=_cmd_report)
 
+
+def _register_mutation_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Register explicit campaign suggestion and mutation commands."""
     suggest_parser = subparsers.add_parser("suggest", help="Generate campaign suggestions.")
     _add_config_log_arguments(suggest_parser)
     suggest_parser.add_argument("--batch-size", type=int, help="Override configured batch size.")
@@ -233,6 +249,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mark_parser.set_defaults(handler=_cmd_mark_observed)
 
+
+def _register_plot_command(subparsers: argparse._SubParsersAction) -> None:
+    """Register the single-output plot export command."""
     plot_parser = subparsers.add_parser("plot", help="Export one campaign plot.")
     _add_config_log_arguments(plot_parser)
     plot_parser.add_argument(
@@ -258,8 +277,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plot_parser.add_argument("--output", type=Path, required=True, help="Figure output path.")
     plot_parser.set_defaults(handler=_cmd_plot)
-
-    return parser
 
 
 def run(argv: Sequence[str] | None = None) -> int:
@@ -713,47 +730,51 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogBusyError):
         return "Hint: Another local writer is active; wait briefly and retry."
     if isinstance(exc, SuggestionError):
-        message = str(exc)
-        if "review_status='pending'" in message and "qLogNEI" in message:
-            return (
-                "Hint: qLogNEI can use accepted suggestions as X_pending, but rows "
-                "still awaiting review must be accepted, rejected, or deferred first."
-            )
-        if "observe accepted pending initial suggestions" in message:
-            return (
-                "Hint: qLogNEI requires observed initial-design rows before "
-                "model-based suggestions; mark accepted initial suggestions observed first."
-            )
-        if "Context" in str(exc) or "context" in str(exc):
-            return (
-                "Hint: Use --context NAME=VALUE for each configured context "
-                "variable, or add context.default_values in the YAML config."
-            )
-        if "qMFKG supports batch_size from 1 through 4" in str(exc):
-            return "Hint: Use --batch-size 1, 2, 3, or 4 for qMFKG suggestions."
-        if "qMFKG acquisition optimization timed out" in str(exc):
-            return (
-                "Hint: Increase or remove fidelity.optimizer_timeout_seconds, "
-                "reduce qMFKG runtime settings, or relax restrictive constraints."
-            )
-        if (
-            "Structured campaign suggestions require an explicit stage" in str(exc)
-            or "Invalid structured campaign stage" in str(exc)
-            or "Unknown structured campaign stage" in str(exc)
-            or "has no active variables" in str(exc)
-            or "--stage is only valid" in str(exc)
-        ):
-            return (
-                "Hint: Use --stage with one configured structured stage name, "
-                "or omit --stage for non-structured campaigns."
-            )
-        return (
-            "Hint: Resolve pending suggestions or review the campaign state before "
-            "requesting new suggestions."
-        )
+        return _suggestion_error_hint(str(exc))
     if isinstance(exc, LogWriteError):
         return "Hint: Check the row_id, pending status, campaign log path, and file permissions."
     return None
+
+
+def _suggestion_error_hint(message: str) -> str:
+    if "review_status='pending'" in message and "qLogNEI" in message:
+        return (
+            "Hint: qLogNEI can use accepted suggestions as X_pending, but rows "
+            "still awaiting review must be accepted, rejected, or deferred first."
+        )
+    if "observe accepted pending initial suggestions" in message:
+        return (
+            "Hint: qLogNEI requires observed initial-design rows before "
+            "model-based suggestions; mark accepted initial suggestions observed first."
+        )
+    if "Context" in message or "context" in message:
+        return (
+            "Hint: Use --context NAME=VALUE for each configured context "
+            "variable, or add context.default_values in the YAML config."
+        )
+    if "qMFKG supports batch_size from 1 through 4" in message:
+        return "Hint: Use --batch-size 1, 2, 3, or 4 for qMFKG suggestions."
+    if "qMFKG acquisition optimization timed out" in message:
+        return (
+            "Hint: Increase or remove fidelity.optimizer_timeout_seconds, "
+            "reduce qMFKG runtime settings, or relax restrictive constraints."
+        )
+    structured_markers = (
+        "Structured campaign suggestions require an explicit stage",
+        "Invalid structured campaign stage",
+        "Unknown structured campaign stage",
+        "has no active variables",
+        "--stage is only valid",
+    )
+    if any(marker in message for marker in structured_markers):
+        return (
+            "Hint: Use --stage with one configured structured stage name, "
+            "or omit --stage for non-structured campaigns."
+        )
+    return (
+        "Hint: Resolve pending suggestions or review the campaign state before "
+        "requesting new suggestions."
+    )
 
 
 if __name__ == "__main__":

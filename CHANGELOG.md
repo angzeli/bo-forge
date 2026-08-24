@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v3.0.0 - Architecture And Scientific UX Reset
+
+- Decomposes configuration, campaign persistence, optimization, diagnostics,
+  Streamlit views, and API transport into focused internal ownership packages.
+- Keeps the documented top-level Python API and legacy implementation modules
+  importable through compatibility facades.
+- Moves the non-HTTP workflow service to `bo_forge.application` and the
+  optional FastAPI implementation to `bo_forge_api` while preserving existing
+  app/API import paths and launcher commands.
+- Reorganizes Streamlit into the task-oriented `Campaign`, `Run`, and `Analyze`
+  areas with native Day/Night theme selection and URL persistence.
+- Applies one scoped scientific plotting contract and a semantic BO color
+  registry without changing plotted campaign values or output-path behavior.
+- Adds architecture, behavior-freeze, UI, plotting, import-boundary, and
+  package-boundary release gates.
+- Preserves BO algorithms, numerical defaults, candidate ordering, YAML/CSV
+  schemas, CLI syntax, API routes and payloads, stage lifecycle, locking, and
+  supported campaign combinations.
+
 ## v2.5.3 - App And API Operational Closeout
 
 This behavior-preserving closeout freezes and verifies the completed v2.5.x

@@ -113,7 +113,8 @@ rm -rf dist/ build/
 
 Package-data boundary:
 
-- the wheel should contain only the importable `bo_forge` and `bo_forge_app` packages, entrypoint metadata, and license metadata;
+- the wheel should contain only the importable `bo_forge`, `bo_forge_app`, and
+  `bo_forge_api` packages, entrypoint metadata, and license metadata;
 - release docs, configs, examples, notebooks, and tests belong in the sdist, not in the wheel;
 - ignored working logs, latest-suggestion CSVs, and runtime reports should not appear in either artifact.
 
@@ -125,7 +126,7 @@ test in isolated environments with normal dependency resolution and `pip check`:
 
 ```bash
 BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES=1 ./.venv/bin/python -m pytest \
-  tests/test_release_readiness.py::test_built_distributions_install_from_outside_source_tree \
+  tests/test_release_artifacts.py::test_built_distributions_install_from_outside_source_tree \
   -p no:cacheprovider
 ```
 
@@ -135,7 +136,7 @@ Run the core wheel check outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_release_probe
-/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-2.5.3-py3-none-any.whl
+/tmp/bo_forge_release_probe/bin/pip install dist/bo_forge-3.0.0-py3-none-any.whl
 cd /tmp
 /tmp/bo_forge_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_release_probe/bin/python -m bo_forge --version
@@ -152,7 +153,7 @@ Test the app extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_app_release_probe
-/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-2.5.3-py3-none-any.whl[app]"
+/tmp/bo_forge_app_release_probe/bin/pip install "dist/bo_forge-3.0.0-py3-none-any.whl[app]"
 cd /tmp
 /tmp/bo_forge_app_release_probe/bin/python -c "import bo_forge_app, streamlit"
 /tmp/bo_forge_app_release_probe/bin/python -c "from bo_forge_app.cli import packaged_streamlit_app_path; print(packaged_streamlit_app_path())"
@@ -169,9 +170,9 @@ Test the experimental API extra separately:
 
 ```bash
 python3 -m venv /tmp/bo_forge_api_release_probe
-/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-2.5.3-py3-none-any.whl[api]"
+/tmp/bo_forge_api_release_probe/bin/pip install "dist/bo_forge-3.0.0-py3-none-any.whl[api]"
 cd /tmp
-/tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_app.api"
+/tmp/bo_forge_api_release_probe/bin/python -c "import bo_forge_api.api; import bo_forge_app.api"
 /tmp/bo_forge_api_release_probe/bin/bo-forge-api --help
 /tmp/bo_forge_api_release_probe/bin/pip check
 ```
@@ -182,7 +183,7 @@ Install the source distribution outside the source checkout:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_release_probe
-/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-2.5.3.tar.gz
+/tmp/bo_forge_sdist_release_probe/bin/pip install dist/bo_forge-3.0.0.tar.gz
 cd /tmp
 /tmp/bo_forge_sdist_release_probe/bin/python -c "import bo_forge, bo_forge_app; print(bo_forge.__version__)"
 /tmp/bo_forge_sdist_release_probe/bin/python -m bo_forge --version
@@ -259,10 +260,10 @@ Confirm the full local loop still works:
 
 ## 🏷️ GitHub Release
 
-- Final closeout: confirm `ROADMAP_V1_X.md` remains completed history,
-  `ROADMAP_V2_X.md` is the active roadmap, and `README.md`, `CHANGELOG.md`,
-  install paths, and the release tag all agree on `v2.5.3`.
-- Tag the release as `v2.5.3`.
+- Final closeout: confirm `ROADMAP_V1_X.md` and `ROADMAP_V2_X.md` remain
+  completed history, `ROADMAP_V3_X.md` is the active baseline, and `README.md`,
+  `CHANGELOG.md`, install paths, and the release tag all agree on `v3.0.0`.
+- Tag the release as `v3.0.0`.
 - Use `CHANGELOG.md` and the final release note as the release description.
 - Attach built distributions only if needed.
 
