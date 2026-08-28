@@ -1,5 +1,26 @@
 # 📝 BO Forge Changelog
 
+## v3.0.1 - CI-Backed Release Foundation
+
+This release-assurance patch adds reproducible dependency constraints,
+required multi-platform CI, exact-tag validation, release-path hygiene, and
+clean external artifact probes without changing BO behavior or campaign data.
+
+- Adds generated, hashed Python 3.11/3.12 constraints for Linux and macOS with
+  a pinned resolver and documented regeneration commands.
+- Adds required Linux full-suite, macOS filesystem/mutation, bounded numerical,
+  and package-install CI jobs with least-privilege permissions and timeouts.
+- Adds a validation-only future tag gate that verifies exact tag/version
+  identity and retains private Actions artifacts without publishing a release.
+- Adds contribution and security-reporting guidance and removes machine-local
+  author paths from release-facing docs and notebooks.
+- Replaces the old direct-dependency snapshot with generated constraint sets
+  included in the source distribution.
+- Changes package maturity metadata from Production/Stable to Beta until the
+  expanded multi-platform release evidence is established.
+- Adds no BO model, acquisition, YAML key, CSV column, API route, or workflow
+  capability.
+
 ## v3.0.0 - Architecture And Scientific UX Reset
 
 - Decomposes configuration, campaign persistence, optimization, diagnostics,

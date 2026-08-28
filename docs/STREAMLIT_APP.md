@@ -1,13 +1,13 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.0.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.0.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local
 paths, then calls `bo_forge.application`, an internal non-HTTP service layer
 that delegates BO behavior to the same `CampaignSession` methods used by
 notebooks and the CLI.
 
-v3.0.0 organizes the workbench into `Campaign`, `Run`, and `Analyze`. A native
+The v3 workbench organizes tasks into `Campaign`, `Run`, and `Analyze`. A native
 Day/Night segmented control persists explicit choices in session state and the
 `theme=day|night` URL query parameter. Theme and navigation changes do not
 invalidate staged suggestions.

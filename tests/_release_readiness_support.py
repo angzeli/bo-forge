@@ -144,7 +144,14 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge_api/stages.py" in names
     assert f"{DIST_INFO_ROOT}/entry_points.txt" in names
     assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
-    excluded_prefixes = ("docs/", "configs/", "examples/", "notebooks/", "tests/")
+    excluded_prefixes = (
+        "docs/",
+        "configs/",
+        "examples/",
+        "notebooks/",
+        "requirements/",
+        "tests/",
+    )
     assert not any(name.startswith(excluded_prefixes) for name in names)
     assert "Provides-Extra: app" in metadata
     assert "Provides-Extra: api" in metadata
@@ -162,8 +169,9 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
 
     required_paths = {
         "README.md",
+        "CONTRIBUTING.md",
         "LICENSE",
-        "requirements-lock.txt",
+        "SECURITY.md",
         "ROADMAP_V0_TO_V1.md",
         "ROADMAP_V1_X.md",
         "ROADMAP_V2_X.md",
@@ -175,6 +183,11 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "docs/API_SECURITY.md",
         "docs/CAPABILITY_MATRIX.md",
         "docs/QLOGNEHVI_FEASIBILITY.md",
+        "requirements/README.md",
+        "requirements/constraints-py311-linux-x86_64.txt",
+        "requirements/constraints-py312-linux-x86_64.txt",
+        "requirements/constraints-py312-macos-arm64.txt",
+        "requirements/constraints-py312-macos-x86_64.txt",
         "examples/quickstart.py",
         "examples/01_simple_2d_maximise_logei_campaign_log.csv",
         "examples/10_multi_objective_mixed_constrained_campaign_log.csv",

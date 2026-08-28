@@ -681,7 +681,9 @@ Allowed constraint syntax is deliberately small: campaign variable names, numeri
 
 Use `campaign.suggestion_quality(suggestions)` to inspect feasibility, constraint violations, exact duplicates, nearest distances, and threshold pass/fail before appending suggestions. Constraint handling in v0.4.2 is repair/filter/retry based; it is not a probabilistic constrained acquisition with a learned feasibility model.
 
-The v0.4.2 constraint and diversity design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_03_mixed_variable_and_constrained_bo_worked.ipynb` for repair-aware constrained mixed-variable BO, and `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_02_batch_bo_for_parallel_experimentation_worked.ipynb` for within-batch distance summaries.
+The constraint and diversity workflow follows the repair-aware constrained
+mixed-variable and batch-distance design documented by the project's internal
+development tutorials; those local source notes are not release artifacts.
 
 Cost-aware and review-enabled campaigns use optional deterministic `cost` and `review` sections:
 
@@ -713,7 +715,9 @@ Budget semantics are:
 - accepted pending suggestions reserve `cost_estimate`;
 - pending, rejected, and deferred suggestions do not reserve budget.
 
-The cost and review design is inspired by `/Users/liangze/Desktop/bo_forge/PyTorch & BoTorch/Part 5/tutorial_04_budget_aware_and_human_in_the_loop_bo_workflows_worked.ipynb`, especially acquisition-minus-cost utility, cumulative-cost comparison, and accepted/rejected workflow history.
+The cost and review workflow follows the acquisition-minus-cost,
+cumulative-cost, and accepted/rejected-history contracts covered by the public
+examples and regression tests.
 
 Replicate-aware campaigns use optional explicit replicate tracking:
 
@@ -760,7 +764,8 @@ Public CSV logs still store every raw replicate row. `campaign.best_observation(
 
 Cost and review summaries remain row-level when combined with replicates. Replicate summaries are group-level, so a replicate group may contain multiple rows with their own costs and review states.
 
-The replicate-aware noisy BO design is inspired by `/Users/liangze/Desktop/from-pytorch-to-bayesian-optimisation/part_6/tutorial_01_noisy_and_replication_aware_bo.ipynb`, especially empirical replicate variance, noisy GP fitting, and repeat-vs-explore decisions.
+The replicate-aware workflow follows the empirical-variance, noisy-GP, and
+repeat-vs-explore contracts covered by the public example and regression tests.
 
 ## 📓 Example Notebooks
 

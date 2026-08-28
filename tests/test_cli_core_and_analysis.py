@@ -32,7 +32,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 3.0.0\n"
+    assert captured.out == "bo-forge 3.0.1\n"
     assert captured.err == ""
 
 @pytest.mark.parametrize("module", ["bo_forge", "bo_forge.cli"])
@@ -40,7 +40,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 3.0.0\n"
+    assert completed.stdout == "bo-forge 3.0.1\n"
     assert completed.stderr == ""
 
 def test_python_module_entrypoint_validate_success(tmp_path: Path) -> None:

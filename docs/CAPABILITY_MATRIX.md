@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.0.0 keeps the YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v3.0.1 keeps the YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while resetting internal architecture and
 scientific UX. BO capability statuses are unchanged from v2.5.3.
 
@@ -80,7 +80,7 @@ Legend:
 | Streamlit workbench | supported | Local wrapper around `CampaignSession` and app service. |
 | Internal app service layer | supported internally | Not documented as stable public API. |
 | Experimental FastAPI probe | supported experimentally | Optional, local/trusted-network only, no built-in auth; non-loopback launch requires acknowledgement and may disable compatibility append/docs. |
-| Production API/auth/database | deferred | No production SaaS backend, auth system, or database store in v2.x. |
+| Production API/auth/database | deferred | No production SaaS backend, built-in auth system, or database store is currently supported. |
 
 ## Safety Boundaries
 

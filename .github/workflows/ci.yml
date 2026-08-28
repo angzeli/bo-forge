@@ -1,0 +1,252 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+  UV_HTTP_TIMEOUT: "300"
+
+jobs:
+  static:
+    name: Static validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install static tools
+        run: python -m pip install "ruff==0.16.5" "uv==0.11.3"
+      - name: Ruff
+        run: ruff check . --no-cache
+      - name: Syntax
+        run: python -m compileall -q bo_forge bo_forge_app bo_forge_api examples tests
+      - name: Whitespace
+        run: git diff --check HEAD^ HEAD
+      - name: Verify generated constraints
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify() {
+            local tracked="$1"
+            shift
+            local generated="$RUNNER_TEMP/$(basename "$tracked")"
+            cp "$tracked" "$generated"
+            uv pip compile pyproject.toml "$@" \
+              --generate-hashes --no-emit-package bo-forge \
+              --custom-compile-command "$(sed -n '2s/^#    //p' "$tracked")" \
+              --output-file "$generated"
+            cmp "$tracked" "$generated"
+          }
+          verify requirements/constraints-py311-linux-x86_64.txt \
+            --all-extras --python-version 3.11 \
+            --python-platform x86_64-manylinux_2_28 --torch-backend cpu
+          verify requirements/constraints-py312-linux-x86_64.txt \
+            --all-extras --python-version 3.12 \
+            --python-platform x86_64-manylinux_2_28 --torch-backend cpu
+          verify requirements/constraints-py312-macos-x86_64.txt \
+            --all-extras --python-version 3.12 \
+            --python-platform x86_64-apple-darwin
+          verify requirements/constraints-py312-macos-arm64.txt \
+            --all-extras --python-version 3.12 \
+            --python-platform aarch64-apple-darwin
+
+  core-tests:
+    name: Core tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.11"
+            constraints: requirements/constraints-py311-linux-x86_64.txt
+          - python: "3.12"
+            constraints: requirements/constraints-py312-linux-x86_64.txt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('requirements/constraints-*.txt') }}
+      - name: Install constrained environment
+        shell: bash
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r "${{ matrix.constraints }}"
+          uv pip install --system --no-deps --no-build-isolation -e .
+          python -m pip check
+      - name: Full pytest suite
+        run: python -m pytest -p no:cacheprovider
+
+  macos-filesystem:
+    name: macOS filesystem and CLI
+    runs-on: macos-14
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-macos-*.txt') }}
+      - name: Install constrained environment
+        shell: bash
+        run: |
+          python -m pip install "uv==0.11.3"
+          case "$(uname -m)" in
+            arm64) constraints=requirements/constraints-py312-macos-arm64.txt ;;
+            x86_64) constraints=requirements/constraints-py312-macos-x86_64.txt ;;
+            *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          uv pip install --system --require-hashes -r "$constraints"
+          uv pip install --system --no-deps --no-build-isolation -e .
+          python -m pip check
+      - name: Path, lock, rollback, and mutation tests
+        run: >-
+          python -m pytest -p no:cacheprovider
+          tests/test_logs.py
+          tests/test_session_mutations.py
+          tests/test_v253_operational_freeze.py
+      - name: Core and CLI smoke
+        run: |
+          python -m bo_forge --version
+          python -m bo_forge doctor
+          python -m bo_forge validate \
+            --config configs/01_simple_2d_maximise_logei.yaml \
+            --log examples/01_simple_2d_maximise_logei_campaign_log.csv
+
+  numerical:
+    name: Bounded real numerical paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
+      - name: Install constrained environment
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r requirements/constraints-py312-linux-x86_64.txt
+          uv pip install --system --no-deps --no-build-isolation -e .
+      - name: Run real qMFKG paths
+        run: >-
+          python -m pytest -p no:cacheprovider
+          tests/test_suggestions_multifidelity_and_cost.py
+          -k real_optimizer_returns
+
+  package:
+    name: Build and external artifact probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
+      - name: Install constrained build environment
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r requirements/constraints-py312-linux-x86_64.txt
+          uv pip install --system --no-deps --no-build-isolation -e .
+          python -m pip check
+      - name: Build wheel and sdist outside the checkout
+        run: python -m build --outdir "$RUNNER_TEMP/dist"
+      - name: Verify metadata and package boundaries
+        env:
+          DIST_DIR: ${{ runner.temp }}/dist
+        run: |
+          python -m twine check "$DIST_DIR"/*
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from tests._release_readiness_support import (
+              _assert_sdist_contains_release_assets,
+              _assert_wheel_package_boundaries,
+          )
+
+          dist = Path(os.environ["DIST_DIR"])
+          wheel, = dist.glob("*.whl")
+          sdist, = dist.glob("*.tar.gz")
+          _assert_wheel_package_boundaries(wheel)
+          _assert_sdist_contains_release_assets(sdist)
+          PY
+      - name: External core wheel and sdist installs
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel=$(find "$RUNNER_TEMP/dist" -name '*.whl' -print -quit)
+          sdist=$(find "$RUNNER_TEMP/dist" -name '*.tar.gz' -print -quit)
+          for kind in wheel sdist; do
+            artifact=$wheel
+            if [[ "$kind" == sdist ]]; then artifact=$sdist; fi
+            python -m venv "$RUNNER_TEMP/$kind"
+            uv pip install --python "$RUNNER_TEMP/$kind/bin/python" \
+              --torch-backend cpu \
+              -c requirements/constraints-py312-linux-x86_64.txt "$artifact"
+            "$RUNNER_TEMP/$kind/bin/python" -m pip check
+            mkdir -p "$RUNNER_TEMP/${kind}-probe"
+            (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= \
+              SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" -c \
+              'import os; from pathlib import Path; import bo_forge; module = Path(bo_forge.__file__).resolve(); source = Path(os.environ["SOURCE_ROOT"]).resolve(); assert source not in module.parents, module; print(bo_forge.__version__)')
+          done
+      - name: Packaged entry-point smokes
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel=$(find "$RUNNER_TEMP/dist" -name '*.whl' -print -quit)
+          python -m venv "$RUNNER_TEMP/interfaces"
+          uv pip install --python "$RUNNER_TEMP/interfaces/bin/python" \
+            --torch-backend cpu \
+            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[app,api]"
+          "$RUNNER_TEMP/interfaces/bin/python" -m pip check
+          mkdir -p "$RUNNER_TEMP/interface-probe"
+          cd "$RUNNER_TEMP/interface-probe"
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" --version
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" --help
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" doctor
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" validate \
+            --config "$GITHUB_WORKSPACE/configs/01_simple_2d_maximise_logei.yaml" \
+            --log "$GITHUB_WORKSPACE/examples/01_simple_2d_maximise_logei_campaign_log.csv"
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-app" --help
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-api" --help
+          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/python" -c \
+            'from pathlib import Path; from bo_forge_api import create_app; app = create_app(root=Path(".")); assert app.title'

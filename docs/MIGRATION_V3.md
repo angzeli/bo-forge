@@ -1,6 +1,6 @@
 # Migrating To BO Forge v3
 
-BO Forge v3.0.0 changes internal ownership and the local workbench layout. It
+BO Forge v3 changes internal ownership and the local workbench layout. It
 does not require YAML or CSV migration.
 
 ## Durable Campaign Files

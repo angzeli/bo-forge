@@ -6,6 +6,7 @@ This repository is organised around one rule: the Bayesian optimisation engine l
 
 ```text
 bo-forge/
+├── .github/workflows/                  # Required CI and validation-only tag gate
 ├── bo_forge/                         # Reusable backend package
 ├── bo_forge_app/                     # Local Streamlit wrapper
 ├── bo_forge_api/                     # Optional FastAPI transport package
@@ -13,6 +14,7 @@ bo-forge/
 ├── examples/                         # Seed CSV logs and runnable scripts
 ├── notebooks/                        # Notebook-first campaign workflows
 ├── reports/                          # Generated local reports and figures
+├── requirements/                     # Generated hashed platform constraints
 ├── docs/                             # Quickstart, schema, errors, and repository guides
 │   ├── QUICKSTART.md
 │   ├── INSTALLATION.md
@@ -39,9 +41,10 @@ bo-forge/
 ├── ROADMAP_V2_X.md                   # Completed v2.x history
 ├── ROADMAP_V3_X.md                   # Active v3 baseline
 ├── CHANGELOG.md                      # Release history
+├── CONTRIBUTING.md                   # Constrained development and contribution guide
 ├── MANIFEST.in                       # Source distribution file inclusion rules
 ├── pyproject.toml                    # Package metadata and dependencies
-├── requirements-lock.txt             # Tested direct dependency snapshot
+├── SECURITY.md                       # Supported-version and vulnerability-reporting policy
 ├── LICENSE                           # Project license
 └── .gitignore                        # Local artifacts excluded from Git
 ```
@@ -107,12 +110,19 @@ production backend; stages disappear when the launcher process restarts.
 
 ## 🚀 How To Use The Repository
 
-Create a local environment and install the package:
+Create a constrained local environment and install the package:
 
 ```bash
-python3 -m venv .venv
-./.venv/bin/pip install -e ".[dev]"
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install "uv==0.11.3"
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --require-hashes -r requirements/constraints-py312-macos-arm64.txt
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --no-deps --no-build-isolation -e .
 ```
+
+Choose the platform file described in `requirements/README.md`; Linux CPU
+installs also pass `--torch-backend cpu`.
 
 For installed use, the stable commands are:
 

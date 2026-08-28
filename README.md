@@ -1,11 +1,12 @@
-# 🧪 BO Forge v3.0.0
+# 🧪 BO Forge v3.0.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.0.0 resets internal architecture and scientific UX without changing BO
-capabilities or durable campaign files. Focused configuration, campaign,
-optimization, diagnostics, application, Streamlit, and optional API ownership
-replace oversized modules behind compatibility facades.
+v3.0.1 adds a CI-backed release foundation to the v3 architecture and
+scientific UX reset without changing BO capabilities or durable campaign
+files. Focused configuration, campaign, optimization, diagnostics,
+application, Streamlit, and optional API ownership remain behind compatibility
+facades.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
 notebooks, service calls, API payloads, and launcher safeguards remain
@@ -66,9 +67,17 @@ pip install "bo-forge[api]"
 For local development from a clone:
 
 ```bash
-python3 -m venv .venv
-./.venv/bin/pip install -e ".[dev]"
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install "uv==0.11.3"
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --require-hashes -r requirements/constraints-py312-macos-arm64.txt
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --no-deps --no-build-isolation -e .
 ```
+
+Choose the generated constraint file matching your interpreter and platform;
+Linux CPU environments also pass `--torch-backend cpu`. See
+[`requirements/README.md`](https://github.com/angzeli/bo-forge/blob/main/requirements/README.md).
 
 Check the installed version and environment:
 
@@ -243,6 +252,7 @@ the GP still trains on group means from every context.
 
 ```text
 bo-forge/
+├── .github/        # required CI and validation-only future tag gate
 ├── bo_forge/       # reusable backend package
 ├── bo_forge_app/   # local Streamlit wrapper
 ├── bo_forge_api/   # optional FastAPI transport package
@@ -251,6 +261,7 @@ bo-forge/
 ├── notebooks/      # notebook-first campaign workflows and deeper simulated demos
 ├── reports/        # generated local reports and figures
 ├── docs/           # quickstart, CLI, schema, troubleshooting, repo guide
+├── requirements/   # generated, hashed Python/platform constraints
 └── tests/          # pytest coverage
 ```
 ---
@@ -273,6 +284,9 @@ bo-forge/
 - [docs/MIGRATION_V3.md](https://github.com/angzeli/bo-forge/blob/main/docs/MIGRATION_V3.md): v3 module facades, UI mapping, API isolation, and figure changes.
 - [docs/RELEASE_CHECKLIST.md](https://github.com/angzeli/bo-forge/blob/main/docs/RELEASE_CHECKLIST.md): GitHub and PyPI release checklist.
 - [docs/REPOSITORY_STRUCTURE.md](https://github.com/angzeli/bo-forge/blob/main/docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
+- [CONTRIBUTING.md](https://github.com/angzeli/bo-forge/blob/main/CONTRIBUTING.md): constrained development setup and contribution checks.
+- [SECURITY.md](https://github.com/angzeli/bo-forge/blob/main/SECURITY.md): supported release and private vulnerability-reporting guidance.
+- [requirements/README.md](https://github.com/angzeli/bo-forge/blob/main/requirements/README.md): generated constraint sets and regeneration commands.
 - [CHANGELOG.md](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md): release history.
 - [ROADMAP_V0_TO_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V0_TO_V1.md): completed milestones through v1.0.0.
 - [ROADMAP_V1_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md): completed v1.x roadmap.
@@ -283,9 +297,9 @@ bo-forge/
 
 ## 📌 Tested Versions
 
-The primary dependency source is `pyproject.toml`.
-
-A direct-dependency snapshot from the v3.0.0 environment is recorded in `requirements-lock.txt`.
+`pyproject.toml` defines broad end-user requirements. Generated, hashed
+Python/platform constraint sets under `requirements/` define the reproducible
+CI and release-preparation environments.
 
 ---
 

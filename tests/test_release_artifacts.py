@@ -39,6 +39,10 @@ def test_version_and_production_complexity_gate_match_project_metadata() -> None
     assert issubclass(bo_forge.LogBusyError, bo_forge.LogWriteError)
     assert issubclass(bo_forge.LogConflictError, bo_forge.LogWriteError)
     assert "Programming Language :: Python :: 3.12" in PYPROJECT["project"]["classifiers"]
+    assert "Development Status :: 4 - Beta" in PYPROJECT["project"]["classifiers"]
+    assert "Development Status :: 5 - Production/Stable" not in PYPROJECT["project"][
+        "classifiers"
+    ]
 
 def test_license_file_exists() -> None:
     assert (PROJECT_ROOT / "LICENSE").is_file()
@@ -68,18 +72,20 @@ def test_manifest_uses_expected_release_directives() -> None:
 
     expected = {
         "include CHANGELOG.md",
+        "include CONTRIBUTING.md",
         "include LICENSE",
         "include README.md",
         "include ROADMAP_V0_TO_V1.md",
         "include ROADMAP_V1_X.md",
         "include ROADMAP_V2_X.md",
         "include ROADMAP_V3_X.md",
-        "include requirements-lock.txt",
+        "include SECURITY.md",
         "recursive-include configs *.yaml",
         "recursive-include docs *.md",
         "include examples/quickstart.py",
         "recursive-include examples *_campaign_log.csv",
         "recursive-include notebooks *.ipynb",
+        "recursive-include requirements *.md *.txt",
         "include tests/conftest.py",
     }
 
@@ -242,8 +248,9 @@ def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v3.0.0" in readme
-    assert "v3.0.0 resets internal architecture and scientific UX" in readme
+    assert "# 🧪 BO Forge v3.0.1" in readme
+    assert "v3.0.1 adds a CI-backed release foundation" in readme
+    assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
     assert "## v2.5.3 - App And API Operational Closeout" in changelog
     assert "## v2.5.2 - Trusted Deployment Hardening" in changelog
@@ -288,7 +295,7 @@ def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v3.0.0 provides a local Streamlit workbench" in streamlit_app_docs
+    assert "BO Forge v3.0.1 provides a local Streamlit workbench" in streamlit_app_docs
     assert "`Campaign`, `Run`, and `Analyze`" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
@@ -380,7 +387,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v3.0.0",
+        "BO Forge v3.0.1",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -551,8 +558,9 @@ def test_release_checklist_requires_clean_tracked_security_docs() -> None:
     )
 
     assert "git status --short" in checklist
-    assert "git ls-files --error-unmatch docs/API_SECURITY.md" in checklist
-    assert "all intended files are committed" in checklist
+    assert "git ls-files --error-unmatch" in checklist
+    assert "docs/API_SECURITY.md" in checklist
+    assert "all intended files must be committed" in checklist.lower()
 
 def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
@@ -684,8 +692,8 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
         'Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md"'
     )
     assert expected_roadmap_url in pyproject
-    assert "Current baseline: `v3.0.0`" in v3_roadmap
-    assert 'v30["v3.0.0<br/>Architecture + scientific UX reset"]' in v3_roadmap
+    assert "Current prepared baseline: `v3.0.1`" in v3_roadmap
+    assert 'v301["v3.0.1<br/>CI-backed release foundation"]' in v3_roadmap
     assert "docs/MIGRATION_V3.md" in v3_roadmap
 
 def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
@@ -707,25 +715,12 @@ def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
 def test_release_checklist_includes_fresh_install_pip_check() -> None:
     checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(encoding="utf-8")
 
-    assert "/tmp/bo_forge_release_probe/bin/pip check" in checklist
-    assert "/tmp/bo_forge_app_release_probe/bin/pip check" in checklist
-    assert "/tmp/bo_forge_api_release_probe/bin/pip check" in checklist
-    assert "/tmp/bo_forge_sdist_release_probe/bin/pip check" in checklist
-    assert "BO_FORGE_RELEASE_RESOLVE_DEPENDENCIES=1" in checklist
-    assert (
-        "tests/test_release_artifacts.py::"
-        "test_built_distributions_install_from_outside_source_tree"
-    ) in checklist
-    assert "fidelity-summary --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
-    assert "fidelity-coverage --config configs/15_multi_fidelity_qmfkg.yaml" in checklist
-    assert "--kind fidelity-diagnostics" in checklist
-    assert "--kind fidelity-progress" in checklist
-    assert "context-summary --config configs/16_contextual_logei.yaml" in checklist
-    assert "--kind context-diagnostics" in checklist
-    assert "model-summary --config configs/17_model_profile_logei.yaml" in checklist
-    assert "model-compare --config configs/17_model_profile_logei.yaml" in checklist
-    assert "--kind model-diagnostics" in checklist
-    assert "--kind model-comparison" in checklist
+    assert "/tmp/bo-forge-release/bin/python -m pip check" in checklist
+    assert "requirements/constraints-py312-linux-x86_64.txt" in checklist
+    assert ".github/workflows/ci.yml" in checklist
+    assert ".github/workflows/release-gate.yml" in checklist
+    assert "exact release commit is the authoritative gate" in checklist
+    assert "does not create a GitHub Release" in checklist
 
 
 def test_release_checklist_pytest_nodes_reference_existing_tests() -> None:
@@ -746,32 +741,17 @@ def test_release_checklist_pytest_nodes_reference_existing_tests() -> None:
         ), f"{relative_path}::{test_name}"
 
 
-def test_release_checklist_names_all_runtime_wheel_packages() -> None:
+def test_release_checklist_names_runtime_packages_and_release_boundaries() -> None:
     checklist = (PROJECT_ROOT / "docs" / "RELEASE_CHECKLIST.md").read_text(
         encoding="utf-8"
     )
 
-    assert "`bo_forge`, `bo_forge_app`, and\n  `bo_forge_api` packages" in checklist
+    assert "`bo_forge`, `bo_forge_app`,\nand `bo_forge_api` packages" in checklist
+    assert "generated constraints remain outside the wheel" in checklist
+    assert "inside the sdist" in checklist
+    assert "requirements/constraints-py312-linux-x86_64.txt" in checklist
     assert "configs/18_noisy_pending_qlognei.yaml" in checklist
-    assert "examples/18_noisy_pending_qlognei_campaign_log.csv" in checklist
-    assert "qlog-nei-summary --config configs/18_noisy_pending_qlognei.yaml" in checklist
-    assert "--kind qlog-nei-diagnostics" in checklist
-    assert "docs/QLOGNEHVI_FEASIBILITY.md" in checklist
-    assert "configs/19_multi_objective_qlognehvi.yaml" in checklist
-    assert "examples/19_multi_objective_qlognehvi_campaign_log.csv" in checklist
-    assert "configs/20_contextual_cost_review_logei.yaml" in checklist
-    assert "examples/20_contextual_cost_review_campaign_log.csv" in checklist
-    assert "notebooks/20_contextual_cost_review_logei_campaign.ipynb" in checklist
-    assert "configs/21_contextual_replicate_logei.yaml" in checklist
-    assert "examples/21_contextual_replicate_campaign_log.csv" in checklist
     assert "configs/22_discrete_multi_fidelity_qmfkg.yaml" in checklist
-    assert "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in checklist
-    assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in checklist
-    assert "--batch-size 2" in checklist
-    assert "--batch-size 4" in checklist
-    assert "/tmp/bo_forge_quickstart_probe" in checklist
-    assert 'REPO_ROOT="$(pwd)"' in checklist
-    assert 'PYTHONPATH="$REPO_ROOT"' in checklist
 
 def test_release_checklist_isolated_quickstart_recipe_works(tmp_path: Path) -> None:
     probe_root = tmp_path / "bo_forge_quickstart_probe"
@@ -800,13 +780,9 @@ def test_release_checklist_isolated_quickstart_recipe_works(tmp_path: Path) -> N
     assert completed.returncode == 0, completed.stderr
     assert (probe_root / "examples" / "quickstart_working_log.csv").is_file()
 
-def test_requirements_lock_matches_current_release_snapshot() -> None:
-    requirements_lock = (PROJECT_ROOT / "requirements-lock.txt").read_text(
-        encoding="utf-8"
-    )
-
-    assert "BO Forge v3.0.0" in requirements_lock
-    assert "v1.4.0 release" not in requirements_lock
+def test_generated_constraints_replace_direct_dependency_snapshot() -> None:
+    assert not (PROJECT_ROOT / "requirements-lock.txt").exists()
+    assert (PROJECT_ROOT / "requirements" / "README.md").is_file()
 
 def test_installation_tutorial_covers_pip_install_paths() -> None:
     tutorial = (PROJECT_ROOT / "docs" / "INSTALLATION.md").read_text(encoding="utf-8")
@@ -814,7 +790,8 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert "pip install bo-forge" in tutorial
     assert 'pip install "bo-forge[app]"' in tutorial
     assert 'pip install "bo-forge[api]"' in tutorial
-    assert 'pip install -e ".[dev]"' in tutorial
+    assert "uv pip install --python" in tutorial
+    assert "--no-deps --no-build-isolation -e ." in tutorial
     assert f"dist/bo_forge-{PROJECT_VERSION}-py3-none-any.whl" in tutorial
     assert f"dist/bo_forge-{PROJECT_VERSION}.tar.gz" in tutorial
     assert "pip check" in tutorial

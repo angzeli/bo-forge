@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v3.0.0.
+This page shows the recommended `pip install` paths for BO Forge v3.0.1.
 
 Use the normal package install when you want BO Forge as a command-line or Python package. Use the app extra when you also want the local Streamlit workbench. Use the API extra only when you want the experimental FastAPI probe.
 
@@ -97,12 +97,25 @@ production backend. Read [API_PROBE.md](API_PROBE.md) and
 
 ## 🛠️ Option 4: Development From A Clone
 
-From the repository root:
+For a reproducible development or release-preparation environment, select the
+generated constraint file matching Python and platform. For example, on macOS
+Apple Silicon with Python 3.12:
 
 ```bash
-python3 -m venv .venv
-./.venv/bin/pip install -e ".[dev]"
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install "uv==0.11.3"
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --require-hashes -r requirements/constraints-py312-macos-arm64.txt
+./.venv/bin/uv pip install --python ./.venv/bin/python \
+  --no-deps --no-build-isolation -e .
+./.venv/bin/python -m pip check
 ```
+
+Linux CPU environments use the matching Linux constraint file and
+`--torch-backend cpu`. Intel macOS uses
+`constraints-py312-macos-x86_64.txt`. See
+[`requirements/README.md`](../requirements/README.md) for all supported files,
+clean bootstrap commands, and exact regeneration commands.
 
 Run the standard development checks:
 
@@ -137,7 +150,7 @@ Install the wheel in a fresh environment:
 
 ```bash
 python3 -m venv /tmp/bo_forge_probe
-/tmp/bo_forge_probe/bin/pip install dist/bo_forge-3.0.0-py3-none-any.whl
+/tmp/bo_forge_probe/bin/pip install dist/bo_forge-3.0.1-py3-none-any.whl
 /tmp/bo_forge_probe/bin/bo-forge doctor
 /tmp/bo_forge_probe/bin/pip check
 ```
@@ -146,7 +159,7 @@ Install the source distribution similarly:
 
 ```bash
 python3 -m venv /tmp/bo_forge_sdist_probe
-/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-3.0.0.tar.gz
+/tmp/bo_forge_sdist_probe/bin/pip install dist/bo_forge-3.0.1.tar.gz
 /tmp/bo_forge_sdist_probe/bin/bo-forge doctor
 /tmp/bo_forge_sdist_probe/bin/pip check
 ```
