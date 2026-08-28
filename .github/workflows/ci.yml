@@ -249,4 +249,4 @@ jobs:
           PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-app" --help
           PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-api" --help
           PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/python" -c \
-            'from pathlib import Path; from bo_forge_api import create_app; app = create_app(root=Path(".")); assert app.title'
+            'from pathlib import Path; from bo_forge_api.api import create_app; app = create_app(root=Path(".")); assert app.title'

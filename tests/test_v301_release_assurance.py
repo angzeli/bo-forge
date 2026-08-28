@@ -70,11 +70,13 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
         "python -m pip check",
         "bo-forge-app",
         "bo-forge-api",
+        "from bo_forge_api.api import create_app",
     )
     for fragment in required_fragments:
         assert fragment in workflow
 
     assert "pull_request_target" not in workflow
+    assert "from bo_forge_api import create_app" not in workflow
     assert "0.0.0.0" not in workflow
     assert workflow.count("timeout-minutes:") == 5
 
