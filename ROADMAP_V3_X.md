@@ -4,8 +4,9 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.0.1`. It adds release-assurance infrastructure
-without publishing a tag, GitHub Release, or package artifact.
+Current prepared baseline: `v3.0.2`. It stabilizes installed-artifact and tag
+gate probes around the existing optional API package contract without changing
+BO behavior or publishing a tag, GitHub Release, or package artifact.
 
 ## Roadmap So Far
 
@@ -15,7 +16,7 @@ flowchart LR
 
     v300["v3.0.0<br/>Architecture + scientific UX reset"]
     v301["v3.0.1<br/>CI-backed release foundation"]
-    v302["v3.0.2<br/>Conditional stabilization"]
+    v302["v3.0.2<br/>CI + packaging stabilization"]
     v310["v3.1.0<br/>Provenance schema + identity"]
     v311["v3.1.1<br/>Fail-closed resume"]
     v312["v3.1.2<br/>Migration + lineage"]
@@ -60,7 +61,8 @@ flowchart LR
     class v30 majorActive
     class v31,v32,v33,v34 majorFuture
     class v300,v301 patchDone
-    class v302,v310,v311,v312,v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v302 patchActive
+    class v310,v311,v312,v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -76,7 +78,7 @@ flowchart LR
 | --- | --- | --- |
 | `v3.0.0` | implemented | Architecture and scientific-UX reset with compatibility facades |
 | `v3.0.1` | prepared | Reproducible environments, required CI, tag gate, and release-process hardening |
-| `v3.0.2` | conditional | Evidence-driven post-release packaging or CI corrections only |
+| `v3.0.2` | prepared | Canonical API factory probes and independent package-extra validation |
 | `v3.1.x` | planned | Durable campaign provenance and lineage |
 | `v3.2.x` | planned | Predictive diagnostics correctness and explicit fit metadata |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
@@ -150,16 +152,26 @@ Acceptance criteria:
   agree on the prepared release identity.
 - [ ] No tag, GitHub Release, package publication, or push occurs.
 
-### v3.0.2 - Conditional Post-Release Stabilization
+### v3.0.2 - CI And Packaging Stabilization
 
-Status: conditional/reserved
+Status: prepared; publication requires separate authorization and exact-commit CI
 
-- Exists only for evidence-driven CI platform incompatibilities, packaging
-  omissions, constraint corrections, or release-process documentation fixes
-  discovered after v3.0.1.
-- Must not contain new scientific features, campaign combinations, schemas, or
-  interface expansion.
-- May be skipped entirely when v3.0.1 evidence remains sound.
+- Standardize installed-artifact validation on the existing
+  `bo_forge_api.api:create_app` factory without expanding the package-root API.
+- Apply the canonical factory smoke to required CI and the future exact-tag
+  validation workflow.
+- Test core wheel, Streamlit app-extra, FastAPI extra, and source-distribution
+  installations independently outside the source checkout.
+- Derive release identity and artifact names from project metadata where
+  practical and keep release-assurance tests version-neutral.
+- Preserve dependency constraints unless a reproducible resolver or platform
+  failure proves a pin invalid.
+- Add no scientific feature, campaign combination, schema, endpoint, CLI, UI,
+  or public API expansion.
+- Mark v3.0.x complete only after every required CI job passes on the exact
+  v3.0.2 commit.
+- No tag, GitHub Release, package publication, or push occurs as part of local
+  preparation.
 
 ## v3.1.x - Durable Campaign Provenance
 

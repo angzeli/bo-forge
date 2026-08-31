@@ -248,8 +248,9 @@ def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
         encoding="utf-8"
     )
 
-    assert "# 🧪 BO Forge v3.0.1" in readme
-    assert "v3.0.1 adds a CI-backed release foundation" in readme
+    assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
+    assert f"v{PROJECT_VERSION} stabilizes the CI and packaging foundation" in readme
+    assert f"## v{PROJECT_VERSION} - CI And Packaging Stabilization" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
     assert "## v2.5.3 - App And API Operational Closeout" in changelog
@@ -295,7 +296,10 @@ def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
     assert "campaign-global budget accounting across contexts" in readme
     assert "CampaignSession.suggest_next(context_values={...})" in readme
     assert "unchanged from the v1.2.3 baseline" not in readme
-    assert "BO Forge v3.0.1 provides a local Streamlit workbench" in streamlit_app_docs
+    assert (
+        f"BO Forge v{PROJECT_VERSION} provides a local Streamlit workbench"
+        in streamlit_app_docs
+    )
     assert "`Campaign`, `Run`, and `Analyze`" in streamlit_app_docs
     assert "Fidelity Coverage" in streamlit_app_docs
     assert "Fidelity Progress" in streamlit_app_docs
@@ -387,7 +391,7 @@ def test_capability_matrix_documents_supported_and_deferred_combinations() -> No
     )
 
     required_phrases = [
-        "BO Forge v3.0.1",
+        f"BO Forge v{PROJECT_VERSION}",
         "supported",
         "read-only/reporting only",
         "rejected",
@@ -692,8 +696,10 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
         'Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md"'
     )
     assert expected_roadmap_url in pyproject
-    assert "Current prepared baseline: `v3.0.1`" in v3_roadmap
+    assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in v3_roadmap
     assert 'v301["v3.0.1<br/>CI-backed release foundation"]' in v3_roadmap
+    assert 'v302["v3.0.2<br/>CI + packaging stabilization"]' in v3_roadmap
+    assert "### v3.0.2 - CI And Packaging Stabilization" in v3_roadmap
     assert "docs/MIGRATION_V3.md" in v3_roadmap
 
 def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
@@ -792,8 +798,10 @@ def test_installation_tutorial_covers_pip_install_paths() -> None:
     assert 'pip install "bo-forge[api]"' in tutorial
     assert "uv pip install --python" in tutorial
     assert "--no-deps --no-build-isolation -e ." in tutorial
-    assert f"dist/bo_forge-{PROJECT_VERSION}-py3-none-any.whl" in tutorial
-    assert f"dist/bo_forge-{PROJECT_VERSION}.tar.gz" in tutorial
+    assert 'glob("bo_forge-*.whl")' in tutorial
+    assert 'glob("bo_forge-*.tar.gz")' in tutorial
+    assert "Expected exactly one wheel" in tutorial
+    assert "Expected exactly one source distribution" in tutorial
     assert "pip check" in tutorial
 
 def test_quickstart_has_no_stale_v0_4_current_feature_wording() -> None:

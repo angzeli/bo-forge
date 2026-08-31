@@ -1,5 +1,21 @@
 # 📝 BO Forge Changelog
 
+## v3.0.2 - CI And Packaging Stabilization
+
+This narrow stabilization patch aligns required CI and future tag-gate probes
+with the existing optional API package contract. BO behavior, campaign formats,
+public interfaces, and supported combinations remain unchanged.
+
+- Uses the canonical `bo_forge_api.api:create_app` factory in installed-wheel
+  probes without adding a package-root re-export.
+- Tests core, Streamlit app-extra, FastAPI extra, and source-distribution
+  installations independently outside the source checkout.
+- Renames version-specific release-assurance tests and derives release identity
+  from `pyproject.toml` where practical.
+- Aligns package, CLI, API, README, changelog, roadmap, artifact, and release
+  documentation identity at `3.0.2`.
+- Adds no BO model, acquisition, YAML key, CSV column, API route, or UI change.
+
 ## v3.0.1 - CI-Backed Release Foundation
 
 This release-assurance patch adds reproducible dependency constraints,

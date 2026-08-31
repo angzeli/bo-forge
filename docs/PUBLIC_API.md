@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.0.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.0.2.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone

@@ -91,23 +91,60 @@ jobs:
           _assert_wheel_package_boundaries(wheel)
           _assert_sdist_contains_release_assets(sdist)
           PY
-      - name: External wheel smoke
+      - name: External core and optional interface smokes
         shell: bash
         run: |
           set -euo pipefail
-          wheel=$(find "$RUNNER_TEMP/dist" -name '*.whl' -print -quit)
-          python -m venv "$RUNNER_TEMP/probe"
-          uv pip install --python "$RUNNER_TEMP/probe/bin/python" \
+          wheels=("$RUNNER_TEMP/dist"/*.whl)
+          sdists=("$RUNNER_TEMP/dist"/*.tar.gz)
+          [[ ${#wheels[@]} -eq 1 && -f ${wheels[0]} ]] || { echo "Expected exactly one wheel" >&2; exit 1; }
+          [[ ${#sdists[@]} -eq 1 && -f ${sdists[0]} ]] || { echo "Expected exactly one sdist" >&2; exit 1; }
+          wheel=${wheels[0]}
+          sdist=${sdists[0]}
+
+          python -m venv "$RUNNER_TEMP/core-probe"
+          uv pip install --python "$RUNNER_TEMP/core-probe/bin/python" \
             --torch-backend cpu \
-            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[app,api]"
-          "$RUNNER_TEMP/probe/bin/python" -m pip check
-          cd "$RUNNER_TEMP"
-          PYTHONPATH= "$RUNNER_TEMP/probe/bin/bo-forge" --version
-          PYTHONPATH= SOURCE_ROOT="$GITHUB_WORKSPACE" \
-            "$RUNNER_TEMP/probe/bin/python" -c \
-            'import os; from pathlib import Path; import bo_forge; module = Path(bo_forge.__file__).resolve(); source = Path(os.environ["SOURCE_ROOT"]).resolve(); assert source not in module.parents, module'
-          PYTHONPATH= "$RUNNER_TEMP/probe/bin/bo-forge-app" --help
-          PYTHONPATH= "$RUNNER_TEMP/probe/bin/bo-forge-api" --help
+            -c requirements/constraints-py312-linux-x86_64.txt "$wheel"
+          "$RUNNER_TEMP/core-probe/bin/python" -m pip check
+          "$RUNNER_TEMP/core-probe/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("streamlit") is None; assert importlib.util.find_spec("fastapi") is None'
+          (cd "$RUNNER_TEMP" && PYTHONPATH= \
+            "$RUNNER_TEMP/core-probe/bin/bo-forge" --version)
+          (cd "$RUNNER_TEMP" && PYTHONPATH= SOURCE_ROOT="$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/core-probe/bin/python" -c \
+              'import os; from pathlib import Path; import bo_forge; module = Path(bo_forge.__file__).resolve(); source = Path(os.environ["SOURCE_ROOT"]).resolve(); assert source not in module.parents, module')
+
+          python -m venv "$RUNNER_TEMP/sdist-probe"
+          uv pip install --python "$RUNNER_TEMP/sdist-probe/bin/python" \
+            --torch-backend cpu \
+            -c requirements/constraints-py312-linux-x86_64.txt "$sdist"
+          "$RUNNER_TEMP/sdist-probe/bin/python" -m pip check
+          (cd "$RUNNER_TEMP" && PYTHONPATH= \
+            "$RUNNER_TEMP/sdist-probe/bin/bo-forge" --version)
+
+          python -m venv "$RUNNER_TEMP/app-probe"
+          uv pip install --python "$RUNNER_TEMP/app-probe/bin/python" \
+            --torch-backend cpu \
+            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[app]"
+          "$RUNNER_TEMP/app-probe/bin/python" -m pip check
+          "$RUNNER_TEMP/app-probe/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("streamlit") is not None; assert importlib.util.find_spec("fastapi") is None'
+          (cd "$RUNNER_TEMP" && PYTHONPATH= \
+            "$RUNNER_TEMP/app-probe/bin/bo-forge-app" --help)
+
+          python -m venv "$RUNNER_TEMP/api-probe"
+          uv pip install --python "$RUNNER_TEMP/api-probe/bin/python" \
+            --torch-backend cpu \
+            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[api]"
+          "$RUNNER_TEMP/api-probe/bin/python" -m pip check
+          "$RUNNER_TEMP/api-probe/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("fastapi") is not None; assert importlib.util.find_spec("streamlit") is None'
+          (cd "$RUNNER_TEMP" && PYTHONPATH= \
+            "$RUNNER_TEMP/api-probe/bin/bo-forge-api" --help)
+          (cd "$RUNNER_TEMP" && PYTHONPATH= \
+            "$RUNNER_TEMP/api-probe/bin/python" -c \
+              'from pathlib import Path; import bo_forge_api; from bo_forge_api.api import create_app; assert not hasattr(bo_forge_api, "create_app"); app = create_app(root=Path(".")); assert app.title')
       - name: Retain verified artifacts for manual release preparation
         uses: actions/upload-artifact@v4
         with:

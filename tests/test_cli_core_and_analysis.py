@@ -1,5 +1,6 @@
 """CLI core, noisy, contextual, and model-analysis command tests."""
 
+from bo_forge import __version__
 from tests._cli_support import (
     CampaignConfig,
     Path,
@@ -32,7 +33,7 @@ def test_version_outputs_clean_line(capsys: pytest.CaptureFixture[str]) -> None:
     assert run(["--version"]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == "bo-forge 3.0.1\n"
+    assert captured.out == f"bo-forge {__version__}\n"
     assert captured.err == ""
 
 @pytest.mark.parametrize("module", ["bo_forge", "bo_forge.cli"])
@@ -40,7 +41,7 @@ def test_python_module_entrypoint_version(module: str) -> None:
     completed = run_python_module(module, "--version")
 
     assert completed.returncode == 0
-    assert completed.stdout == "bo-forge 3.0.1\n"
+    assert completed.stdout == f"bo-forge {__version__}\n"
     assert completed.stderr == ""
 
 def test_python_module_entrypoint_validate_success(tmp_path: Path) -> None:

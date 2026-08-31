@@ -35,7 +35,7 @@ build directories.
 ```bash
 /tmp/bo-forge-release/bin/ruff check . --no-cache
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider \
-  tests/test_v301_release_assurance.py \
+  tests/test_release_assurance.py \
   tests/test_release_artifacts.py \
   tests/test_release_dependency_resolution.py
 git diff --check
@@ -172,23 +172,68 @@ Create each probe outside the source checkout, clear `PYTHONPATH`, install under
 the matching constraints, and run `pip check`:
 
 ```bash
+wheel=$(python3.12 - <<'PY'
+from pathlib import Path
+
+artifacts = sorted(Path("/tmp/bo-forge-dist").glob("bo_forge-*.whl"))
+if len(artifacts) != 1:
+    raise SystemExit(f"Expected exactly one wheel, found {len(artifacts)}")
+print(artifacts[0])
+PY
+)
 python3.12 -m venv /tmp/bo-forge-wheel-probe
 /tmp/bo-forge-release/bin/uv pip install \
   --python /tmp/bo-forge-wheel-probe/bin/python \
   --torch-backend cpu \
   -c requirements/constraints-py312-linux-x86_64.txt \
-  /tmp/bo-forge-dist/bo_forge-3.0.1-py3-none-any.whl
+  "$wheel"
 (cd /tmp && PYTHONPATH= /tmp/bo-forge-wheel-probe/bin/bo-forge --version)
 /tmp/bo-forge-wheel-probe/bin/python -m pip check
 ```
 
-Repeat with the sdist and with wheel extras `[app,api]`. Verify:
+Discover and install the sdist with the same exact-one rule. Then install the
+app and API extras in separate clean environments:
 
 ```bash
+sdist=$(python3.12 - <<'PY'
+from pathlib import Path
+
+artifacts = sorted(Path("/tmp/bo-forge-dist").glob("bo_forge-*.tar.gz"))
+if len(artifacts) != 1:
+    raise SystemExit(f"Expected exactly one source distribution, found {len(artifacts)}")
+print(artifacts[0])
+PY
+)
+python3.12 -m venv /tmp/bo-forge-sdist-probe
+/tmp/bo-forge-release/bin/uv pip install \
+  --python /tmp/bo-forge-sdist-probe/bin/python \
+  --torch-backend cpu \
+  -c requirements/constraints-py312-linux-x86_64.txt \
+  "$sdist"
+/tmp/bo-forge-sdist-probe/bin/python -m pip check
+
+python3.12 -m venv /tmp/bo-forge-app-probe
+/tmp/bo-forge-release/bin/uv pip install \
+  --python /tmp/bo-forge-app-probe/bin/python \
+  --torch-backend cpu \
+  -c requirements/constraints-py312-linux-x86_64.txt \
+  "${wheel}[app]"
+/tmp/bo-forge-app-probe/bin/python -m pip check
+
+python3.12 -m venv /tmp/bo-forge-api-probe
+/tmp/bo-forge-release/bin/uv pip install \
+  --python /tmp/bo-forge-api-probe/bin/python \
+  --torch-backend cpu \
+  -c requirements/constraints-py312-linux-x86_64.txt \
+  "${wheel}[api]"
+/tmp/bo-forge-api-probe/bin/python -m pip check
+
 PYTHONPATH= /tmp/bo-forge-wheel-probe/bin/bo-forge --help
 PYTHONPATH= /tmp/bo-forge-wheel-probe/bin/bo-forge doctor
-PYTHONPATH= /tmp/bo-forge-wheel-probe/bin/bo-forge-app --help
-PYTHONPATH= /tmp/bo-forge-wheel-probe/bin/bo-forge-api --help
+PYTHONPATH= /tmp/bo-forge-app-probe/bin/bo-forge-app --help
+PYTHONPATH= /tmp/bo-forge-api-probe/bin/bo-forge-api --help
+(cd /tmp && PYTHONPATH= /tmp/bo-forge-api-probe/bin/python -c \
+  'from pathlib import Path; import bo_forge_api; from bo_forge_api.api import create_app; assert not hasattr(bo_forge_api, "create_app"); app = create_app(root=Path(".")); assert app.title')
 ```
 
 Inspect `bo_forge.__file__` and confirm it is under the probe environment, not
@@ -203,7 +248,7 @@ For a pushed `v*` tag or a manual run naming an existing tag, it:
 2. requires the tag to equal `v<pyproject version>`;
 3. runs required tests and Ruff;
 4. builds and verifies wheel/sdist in runner-temporary storage;
-5. smoke-installs the exact wheel;
+5. smoke-installs the exact wheel, source distribution, app extra, and API extra;
 6. retains verified files as private GitHub Actions artifacts for 14 days.
 
 It does not create a GitHub Release, publish to PyPI, use trusted publishing,
@@ -217,4 +262,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.0.1 does none of those actions.
+separate explicit authorization. Preparing v3.0.2 does none of those actions.

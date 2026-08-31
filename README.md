@@ -1,12 +1,12 @@
-# 🧪 BO Forge v3.0.1
+# 🧪 BO Forge v3.0.2
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.0.1 adds a CI-backed release foundation to the v3 architecture and
-scientific UX reset without changing BO capabilities or durable campaign
-files. Focused configuration, campaign, optimization, diagnostics,
-application, Streamlit, and optional API ownership remain behind compatibility
-facades.
+v3.0.2 stabilizes the CI and packaging foundation around the v3 architecture
+and scientific UX reset without changing BO capabilities or durable campaign
+files. Installed-artifact probes use the canonical optional API factory path,
+while focused configuration, campaign, optimization, diagnostics, application,
+Streamlit, and optional API ownership remain behind compatibility facades.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
 notebooks, service calls, API payloads, and launcher safeguards remain

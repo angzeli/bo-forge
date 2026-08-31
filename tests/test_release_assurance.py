@@ -1,4 +1,4 @@
-"""Release-assurance contracts introduced for the v3.0.1 preparation."""
+"""Release-neutral CI, packaging, and publication-assurance contracts."""
 
 from __future__ import annotations
 
@@ -6,7 +6,15 @@ import re
 import tomllib
 from pathlib import Path
 
+import yaml
+
+import bo_forge
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_METADATA = tomllib.loads(
+    (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+)["project"]
+PROJECT_VERSION = PROJECT_METADATA["version"]
 CONSTRAINT_FILES = (
     "constraints-py311-linux-x86_64.txt",
     "constraints-py312-linux-x86_64.txt",
@@ -19,15 +27,23 @@ def _read(relative_path: str) -> str:
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_release_identity_and_maturity_are_aligned() -> None:
-    pyproject = tomllib.loads(_read("pyproject.toml"))["project"]
+def _workflow(relative_path: str) -> dict[str, object]:
+    return yaml.load(_read(relative_path), Loader=yaml.BaseLoader)
 
-    assert pyproject["version"] == "3.0.1"
-    assert "Development Status :: 4 - Beta" in pyproject["classifiers"]
-    assert "Development Status :: 5 - Production/Stable" not in pyproject["classifiers"]
-    assert '__version__ = "3.0.1"' in _read("bo_forge/__init__.py")
-    assert "# 🧪 BO Forge v3.0.1" in _read("README.md")
-    assert "## v3.0.1 - CI-Backed Release Foundation" in _read("CHANGELOG.md")
+
+def test_release_identity_and_maturity_are_aligned() -> None:
+    assert re.fullmatch(r"\d+\.\d+\.\d+", PROJECT_VERSION)
+    assert bo_forge.__version__ == PROJECT_VERSION
+    assert "Development Status :: 4 - Beta" in PROJECT_METADATA["classifiers"]
+    assert "Development Status :: 5 - Production/Stable" not in PROJECT_METADATA[
+        "classifiers"
+    ]
+    assert f'__version__ = "{PROJECT_VERSION}"' in _read("bo_forge/__init__.py")
+    assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in _read("README.md")
+    current_changelog_heading = next(
+        line for line in _read("CHANGELOG.md").splitlines() if line.startswith("## v")
+    )
+    assert current_changelog_heading.startswith(f"## v{PROJECT_VERSION} - ")
 
 
 def test_generated_constraints_are_hashed_and_resolver_pinned() -> None:
@@ -52,6 +68,7 @@ def test_generated_constraints_are_hashed_and_resolver_pinned() -> None:
 
 def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
     workflow = _read(".github/workflows/ci.yml")
+    workflow_data = _workflow(".github/workflows/ci.yml")
 
     required_fragments = (
         "permissions:\n  contents: read",
@@ -71,18 +88,34 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
         "bo-forge-app",
         "bo-forge-api",
         "from bo_forge_api.api import create_app",
+        'assert not hasattr(bo_forge_api, "create_app")',
+        '"${wheel}[app]"',
+        '"${wheel}[api]"',
+        'assert importlib.util.find_spec("streamlit") is None',
+        'assert importlib.util.find_spec("fastapi") is None',
     )
     for fragment in required_fragments:
         assert fragment in workflow
 
     assert "pull_request_target" not in workflow
     assert "from bo_forge_api import create_app" not in workflow
+    assert '"${wheel}[app,api]"' not in workflow
     assert "0.0.0.0" not in workflow
-    assert workflow.count("timeout-minutes:") == 5
+    assert "-print -quit" not in workflow
+    jobs = workflow_data["jobs"]
+    assert set(jobs) == {
+        "static",
+        "core-tests",
+        "macos-filesystem",
+        "numerical",
+        "package",
+    }
+    assert all(int(job["timeout-minutes"]) > 0 for job in jobs.values())
 
 
 def test_future_tag_gate_validates_without_publishing() -> None:
     workflow = _read(".github/workflows/release-gate.yml")
+    workflow_data = _workflow(".github/workflows/release-gate.yml")
 
     for fragment in (
         "tags: [\"v*\"]",
@@ -92,6 +125,13 @@ def test_future_tag_gate_validates_without_publishing() -> None:
         "ruff check . --no-cache",
         "python -m build --outdir",
         "python -m twine check",
+        "from bo_forge_api.api import create_app",
+        'assert not hasattr(bo_forge_api, "create_app")',
+        '"${wheel}[app]"',
+        '"${wheel}[api]"',
+        '"$sdist"',
+        'assert importlib.util.find_spec("streamlit") is None',
+        'assert importlib.util.find_spec("fastapi") is None',
         "actions/upload-artifact@v4",
         "retention-days: 14",
     ):
@@ -107,6 +147,11 @@ def test_future_tag_gate_validates_without_publishing() -> None:
     )
     for fragment in forbidden:
         assert fragment not in workflow
+    assert "from bo_forge_api import create_app" not in workflow
+    assert '"${wheel}[app,api]"' not in workflow
+    assert "-print -quit" not in workflow
+    assert set(workflow_data["jobs"]) == {"validate-tag"}
+    assert int(workflow_data["jobs"]["validate-tag"]["timeout-minutes"]) > 0
 
 
 def test_release_facing_files_do_not_expose_author_home_paths() -> None:
@@ -155,6 +200,19 @@ def test_contribution_security_and_release_guidance_define_boundaries() -> None:
     assert "separate explicit authorization" in release
 
 
+def test_release_checklist_uses_isolated_optional_extra_probes() -> None:
+    release = _read("docs/RELEASE_CHECKLIST.md")
+
+    assert "/tmp/bo-forge-app-probe/bin/bo-forge-app --help" in release
+    assert "/tmp/bo-forge-api-probe/bin/bo-forge-api --help" in release
+    assert '"${wheel}[app]"' in release
+    assert '"${wheel}[api]"' in release
+    assert "from bo_forge_api.api import create_app" in release
+    assert 'assert not hasattr(bo_forge_api, "create_app")' in release
+    assert "/tmp/bo-forge-wheel-probe/bin/bo-forge-app" not in release
+    assert "/tmp/bo-forge-wheel-probe/bin/bo-forge-api" not in release
+
+
 def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     roadmap = _read("ROADMAP_V3_X.md")
 
@@ -162,7 +220,7 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
         assert f'{node}["' in roadmap
     for finding in ("REL-001", "REP-001", "REP-002", "DOC-001", "DOC-002", "DX-001"):
         assert finding in roadmap
-    assert "Current prepared baseline: `v3.0.1`" in roadmap
+    assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in roadmap
     assert "Status: prepared; publication requires separate authorization" in roadmap
-    assert "v3.0.2 - Conditional Post-Release Stabilization" in roadmap
+    assert f"### v{PROJECT_VERSION} - " in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap

@@ -10,6 +10,7 @@ import torch
 from fastapi.testclient import TestClient
 
 import bo_forge.suggestions as suggestions_module
+from bo_forge import __version__
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import SuggestionError
 from bo_forge.session import CampaignSession
@@ -79,7 +80,7 @@ def test_api_health(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["version"] == "3.0.1"
+    assert payload["version"] == __version__
     assert payload["experimental"] is True
     assert payload["staging"]["active_stages"] == 0
     assert payload["staging"]["stage_ttl_seconds"] == pytest.approx(1800)

@@ -497,13 +497,24 @@ if installed_site in sys.path:
 sys.path.insert(0, installed_site)
 import fastapi
 import uvicorn
+import bo_forge_api
 import bo_forge_api.api
 import bo_forge_app.api
+from bo_forge_api.api import create_app
 
 source_root = Path({source_root!r})
 api_path = Path(bo_forge_app.api.__file__).resolve()
 assert source_root not in api_path.parents, api_path
 assert source_root not in Path(bo_forge_api.api.__file__).resolve().parents
+assert not hasattr(bo_forge_api, "create_app")
+try:
+    exec("from bo_forge_api import create_app")
+except ImportError:
+    pass
+else:
+    raise AssertionError("bo_forge_api must not export create_app")
+app = create_app(root=Path("."))
+assert app.title
 assert fastapi.__version__
 assert uvicorn.__version__
 """

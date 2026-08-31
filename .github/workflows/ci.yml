@@ -213,8 +213,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wheel=$(find "$RUNNER_TEMP/dist" -name '*.whl' -print -quit)
-          sdist=$(find "$RUNNER_TEMP/dist" -name '*.tar.gz' -print -quit)
+          wheels=("$RUNNER_TEMP/dist"/*.whl)
+          sdists=("$RUNNER_TEMP/dist"/*.tar.gz)
+          [[ ${#wheels[@]} -eq 1 && -f ${wheels[0]} ]] || { echo "Expected exactly one wheel" >&2; exit 1; }
+          [[ ${#sdists[@]} -eq 1 && -f ${sdists[0]} ]] || { echo "Expected exactly one sdist" >&2; exit 1; }
+          wheel=${wheels[0]}
+          sdist=${sdists[0]}
           for kind in wheel sdist; do
             artifact=$wheel
             if [[ "$kind" == sdist ]]; then artifact=$sdist; fi
@@ -228,25 +232,47 @@ jobs:
               SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" -c \
               'import os; from pathlib import Path; import bo_forge; module = Path(bo_forge.__file__).resolve(); source = Path(os.environ["SOURCE_ROOT"]).resolve(); assert source not in module.parents, module; print(bo_forge.__version__)')
           done
-      - name: Packaged entry-point smokes
+      - name: Packaged core and optional entry-point smokes
         shell: bash
         run: |
           set -euo pipefail
-          wheel=$(find "$RUNNER_TEMP/dist" -name '*.whl' -print -quit)
-          python -m venv "$RUNNER_TEMP/interfaces"
-          uv pip install --python "$RUNNER_TEMP/interfaces/bin/python" \
+          wheels=("$RUNNER_TEMP/dist"/*.whl)
+          [[ ${#wheels[@]} -eq 1 && -f ${wheels[0]} ]] || { echo "Expected exactly one wheel" >&2; exit 1; }
+          wheel=${wheels[0]}
+          "$RUNNER_TEMP/wheel/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("streamlit") is None; assert importlib.util.find_spec("fastapi") is None'
+          (cd "$RUNNER_TEMP/wheel-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/wheel/bin/bo-forge" --version)
+          (cd "$RUNNER_TEMP/wheel-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/wheel/bin/bo-forge" --help)
+          (cd "$RUNNER_TEMP/wheel-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/wheel/bin/bo-forge" doctor)
+          (cd "$RUNNER_TEMP/wheel-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/wheel/bin/bo-forge" validate \
+              --config "$GITHUB_WORKSPACE/configs/01_simple_2d_maximise_logei.yaml" \
+              --log "$GITHUB_WORKSPACE/examples/01_simple_2d_maximise_logei_campaign_log.csv")
+
+          python -m venv "$RUNNER_TEMP/app-interface"
+          uv pip install --python "$RUNNER_TEMP/app-interface/bin/python" \
             --torch-backend cpu \
-            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[app,api]"
-          "$RUNNER_TEMP/interfaces/bin/python" -m pip check
-          mkdir -p "$RUNNER_TEMP/interface-probe"
-          cd "$RUNNER_TEMP/interface-probe"
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" --version
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" --help
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" doctor
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge" validate \
-            --config "$GITHUB_WORKSPACE/configs/01_simple_2d_maximise_logei.yaml" \
-            --log "$GITHUB_WORKSPACE/examples/01_simple_2d_maximise_logei_campaign_log.csv"
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-app" --help
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/bo-forge-api" --help
-          PYTHONPATH= "$RUNNER_TEMP/interfaces/bin/python" -c \
-            'from pathlib import Path; from bo_forge_api.api import create_app; app = create_app(root=Path(".")); assert app.title'
+            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[app]"
+          "$RUNNER_TEMP/app-interface/bin/python" -m pip check
+          "$RUNNER_TEMP/app-interface/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("streamlit") is not None; assert importlib.util.find_spec("fastapi") is None'
+          mkdir -p "$RUNNER_TEMP/app-interface-probe"
+          (cd "$RUNNER_TEMP/app-interface-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/app-interface/bin/bo-forge-app" --help)
+
+          python -m venv "$RUNNER_TEMP/api-interface"
+          uv pip install --python "$RUNNER_TEMP/api-interface/bin/python" \
+            --torch-backend cpu \
+            -c requirements/constraints-py312-linux-x86_64.txt "${wheel}[api]"
+          "$RUNNER_TEMP/api-interface/bin/python" -m pip check
+          "$RUNNER_TEMP/api-interface/bin/python" -c \
+            'import importlib.util; assert importlib.util.find_spec("fastapi") is not None; assert importlib.util.find_spec("streamlit") is None'
+          mkdir -p "$RUNNER_TEMP/api-interface-probe"
+          (cd "$RUNNER_TEMP/api-interface-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/api-interface/bin/bo-forge-api" --help)
+          (cd "$RUNNER_TEMP/api-interface-probe" && PYTHONPATH= \
+            "$RUNNER_TEMP/api-interface/bin/python" -c \
+              'from pathlib import Path; import bo_forge_api; from bo_forge_api.api import create_app; assert not hasattr(bo_forge_api, "create_app"); app = create_app(root=Path(".")); assert app.title')
