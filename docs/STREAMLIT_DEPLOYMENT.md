@@ -1,6 +1,6 @@
 # Streamlit Deployment And Safety Guide
 
-BO Forge v3.0.2 documents local and trusted-network use of the existing
+BO Forge v3.1.0 documents local and trusted-network use of the existing
 Streamlit workbench. This guide covers deployment choices only. The launcher requires
 explicit acknowledgement for non-loopback launcher binds, but does not change
 BO behavior, YAML/CSV semantics, authentication, storage, or app workflow logic.

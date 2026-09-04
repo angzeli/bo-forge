@@ -43,13 +43,26 @@ This is equivalent to running `bo-forge next-action ...` in a terminal, but it a
 
 ## 🔁 Basic Workflow
 
-Create an empty canonical campaign log from a config:
+Create an empty canonical campaign log and provenance manifest from a config:
 
 ```bash
 bo-forge init-log \
   --config configs/01_simple_2d_maximise_logei.yaml \
   --log examples/my_new_campaign_log.csv
 ```
+
+The manifest is written beside the log as `<log>.manifest.json`. Existing
+campaigns without a manifest remain legacy-compatible and are not adopted
+automatically. Keep a managed CSV and sidecar together. Inspect either state with:
+
+```bash
+bo-forge provenance --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/my_new_campaign_log.csv
+```
+
+The command exits nonzero when the log is missing or a managed campaign reports
+`mismatch` or `pending_recovery`; it remains a read-only diagnostic and does not repair
+files.
 
 Validate a campaign log:
 
@@ -459,7 +472,7 @@ bo-forge plot \
 | `bo-forge --version` | Print the installed BO Forge version. |
 | `bo-forge doctor` | Check the active BO Forge environment and key imports. |
 | `python -m bo_forge --version` | Run the same CLI through a specific Python interpreter. |
-| `bo-forge init-log --config PATH --log PATH` | Create an empty canonical campaign CSV log. |
+| `bo-forge init-log --config PATH --log PATH` | Create an empty canonical campaign CSV log and versioned provenance manifest. |
 | `bo-forge validate --config PATH --log PATH` | Validate a YAML config and CSV campaign log. |
 | `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
 | `bo-forge status --config PATH --log PATH` | Print exactly one campaign status line. |
@@ -476,6 +489,7 @@ bo-forge plot \
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
+| `bo-forge provenance --config PATH --log PATH` | Print managed/legacy provenance status, identities, hashes, environment count, event count, and pending-transaction state. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
@@ -498,7 +512,7 @@ Most commands are read-only.
 
 The commands that can change files are:
 
-- `bo-forge init-log`: creates a new empty campaign log and refuses to overwrite existing files.
+- `bo-forge init-log`: creates a new empty campaign log and provenance manifest and refuses to overwrite either file.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
 - `bo-forge review`: updates `review_status` and `review_note` for one suggested row.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.
@@ -518,6 +532,10 @@ canonical-log lock used by sessions, Streamlit, and the API on one machine.
 Each CLI mutation loads a current fingerprint before writing. A conflicting or
 busy log fails clearly without overwriting newer rows; multi-host shared-file
 coordination remains unsupported.
+
+For provenance-managed campaigns, successful append, review, and observation
+mutations also update the sidecar ledger under the same lock. Read-only commands
+do not add events. See [PROVENANCE.md](PROVENANCE.md).
 
 Conflict errors tell the user to reload and inspect the latest campaign before
 retrying. Busy errors tell the user to wait briefly for the active local writer.

@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.0.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.1.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local
 paths, then calls `bo_forge.application`, an internal non-HTTP service layer
@@ -278,7 +278,7 @@ Then use the compact campaign source bar to enter:
 
 Use a working log rather than editing seed example logs directly.
 
-You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write both the config and an empty canonical CSV log. Choose `Campaign kind` for single-objective, multi-objective, multi-fidelity qMFKG, or Contextual LogEI creation. Multi-objective creation supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. Multi-fidelity creation is single-objective qMFKG with continuous or ordered numeric fidelity and batch sizes up to four. Contextual creation is single-objective LogEI only. The app validates the YAML before writing files and refuses to overwrite existing config or log paths.
+You can also use `Create Campaign` from the same source bar to build a config from structured fields, inspect or edit the generated YAML, and write the config, an empty canonical CSV log, and its provenance manifest. Choose `Campaign kind` for single-objective, multi-objective, multi-fidelity qMFKG, or Contextual LogEI creation. Multi-objective creation supports 2-4 coupled objectives plus optional review, replicates, and deterministic cost sections. Multi-fidelity creation is single-objective qMFKG with continuous or ordered numeric fidelity and batch sizes up to four. Contextual creation is single-objective LogEI only. The app validates the YAML before writing files and refuses to overwrite existing config, log, or manifest paths.
 
 For a full walkthrough, see [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md).
 
@@ -316,6 +316,13 @@ collects and renders its data on each Streamlit rerun:
 
 Stored v2 panel state maps automatically: `Overview` and `Data` become
 `Campaign`; `Suggest` and `Resolve` become `Run`; `Reports` becomes `Analyze`.
+
+Provenance-managed campaigns show a compact provenance table in `Campaign`,
+including campaign identity, schema, config/log hashes, environment/event
+counts, last mutation, and pending-transaction state. The app reads this data
+through `CampaignAppService`; it does not implement manifest filesystem logic.
+Legacy campaigns show no fabricated provenance block. See
+[PROVENANCE.md](PROVENANCE.md).
 
 ## ⚠️ Write Actions
 

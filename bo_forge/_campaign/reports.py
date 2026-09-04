@@ -209,6 +209,11 @@ def _format_multi_objective_report(tables: dict[str, pd.DataFrame]) -> str:
                 "No suggestions awaiting review.",
             )
         )
+    if "provenance" in tables:
+        sections.append(
+            "Provenance\n----------\n\n"
+            + _format_report_table(tables["provenance"], "No provenance metadata.")
+        )
     return "\n\n".join(sections)
 
 
@@ -288,6 +293,17 @@ def _format_single_objective_report(tables: dict[str, pd.DataFrame]) -> str:
                     )
                 ]
                 if "qlog_nei_summary" in tables
+                else []
+            ),
+            *(
+                [
+                    "Provenance\n----------\n\n"
+                    + _format_report_table(
+                        tables["provenance"],
+                        "No provenance metadata.",
+                    )
+                ]
+                if "provenance" in tables
                 else []
             ),
         ]

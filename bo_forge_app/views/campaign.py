@@ -94,6 +94,15 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
         )
 
     summary = _view_data_value(view_data, "summary", campaign.summary)
+    provenance = view_data.get("provenance")
+    if provenance is not None:
+        _render_table_section(
+            st,
+            "Provenance",
+            provenance,
+            empty_kind="report_preview",
+            expanded_raw=False,
+        )
     _render_campaign_state_blocks(st, campaign, view_data)
     _render_metric_grid(
         st,

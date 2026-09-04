@@ -272,6 +272,7 @@ _SESSION_READ_HELPERS = {
     "qlog_nei_summary",
     "model_summary",
     "model_profile_comparison",
+    "provenance_summary",
 }
 
 _PANEL_BASE_READERS = {
@@ -411,6 +412,7 @@ class CampaignViewData:
     qlog_nei_summary: pd.DataFrame | None = None
     model_summary: pd.DataFrame | None = None
     model_profile_comparison: pd.DataFrame | None = None
+    provenance: pd.DataFrame | None = None
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like compatibility for existing app render helpers."""
@@ -521,7 +523,18 @@ class CampaignAppService:
                 else getattr(self.session, reader)()
             )
             setattr(data, field, value)
+        if panel in {"Campaign", "Overview", "Data"} and self.session.is_provenance_managed:
+            data.provenance = self.session.provenance_summary()
         return data
+
+    @property
+    def is_provenance_managed(self) -> bool:
+        """Return whether the active campaign has a provenance manifest."""
+        return self.session.is_provenance_managed
+
+    def provenance_summary(self) -> pd.DataFrame:
+        """Return campaign provenance fields without performing filesystem repair."""
+        return self.session.provenance_summary()
 
     def suggest_dry_run(
         self,

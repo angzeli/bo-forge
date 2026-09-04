@@ -134,6 +134,16 @@ assert code == 0
     assert result["blocked"] == []
 
 
+def test_provenance_summary_export_avoids_heavy_and_optional_dependencies() -> None:
+    result = _blocked_probe(
+        """
+from bo_forge import provenance_summary
+assert callable(provenance_summary)
+"""
+    )
+    assert result["blocked"] == []
+
+
 def test_lazy_public_exports_preserve_star_import_and_dir() -> None:
     result = _probe(
         """

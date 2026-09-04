@@ -8,12 +8,10 @@ import importlib
 import importlib.util
 import io
 import math
-import os
 import platform
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -27,10 +25,9 @@ from bo_forge.errors import (
     LogConflictError,
     LogValidationError,
     LogWriteError,
+    ProvenanceError,
     SuggestionError,
 )
-from bo_forge.io import empty_campaign_log
-from bo_forge.logs import load_campaign_log
 from bo_forge.plot_registry import _PLOT_ROUTES, _canonical_plot_kind
 
 if TYPE_CHECKING:
@@ -69,7 +66,7 @@ def _register_environment_commands(subparsers: argparse._SubParsersAction) -> No
 
     init_log_parser = subparsers.add_parser(
         "init-log",
-        help="Create an empty canonical campaign CSV log from a config.",
+        help="Create an empty canonical campaign CSV log and provenance manifest.",
     )
     _add_config_log_arguments(init_log_parser)
     init_log_parser.set_defaults(handler=_cmd_init_log)
@@ -183,6 +180,13 @@ def _register_read_commands(subparsers: argparse._SubParsersAction) -> None:
     _add_config_log_arguments(report_parser)
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
     report_parser.set_defaults(handler=_cmd_report)
+
+    provenance_parser = subparsers.add_parser(
+        "provenance",
+        help="Print campaign provenance and integrity fields.",
+    )
+    _add_config_log_arguments(provenance_parser)
+    provenance_parser.set_defaults(handler=_cmd_provenance)
 
 
 def _register_mutation_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -343,11 +347,12 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_init_log(args: argparse.Namespace) -> int:
-    config = CampaignConfig.from_yaml(args.config)
-    log = empty_campaign_log(config)
-    log_path = _write_empty_log(log, args.log)
-    load_campaign_log(log_path, config)
-    print(f"Created empty campaign log: {log_path}")
+    from bo_forge._campaign.provenance import manifest_path_for_log
+    from bo_forge.session import CampaignSession
+
+    campaign = CampaignSession.initialize(args.config, args.log)
+    print(f"Created empty campaign log: {campaign.log_path}")
+    print(f"Created provenance manifest: {manifest_path_for_log(campaign.log_path)}")
     return 0
 
 
@@ -471,6 +476,23 @@ def _cmd_report(args: argparse.Namespace) -> int:
                 f"Could not write campaign report '{args.output}': {exc}"
             ) from exc
         print(f"Wrote campaign report: {report_path}")
+    return 0
+
+
+def _cmd_provenance(args: argparse.Namespace) -> int:
+    from bo_forge.provenance import provenance_summary
+
+    summary = provenance_summary(args.config, args.log)
+    _print_table(summary)
+    values = dict(summary.itertuples(index=False, name=None))
+    if values.get("provenance_status") == "managed" and values.get(
+        "integrity_status"
+    ) != "valid":
+        print(
+            "Error: Managed campaign provenance is not in a finalized valid state.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
@@ -651,34 +673,6 @@ def _write_csv(df: pd.DataFrame, path: Path) -> Path:
     return path
 
 
-def _write_empty_log(df: pd.DataFrame, path: Path) -> Path:
-    temp_path: Path | None = None
-    try:
-        if path.exists():
-            raise _CLIOutputError(
-                f"Cannot create empty campaign log '{path}' because file already exists."
-            )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="",
-            dir=path.parent,
-            delete=False,
-        ) as temp_file:
-            temp_path = Path(temp_file.name)
-            df.to_csv(temp_file, index=False)
-        os.link(temp_path, path)
-    except _CLIOutputError:
-        raise
-    except OSError as exc:
-        raise _CLIOutputError(f"Could not write empty campaign log '{path}': {exc}") from exc
-    finally:
-        if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
-    return path
-
-
 def _parse_cli_objective_values(values: list[str]) -> dict[str, float]:
     parsed: dict[str, float] = {}
     for item in values:
@@ -733,6 +727,11 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
         return _suggestion_error_hint(str(exc))
     if isinstance(exc, LogWriteError):
         return "Hint: Check the row_id, pending status, campaign log path, and file permissions."
+    if isinstance(exc, ProvenanceError):
+        return (
+            "Hint: Check that the CSV and its .manifest.json sidecar exist together, "
+            "then inspect their paths and JSON content."
+        )
     return None
 
 

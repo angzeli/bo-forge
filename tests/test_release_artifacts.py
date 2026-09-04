@@ -239,9 +239,10 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/API_PROBE.md" in readme
     assert "docs/API_SECURITY.md" in readme
     assert "docs/CAPABILITY_MATRIX.md" in readme
+    assert "docs/PROVENANCE.md" in readme
     assert "docs/INSTALLATION.md" in readme
 
-def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
+def test_v3_docs_describe_current_provenance_foundation() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
@@ -249,8 +250,8 @@ def test_v3_docs_describe_architecture_and_scientific_ux_reset() -> None:
     )
 
     assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
-    assert f"v{PROJECT_VERSION} stabilizes the CI and packaging foundation" in readme
-    assert f"## v{PROJECT_VERSION} - CI And Packaging Stabilization" in changelog
+    assert "durable provenance foundation" in readme
+    assert f"## v{PROJECT_VERSION} - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
     assert "## v2.5.3 - App And API Operational Closeout" in changelog
@@ -611,6 +612,7 @@ def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> Non
 def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
     v3_roadmap = (PROJECT_ROOT / "ROADMAP_V3_X.md").read_text(encoding="utf-8")
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert "Final v2 baseline: `v2.5.3`" in roadmap
@@ -699,8 +701,10 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in v3_roadmap
     assert 'v301["v3.0.1<br/>CI-backed release foundation"]' in v3_roadmap
     assert 'v302["v3.0.2<br/>CI + packaging stabilization"]' in v3_roadmap
+    assert 'v310["v3.1.0<br/>Provenance schema + identity"]' in v3_roadmap
     assert "### v3.0.2 - CI And Packaging Stabilization" in v3_roadmap
     assert "docs/MIGRATION_V3.md" in v3_roadmap
+    assert "docs/PROVENANCE.md" in readme
 
 def test_streamlit_service_layer_is_documented_as_internal_non_http() -> None:
     repository_structure = (PROJECT_ROOT / "docs" / "REPOSITORY_STRUCTURE.md").read_text(

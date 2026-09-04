@@ -16,7 +16,7 @@ from bo_forge.application import (
     ValidationResult,
     file_fingerprint,
 )
-from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError
+from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError, ProvenanceError
 from bo_forge_api.contracts import (
     ApiError,
     AppendRequest,
@@ -153,6 +153,13 @@ def _register_health_and_read_routes(
             "log_fingerprint": file_fingerprint(service.log_path),
         }
 
+    @app.post("/campaign/provenance")
+    def provenance(request: CampaignRef) -> dict[str, object]:
+        from bo_forge.provenance import provenance_summary
+
+        config_path, log_path = _resolve_campaign_paths(resolved_root, request)
+        return {"provenance": _table_payload(provenance_summary(config_path, log_path))}
+
 
 def _register_mutation_routes(
     app: FastAPI,
@@ -288,6 +295,13 @@ def _register_error_handlers(app: FastAPI) -> None:
         exc: LogConflictError,
     ) -> JSONResponse:
         return _error_response("stale_log", str(exc), 400)
+
+    @app.exception_handler(ProvenanceError)
+    async def _provenance_error_handler(
+        _request: Request,
+        exc: ProvenanceError,
+    ) -> JSONResponse:
+        return _error_response("provenance_error", str(exc), 400)
 
     @app.exception_handler(BOForgeError)
     async def _bo_forge_error_handler(_request: Request, exc: BOForgeError) -> JSONResponse:
@@ -456,30 +470,6 @@ def _register_stage_mutation_routes(
 def _load_service(root: Path, request: CampaignRef) -> CampaignAppService:
     config_path, log_path = _resolve_campaign_paths(root, request)
     return CampaignAppService.load(config_path, log_path)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _server_stage_file_invalidation_reason(
     staged: StageValidationSnapshot | StageSnapshot,
     *,

@@ -101,14 +101,20 @@ backend-owned through `CampaignSession`. Staged suggestions are blocked from
 append if the selected stage, context, config, log, or payload changes after
 staging.
 
-Environment checks remain CLI workflows. Empty-log creation is also available through the CLI when you already have a config:
+Environment checks remain CLI workflows. Managed campaign initialization is also
+available through the CLI when you already have a config; it creates the empty
+canonical CSV and its provenance manifest together:
 
 ```bash
 ./.venv/bin/python -m bo_forge doctor
 ./.venv/bin/python -m bo_forge init-log --config configs/01_simple_2d_maximise_logei.yaml --log examples/new_campaign_log.csv
 ```
 
-See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and write-action warnings. See [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md) for a step-by-step app-created campaign tutorial.
+See [PROVENANCE.md](PROVENANCE.md) for managed-versus-legacy behavior and
+recovery details. See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and
+write-action warnings. See
+[09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md) for a
+step-by-step app-created campaign tutorial.
 
 ## 🧪 Experimental API Probe
 

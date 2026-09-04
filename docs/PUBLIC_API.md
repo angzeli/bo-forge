@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.0.2.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.0.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -39,6 +39,7 @@ These names are supported imports from `bo_forge`:
 - `LogWriteError`
 - `ModelConfig`
 - `ObjectiveConfig`
+- `ProvenanceError`
 - `ReplicateConfig`
 - `ReviewConfig`
 - `StageConfig`
@@ -64,6 +65,7 @@ These names are supported imports from `bo_forge`:
 - `model_profile_comparison`
 - `pareto_front`
 - `pareto_summary`
+- `provenance_summary`
 - `qlog_nei_summary`
 - `review_suggestion`
 - `replicate_summary`
@@ -159,6 +161,19 @@ CSV log. Comparison rows include `fit_status` and `fit_message` so failed or
 insufficient profile fits stay visible in tables and plots.
 `last_fit_*` fields are process-local and report `not_recorded` unless a model
 fit has happened in the same Python process for matching current fitting inputs.
+
+New campaigns initialized with `CampaignSession.initialize(config_path, log_path)`
+receive a versioned provenance manifest beside the CSV log. Use
+`provenance_summary(config_path, log_path)` or
+`CampaignSession.provenance_summary()` for ordered, read-only identity and
+integrity fields. Existing `CampaignSession.from_files()` calls remain valid;
+campaigns without a manifest are reported as `legacy` and are not adopted
+automatically. When a manifest is present, `from_files()` and `reload()` verify the
+current config and log against it and fail closed on mismatch. Because schema v1 has no
+marker inside legacy CSVs, callers must move and back up a managed CSV with its sidecar.
+`ProvenanceError` identifies missing diagnostic inputs or malformed, unreadable, or
+unsupported manifests. Managed load and mutation state conflicts use
+`LogConflictError`. See [PROVENANCE.md](PROVENANCE.md) for the schema and trust boundary.
 
 qLogNEI pending-state diagnostics expose `qlog_nei_summary` through the
 top-level package for read-only inspection. Use `qlog_nei_summary(config, df)`

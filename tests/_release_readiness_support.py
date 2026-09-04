@@ -177,6 +177,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "ROADMAP_V2_X.md",
         "ROADMAP_V3_X.md",
         "docs/PUBLIC_API.md",
+        "docs/PROVENANCE.md",
         "docs/MIGRATION_V3.md",
         "docs/STREAMLIT_DEPLOYMENT.md",
         "docs/API_PROBE.md",

@@ -4,9 +4,9 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.0.2`. It stabilizes installed-artifact and tag
-gate probes around the existing optional API package contract without changing
-BO behavior or publishing a tag, GitHub Release, or package artifact.
+Current prepared baseline: `v3.1.0`. It adds opt-in durable campaign provenance
+across Python, CLI, Streamlit, reports, and the experimental API while keeping
+legacy YAML/CSV campaigns compatible and manifest-free.
 
 ## Roadmap So Far
 
@@ -58,11 +58,12 @@ flowchart LR
     v34 -.-> v343
     v34 -.-> v344
 
-    class v30 majorActive
-    class v31,v32,v33,v34 majorFuture
-    class v300,v301 patchDone
-    class v302 patchActive
-    class v310,v311,v312,v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v30 majorDone
+    class v31 majorActive
+    class v32,v33,v34 majorFuture
+    class v300,v301,v302 patchDone
+    class v310 patchActive
+    class v311,v312,v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -79,14 +80,15 @@ flowchart LR
 | `v3.0.0` | implemented | Architecture and scientific-UX reset with compatibility facades |
 | `v3.0.1` | prepared | Reproducible environments, required CI, tag gate, and release-process hardening |
 | `v3.0.2` | prepared | Canonical API factory probes and independent package-extra validation |
-| `v3.1.x` | planned | Durable campaign provenance and lineage |
+| `v3.1.0` | prepared | Versioned campaign manifests, mutation ledger, and managed transaction recovery |
+| `v3.1.x` | active | Durable campaign provenance and lineage |
 | `v3.2.x` | planned | Predictive diagnostics correctness and explicit fit metadata |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
 
-Status: active
+Status: completed
 
 ### v3.0.0 - Architecture And Scientific UX Reset
 
@@ -175,24 +177,37 @@ Status: prepared; publication requires separate authorization and exact-commit C
 
 ## v3.1.x - Durable Campaign Provenance
 
-Status: planned
+Status: active
 
 Audit mapping: `REP-001`.
 
 ### v3.1.0 - Provenance Schema And Campaign Identity
 
-- Add a versioned sidecar manifest without replacing YAML/CSV source data.
-- Record exact config bytes/hash and normalized semantic config identity.
-- Record BO Forge version and commit when available, Python/platform/dependency
-  identity, seeds, optimization settings, and creation/mutation timestamps.
-- Define ownership and atomic-write behavior before enabling mutation.
+Status: prepared; publication requires separate authorization and exact-commit CI
+
+- Adds a versioned sidecar manifest without replacing YAML/CSV source data.
+- Records exact config bytes/hash, normalized semantic config identity, current
+  log hash/row count, optimization identity, and bounded environment snapshots.
+- Records append-only initialization and mutation events with ordered row IDs,
+  environment identity, and previous/resulting log hashes.
+- Coordinates managed CSV/manifest writes under the existing canonical log
+  lock with rollback and deterministic pending-transaction recovery.
+- Verifies present manifests against current config and log identity during load and
+  resume, with read-only mismatch diagnostics and fail-closed managed sessions.
+- Exposes opt-in initialization and read-only provenance through Python, CLI,
+  reports, Streamlit, the application service, and the experimental API.
+- Leaves existing campaigns manifest-free and behavior-compatible; explicit
+  adoption remains reserved for v3.1.2.
+- Adds no BO algorithm, YAML key, CSV column, campaign combination, notebook,
+  authentication mechanism, or tamper-proof audit claim.
 
 ### v3.1.1 - Fail-Closed Resume Semantics
 
-- Verify manifests on campaign load and resume.
-- Classify byte, semantic, environment, and lineage mismatches clearly.
-- Reject unexplained semantic mismatch by default while preserving established
-  exception and mutation contracts.
+- Refine mismatch classification and recovery guidance beyond the v3.1.0 byte,
+  semantic, log, and pending-transaction checks.
+- Define an explicit resume policy for missing sidecars without changing legacy CSV
+  compatibility implicitly.
+- Preserve established exception and mutation contracts.
 
 ### v3.1.2 - Explicit Migration And Lineage
 

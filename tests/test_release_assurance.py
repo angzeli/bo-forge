@@ -223,4 +223,9 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in roadmap
     assert "Status: prepared; publication requires separate authorization" in roadmap
     assert f"### v{PROJECT_VERSION} - " in roadmap
+    assert "class v30 majorDone" in roadmap
+    assert "class v31 majorActive" in roadmap
+    assert "class v310 patchActive" in roadmap
+    assert "## v3.0.x - Architecture And Release Assurance\n\nStatus: completed" in roadmap
+    assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: active" in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap

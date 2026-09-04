@@ -1,9 +1,15 @@
 # Experimental API Security And Trust Boundaries
 
-BO Forge v3.0.2 includes deployment safeguards for deliberate local and
+BO Forge v3.1.0 includes deployment safeguards for deliberate local and
 trusted-network use of the experimental FastAPI probe. These safeguards do not
 make the probe a production service. The API has no built-in authentication,
-authorization, user identity, TLS termination, or persistent audit log.
+authorization, user identity, TLS termination, or persistent security audit
+log. Provenance-managed campaigns may have a local lineage ledger, but it is not
+a security audit system.
+
+Provenance manifests add campaign integrity and lineage metadata, but they are
+not signed, tamper-proof, or an authorization boundary. See
+[PROVENANCE.md](PROVENANCE.md).
 
 ## Assets And Trust Boundary
 

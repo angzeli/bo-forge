@@ -2,6 +2,9 @@
 
 BO Forge campaign logs are plain CSV files. The schema is deliberately strict so a campaign can be resumed safely after manual edits.
 
+Provenance-managed campaigns add a JSON sidecar beside the log; they do not add
+or change any CSV columns. See [PROVENANCE.md](PROVENANCE.md).
+
 ## 📐 Canonical Column Order
 
 ```text

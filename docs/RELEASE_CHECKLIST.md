@@ -45,6 +45,22 @@ These checks cover version consistency, constraints/workflow contracts,
 release-facing path hygiene, package metadata, docs assets, and release
 boundaries.
 
+For v3.1.x provenance releases, also run the managed-transaction and adapter
+coverage directly:
+
+```bash
+/tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider \
+  tests/test_provenance.py \
+  tests/test_cli_core_and_analysis.py \
+  tests/test_app_service.py \
+  tests/test_api.py
+```
+
+Verify that managed campaign fixtures keep each CSV with its manifest, cross-directory
+initialization uses `~/...` rather than serializing author-home components, mismatched
+managed files fail closed on load, and rollback-failure tests retain a recoverable CSV
+backup.
+
 ## 3. Full Local Preflight
 
 ```bash
@@ -165,6 +181,8 @@ and tests required by the release contract.
 Specifically, verify that the wheel contains the `bo_forge`, `bo_forge_app`,
 and `bo_forge_api` packages, while release documentation, examples, notebooks,
 tests, and generated constraints remain outside the wheel and inside the sdist.
+The source distribution must include `docs/PROVENANCE.md`; the wheel must
+include the provenance facade and internal campaign transaction modules.
 
 ## 7. External Installation Probes
 
@@ -262,4 +280,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.0.2 does none of those actions.
+separate explicit authorization. Preparing v3.1.0 does none of those actions.

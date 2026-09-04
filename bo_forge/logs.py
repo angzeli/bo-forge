@@ -45,6 +45,7 @@ _SYSTEM_TEMP_DIRECTORY = Path(tempfile.gettempdir()) if os.name == "nt" else Pat
 _LOCK_OWNER = str(os.getuid()) if hasattr(os, "getuid") else "default"
 _LOG_LOCK_DIRECTORY = _SYSTEM_TEMP_DIRECTORY / f"bo-forge-{_LOCK_OWNER}-log-locks"
 _MISSING_LOG_FINGERPRINT = "<missing-log>"
+_SESSION_FINGERPRINT_PREFIX = "bo-forge-session-v1"
 
 
 def load_campaign_log(path: str | Path, config: CampaignConfig) -> pd.DataFrame:
@@ -126,7 +127,14 @@ def append_suggestions(
                 "qLogNEHVI append requires config-aware validation; use "
                 "append_suggestions(..., config=config) or CampaignSession.append_suggestions()."
             )
-        _atomic_write_and_validate(path, combined, config=config)
+        _write_campaign_log(
+            path,
+            combined,
+            config=config,
+            operation="append_suggestions",
+            affected_row_ids=suggestions["row_id"].astype(str).tolist(),
+            metadata={"appended_row_count": len(suggestions)},
+        )
 
 
 def mark_observed(
@@ -177,7 +185,17 @@ def mark_observed(
         _validate_structural_log(df)
         if config is not None:
             validate_campaign_data(config, df)
-        _atomic_write_and_validate(path, df, config=config)
+        _write_campaign_log(
+            path,
+            df,
+            config=config,
+            operation="mark_observed",
+            affected_row_ids=[row_id],
+            metadata={
+                "objective_count": len(parsed_objective_values),
+                "actual_cost_recorded": actual_cost_text is not None,
+            },
+        )
 
 
 def _parse_actual_cost(row_id: str, actual_cost: float | None) -> str | None:
@@ -416,7 +434,37 @@ def review_suggestion(
         _validate_structural_log(df)
         if config is not None:
             validate_campaign_data(config, df)
-        _atomic_write_and_validate(path, df, config=config)
+        _write_campaign_log(
+            path,
+            df,
+            config=config,
+            operation="review_suggestion",
+            affected_row_ids=[row_id],
+            metadata={"decision": decision_map[decision]},
+        )
+
+
+def _write_campaign_log(
+    path: Path,
+    df: pd.DataFrame,
+    *,
+    config: CampaignConfig | None,
+    operation: str,
+    affected_row_ids: list[str],
+    metadata: dict[str, object],
+) -> None:
+    from bo_forge._campaign.provenance import write_managed_campaign_log
+
+    if write_managed_campaign_log(
+        path,
+        df,
+        config=config,
+        operation=operation,
+        affected_row_ids=affected_row_ids,
+        metadata=metadata,
+    ):
+        return
+    _atomic_write_and_validate(path, df, config=config)
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
@@ -568,9 +616,23 @@ def _log_file_fingerprint(path: str | Path) -> str | None:
 def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> None:
     if expected is None:
         return
+    if expected.startswith(f"{_SESSION_FINGERPRINT_PREFIX}:"):
+        _, expected_mode, expected = expected.split(":", maxsplit=2)
+        manifest_exists = path.with_name(f"{path.name}.manifest.json").exists()
+        if manifest_exists != (expected_mode == "managed"):
+            raise LogConflictError(
+                "Campaign provenance state changed after it was loaded. Reload the "
+                f"campaign before retrying the mutation: log='{path}'."
+            )
     current = _log_file_fingerprint(path) or _MISSING_LOG_FINGERPRINT
     if current != expected:
         raise LogConflictError(
             "Campaign log changed after it was loaded. Reload the campaign before retrying "
             f"the mutation: log='{path}'."
         )
+
+
+def _session_log_fingerprint(fingerprint: str | None, *, managed: bool) -> str:
+    value = fingerprint or _MISSING_LOG_FINGERPRINT
+    mode = "managed" if managed else "legacy"
+    return f"{_SESSION_FINGERPRINT_PREFIX}:{mode}:{value}"

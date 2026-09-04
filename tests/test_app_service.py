@@ -57,6 +57,21 @@ print("ok")
     assert completed.stdout == "ok\n"
 
 
+def test_app_service_exposes_managed_provenance_lazily(tmp_path: Path) -> None:
+    config_path = copy_example_config(tmp_path, "01_simple_2d_maximise_logei.yaml")
+    session = CampaignSession.initialize(config_path, tmp_path / "campaign.csv")
+    service = CampaignAppService.from_session(session)
+
+    run_data = service.collect_view_data("Run")
+    campaign_data = service.collect_view_data("Campaign")
+
+    assert run_data.provenance is None
+    assert campaign_data.provenance is not None
+    values = service.provenance_summary().set_index("field")["value"]
+    assert values["provenance_status"] == "managed"
+    assert values["event_count"] == 1
+
+
 @pytest.mark.parametrize("changed_source", ["config", "log"])
 def test_suggest_dry_run_rejects_source_change_during_generation(
     tmp_path: Path,

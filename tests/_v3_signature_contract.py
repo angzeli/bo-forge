@@ -7,6 +7,7 @@ PUBLIC_EXCEPTION_EXPORTS = {
     "LogConflictError",
     "LogValidationError",
     "LogWriteError",
+    "ProvenanceError",
     "SuggestionError",
 }
 
@@ -43,6 +44,7 @@ PUBLIC_SIGNATURE_NAMES = {
     "model_summary",
     "pareto_front",
     "pareto_summary",
+    "provenance_summary",
     "qlog_nei_summary",
     "replicate_summary",
     "review_suggestion",
@@ -63,6 +65,7 @@ SESSION_METHOD_NAMES = {
     "fidelity_coverage",
     "fidelity_summary",
     "from_files",
+    "initialize",
     "mark_observed",
     "model_profile_comparison",
     "model_summary",
@@ -86,6 +89,7 @@ SESSION_METHOD_NAMES = {
     "plot_replicates",
     "plot_stage_diagnostics",
     "qlog_nei_summary",
+    "provenance_summary",
     "reload",
     "replicate_summary",
     "report",
@@ -99,7 +103,7 @@ SESSION_METHOD_NAMES = {
 }
 
 # Hashes cover the complete name-to-signature maps. Failed assertions print the maps.
-PUBLIC_SIGNATURE_DIGEST = "658ec570dad2712da3eb2d9646be832bba251853badf961c47a5db859962cb4b"
+PUBLIC_SIGNATURE_DIGEST = "5513764474dbcf3797ec6b135263d1a703e854f66b5aaf4f8d13113a0c349fd3"
 SESSION_METHOD_SIGNATURE_DIGEST = (
-    "84784177ebf6096a3c02ed2a9da0c22c74e6b71ca00815638c275bb28e5c6feb"
+    "b041e46ef119c488e88f97ef3db9b38b1af446617431a96fa34d2a170ec18e8a"
 )

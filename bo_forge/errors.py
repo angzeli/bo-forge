@@ -21,6 +21,10 @@ class LogWriteError(BOForgeError):
     """Raised when writing or post-write validation of a campaign log fails."""
 
 
+class ProvenanceError(BOForgeError):
+    """Raised when campaign provenance metadata is unreadable or unsupported."""
+
+
 class LogConflictError(LogWriteError):
     """Raised when a campaign log changed after a caller captured its state."""
 

@@ -1,12 +1,13 @@
-# 🧪 BO Forge v3.0.2
+# 🧪 BO Forge v3.1.0
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.0.2 stabilizes the CI and packaging foundation around the v3 architecture
-and scientific UX reset without changing BO capabilities or durable campaign
-files. Installed-artifact probes use the canonical optional API factory path,
-while focused configuration, campaign, optimization, diagnostics, application,
-Streamlit, and optional API ownership remain behind compatibility facades.
+v3.1.0 adds an opt-in durable provenance foundation around the v3 architecture
+without changing BO numerical behavior or YAML/CSV campaign schemas. Newly
+initialized campaigns receive a versioned JSON sidecar with config identity,
+log integrity, bounded environment snapshots, and an append-only mutation
+ledger. Existing campaigns remain legacy-compatible and are not silently
+adopted.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
 notebooks, service calls, API payloads, and launcher safeguards remain
@@ -39,6 +40,7 @@ BO Forge deliberately supports only:
 - an optional experimental FastAPI probe with preferred server-managed staging
   for local/trusted-network exploration
 - coordinated append, review, and observation writes across local processes
+- optional provenance-managed campaigns with config/log hashes and mutation lineage
 
 It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, or qLogNEI/qLogNEHVI, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, named fidelity sources, per-level fidelity costs, qMFKG batches above four, automatic stage transitions, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
@@ -155,6 +157,19 @@ before using it beyond localhost.
 ---
 
 ## 🔁 Workflow
+
+Initialize a new provenance-managed campaign with:
+
+```bash
+bo-forge init-log --config configs/my_campaign.yaml --log work/campaign.csv
+bo-forge provenance --config configs/my_campaign.yaml --log work/campaign.csv
+```
+
+The first command creates both the canonical CSV and
+`work/campaign.csv.manifest.json`. Existing CSV campaigns without a manifest
+continue unchanged. Move and back up a managed CSV together with its sidecar; schema v1
+cannot distinguish a deliberately removed sidecar from a genuine legacy CSV. See
+[docs/PROVENANCE.md](https://github.com/angzeli/bo-forge/blob/main/docs/PROVENANCE.md).
 
 ```mermaid
 flowchart LR
@@ -275,6 +290,7 @@ bo-forge/
 - [docs/STREAMLIT_DEPLOYMENT.md](https://github.com/angzeli/bo-forge/blob/main/docs/STREAMLIT_DEPLOYMENT.md): safe local, trusted-LAN, SSH/VPN, and authenticated reverse-proxy deployment guidance.
 - [docs/API_PROBE.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_PROBE.md): experimental optional FastAPI probe usage and safety model.
 - [docs/API_SECURITY.md](https://github.com/angzeli/bo-forge/blob/main/docs/API_SECURITY.md): API assets, trust boundaries, deployment safeguards, and deferred production requirements.
+- [docs/PROVENANCE.md](https://github.com/angzeli/bo-forge/blob/main/docs/PROVENANCE.md): managed campaign identity, mutation ledger, recovery, and trust boundary.
 - [docs/CAPABILITY_MATRIX.md](https://github.com/angzeli/bo-forge/blob/main/docs/CAPABILITY_MATRIX.md): supported, read-only, rejected, and deferred feature combinations.
 - [docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md](https://github.com/angzeli/bo-forge/blob/main/docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md): step-by-step tutorial for creating a new campaign inside the app.
 - [docs/CLI_ERROR_EXAMPLES.md](https://github.com/angzeli/bo-forge/blob/main/docs/CLI_ERROR_EXAMPLES.md): intentional CLI failures with expected error and hint output.

@@ -602,6 +602,7 @@ def test_create_campaign_files_writes_config_and_empty_log(tmp_path: Path) -> No
     df = pd.read_csv(log_path, keep_default_na=False)
     assert df.empty
     assert list(df.columns) == canonical_columns(campaign.config)
+    assert log_path.with_name("campaign.csv.manifest.json").exists()
 
 def test_create_campaign_files_validates_before_writing(tmp_path: Path) -> None:
     config_path = tmp_path / "nested" / "campaign.yaml"
@@ -659,10 +660,14 @@ def test_create_campaign_files_rolls_back_config_if_log_write_fails(
         random_seed=0,
     )
 
-    def fail_log_write(path: Path, df: pd.DataFrame) -> None:
+    def fail_log_write(config_path: Path, log_path: Path) -> None:
         raise OSError("no log write")
 
-    monkeypatch.setattr(streamlit_helpers, "_write_dataframe_no_overwrite", fail_log_write)
+    monkeypatch.setattr(
+        streamlit_helpers.CampaignSession,
+        "initialize",
+        staticmethod(fail_log_write),
+    )
 
     with pytest.raises(OSError, match="no log write"):
         create_campaign_files(
@@ -673,6 +678,7 @@ def test_create_campaign_files_rolls_back_config_if_log_write_fails(
 
     assert not config_path.exists()
     assert not log_path.exists()
+    assert not log_path.with_name("campaign.csv.manifest.json").exists()
 
 def test_make_staged_suggestion_bundle_records_context(tmp_path: Path) -> None:
     config_path = tmp_path / "campaign.yaml"

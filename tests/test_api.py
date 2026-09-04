@@ -95,6 +95,90 @@ def test_api_health(tmp_path: Path) -> None:
     }
 
 
+def test_api_provenance_returns_root_bounded_managed_summary(tmp_path: Path) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "01_simple_2d_maximise_logei.yaml",
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    log_path.unlink()
+    CampaignSession.initialize(tmp_path / ref["config_path"], log_path)
+
+    response = client(tmp_path).post("/campaign/provenance", json=ref)
+
+    assert response.status_code == 200
+    payload = response.json()["provenance"]
+    assert payload["columns"] == ["field", "value"]
+    values = {row["field"]: row["value"] for row in payload["records"]}
+    assert values["provenance_status"] == "managed"
+    assert values["event_count"] == 1
+
+
+def test_api_provenance_reports_legacy_and_rejects_outside_root(tmp_path: Path) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "01_simple_2d_maximise_logei.yaml",
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+
+    legacy_response = client(tmp_path).post("/campaign/provenance", json=ref)
+    outside_response = client(tmp_path).post(
+        "/campaign/provenance",
+        json={"config_path": "../outside.yaml", "log_path": ref["log_path"]},
+    )
+
+    assert legacy_response.status_code == 200
+    assert legacy_response.json()["provenance"]["records"] == [
+        {"field": "provenance_status", "value": "legacy"}
+    ]
+    assert outside_response.status_code == 400
+    assert outside_response.json()["error"]["code"] == "path_outside_root"
+
+
+def test_api_provenance_rejects_missing_log(tmp_path: Path) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "01_simple_2d_maximise_logei.yaml",
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    (tmp_path / ref["log_path"]).unlink()
+
+    response = client(tmp_path).post("/campaign/provenance", json=ref)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "provenance_error"
+    assert "provenance status is unknown" in response.json()["error"]["message"]
+
+
+def test_api_provenance_diagnoses_mismatch_while_campaign_load_fails_closed(
+    tmp_path: Path,
+) -> None:
+    ref = copy_campaign(
+        tmp_path,
+        "01_simple_2d_maximise_logei.yaml",
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    log_path = tmp_path / ref["log_path"]
+    log_path.unlink()
+    CampaignSession.initialize(tmp_path / ref["config_path"], log_path)
+    log_path.write_bytes(log_path.read_bytes() + b"\n")
+    before_log = log_path.read_bytes()
+
+    provenance_response = client(tmp_path).post("/campaign/provenance", json=ref)
+    summary_response = client(tmp_path).post("/campaign/summary", json=ref)
+
+    assert provenance_response.status_code == 200
+    values = {
+        row["field"]: row["value"]
+        for row in provenance_response.json()["provenance"]["records"]
+    }
+    assert values["integrity_status"] == "mismatch"
+    assert summary_response.status_code == 400
+    assert summary_response.json()["error"]["code"] == "stale_log"
+    assert log_path.read_bytes() == before_log
+
+
 def test_api_health_reports_strict_deployment_modes(tmp_path: Path) -> None:
     response = TestClient(
         create_app(tmp_path, server_stages_only=True, interactive_docs=False)

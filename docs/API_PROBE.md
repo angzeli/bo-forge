@@ -133,6 +133,20 @@ For fidelity campaigns, the additive summary response includes both
 `fidelity_summary` and `fidelity_coverage` table payloads. Non-fidelity
 campaigns return empty payloads for those keys.
 
+Inspect managed or legacy provenance state:
+
+```bash
+curl -X POST http://127.0.0.1:8765/campaign/provenance \
+  -H "Content-Type: application/json" \
+  -d '{"config_path":"configs/01_simple_2d_maximise_logei.yaml","log_path":"work/campaign.csv"}'
+```
+
+The response uses the normal JSON-safe table payload. It is read-only and does
+not repair an interrupted pending transaction. Missing logs return
+`provenance_error`; managed mismatches remain inspectable as
+`integrity_status=mismatch`, while ordinary campaign endpoints fail closed with
+`stale_log`. See [PROVENANCE.md](PROVENANCE.md).
+
 Generate dry-run suggestions without mutating the CSV:
 
 ```bash

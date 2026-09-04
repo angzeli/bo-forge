@@ -1,5 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v3.1.0 - Durable Campaign Provenance Foundation
+
+This release adds opt-in, versioned campaign provenance while preserving YAML
+configuration and CSV logs as source data. Existing campaigns remain fully
+legacy-compatible and are never adopted silently.
+
+- Adds schema-v1 `<log>.manifest.json` sidecars with immutable campaign IDs,
+  UTC timestamps, exact and semantic config hashes, log identity, optimization
+  settings, and deduplicated environment snapshots.
+- Adds append-only `initialize`, `append_suggestions`, `review_suggestion`, and
+  `mark_observed` events with ordered row IDs and previous/resulting log hashes.
+- Coordinates managed CSV and manifest mutation under the existing log lock,
+  including rollback and deterministic interrupted-transaction recovery.
+- Fails closed when a present manifest disagrees with current config or log bytes,
+  preserves a recovery CSV if rollback cannot complete, and uses home-relative
+  references instead of exposing author-home components across path roots.
+- Adds `CampaignSession.initialize()`, public `provenance_summary()`,
+  `ProvenanceError`, `bo-forge provenance`, report integration, Streamlit
+  creation/display, and a root-bounded experimental API endpoint.
+- Keeps legacy campaigns manifest-free and preserves their existing reports,
+  mutation paths, numerical behavior, YAML keys, and CSV schemas.
+- Documents the integrity and lineage boundary explicitly: manifests are not
+  signatures, tamper-proof audit records, or authorization mechanisms.
+
 ## v3.0.2 - CI And Packaging Stabilization
 
 This narrow stabilization patch aligns required CI and future tag-gate probes

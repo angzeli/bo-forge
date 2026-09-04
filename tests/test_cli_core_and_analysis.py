@@ -1,6 +1,7 @@
 """CLI core, noisy, contextual, and model-analysis command tests."""
 
 from bo_forge import __version__
+from bo_forge._campaign.provenance import manifest_path_for_log
 from tests._cli_support import (
     CampaignConfig,
     Path,
@@ -109,12 +110,77 @@ def test_init_log_creates_empty_canonical_log(
     assert run(["init-log", *base_args(config_path, log_path)]) == 0
 
     captured = capsys.readouterr()
-    assert captured.out == f"Created empty campaign log: {log_path}\n"
+    assert captured.out == (
+        f"Created empty campaign log: {log_path}\n"
+        f"Created provenance manifest: {manifest_path_for_log(log_path)}\n"
+    )
     assert captured.err == ""
     cfg = CampaignConfig.from_yaml(config_path)
     df = load_campaign_log(log_path, cfg)
     assert df.empty
     assert list(df.columns) == canonical_columns(cfg)
+    assert manifest_path_for_log(log_path).exists()
+
+
+def test_provenance_command_reports_managed_and_legacy_campaigns(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    managed_log = tmp_path / "managed.csv"
+    legacy_log = write_log(tmp_path / "legacy.csv", config())
+    assert run(["init-log", *base_args(config_path, managed_log)]) == 0
+    capsys.readouterr()
+
+    assert run(["provenance", *base_args(config_path, managed_log)]) == 0
+    managed_output = capsys.readouterr().out
+    assert "provenance_status" in managed_output
+    assert "managed" in managed_output
+    assert "integrity_status" in managed_output
+    assert "valid" in managed_output
+    assert "campaign_id" in managed_output
+
+    assert run(["provenance", *base_args(config_path, legacy_log)]) == 0
+    legacy_output = capsys.readouterr().out
+    assert "provenance_status" in legacy_output
+    assert "legacy" in legacy_output
+
+
+def test_provenance_command_rejects_missing_log(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "missing.csv"
+
+    assert run(["provenance", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "provenance status is unknown" in captured.err
+    assert ".manifest.json sidecar" in captured.err
+
+
+def test_provenance_command_reports_managed_mismatch_as_failure(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "campaign.csv"
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+    capsys.readouterr()
+    log_path.write_bytes(log_path.read_bytes() + b"\n")
+    before_log = log_path.read_bytes()
+    before_manifest = manifest_path_for_log(log_path).read_bytes()
+
+    assert run(["provenance", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "integrity_status" in captured.out
+    assert "mismatch" in captured.out
+    assert "not in a finalized valid state" in captured.err
+    assert log_path.read_bytes() == before_log
+    assert manifest_path_for_log(log_path).read_bytes() == before_manifest
 
 def test_init_log_creates_cost_review_schema(
     tmp_path: Path,
@@ -159,7 +225,7 @@ def test_init_log_refuses_to_overwrite_existing_file(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Error:" in captured.err
-    assert "file already exists" in captured.err
+    assert "already exists" in captured.err
     assert log_path.read_text(encoding="utf-8") == "existing"
 
 def test_init_log_does_not_create_file_when_config_fails(
@@ -187,7 +253,7 @@ def test_init_log_write_failure_returns_clear_error(
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert f"Error: Could not write empty campaign log '{log_path}'" in captured.err
+    assert "Error: Could not prepare campaign log directory" in captured.err
 
 def test_init_log_missing_required_arguments_return_argparse_error(
     capsys: pytest.CaptureFixture[str],

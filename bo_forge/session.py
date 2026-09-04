@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +23,11 @@ from bo_forge.costs import (
     observed_effective_cost,
 )
 from bo_forge.errors import LogConflictError
-from bo_forge.logs import _load_campaign_log_snapshot, _log_file_fingerprint
+from bo_forge.logs import (
+    _load_campaign_log_snapshot,
+    _log_file_fingerprint,
+    _session_log_fingerprint,
+)
 from bo_forge.logs import (
     append_suggestions as _append_suggestions,
 )
@@ -64,6 +68,13 @@ class CampaignSession:
     df: pd.DataFrame
     log_fingerprint: str | None = None
     config_fingerprint: str | None = None
+    _provenance_managed: bool | None = field(default=None, init=False, repr=False)
+
+    @classmethod
+    def initialize(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
+        """Create an empty provenance-managed campaign and return its session."""
+        from bo_forge._campaign.provenance import initialize_campaign_session
+        return initialize_campaign_session(cls, config_path, log_path)
 
     @classmethod
     def from_files(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
@@ -81,7 +92,18 @@ class CampaignSession:
             raise LogConflictError(
                 "Campaign config changed while it was being loaded. Reload the campaign."
             )
-        return cls(
+        from bo_forge._campaign.provenance import validate_manifest_for_load
+        manifest = validate_manifest_for_load(
+            parsed_config_path,
+            parsed_log_path,
+            config=config,
+            log_row_count=len(df),
+        )
+        if manifest is not None and _log_file_fingerprint(parsed_log_path) != fingerprint:
+            raise LogConflictError(
+                "Campaign log changed while it was being loaded. Reload the campaign."
+            )
+        session = cls(
             config_path=parsed_config_path,
             log_path=parsed_log_path,
             config=config,
@@ -89,13 +111,29 @@ class CampaignSession:
             log_fingerprint=fingerprint,
             config_fingerprint=config_fingerprint,
         )
+        session._provenance_managed = manifest is not None
+        return session
 
     def reload(self) -> pd.DataFrame:
         """Reload the campaign log from disk into the session."""
-        self.df, self.log_fingerprint = _load_campaign_log_snapshot(
+        from bo_forge._campaign.provenance import validate_manifest_for_load
+        df, fingerprint = _load_campaign_log_snapshot(self.log_path, self.config)
+        manifest = validate_manifest_for_load(
+            self.config_path,
             self.log_path,
-            self.config,
+            config=self.config,
+            log_row_count=len(df),
         )
+        managed = manifest is not None
+        if self._provenance_managed is not None and managed != self._provenance_managed:
+            raise LogConflictError(
+                "Campaign provenance state changed after it was loaded. Reload from files."
+            )
+        if managed and _log_file_fingerprint(self.log_path) != fingerprint:
+            raise LogConflictError(
+                "Campaign log changed while it was being reloaded. Reload the campaign."
+            )
+        self.df, self.log_fingerprint = df, fingerprint
         return self.df
 
     def validate(self) -> None:
@@ -470,7 +508,19 @@ class CampaignSession:
         tables = _base_report_tables(self)
         for name, reader in _optional_report_readers(self):
             tables[name] = reader()
+        if self.is_provenance_managed:
+            tables["provenance"] = self.provenance_summary()
         return tables
+
+    @property
+    def is_provenance_managed(self) -> bool:
+        """Return whether this campaign has a valid provenance manifest."""
+        return bool(self._provenance_managed)
+
+    def provenance_summary(self) -> pd.DataFrame:
+        """Return ordered provenance fields for managed or legacy campaigns."""
+        from bo_forge.provenance import provenance_summary
+        return provenance_summary(self.config_path, self.log_path)
 
     def export_report(self, path: str | Path) -> Path:
         """Write a deterministic plain-text campaign report and return its path."""
@@ -598,16 +648,11 @@ class CampaignSession:
         expected_log_fingerprint: str | None = None,
     ) -> pd.DataFrame:
         """Append suggestions to disk, reload the session, and return the refreshed log."""
-        expected = (
-            self.log_fingerprint
-            if expected_log_fingerprint is None
-            else expected_log_fingerprint
-        )
         _append_suggestions(
             self.log_path,
             suggestions,
             config=self.config,
-            expected_log_fingerprint=expected,
+            expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
         return self.reload()
 
@@ -628,11 +673,7 @@ class CampaignSession:
             objective_values=objective_values,
             actual_cost=actual_cost,
             config=self.config,
-            expected_log_fingerprint=(
-                self.log_fingerprint
-                if expected_log_fingerprint is None
-                else expected_log_fingerprint
-            ),
+            expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
         return self.reload()
 
@@ -651,13 +692,15 @@ class CampaignSession:
             decision,
             note,
             config=self.config,
-            expected_log_fingerprint=(
-                self.log_fingerprint
-                if expected_log_fingerprint is None
-                else expected_log_fingerprint
-            ),
+            expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
         return self.reload()
+
+    def _mutation_fingerprint(self, expected: str | None) -> str | None:
+        fingerprint = self.log_fingerprint if expected is None else expected
+        if self._provenance_managed is None:
+            return fingerprint
+        return _session_log_fingerprint(fingerprint, managed=self._provenance_managed)
 
     def plot_progress(self, **kwargs: Any) -> Any:
         """Plot campaign progress and return figure/axes objects."""

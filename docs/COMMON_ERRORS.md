@@ -17,6 +17,12 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `require an explicit stage`, `unknown stage`, or `inactive variable`: check structured-campaign `stages:`, pass `--stage` for structured suggestions, and keep inactive variable cells blank.
 - `Contextual suggestions require values`: pass every configured context value through `context.default_values`, `context_values={...}`, the app context inputs, API `context_values`, or CLI `--context NAME=VALUE`.
 - `Non-default model profiles`: use `model.profile: default` for multi-objective, multi-fidelity, or structured campaigns.
+- `Provenance manifest ...`: restore a readable schema-v1 manifest that matches
+  its recorded config/log paths. Malformed or unsupported manifests raise
+  `ProvenanceError`; config/log hash mismatches raise `LogConflictError` without
+  mutating campaign files. Keep a managed CSV and its `.manifest.json` sidecar
+  together when moving or restoring files; a fresh schema-v1 load cannot infer that a
+  missing sidecar was deleted from a formerly managed campaign.
 
 ## ⚙️ Config Errors
 

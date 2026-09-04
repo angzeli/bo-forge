@@ -760,6 +760,7 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert len(app.exception) == 0
     assert config_path.exists()
     assert log_path.exists()
+    assert log_path.with_name("campaign.csv.manifest.json").exists()
     config = CampaignConfig.from_yaml(config_path)
     assert config.model.profile == "smooth"
     markdown_text = "\n".join(markdown.value for markdown in app.markdown)
@@ -769,6 +770,7 @@ def test_streamlit_app_can_create_minimal_campaign(tmp_path: Path) -> None:
     assert "Valid" in markdown_text
     assert "Campaign created and loaded" in success_text
     assert any(subheader.value == "Model Summary" for subheader in app.subheader)
+    assert any(subheader.value == "Provenance" for subheader in app.subheader)
 
 def test_streamlit_app_can_create_qlog_nei_campaign(tmp_path: Path) -> None:
     from streamlit.testing.v1 import AppTest

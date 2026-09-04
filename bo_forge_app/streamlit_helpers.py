@@ -16,7 +16,6 @@ import yaml
 
 from bo_forge.config import CampaignConfig, parse_campaign_config
 from bo_forge.errors import ConfigError
-from bo_forge.io import empty_campaign_log
 from bo_forge.session import CampaignSession, _format_campaign_report
 
 if TYPE_CHECKING:
@@ -166,7 +165,7 @@ def create_campaign_files(
     log_path: str | Path,
 ) -> CampaignSession:
     """Create a validated config and empty canonical log, then load the session."""
-    config = parse_campaign_config_text(config_text)
+    parse_campaign_config_text(config_text)
     resolved_config_path = Path(config_path).expanduser()
     resolved_log_path = Path(log_path).expanduser()
     if resolved_config_path.exists():
@@ -181,14 +180,16 @@ def create_campaign_files(
     try:
         _write_text_no_overwrite(resolved_config_path, config_text)
         config_written = True
-        empty_log = empty_campaign_log(config)
-        _write_dataframe_no_overwrite(resolved_log_path, empty_log)
+        return CampaignSession.initialize(resolved_config_path, resolved_log_path)
     except Exception:
         # Creation is transactional: every failure after the YAML write must roll it back.
         if config_written:
-            resolved_config_path.unlink(missing_ok=True)
+            try:
+                if resolved_config_path.read_text(encoding="utf-8") == config_text:
+                    resolved_config_path.unlink()
+            except OSError:
+                pass
         raise
-    return CampaignSession.from_files(resolved_config_path, resolved_log_path)
 
 
 def file_fingerprint(path: str | Path) -> str:
@@ -709,24 +710,6 @@ def _write_text_no_overwrite(path: Path, text: str) -> None:
         ) as temp_file:
             temp_path = Path(temp_file.name)
             temp_file.write(text)
-        os.link(temp_path, path)
-    finally:
-        if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
-
-
-def _write_dataframe_no_overwrite(path: Path, df: pd.DataFrame) -> None:
-    temp_path: Path | None = None
-    try:
-        with NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="",
-            dir=path.parent,
-            delete=False,
-        ) as temp_file:
-            temp_path = Path(temp_file.name)
-            df.to_csv(temp_file, index=False)
         os.link(temp_path, path)
     finally:
         if temp_path is not None:
