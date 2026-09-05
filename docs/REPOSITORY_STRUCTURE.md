@@ -60,8 +60,8 @@ The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It i
 are thin compatibility facades over focused ownership packages:
 
 - `_config/`: YAML parsing and feature-combination validation;
-- `_campaign/`: schema, validation, reports, persistence/session support, and
-  provenance-managed mutation transactions;
+- `_campaign/`: schema, validation, reports, persistence/session support,
+  provenance-managed mutation transactions, resume inspection, and explicit recovery;
 - `_optimization/`: suggestion routing, initial design, single/multi-objective,
   replicate, and qMFKG candidate paths;
 - `_diagnostics/`: standard, Pareto, fidelity, contextual, model, structured,
@@ -91,7 +91,7 @@ The compatibility facades and remaining focused modules include:
 - `plot_registry.py`: internal plot labels and `CampaignSession` method routing shared by adapters.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
-- `provenance.py`: public read-only provenance-summary facade.
+- `provenance.py`: public provenance-summary and explicit-recovery facade.
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 

@@ -64,6 +64,21 @@ The command exits nonzero when the log is missing or a managed campaign reports
 `mismatch` or `pending_recovery`; it remains a read-only diagnostic and does not repair
 files.
 
+Campaign-loading commands accept `--require-provenance`. Without it, a missing
+manifest is treated as a legacy campaign for backward compatibility. With it, a
+missing manifest fails; any present malformed or mismatched manifest fails under
+either mode. When inspection reports `pending_previous_state` or
+`pending_resulting_state`, recover explicitly and then reload:
+
+```bash
+bo-forge provenance-recover \
+  --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/my_new_campaign_log.csv \
+  --expected-log-fingerprint CURRENT_LOG_SHA256
+```
+
+The recovery command changes only the manifest. It never changes YAML or CSV bytes.
+
 Validate a campaign log:
 
 ```bash
@@ -490,6 +505,7 @@ bo-forge plot \
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
 | `bo-forge provenance --config PATH --log PATH` | Print managed/legacy provenance status, identities, hashes, environment count, event count, and pending-transaction state. |
+| `bo-forge provenance-recover --config PATH --log PATH [--expected-log-fingerprint SHA256]` | Explicitly finalize or cancel a recoverable pending manifest transaction without changing YAML or CSV bytes. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
@@ -513,6 +529,7 @@ Most commands are read-only.
 The commands that can change files are:
 
 - `bo-forge init-log`: creates a new empty campaign log and provenance manifest and refuses to overwrite either file.
+- `bo-forge provenance-recover`: updates only a managed manifest to resolve a recoverable interrupted transaction.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
 - `bo-forge review`: updates `review_status` and `review_note` for one suggested row.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.
@@ -535,7 +552,9 @@ coordination remains unsupported.
 
 For provenance-managed campaigns, successful append, review, and observation
 mutations also update the sidecar ledger under the same lock. Read-only commands
-do not add events. See [PROVENANCE.md](PROVENANCE.md).
+do not add events. Interrupted transactions block ordinary loading and mutation until
+`bo-forge provenance-recover` is run explicitly. See
+[PROVENANCE.md](PROVENANCE.md).
 
 Conflict errors tell the user to reload and inspect the latest campaign before
 retrying. Busy errors tell the user to wait briefly for the active local writer.

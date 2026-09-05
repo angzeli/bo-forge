@@ -16,13 +16,20 @@ from bo_forge.application import (
     ValidationResult,
     file_fingerprint,
 )
-from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError, ProvenanceError
+from bo_forge.errors import (
+    BOForgeError,
+    LogBusyError,
+    LogConflictError,
+    ProvenanceError,
+    ProvenanceRecoveryRequired,
+)
 from bo_forge_api.contracts import (
     ApiError,
     AppendRequest,
     CampaignRef,
     DryRunRequest,
     ObservationRequest,
+    ProvenanceRecoveryRequest,
     ReviewRequest,
     _error_recovery,
     _error_response,
@@ -88,6 +95,7 @@ def create_app(
         stage_store,
         server_stages_only=server_stages_only,
     )
+    _register_provenance_recovery_route(app, resolved_root)
     _register_server_stage_routes(app, resolved_root, stage_store)
     return app
 
@@ -123,7 +131,17 @@ def _register_health_and_read_routes(
     def validation(request: CampaignRef) -> dict[str, object]:
         config_path, log_path = _resolve_campaign_paths(resolved_root, request)
         try:
-            service = CampaignAppService.load(config_path, log_path)
+            service = CampaignAppService.load(
+                config_path,
+                log_path,
+                provenance_policy=_provenance_policy(request),
+            )
+        except ProvenanceRecoveryRequired:
+            raise
+        except ProvenanceError as exc:
+            if request.require_provenance:
+                raise
+            result = ValidationResult(False, "Validation issue", str(exc))
         except BOForgeError as exc:
             result = ValidationResult(False, "Validation issue", str(exc))
         else:
@@ -155,10 +173,19 @@ def _register_health_and_read_routes(
 
     @app.post("/campaign/provenance")
     def provenance(request: CampaignRef) -> dict[str, object]:
-        from bo_forge.provenance import provenance_summary
+        from bo_forge._campaign.provenance_resume import inspect_provenance
 
         config_path, log_path = _resolve_campaign_paths(resolved_root, request)
-        return {"provenance": _table_payload(provenance_summary(config_path, log_path))}
+        inspection = inspect_provenance(
+            config_path,
+            log_path,
+            provenance_policy=_provenance_policy(request),
+        )
+        if inspection.provenance_status == "legacy" and not log_path.exists():
+            from bo_forge.provenance import provenance_summary
+
+            return {"provenance": _table_payload(provenance_summary(config_path, log_path))}
+        return {"provenance": _table_payload(inspection.to_frame())}
 
 
 def _register_mutation_routes(
@@ -194,6 +221,8 @@ def _register_mutation_routes(
                 log_path=service.log_path,
                 stage_selection=resolved_stage,
                 context_values=resolved_context_values,
+                provenance_policy=_provenance_policy(request),
+                provenance_managed=service.is_provenance_managed,
                 reservation_token=reservation,
             )
         except Exception:
@@ -272,6 +301,24 @@ def _register_mutation_routes(
             "log_fingerprint": file_fingerprint(result.service.log_path),
         }
 
+
+
+def _register_provenance_recovery_route(app: FastAPI, root: Path) -> None:
+    @app.post("/campaign/provenance/recover")
+    def recover_campaign_provenance(
+        request: ProvenanceRecoveryRequest,
+    ) -> dict[str, object]:
+        config_path, log_path = _resolve_campaign_paths(root, request)
+        summary = CampaignAppService.recover_provenance(
+            config_path,
+            log_path,
+            expected_log_fingerprint=request.expected_log_fingerprint,
+        )
+        return {
+            "provenance": _table_payload(summary),
+            "log_fingerprint": file_fingerprint(log_path),
+        }
+
 def _register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ApiError)
@@ -289,19 +336,44 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _log_busy_error_handler(_request: Request, exc: LogBusyError) -> JSONResponse:
         return _error_response("log_busy", str(exc), 409)
 
+    @app.exception_handler(ProvenanceRecoveryRequired)
+    async def _provenance_recovery_required_handler(
+        _request: Request,
+        exc: ProvenanceRecoveryRequired,
+    ) -> JSONResponse:
+        return _error_response(
+            "provenance_recovery_required",
+            str(exc),
+            409,
+            reason_code=exc.reason_code,
+            recovery_action=exc.recovery_action,
+        )
+
     @app.exception_handler(LogConflictError)
     async def _log_conflict_error_handler(
         _request: Request,
         exc: LogConflictError,
     ) -> JSONResponse:
-        return _error_response("stale_log", str(exc), 400)
+        return _error_response(
+            "stale_log",
+            str(exc),
+            400,
+            reason_code=getattr(exc, "reason_code", None),
+            recovery_action=getattr(exc, "recovery_action", None),
+        )
 
     @app.exception_handler(ProvenanceError)
     async def _provenance_error_handler(
         _request: Request,
         exc: ProvenanceError,
     ) -> JSONResponse:
-        return _error_response("provenance_error", str(exc), 400)
+        return _error_response(
+            "provenance_error",
+            str(exc),
+            400,
+            reason_code=exc.reason_code,
+            recovery_action=exc.recovery_action,
+        )
 
     @app.exception_handler(BOForgeError)
     async def _bo_forge_error_handler(_request: Request, exc: BOForgeError) -> JSONResponse:
@@ -410,7 +482,11 @@ def _register_stage_mutation_routes(
             stage_store.complete(stage_id, "stale", reason=stale_reason)
             raise StageStoreError("stage_stale", stale_reason, 409)
         try:
-            service = CampaignAppService.load(staged.config_path, staged.log_path)
+            service = CampaignAppService.load(
+                staged.config_path,
+                staged.log_path,
+                provenance_policy=staged.provenance_policy,
+            )
             bundled_context_values = staged.bundle.get("context_values")
             result = service.append_staged(
                 staged.bundle,
@@ -421,6 +497,9 @@ def _register_stage_mutation_routes(
                     else None
                 ),
             )
+        except ProvenanceRecoveryRequired:
+            stage_store.restore(stage_id)
+            raise
         except (LogConflictError, ValueError) as exc:
             stale_message = (
                 "Staged batch failed append integrity checks and cannot be retried."
@@ -469,12 +548,23 @@ def _register_stage_mutation_routes(
 
 def _load_service(root: Path, request: CampaignRef) -> CampaignAppService:
     config_path, log_path = _resolve_campaign_paths(root, request)
-    return CampaignAppService.load(config_path, log_path)
+    return CampaignAppService.load(
+        config_path,
+        log_path,
+        provenance_policy=_provenance_policy(request),
+    )
+
+
+def _provenance_policy(request: CampaignRef) -> str:
+    return "required" if request.require_provenance else "compatible"
 def _server_stage_file_invalidation_reason(
     staged: StageValidationSnapshot | StageSnapshot,
     *,
     fingerprint_cache: dict[Path, tuple[str | None, bool]] | None = None,
 ) -> str | None:
+    manifest_path = staged.log_path.with_name(f"{staged.log_path.name}.manifest.json")
+    if manifest_path.exists() != staged.provenance_managed:
+        return "Campaign provenance state changed after suggestions were staged."
     config_fingerprint, config_unreadable = _cached_stage_file_fingerprint(
         staged.config_path,
         fingerprint_cache,

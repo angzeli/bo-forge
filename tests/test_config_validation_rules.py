@@ -90,6 +90,14 @@ bo:
     with pytest.raises(ConfigError, match=message):
         CampaignConfig.from_yaml(path)
 
+
+def test_malformed_yaml_raises_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "malformed.yaml"
+    path.write_text("campaign_name: [broken\n", encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="Could not parse config file"):
+        CampaignConfig.from_yaml(path)
+
 def test_fidelity_requires_configured_continuous_variable(tmp_path: Path) -> None:
     path = write_yaml(
         tmp_path / "campaign.yaml",

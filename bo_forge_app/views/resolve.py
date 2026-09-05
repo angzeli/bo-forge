@@ -12,8 +12,13 @@ from typing import Any
 
 import pandas as pd
 
-from bo_forge.application import CampaignAppService
-from bo_forge.errors import BOForgeError, LogBusyError, LogConflictError
+from bo_forge.application import CampaignAppService, file_fingerprint
+from bo_forge.errors import (
+    BOForgeError,
+    LogBusyError,
+    LogConflictError,
+    ProvenanceRecoveryRequired,
+)
 from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
     LOG_PATH_KEY,
@@ -34,6 +39,7 @@ from bo_forge_app.ui.components import (
     _view_data_value,
 )
 from bo_forge_app.ui.state import (
+    PROVENANCE_RECOVERY_KEY,
     _clear_observation_inputs,
     _clear_report_preview,
     _clear_staged_suggestions,
@@ -309,9 +315,29 @@ def _handle_log_mutation_error(st: Any, campaign: Any, exc: Exception) -> bool:
     _clear_observation_inputs(st)
     _clear_report_preview(st)
     config_path, log_path = _current_paths(st)
+    policy = getattr(
+        campaign,
+        "provenance_policy",
+        getattr(getattr(campaign, "session", None), "_provenance_policy", "compatible"),
+    )
+    if isinstance(exc, ProvenanceRecoveryRequired):
+        st.session_state[PROVENANCE_RECOVERY_KEY] = {
+            "config_path": str(config_path),
+            "log_path": str(log_path),
+            "expected_log_fingerprint": file_fingerprint(log_path),
+            "reason_code": exc.reason_code,
+            "recovery_action": exc.recovery_action,
+            "require_provenance": policy == "required",
+        }
+        st.error(str(exc))
+        return True
     try:
         if isinstance(campaign, CampaignAppService) or hasattr(campaign, "session"):
-            campaign = CampaignAppService.load(config_path, log_path)
+            campaign = CampaignAppService.load(
+                config_path,
+                log_path,
+                provenance_policy=policy,
+            )
         else:
             campaign.reload()
     except (BOForgeError, OSError, ValueError) as reload_exc:

@@ -20,6 +20,8 @@ CAMPAIGN_FILE_MODE_KEY = "bo_forge_campaign_file_mode"
 FLASH_MESSAGE_KEY = "bo_forge_flash_message"
 NEW_CAMPAIGN_FORM_YAML_KEY = "bo_forge_new_campaign_form_yaml"
 NEW_CAMPAIGN_KIND_KEY = "bo_forge_new_campaign_kind"
+PROVENANCE_POLICY_KEY = "bo_forge_require_provenance"
+PROVENANCE_RECOVERY_KEY = "bo_forge_provenance_recovery"
 REPORT_PREVIEW_KEY = "bo_forge_report_preview_text"
 STAGED_FRESHNESS_MESSAGE_KEY = "bo_forge_staged_freshness_message"
 SUGGEST_STAGE_KEY = "bo_forge_suggest_stage"
@@ -44,10 +46,16 @@ def _cached_validation_label(st: Any, campaign: Any | None) -> str:
 def _cached_validation_state(st: Any, campaign: Any | None) -> dict[str, str]:
     if campaign is None:
         return {"label": "Not loaded", "error": ""}
+    active_policy = getattr(
+        campaign,
+        "provenance_policy",
+        getattr(getattr(campaign, "session", campaign), "_provenance_policy", "compatible"),
+    )
     cache = st.session_state.get(VALIDATION_CACHE_KEY)
     expected = _validation_cache_signature(
         st.session_state.get(CONFIG_PATH_KEY, ""),
         st.session_state.get(LOG_PATH_KEY, ""),
+        require_provenance=active_policy == "required",
     )
     if not isinstance(cache, dict):
         return {"label": "Reload to validate", "error": ""}
@@ -78,14 +86,32 @@ def _refresh_validation_cache(
             label = "Valid"
             error = ""
     st.session_state[VALIDATION_CACHE_KEY] = {
-        "signature": _validation_cache_signature(config_path, log_path),
+        "signature": _validation_cache_signature(
+            config_path,
+            log_path,
+            require_provenance=(
+                getattr(campaign, "provenance_policy", "compatible") == "required"
+            ),
+        ),
         "label": label,
         "error": error,
     }
 
 
-def _validation_cache_signature(config_path: object, log_path: object) -> tuple[object, object]:
-    return (_file_metadata_signature(config_path), _file_metadata_signature(log_path))
+def _validation_cache_signature(
+    config_path: object,
+    log_path: object,
+    *,
+    require_provenance: bool = False,
+) -> tuple[object, object, object, str]:
+    log_file = Path(str(log_path)).expanduser().resolve(strict=False)
+    manifest_path = log_file.with_name(f"{log_file.name}.manifest.json")
+    return (
+        _file_metadata_signature(config_path),
+        _file_metadata_signature(log_path),
+        _file_metadata_signature(manifest_path),
+        "required" if require_provenance else "compatible",
+    )
 
 
 def _file_metadata_signature(path_value: object) -> tuple[str, int | None, int | None]:

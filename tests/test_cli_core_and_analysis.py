@@ -1,5 +1,8 @@
 """CLI core, noisy, contextual, and model-analysis command tests."""
 
+import json
+
+import bo_forge._campaign.provenance as provenance_module
 from bo_forge import __version__
 from bo_forge._campaign.provenance import manifest_path_for_log
 from tests._cli_support import (
@@ -158,7 +161,55 @@ def test_provenance_command_rejects_missing_log(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "provenance status is unknown" in captured.err
-    assert ".manifest.json sidecar" in captured.err
+    assert "Restore the managed CSV" in captured.err
+
+
+def test_require_provenance_rejects_legacy_campaign(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = write_log(tmp_path / "campaign.csv", config())
+
+    assert run(["validate", *base_args(config_path, log_path), "--require-provenance"]) == 1
+
+    captured = capsys.readouterr()
+    assert "provenance manifest is required" in captured.err
+    assert "Initialize a managed campaign" in captured.err
+
+
+def test_provenance_recover_command_resolves_pending_previous_state(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "campaign.csv"
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+    capsys.readouterr()
+    manifest_path = manifest_path_for_log(log_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    pending = provenance_module._manifest_with_pending_transaction(
+        manifest,
+        config_file=config_path,
+        operation="append_suggestions",
+        affected_row_ids=["row_1"],
+        metadata={"appended_row_count": 1},
+        resulting_hash="1" * 64,
+        resulting_row_count=1,
+    )
+    provenance_module._write_json_atomic(manifest_path, pending)
+    before_log = log_path.read_bytes()
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 1
+    blocked = capsys.readouterr()
+    assert "provenance recovery" in blocked.err
+    assert run(["provenance-recover", *base_args(config_path, log_path)]) == 0
+
+    recovered = capsys.readouterr()
+    assert "resume_status" in recovered.out
+    assert "ready" in recovered.out
+    assert "Provenance state verified" in recovered.out
+    assert log_path.read_bytes() == before_log
 
 
 def test_provenance_command_reports_managed_mismatch_as_failure(
@@ -179,8 +230,28 @@ def test_provenance_command_reports_managed_mismatch_as_failure(
     assert "integrity_status" in captured.out
     assert "mismatch" in captured.out
     assert "not in a finalized valid state" in captured.err
+    assert "Reason: log_hash_changed" in captured.err
+    assert "Restore a CSV state recorded by the provenance ledger" in captured.err
     assert log_path.read_bytes() == before_log
     assert manifest_path_for_log(log_path).read_bytes() == before_manifest
+
+
+def test_malformed_managed_yaml_returns_structured_cli_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = write_config(tmp_path / "campaign.yaml")
+    log_path = tmp_path / "campaign.csv"
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+    capsys.readouterr()
+    config_path.write_text("campaign_name: [broken\n", encoding="utf-8")
+
+    assert run(["validate", *base_args(config_path, log_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "config semantics do not match" in captured.err
+    assert "Restore the recorded YAML semantics" in captured.err
+    assert "Traceback" not in captured.err
 
 def test_init_log_creates_cost_review_schema(
     tmp_path: Path,

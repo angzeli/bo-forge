@@ -1,5 +1,9 @@
 """Streamlit AppTest loading, switching, and campaign workflow tests."""
 
+import json
+
+import bo_forge._campaign.provenance as provenance_module
+from bo_forge.errors import ProvenanceRecoveryRequired
 from tests._streamlit_support import (
     PROJECT_ROOT,
     BOConfig,
@@ -20,6 +24,77 @@ from tests._streamlit_support import (
     pytest,
     streamlit_app,
 )
+
+
+def test_streamlit_strict_provenance_loading_and_explicit_recovery(
+    tmp_path: Path,
+) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    config_path = tmp_path / "campaign.yaml"
+    config_path.write_text(
+        (PROJECT_ROOT / "configs" / "01_simple_2d_maximise_logei.yaml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    legacy_log = copy_example_log(
+        tmp_path,
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    app = AppTest.from_file(PROJECT_ROOT / "bo_forge_app" / "streamlit_app.py")
+    app.run(timeout=10)
+    next(input_ for input_ in app.text_input if input_.label == "YAML config path").set_value(
+        str(config_path)
+    )
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(legacy_log)
+    )
+    next(
+        item for item in app.checkbox if item.label == "Require provenance manifest"
+    ).set_value(True)
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    assert any("provenance manifest is required" in error.value for error in app.error)
+    assert streamlit_app.SESSION_KEY not in app.session_state
+
+    managed_log = tmp_path / "managed.csv"
+    CampaignSession.initialize(config_path, managed_log)
+    manifest_path = provenance_module.manifest_path_for_log(managed_log)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    pending = provenance_module._manifest_with_pending_transaction(
+        manifest,
+        config_file=config_path,
+        operation="append_suggestions",
+        affected_row_ids=["row_1"],
+        metadata={"appended_row_count": 1},
+        resulting_hash="1" * 64,
+        resulting_row_count=1,
+    )
+    provenance_module._write_json_atomic(manifest_path, pending)
+    before_log = managed_log.read_bytes()
+
+    next(input_ for input_ in app.text_input if input_.label == "CSV log path").set_value(
+        str(managed_log)
+    )
+    next(button for button in app.button if button.label == "Load campaign").click()
+    app.run(timeout=10)
+    assert any("interrupted transaction" in error.value for error in app.error)
+    confirmation = next(
+        item
+        for item in app.checkbox
+        if item.label == "I understand recovery changes the provenance manifest"
+    )
+    confirmation.set_value(True)
+    app.run(timeout=10)
+    next(button for button in app.button if button.label == "Recover provenance").click()
+    app.run(timeout=10)
+
+    assert len(app.exception) == 0
+    assert streamlit_app.SESSION_KEY in app.session_state
+    assert managed_log.read_bytes() == before_log
+    recovered = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert recovered["pending_transaction"] is None
 
 
 def test_reports_model_comparison_is_lazy(
@@ -342,6 +417,7 @@ def test_streamlit_log_conflict_clears_stale_state_and_reloads_campaign(
     log_path = tmp_path / "campaign.csv"
     refreshed = SimpleNamespace(config_path=config_path, log_path=log_path)
     messages: list[str] = []
+    loaded_policies: list[str] = []
 
     class FakeStreamlit:
         session_state = {
@@ -357,11 +433,11 @@ def test_streamlit_log_conflict_clears_stale_state_and_reloads_campaign(
         def error(message: str) -> None:
             raise AssertionError(message)
 
-    monkeypatch.setattr(
-        streamlit_app.CampaignAppService,
-        "load",
-        lambda *_args, **_kwargs: refreshed,
-    )
+    def load_with_policy(*_args: object, **kwargs: object) -> object:
+        loaded_policies.append(str(kwargs["provenance_policy"]))
+        return refreshed
+
+    monkeypatch.setattr(streamlit_app.CampaignAppService, "load", load_with_policy)
     monkeypatch.setattr(
         streamlit_app,
         "_refresh_validation_cache",
@@ -375,7 +451,7 @@ def test_streamlit_log_conflict_clears_stale_state_and_reloads_campaign(
 
     handled = streamlit_app._handle_log_mutation_error(
         FakeStreamlit,
-        SimpleNamespace(session=object()),
+        SimpleNamespace(session=object(), provenance_policy="required"),
         LogConflictError("stale"),
     )
 
@@ -388,6 +464,50 @@ def test_streamlit_log_conflict_clears_stale_state_and_reloads_campaign(
     assert messages == [
         "Campaign log changed in another process. The latest log was reloaded; retry the action."
     ]
+    assert loaded_policies == ["required"]
+
+
+def test_streamlit_recovery_conflict_preserves_policy_and_exposes_action(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    config_path.write_text("campaign_name: managed\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+    campaign = SimpleNamespace(provenance_policy="required")
+    errors: list[str] = []
+
+    class FakeStreamlit:
+        session_state = {
+            streamlit_app.CONFIG_PATH_KEY: str(config_path),
+            streamlit_app.LOG_PATH_KEY: str(log_path),
+            streamlit_app.SESSION_KEY: campaign,
+            streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY: {"suggestions": "stale"},
+        }
+
+        @staticmethod
+        def error(message: str) -> None:
+            errors.append(message)
+
+    recovery_error = ProvenanceRecoveryRequired(
+        "recovery required",
+        reason_code="pending_previous_state",
+        recovery_action="Run provenance recovery.",
+    )
+
+    handled = streamlit_app._handle_log_mutation_error(
+        FakeStreamlit,
+        campaign,
+        recovery_error,
+    )
+
+    recovery = FakeStreamlit.session_state[streamlit_app.PROVENANCE_RECOVERY_KEY]
+    assert handled is True
+    assert recovery["require_provenance"] is True
+    assert recovery["reason_code"] == "pending_previous_state"
+    assert FakeStreamlit.session_state[streamlit_app.SESSION_KEY] is campaign
+    assert streamlit_app.STAGED_SUGGESTION_BUNDLE_KEY not in FakeStreamlit.session_state
+    assert errors == ["recovery required"]
 
 def test_streamlit_log_busy_keeps_retryable_staged_state() -> None:
     errors: list[str] = []

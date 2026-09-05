@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import BOForgeError, LogConflictError
+from bo_forge.errors import BOForgeError, LogConflictError, ProvenanceRecoveryRequired
 from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge.session import CampaignSession, _format_campaign_report
 
@@ -472,9 +472,21 @@ class CampaignAppService:
     session: CampaignSession
 
     @classmethod
-    def load(cls, config_path: str | Path, log_path: str | Path) -> CampaignAppService:
+    def load(
+        cls,
+        config_path: str | Path,
+        log_path: str | Path,
+        *,
+        provenance_policy: str = "compatible",
+    ) -> CampaignAppService:
         """Load a campaign service from YAML config and CSV log paths."""
-        return cls(CampaignSession.from_files(config_path=config_path, log_path=log_path))
+        return cls(
+            CampaignSession.from_files(
+                config_path=config_path,
+                log_path=log_path,
+                provenance_policy=provenance_policy,
+            )
+        )
 
     @classmethod
     def from_session(cls, session: CampaignSession) -> CampaignAppService:
@@ -501,10 +513,17 @@ class CampaignAppService:
         """Return the active log path."""
         return self.session.log_path
 
+    @property
+    def provenance_policy(self) -> str:
+        """Return the active session's provenance loading policy."""
+        return self.session._provenance_policy
+
     def validate(self) -> ValidationResult:
         """Validate the current campaign and return app display state."""
         try:
             self.session.validate()
+        except ProvenanceRecoveryRequired:
+            raise
         except BOForgeError as exc:
             return ValidationResult(False, "Validation issue", str(exc))
         return ValidationResult(True, "Valid", "")
@@ -535,6 +554,22 @@ class CampaignAppService:
     def provenance_summary(self) -> pd.DataFrame:
         """Return campaign provenance fields without performing filesystem repair."""
         return self.session.provenance_summary()
+
+    @staticmethod
+    def recover_provenance(
+        config_path: str | Path,
+        log_path: str | Path,
+        *,
+        expected_log_fingerprint: str | None = None,
+    ) -> pd.DataFrame:
+        """Explicitly recover a pending managed-campaign transaction."""
+        from bo_forge.provenance import recover_provenance
+
+        return recover_provenance(
+            config_path,
+            log_path,
+            expected_log_fingerprint=expected_log_fingerprint,
+        )
 
     def suggest_dry_run(
         self,

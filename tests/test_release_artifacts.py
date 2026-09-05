@@ -242,7 +242,7 @@ def test_readme_contains_current_install_commands() -> None:
     assert "docs/PROVENANCE.md" in readme
     assert "docs/INSTALLATION.md" in readme
 
-def test_v3_docs_describe_current_provenance_foundation() -> None:
+def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
@@ -251,7 +251,8 @@ def test_v3_docs_describe_current_provenance_foundation() -> None:
 
     assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
     assert "durable provenance foundation" in readme
-    assert f"## v{PROJECT_VERSION} - Durable Campaign Provenance Foundation" in changelog
+    assert f"## v{PROJECT_VERSION} - Fail-Closed Provenance Resume" in changelog
+    assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
     assert "## v2.5.3 - App And API Operational Closeout" in changelog
@@ -702,6 +703,22 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     assert 'v301["v3.0.1<br/>CI-backed release foundation"]' in v3_roadmap
     assert 'v302["v3.0.2<br/>CI + packaging stabilization"]' in v3_roadmap
     assert 'v310["v3.1.0<br/>Provenance schema + identity"]' in v3_roadmap
+    assert 'v311["v3.1.1<br/>Fail-closed resume"]' in v3_roadmap
+    assert "class v310 patchDone" in v3_roadmap
+    assert "class v311 patchActive" in v3_roadmap
+    provenance_docs = (PROJECT_ROOT / "docs" / "PROVENANCE.md").read_text(
+        encoding="utf-8"
+    )
+    cli_docs = (PROJECT_ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
+    common_errors = (PROJECT_ROOT / "docs" / "COMMON_ERRORS.md").read_text(
+        encoding="utf-8"
+    )
+    assert "provenance_policy=\"required\"" in provenance_docs
+    assert "bo-forge provenance-recover" in cli_docs
+    assert "--expected-log-fingerprint CURRENT_LOG_SHA256" in provenance_docs
+    assert "--expected-log-fingerprint CURRENT_LOG_SHA256" in cli_docs
+    assert "`qlog_nei`" in common_errors
+    assert "`qlog_nehvi`" in common_errors
     assert "### v3.0.2 - CI And Packaging Stabilization" in v3_roadmap
     assert "docs/MIGRATION_V3.md" in v3_roadmap
     assert "docs/PROVENANCE.md" in readme

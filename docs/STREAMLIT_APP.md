@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.1.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.1.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local
 paths, then calls `bo_forge.application`, an internal non-HTTP service layer
@@ -321,7 +321,11 @@ Provenance-managed campaigns show a compact provenance table in `Campaign`,
 including campaign identity, schema, config/log hashes, environment/event
 counts, last mutation, and pending-transaction state. The app reads this data
 through `CampaignAppService`; it does not implement manifest filesystem logic.
-Legacy campaigns show no fabricated provenance block. See
+Enable `Require provenance manifest` before loading when a missing sidecar must
+fail instead of loading as legacy. If a managed campaign has a recoverable pending
+transaction, the app shows its reason and requires explicit confirmation before
+manifest-only recovery. Successful recovery reloads the campaign and clears staged and
+row-scoped mutation state. Legacy campaigns show no fabricated provenance block. See
 [PROVENANCE.md](PROVENANCE.md).
 
 ## ⚠️ Write Actions

@@ -19,7 +19,6 @@ import pandas as pd
 
 from bo_forge._campaign.provenance_environment import capture_environment
 from bo_forge._campaign.provenance_schema import (
-    validate_current_manifest_state,
     validate_manifest_payload,
 )
 from bo_forge.config import CampaignConfig
@@ -91,7 +90,9 @@ def validate_manifest_references(
     if referenced_config != expected_config or referenced_log != expected_log:
         raise ProvenanceError(
             "Provenance manifest path references do not match the requested campaign: "
-            f"manifest='{manifest_path}'."
+            f"manifest='{manifest_path}'.",
+            reason_code="manifest_path_mismatch",
+            recovery_action="Use the config and log referenced by this manifest.",
         )
     return manifest
 
@@ -102,22 +103,21 @@ def validate_manifest_for_load(
     *,
     config: CampaignConfig,
     log_row_count: int,
+    provenance_policy: str = "compatible",
 ) -> dict[str, Any] | None:
     """Fail closed when a present manifest disagrees with current campaign files."""
-    config_file = Path(config_path).expanduser().resolve(strict=False)
-    log_file = Path(log_path).expanduser().resolve(strict=False)
-    manifest = validate_manifest_references(config_file, log_file)
-    if manifest is None:
-        return None
-    config_bytes = _read_config_bytes(config_file)
-    validate_current_manifest_state(
-        manifest,
-        config_byte_sha256=_sha256_bytes(config_bytes),
-        config_semantic_sha256=config_semantic_sha256(config),
-        log_sha256=_sha256_file_or_none(log_file),
+    from bo_forge._campaign.provenance_resume import enforce_resumable, inspect_provenance
+
+    inspection = inspect_provenance(
+        config_path,
+        log_path,
+        provenance_policy=provenance_policy,
+        config=config,
         log_row_count=log_row_count,
+        include_environment=False,
     )
-    return manifest
+    enforce_resumable(inspection)
+    return inspection.manifest
 
 
 def initialize_campaign(config_path: str | Path, log_path: str | Path) -> tuple[Path, Path]:
@@ -174,7 +174,11 @@ def initialize_campaign_session(
     try:
         log_bytes = initialized_log.read_bytes()
         manifest_bytes = initialized_manifest.read_bytes()
-        return session_type.from_files(config_path, initialized_log)
+        return session_type.from_files(
+            config_path,
+            initialized_log,
+            provenance_policy="required",
+        )
     except Exception as exc:
         # This broad boundary protects the exact files created before session loading.
         try:
@@ -205,61 +209,9 @@ def provenance_summary(
     log_path: str | Path,
 ) -> pd.DataFrame:
     """Return ordered campaign provenance and integrity fields without repairing files."""
-    config_file = Path(config_path).expanduser().resolve(strict=False)
-    log_file = Path(log_path).expanduser().resolve(strict=False)
-    manifest = validate_manifest_references(config_file, log_file)
-    if manifest is None:
-        if not log_file.exists():
-            raise ProvenanceError(
-                f"Campaign log '{log_file}' does not exist; provenance status is unknown."
-            )
-        return pd.DataFrame([("provenance_status", "legacy")], columns=["field", "value"])
-    current_config_hash = _sha256_file_or_none(config_file)
-    current_log_hash = _sha256_file_or_none(log_file)
-    events = manifest["events"]
-    last_event = events[-1] if events else None
-    pending = manifest.get("pending_transaction")
-    config_matches = current_config_hash == manifest["config"]["byte_sha256"]
-    accepted_log_hashes = {manifest["log"]["sha256"]}
-    if pending is not None:
-        accepted_log_hashes.update(
-            {
-                pending["previous_log_sha256"],
-                pending["resulting_log_sha256"],
-            }
-        )
-    log_matches = current_log_hash in accepted_log_hashes
-    integrity_status = (
-        "mismatch"
-        if not config_matches or not log_matches
-        else "pending_recovery"
-        if pending is not None
-        else "valid"
-    )
-    rows = [
-        ("provenance_status", "managed"),
-        ("integrity_status", integrity_status),
-        ("campaign_id", manifest["campaign_id"]),
-        ("schema_version", manifest["schema_version"]),
-        ("config_byte_sha256", manifest["config"]["byte_sha256"]),
-        ("config_semantic_sha256", manifest["config"]["semantic_sha256"]),
-        ("config_bytes_match", config_matches),
-        ("log_sha256", manifest["log"]["sha256"]),
-        ("current_log_sha256", current_log_hash),
-        ("log_bytes_match", log_matches),
-        ("log_row_count", manifest["log"]["row_count"]),
-        ("environment_count", len(manifest["environments"])),
-        (
-            "current_environment_id",
-            None if last_event is None else last_event["environment_id"],
-        ),
-        ("event_count", len(events)),
-        ("last_event_sequence", None if last_event is None else last_event["sequence"]),
-        ("last_mutation", None if last_event is None else last_event["operation"]),
-        ("updated_at", manifest["updated_at"]),
-        ("pending_transaction", pending is not None),
-    ]
-    return pd.DataFrame(rows, columns=["field", "value"])
+    from bo_forge._campaign.provenance_resume import provenance_summary as inspect_summary
+
+    return inspect_summary(config_path, log_path)
 
 
 def write_managed_campaign_log(
@@ -270,10 +222,17 @@ def write_managed_campaign_log(
     operation: str,
     affected_row_ids: list[str],
     metadata: dict[str, object],
+    expected_managed: bool | None = None,
 ) -> bool:
     """Write a managed campaign mutation, returning False for legacy campaigns."""
     manifest_file = manifest_path_for_log(path)
-    if not manifest_file.exists():
+    manifest_exists = manifest_file.exists()
+    if expected_managed is not None and manifest_exists != expected_managed:
+        raise LogConflictError(
+            "Campaign provenance state changed during mutation. Reload the campaign "
+            f"before retrying: log='{path}'."
+        )
+    if not manifest_exists:
         return False
     temp_path: Path | None = None
     backup_path: Path | None = None
@@ -398,30 +357,32 @@ def _prepare_managed_state(
     log_path: Path,
     provided_config: CampaignConfig | None,
 ) -> tuple[dict[str, Any], CampaignConfig, Path]:
+    from bo_forge._campaign.provenance_resume import (
+        enforce_resumable,
+        inspect_loaded_manifest,
+    )
+
     manifest = load_manifest(log_path)
     if manifest is None:
         raise ProvenanceError(f"Managed manifest disappeared during mutation: '{manifest_path}'.")
-    if manifest.get("pending_transaction") is not None:
-        manifest = _recover_pending_transaction(manifest_path, log_path, manifest)
     config_file, referenced_log = _resolved_manifest_paths(manifest_path, manifest)
     if referenced_log != log_path.resolve(strict=False):
         raise ProvenanceError(
             f"Provenance manifest '{manifest_path}' references a different log."
         )
-    config_bytes = _read_config_bytes(config_file)
-    current_config = CampaignConfig.from_yaml(config_file)
-    if _sha256_bytes(config_bytes) != manifest["config"]["byte_sha256"]:
-        raise LogConflictError(
-            "Managed campaign config changed after initialization. Restore the recorded "
-            "config or initialize a new campaign."
-        )
-    if config_semantic_sha256(current_config) != manifest["config"]["semantic_sha256"]:
-        raise LogConflictError("Managed campaign semantic config identity no longer matches.")
+    inspection = inspect_loaded_manifest(
+        config_file,
+        log_path,
+        manifest,
+        include_environment=False,
+    )
+    enforce_resumable(inspection)
+    assert inspection.config is not None
+    current_config = inspection.config
     if provided_config is not None and (
         config_semantic_sha256(provided_config) != config_semantic_sha256(current_config)
     ):
         raise LogConflictError("Mutation config does not match the managed campaign config.")
-    _assert_manifest_log_state(manifest, log_path)
     return manifest, current_config, config_file
 
 

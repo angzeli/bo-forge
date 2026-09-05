@@ -1,5 +1,26 @@
 # 📝 BO Forge Changelog
 
+## v3.1.1 - Fail-Closed Provenance Resume
+
+This release makes managed-campaign resume decisions explicit while preserving
+legacy loading by default and keeping schema-v1 manifests unchanged.
+
+- Adds `compatible` and `required` provenance policies to
+  `CampaignSession.from_files()` and propagates managed-only loading through
+  the CLI, Streamlit, application service, and experimental API.
+- Adds stable resume statuses, mismatch reason codes, recovery guidance,
+  semantic-config comparison, and informational environment-drift fields to
+  provenance summaries.
+- Adds public `ProvenanceRecoveryRequired` and explicit
+  `recover_provenance()` / `bo-forge provenance-recover` workflows.
+- Blocks ordinary load, reload, suggestion, reporting, and mutation while a
+  recoverable transaction is pending instead of repairing it implicitly on a
+  later write.
+- Adds root-bounded API recovery and Streamlit confirmation while preserving
+  config and CSV bytes during recovery.
+- Adds no BO capability, manifest schema, YAML key, CSV column, notebook,
+  plot, authentication mechanism, or database.
+
 ## v3.1.0 - Durable Campaign Provenance Foundation
 
 This release adds opt-in, versioned campaign provenance while preserving YAML

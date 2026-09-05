@@ -44,6 +44,7 @@ class CampaignRef(BaseModel):
 
     config_path: str
     log_path: str
+    require_provenance: bool = False
 
 
 class DryRunRequest(CampaignRef):
@@ -92,6 +93,12 @@ class ObservationRequest(CampaignRef):
     objective_value: float | None = None
     objective_values: dict[str, float] | None = None
     actual_cost: float | None = None
+    expected_log_fingerprint: str
+
+
+class ProvenanceRecoveryRequest(CampaignRef):
+    """Request for explicit managed-campaign transaction recovery."""
+
     expected_log_fingerprint: str
 
 
@@ -267,18 +274,30 @@ def _validation_payload(result: ValidationResult) -> dict[str, object]:
     return {"ok": result.ok, "label": result.label, "message": result.message}
 
 
-def _error_response(code: str, message: str, status_code: int) -> JSONResponse:
+def _error_response(
+    code: str,
+    message: str,
+    status_code: int,
+    *,
+    reason_code: str | None = None,
+    recovery_action: str | None = None,
+) -> JSONResponse:
     retryable, suggested_action = _error_recovery(code)
+    error: dict[str, object] = {
+        "code": code,
+        "message": message,
+        "retryable": retryable,
+        "suggested_action": suggested_action,
+    }
+    if reason_code is not None:
+        error["reason_code"] = reason_code
+    if recovery_action is not None:
+        error["recovery_action"] = recovery_action
     return JSONResponse(
         status_code=status_code,
         content={
             "ok": False,
-            "error": {
-                "code": code,
-                "message": message,
-                "retryable": retryable,
-                "suggested_action": suggested_action,
-            },
+            "error": error,
         },
     )
 
@@ -311,6 +330,10 @@ def _error_recovery(code: str) -> tuple[bool, str]:
         "stale_log": (
             False,
             "Refresh campaign state and resubmit with the new log fingerprint.",
+        ),
+        "provenance_recovery_required": (
+            False,
+            "Run provenance recovery, then reload the campaign and retry.",
         ),
         "path_outside_root": (
             False,

@@ -7,7 +7,7 @@ from html import escape
 from typing import Any
 
 from bo_forge.application import CampaignAppService
-from bo_forge.errors import BOForgeError
+from bo_forge.errors import BOForgeError, ProvenanceRecoveryRequired
 from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
     LOG_PATH_KEY,
@@ -22,6 +22,7 @@ from bo_forge_app.ui.components import (
     _render_variable_type_badge,
 )
 from bo_forge_app.ui.state import (
+    PROVENANCE_RECOVERY_KEY,
     _clear_observation_inputs,
     _clear_report_preview,
     _clear_staged_suggestions,
@@ -414,18 +415,42 @@ def _session_value(key: str) -> object:
     return st.session_state.get(key)
 
 
-def _load_campaign_from_inputs(st: Any, config_value: str, log_value: str) -> None:
+def _load_campaign_from_inputs(
+    st: Any,
+    config_value: str,
+    log_value: str,
+    require_provenance: bool = False,
+) -> None:
     try:
         config_path = resolve_path_input(config_value, "Config")
         log_path = resolve_path_input(log_value, "Log")
-        campaign = CampaignAppService.load(config_path, log_path)
+        campaign = CampaignAppService.load(
+            config_path,
+            log_path,
+            provenance_policy="required" if require_provenance else "compatible",
+        )
+    except ProvenanceRecoveryRequired as exc:
+        from bo_forge.application import file_fingerprint
+
+        st.session_state[PROVENANCE_RECOVERY_KEY] = {
+            "config_path": str(config_path),
+            "log_path": str(log_path),
+            "expected_log_fingerprint": file_fingerprint(log_path),
+            "reason_code": exc.reason_code,
+            "recovery_action": exc.recovery_action,
+            "require_provenance": require_provenance,
+        }
+        st.error(str(exc))
+        return
     except (BOForgeError, OSError, ValueError) as exc:
+        st.session_state.pop(PROVENANCE_RECOVERY_KEY, None)
         st.error(str(exc))
         return
 
     st.session_state[CONFIG_PATH_KEY] = str(config_path)
     st.session_state[LOG_PATH_KEY] = str(log_path)
     st.session_state[SESSION_KEY] = campaign
+    st.session_state.pop(PROVENANCE_RECOVERY_KEY, None)
     _clear_staged_suggestions(st)
     _clear_observation_inputs(st)
     _clear_report_preview(st)

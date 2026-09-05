@@ -1,6 +1,6 @@
 # Campaign Provenance
 
-BO Forge 3.1.0 can initialize a campaign with a versioned provenance manifest while
+BO Forge 3.1.1 can initialize a campaign with a versioned provenance manifest while
 keeping the YAML configuration and CSV log as the campaign source data.
 
 ## Managed And Legacy Campaigns
@@ -16,13 +16,29 @@ The command creates both `work/my_campaign.csv` and
 created in Streamlit use the same initialization path.
 
 Existing CSV campaigns without a manifest remain legacy campaigns. They load, suggest,
-append, review, observe, report, and plot as before. BO Forge does not silently create a
-manifest for them. Explicit legacy adoption is deferred to v3.1.2.
+append, review, observe, report, and plot as before under the default `compatible`
+resume policy. BO Forge does not silently create a manifest for them. Explicit legacy
+adoption is deferred to v3.1.2.
 
 Manifest presence identifies a managed campaign. Keep the CSV and its manifest together
 when moving, restoring, or backing up a campaign. A newly loaded CSV whose sidecar was
-deleted or omitted is indistinguishable from a genuine legacy campaign in schema v1;
-an already loaded managed session rejects sidecar disappearance before mutation.
+deleted or omitted is indistinguishable from a genuine legacy campaign in schema v1
+under compatible loading. Use `provenance_policy="required"` whenever sidecar absence
+must fail closed:
+
+```python
+campaign = CampaignSession.from_files(
+    "configs/my_campaign.yaml",
+    "work/my_campaign.csv",
+    provenance_policy="required",
+)
+```
+
+The CLI equivalent is `--require-provenance`; Streamlit exposes a `Require provenance
+manifest` toggle. `CampaignSession.initialize()` always returns a managed session using
+the required policy, and `reload()` preserves the session's selected policy. A present
+manifest is always enforced under either policy; there is no ignore-invalid-manifest
+mode.
 
 Inspect either kind with:
 
@@ -32,6 +48,17 @@ bo-forge provenance --config configs/my_campaign.yaml --log work/my_campaign.csv
 
 Python callers can use `campaign.provenance_summary()` or the top-level
 `provenance_summary(config_path, log_path)` helper.
+
+The ordered summary preserves `provenance_status` and `integrity_status` and adds:
+
+- `resume_status`: `ready`, `legacy`, `recovery_required`, or `blocked`;
+- a stable `reason_code` and concrete `recovery_action`;
+- semantic config-match state;
+- the current environment identity, whether it matches the latest event, and the
+  changed environment sections.
+
+Environment differences are informational. They do not block resume and inspection
+does not update the manifest.
 
 ## Manifest Location And Format
 
@@ -85,19 +112,52 @@ Ordinary write or validation failures roll back the CSV and manifest together us
 atomic replacement. If rollback cannot restore the CSV, BO Forge retains the recovery
 backup and reports its path instead of deleting the last known-good bytes. If the process
 is interrupted between replacements, the files can retain a pending transaction.
-Read-only inspection reports that state but does not repair it. At the next managed
-mutation BO Forge:
+Read-only provenance inspection reports that state but does not repair it. Ordinary load,
+reload, suggestion, report, plot, append, review, and observation operations raise
+`ProvenanceRecoveryRequired` when the CSV matches a recoverable pending state. Recovery
+must be requested explicitly:
+
+```bash
+bo-forge provenance-recover \
+  --config configs/my_campaign.yaml \
+  --log work/my_campaign.csv \
+  --expected-log-fingerprint CURRENT_LOG_SHA256
+```
+
+```python
+from bo_forge import recover_provenance
+
+summary = recover_provenance(
+    "configs/my_campaign.yaml",
+    "work/my_campaign.csv",
+    expected_log_fingerprint=current_fingerprint,
+)
+```
+
+Under the canonical campaign lock, explicit recovery:
 
 - finalizes the event when the CSV matches the intended resulting hash;
 - cancels the pending transaction when the CSV matches the prior hash;
 - fails closed without writing when the CSV matches neither hash.
 
+Recovery never changes YAML or CSV bytes. It only finalizes or cancels the existing
+manifest transaction, is idempotent when no transaction is pending, and accepts an
+optional expected log fingerprint. Reload the campaign after successful recovery.
+
 Campaign load and managed mutation both fail with `LogConflictError` when current config
-or log bytes no longer match the manifest. `bo-forge provenance` and the provenance API
-remain read-only diagnostic paths: they report `mismatch` or `pending_recovery`, and the
-CLI exits nonzero until the managed state is finalized and valid. `ProvenanceError` is
-reserved for missing diagnostic inputs or unreadable, malformed, or unsupported manifest
-data.
+or log bytes no longer match the manifest. Byte-only YAML edits are classified
+separately from semantic changes, but both remain blocking. `bo-forge provenance` and
+the provenance API remain read-only diagnostic paths: they report `mismatch` or
+`pending_recovery`, and the CLI exits nonzero until the managed state is finalized and
+valid. `ProvenanceError` covers unreadable, malformed, unsupported,
+required-but-missing, or path-invalid manifests. Recoverable pending transactions use
+the public `ProvenanceRecoveryRequired` subclass of `LogConflictError`.
+
+Stable reason codes are `manifest_required`, `manifest_invalid`,
+`manifest_path_mismatch`, `config_bytes_changed_semantics_same`,
+`config_semantics_changed`, `log_missing`, `log_hash_changed`,
+`log_row_count_changed`, `pending_previous_state`, `pending_resulting_state`, and
+`pending_unknown_state`.
 
 ## Trust Boundary
 

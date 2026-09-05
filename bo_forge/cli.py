@@ -26,6 +26,7 @@ from bo_forge.errors import (
     LogValidationError,
     LogWriteError,
     ProvenanceError,
+    ProvenanceRecoveryRequired,
     SuggestionError,
 )
 from bo_forge.plot_registry import _PLOT_ROUTES, _canonical_plot_kind
@@ -53,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     _register_environment_commands(subparsers)
     _register_read_commands(subparsers)
+    from bo_forge._cli.provenance import register_provenance_commands
+
+    register_provenance_commands(subparsers, _add_config_log_arguments)
     _register_mutation_commands(subparsers)
     _register_plot_command(subparsers)
     return parser
@@ -68,7 +72,7 @@ def _register_environment_commands(subparsers: argparse._SubParsersAction) -> No
         "init-log",
         help="Create an empty canonical campaign CSV log and provenance manifest.",
     )
-    _add_config_log_arguments(init_log_parser)
+    _add_config_log_arguments(init_log_parser, include_provenance_policy=False)
     init_log_parser.set_defaults(handler=_cmd_init_log)
 
 
@@ -181,12 +185,6 @@ def _register_read_commands(subparsers: argparse._SubParsersAction) -> None:
     report_parser.add_argument("--output", type=Path, help="Optional report output path.")
     report_parser.set_defaults(handler=_cmd_report)
 
-    provenance_parser = subparsers.add_parser(
-        "provenance",
-        help="Print campaign provenance and integrity fields.",
-    )
-    _add_config_log_arguments(provenance_parser)
-    provenance_parser.set_defaults(handler=_cmd_provenance)
 
 
 def _register_mutation_commands(subparsers: argparse._SubParsersAction) -> None:
@@ -308,15 +306,30 @@ def main(argv: Sequence[str] | None = None) -> None:
     raise SystemExit(run(argv))
 
 
-def _add_config_log_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_config_log_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    include_provenance_policy: bool = True,
+) -> None:
     parser.add_argument("--config", required=True, type=Path, help="Campaign YAML config path.")
     parser.add_argument("--log", required=True, type=Path, help="Campaign CSV log path.")
+    if include_provenance_policy:
+        parser.add_argument(
+            "--require-provenance",
+            action="store_true",
+            help="Reject legacy campaigns that do not have a provenance manifest.",
+        )
 
 
 def _load_session(args: argparse.Namespace) -> CampaignSession:
     from bo_forge.session import CampaignSession
 
-    return CampaignSession.from_files(args.config, args.log)
+    policy = "required" if args.require_provenance else "compatible"
+    return CampaignSession.from_files(
+        args.config,
+        args.log,
+        provenance_policy=policy,
+    )
 
 
 def _cmd_doctor(args: argparse.Namespace) -> int:
@@ -476,23 +489,6 @@ def _cmd_report(args: argparse.Namespace) -> int:
                 f"Could not write campaign report '{args.output}': {exc}"
             ) from exc
         print(f"Wrote campaign report: {report_path}")
-    return 0
-
-
-def _cmd_provenance(args: argparse.Namespace) -> int:
-    from bo_forge.provenance import provenance_summary
-
-    summary = provenance_summary(args.config, args.log)
-    _print_table(summary)
-    values = dict(summary.itertuples(index=False, name=None))
-    if values.get("provenance_status") == "managed" and values.get(
-        "integrity_status"
-    ) != "valid":
-        print(
-            "Error: Managed campaign provenance is not in a finalized valid state.",
-            file=sys.stderr,
-        )
-        return 1
     return 0
 
 
@@ -719,7 +715,12 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
         return "Hint: Check the YAML config path and campaign settings."
     if isinstance(exc, LogValidationError):
         return "Hint: Check the CSV schema, statuses, objective values, and variable bounds."
+    if isinstance(exc, ProvenanceRecoveryRequired):
+        return f"Hint: {exc.recovery_action}"
     if isinstance(exc, LogConflictError):
+        action = getattr(exc, "recovery_action", None)
+        if action:
+            return f"Hint: {action}"
         return "Hint: Reload the campaign, inspect the latest log, and retry the mutation."
     if isinstance(exc, LogBusyError):
         return "Hint: Another local writer is active; wait briefly and retry."
@@ -728,6 +729,8 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
     if isinstance(exc, LogWriteError):
         return "Hint: Check the row_id, pending status, campaign log path, and file permissions."
     if isinstance(exc, ProvenanceError):
+        if exc.recovery_action:
+            return f"Hint: {exc.recovery_action}"
         return (
             "Hint: Check that the CSV and its .manifest.json sidecar exist together, "
             "then inspect their paths and JSON content."

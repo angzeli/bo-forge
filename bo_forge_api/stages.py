@@ -52,6 +52,8 @@ class StageSnapshot:
     log_path: Path
     stage_selection: str | None
     context_values: dict[str, object] | None
+    provenance_policy: str
+    provenance_managed: bool
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,7 @@ class StageValidationSnapshot:
     log_path: Path
     config_fingerprint: str
     log_fingerprint: str
+    provenance_managed: bool
 
 
 @dataclass
@@ -111,6 +114,8 @@ class _StageRecord:
     log_path: Path
     stage_selection: str | None
     context_values: dict[str, object] | None
+    provenance_policy: str
+    provenance_managed: bool
 
 
 @dataclass(frozen=True)
@@ -187,6 +192,8 @@ class InMemoryStageStore:
         log_path: str | Path,
         stage_selection: str | None = None,
         context_values: dict[str, object] | None = None,
+        provenance_policy: str = "compatible",
+        provenance_managed: bool = False,
         reservation_token: str | None = None,
     ) -> StageSnapshot:
         """Store one staged batch after enforcing TTL and capacity limits."""
@@ -219,6 +226,8 @@ class InMemoryStageStore:
                 context_values=None
                 if context_values is None
                 else copy.deepcopy(context_values),
+                provenance_policy=provenance_policy,
+                provenance_managed=provenance_managed,
             )
             self._active[stage_id] = record
             self._lifecycle_totals["created"] += 1
@@ -660,6 +669,7 @@ class InMemoryStageStore:
             log_path=record.log_path,
             config_fingerprint=str(record.bundle.get("config_fingerprint", "")),
             log_fingerprint=str(record.bundle.get("log_fingerprint", "")),
+            provenance_managed=record.provenance_managed,
         )
 
     @staticmethod
@@ -674,6 +684,7 @@ class InMemoryStageStore:
             == snapshot.config_fingerprint
             and str(record.bundle.get("log_fingerprint", ""))
             == snapshot.log_fingerprint
+            and record.provenance_managed == snapshot.provenance_managed
         )
 
     @staticmethod
@@ -695,6 +706,8 @@ class InMemoryStageStore:
             context_values=None
             if record.context_values is None
             else copy.deepcopy(record.context_values),
+            provenance_policy=record.provenance_policy,
+            provenance_managed=record.provenance_managed,
         )
 
     @staticmethod

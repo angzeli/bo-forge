@@ -24,9 +24,29 @@ class LogWriteError(BOForgeError):
 class ProvenanceError(BOForgeError):
     """Raised when campaign provenance metadata is unreadable or unsupported."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_code: str = "manifest_invalid",
+        recovery_action: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+        self.recovery_action = recovery_action
+
 
 class LogConflictError(LogWriteError):
     """Raised when a campaign log changed after a caller captured its state."""
+
+
+class ProvenanceRecoveryRequired(LogConflictError):
+    """Raised when an interrupted managed mutation requires explicit recovery."""
+
+    def __init__(self, message: str, *, reason_code: str, recovery_action: str) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+        self.recovery_action = recovery_action
 
 
 class LogBusyError(LogWriteError):

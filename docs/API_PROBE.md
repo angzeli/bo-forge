@@ -145,7 +145,23 @@ The response uses the normal JSON-safe table payload. It is read-only and does
 not repair an interrupted pending transaction. Missing logs return
 `provenance_error`; managed mismatches remain inspectable as
 `integrity_status=mismatch`, while ordinary campaign endpoints fail closed with
-`stale_log`. See [PROVENANCE.md](PROVENANCE.md).
+`stale_log`. Add `"require_provenance": true` to any campaign reference when a
+missing sidecar must fail instead of loading as a legacy campaign. A present manifest
+is always enforced.
+
+Recover a transaction reported as `pending_previous_state` or
+`pending_resulting_state`:
+
+```bash
+curl -X POST http://127.0.0.1:8765/campaign/provenance/recover \
+  -H "Content-Type: application/json" \
+  -d '{"config_path":"configs/01_simple_2d_maximise_logei.yaml","log_path":"work/campaign.csv","require_provenance":true,"expected_log_fingerprint":"<current-sha256>"}'
+```
+
+The recovery fingerprint is required. Recovery changes only the manifest and returns
+the refreshed provenance table. Ordinary endpoints return HTTP `409` with code
+`provenance_recovery_required` while a recoverable transaction is pending. See
+[PROVENANCE.md](PROVENANCE.md).
 
 Generate dry-run suggestions without mutating the CSV:
 
@@ -224,8 +240,8 @@ Query parameters:
 - `limit=50` accepts values from 1 through 200.
 
 Results are ordered by newest lifecycle transition, then stage ID. Listing
-lazily expires old active stages and marks active stages stale when their config
-or log fingerprint no longer matches. A summary includes only lifecycle times,
+lazily expires old active stages and marks active stages stale when their config,
+log, or managed-versus-legacy provenance state no longer matches. A summary includes only lifecycle times,
 remaining TTL, suggestion count, root-relative config/log paths, structured
 stage selection, configured context variable names, renewal count, and a concise
 status reason. Defaults and safely inferred single-stage selections are reported
@@ -329,7 +345,7 @@ Server-stage lifecycle errors use these codes:
 | `stage_expired` | 410 | The stage exceeded its configured lifetime. |
 | `stage_consumed` | 409 | The batch was already appended. |
 | `stage_discarded` | 409 | The batch was explicitly discarded. |
-| `stage_stale` | 409 | Config/log fingerprints changed before or during append, so retry is unsafe. |
+| `stage_stale` | 409 | Config/log fingerprints or provenance mode changed before or during append, so retry is unsafe. |
 | `stage_in_use` | 409 | Another request currently owns the append claim. |
 | `stage_capacity` | 503 | The process-local active-stage limit is full. |
 | `log_busy` | 409 | Another local process held the campaign log lock too long. |

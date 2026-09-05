@@ -216,7 +216,7 @@ def test_release_checklist_uses_isolated_optional_extra_probes() -> None:
 def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     roadmap = _read("ROADMAP_V3_X.md")
 
-    for node in ("v301", "v302", "v310", "v320", "v330", "v340", "v344"):
+    for node in ("v301", "v302", "v310", "v311", "v320", "v330", "v340", "v344"):
         assert f'{node}["' in roadmap
     for finding in ("REL-001", "REP-001", "REP-002", "DOC-001", "DOC-002", "DX-001"):
         assert finding in roadmap
@@ -225,7 +225,8 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert f"### v{PROJECT_VERSION} - " in roadmap
     assert "class v30 majorDone" in roadmap
     assert "class v31 majorActive" in roadmap
-    assert "class v310 patchActive" in roadmap
+    assert "class v310 patchDone" in roadmap
+    assert "class v311 patchActive" in roadmap
     assert "## v3.0.x - Architecture And Release Assurance\n\nStatus: completed" in roadmap
     assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: active" in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap

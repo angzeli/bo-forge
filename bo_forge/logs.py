@@ -84,7 +84,7 @@ def append_suggestions(
 
     _validate_suggestions_for_append(suggestions)
     with _campaign_log_lock(path):
-        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        expected_managed = _assert_expected_log_fingerprint(path, expected_log_fingerprint)
         if path.exists():
             existing = _read_csv(path)
             _validate_structural_log(existing)
@@ -134,6 +134,7 @@ def append_suggestions(
             operation="append_suggestions",
             affected_row_ids=suggestions["row_id"].astype(str).tolist(),
             metadata={"appended_row_count": len(suggestions)},
+            expected_managed=expected_managed,
         )
 
 
@@ -153,7 +154,7 @@ def mark_observed(
         raise LogWriteError("row_id must be a non-empty string.")
 
     with _campaign_log_lock(path):
-        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        expected_managed = _assert_expected_log_fingerprint(path, expected_log_fingerprint)
         if not path.exists():
             raise LogWriteError(
                 f"Cannot mark row '{row_id}' observed because log '{path}' does not exist."
@@ -195,6 +196,7 @@ def mark_observed(
                 "objective_count": len(parsed_objective_values),
                 "actual_cost_recorded": actual_cost_text is not None,
             },
+            expected_managed=expected_managed,
         )
 
 
@@ -399,7 +401,7 @@ def review_suggestion(
         raise LogWriteError("review_note cannot contain newline characters.")
 
     with _campaign_log_lock(path):
-        _assert_expected_log_fingerprint(path, expected_log_fingerprint)
+        expected_managed = _assert_expected_log_fingerprint(path, expected_log_fingerprint)
         if not path.exists():
             raise LogWriteError(
                 f"Cannot review row '{row_id}' because log '{path}' does not exist."
@@ -441,6 +443,7 @@ def review_suggestion(
             operation="review_suggestion",
             affected_row_ids=[row_id],
             metadata={"decision": decision_map[decision]},
+            expected_managed=expected_managed,
         )
 
 
@@ -452,6 +455,7 @@ def _write_campaign_log(
     operation: str,
     affected_row_ids: list[str],
     metadata: dict[str, object],
+    expected_managed: bool | None,
 ) -> None:
     from bo_forge._campaign.provenance import write_managed_campaign_log
 
@@ -462,6 +466,7 @@ def _write_campaign_log(
         operation=operation,
         affected_row_ids=affected_row_ids,
         metadata=metadata,
+        expected_managed=expected_managed,
     ):
         return
     _atomic_write_and_validate(path, df, config=config)
@@ -613,13 +618,15 @@ def _log_file_fingerprint(path: str | Path) -> str | None:
     return digest.hexdigest()
 
 
-def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> None:
+def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> bool | None:
     if expected is None:
-        return
+        return None
+    expected_managed: bool | None = None
     if expected.startswith(f"{_SESSION_FINGERPRINT_PREFIX}:"):
         _, expected_mode, expected = expected.split(":", maxsplit=2)
+        expected_managed = expected_mode == "managed"
         manifest_exists = path.with_name(f"{path.name}.manifest.json").exists()
-        if manifest_exists != (expected_mode == "managed"):
+        if manifest_exists != expected_managed:
             raise LogConflictError(
                 "Campaign provenance state changed after it was loaded. Reload the "
                 f"campaign before retrying the mutation: log='{path}'."
@@ -630,6 +637,7 @@ def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> None:
             "Campaign log changed after it was loaded. Reload the campaign before retrying "
             f"the mutation: log='{path}'."
         )
+    return expected_managed
 
 
 def _session_log_fingerprint(fingerprint: str | None, *, managed: bool) -> str:

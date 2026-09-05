@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.1.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -40,6 +40,7 @@ These names are supported imports from `bo_forge`:
 - `ModelConfig`
 - `ObjectiveConfig`
 - `ProvenanceError`
+- `ProvenanceRecoveryRequired`
 - `ReplicateConfig`
 - `ReviewConfig`
 - `StageConfig`
@@ -66,6 +67,7 @@ These names are supported imports from `bo_forge`:
 - `pareto_front`
 - `pareto_summary`
 - `provenance_summary`
+- `recover_provenance`
 - `qlog_nei_summary`
 - `review_suggestion`
 - `replicate_summary`
@@ -166,14 +168,20 @@ New campaigns initialized with `CampaignSession.initialize(config_path, log_path
 receive a versioned provenance manifest beside the CSV log. Use
 `provenance_summary(config_path, log_path)` or
 `CampaignSession.provenance_summary()` for ordered, read-only identity and
-integrity fields. Existing `CampaignSession.from_files()` calls remain valid;
-campaigns without a manifest are reported as `legacy` and are not adopted
-automatically. When a manifest is present, `from_files()` and `reload()` verify the
-current config and log against it and fail closed on mismatch. Because schema v1 has no
-marker inside legacy CSVs, callers must move and back up a managed CSV with its sidecar.
-`ProvenanceError` identifies missing diagnostic inputs or malformed, unreadable, or
-unsupported manifests. Managed load and mutation state conflicts use
-`LogConflictError`. See [PROVENANCE.md](PROVENANCE.md) for the schema and trust boundary.
+integrity fields. Existing `CampaignSession.from_files()` calls remain valid and use
+`provenance_policy="compatible"`; pass `provenance_policy="required"` to reject a
+missing sidecar. `reload()` preserves that policy, and any present manifest is enforced
+in both modes. Campaigns without a manifest are reported as `legacy` and are not adopted
+automatically.
+
+Use `recover_provenance(config_path, log_path,
+expected_log_fingerprint=...)` to explicitly finalize or cancel a recoverable pending
+transaction. It changes only manifest bytes. Ordinary session operations raise
+`ProvenanceRecoveryRequired`, a `LogConflictError` subclass, until recovery completes.
+`ProvenanceError` identifies malformed, unreadable, unsupported, required-but-missing,
+or path-invalid manifests. Because schema v1 has no marker inside legacy CSVs, callers
+must move and back up a managed CSV with its sidecar. See
+[PROVENANCE.md](PROVENANCE.md) for reason codes, recovery, and the trust boundary.
 
 qLogNEI pending-state diagnostics expose `qlog_nei_summary` through the
 top-level package for read-only inspection. Use `qlog_nei_summary(config, df)`

@@ -10,7 +10,13 @@ from matplotlib import pyplot as plt
 
 import bo_forge.suggestions as suggestions_module
 from bo_forge.config import CampaignConfig
-from bo_forge.errors import LogConflictError, LogWriteError, SuggestionError
+from bo_forge.errors import (
+    LogConflictError,
+    LogWriteError,
+    ProvenanceError,
+    ProvenanceRecoveryRequired,
+    SuggestionError,
+)
 from bo_forge.session import CampaignSession
 from bo_forge.transforms import values_to_unit_cube
 from bo_forge.validation import canonical_columns
@@ -70,6 +76,44 @@ def test_app_service_exposes_managed_provenance_lazily(tmp_path: Path) -> None:
     values = service.provenance_summary().set_index("field")["value"]
     assert values["provenance_status"] == "managed"
     assert values["event_count"] == 1
+
+
+def test_app_service_provenance_policy_and_recovery(tmp_path: Path) -> None:
+    import json
+
+    import bo_forge._campaign.provenance as provenance_module
+
+    config_path = copy_example_config(tmp_path, "01_simple_2d_maximise_logei.yaml")
+    legacy_log = copy_example_log(
+        tmp_path,
+        "01_simple_2d_maximise_logei_campaign_log.csv",
+    )
+    with pytest.raises(ProvenanceError) as error:
+        CampaignAppService.load(
+            config_path,
+            legacy_log,
+            provenance_policy="required",
+        )
+    assert error.value.reason_code == "manifest_required"
+
+    managed = CampaignSession.initialize(config_path, tmp_path / "managed.csv")
+    manifest_path = provenance_module.manifest_path_for_log(managed.log_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    pending = provenance_module._manifest_with_pending_transaction(
+        manifest,
+        config_file=config_path,
+        operation="append_suggestions",
+        affected_row_ids=["row_1"],
+        metadata={"appended_row_count": 1},
+        resulting_hash="1" * 64,
+        resulting_row_count=1,
+    )
+    provenance_module._write_json_atomic(manifest_path, pending)
+    before_log = managed.log_path.read_bytes()
+
+    summary = CampaignAppService.recover_provenance(config_path, managed.log_path)
+    assert dict(summary.itertuples(False, None))["resume_status"] == "ready"
+    assert managed.log_path.read_bytes() == before_log
 
 
 @pytest.mark.parametrize("changed_source", ["config", "log"])
@@ -1101,6 +1145,28 @@ def test_app_service_validate_failure_is_non_mutating(tmp_path: Path) -> None:
     assert result.label == "Validation issue"
     assert "missing required columns" in result.message
     assert log_path.read_bytes() == before
+
+
+def test_app_service_preserves_typed_provenance_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = copy_example_config(tmp_path, "01_simple_2d_maximise_logei.yaml")
+    campaign = CampaignSession.initialize(config_path, tmp_path / "campaign.csv")
+    service = CampaignAppService.from_session(campaign)
+    error = ProvenanceRecoveryRequired(
+        "recovery required",
+        reason_code="pending_previous_state",
+        recovery_action="Recover provenance.",
+    )
+
+    def block() -> None:
+        raise error
+
+    monkeypatch.setattr(service.session, "validate", block)
+    with pytest.raises(ProvenanceRecoveryRequired):
+        service.validate()
+    assert service.provenance_policy == "required"
 
 
 def test_app_service_plot_rejects_unknown_kind(tmp_path: Path) -> None:

@@ -111,7 +111,9 @@ canonical CSV and its provenance manifest together:
 ```
 
 See [PROVENANCE.md](PROVENANCE.md) for managed-versus-legacy behavior and
-recovery details. See [STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and
+explicit recovery details. Add `--require-provenance` to a campaign-loading CLI
+command when a missing manifest must fail instead of loading as legacy. See
+[STREAMLIT_APP.md](STREAMLIT_APP.md) for setup details and
 write-action warnings. See
 [09_APP_CREATED_CAMPAIGN_TUTORIAL.md](09_APP_CREATED_CAMPAIGN_TUTORIAL.md) for a
 step-by-step app-created campaign tutorial.
@@ -508,7 +510,7 @@ campaign.plot_diagnostics(save_path="reports/diagnostics.png")
 
 | API | Description |
 | --- | --- |
-| `CampaignSession.from_files(config_path, log_path)` | Load YAML config and CSV log into one session object. |
+| `CampaignSession.from_files(config_path, log_path, *, provenance_policy="compatible")` | Load YAML config and CSV log; use `"required"` to reject a missing manifest. |
 | `campaign.validate()` | Validate the current in-memory campaign DataFrame. |
 | `campaign.summary()` | Return a two-column DataFrame with campaign counts, status, and best observation. |
 | `campaign.observed_data()` | Return raw observed CSV rows. Replicate-aware model fitting aggregates separately. |

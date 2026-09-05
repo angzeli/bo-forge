@@ -8,6 +8,7 @@ PUBLIC_EXCEPTION_EXPORTS = {
     "LogValidationError",
     "LogWriteError",
     "ProvenanceError",
+    "ProvenanceRecoveryRequired",
     "SuggestionError",
 }
 
@@ -45,6 +46,7 @@ PUBLIC_SIGNATURE_NAMES = {
     "pareto_front",
     "pareto_summary",
     "provenance_summary",
+    "recover_provenance",
     "qlog_nei_summary",
     "replicate_summary",
     "review_suggestion",
@@ -103,7 +105,7 @@ SESSION_METHOD_NAMES = {
 }
 
 # Hashes cover the complete name-to-signature maps. Failed assertions print the maps.
-PUBLIC_SIGNATURE_DIGEST = "5513764474dbcf3797ec6b135263d1a703e854f66b5aaf4f8d13113a0c349fd3"
+PUBLIC_SIGNATURE_DIGEST = "257035aadf6c1a8fa189be38efeb1f5e65757154c88d26ef0eea7716767cb1d0"
 SESSION_METHOD_SIGNATURE_DIGEST = (
-    "b041e46ef119c488e88f97ef3db9b38b1af446617431a96fa34d2a170ec18e8a"
+    "06c8306ef66f28a0d852934dbbead19ad7256effba46f3293a5f81b3537bdf9d"
 )

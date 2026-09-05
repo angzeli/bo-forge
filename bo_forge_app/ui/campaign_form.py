@@ -12,6 +12,7 @@ from bo_forge_app.streamlit_helpers import (
     CONFIG_PATH_KEY,
     LOG_PATH_KEY,
     NEW_CAMPAIGN_YAML_KEY,
+    SESSION_KEY,
     build_campaign_yaml_text,
     default_new_campaign_paths,
     parse_campaign_config_text,
@@ -34,7 +35,14 @@ from bo_forge_app.ui.form_fields import (
 from bo_forge_app.ui.state import (
     NEW_CAMPAIGN_FORM_YAML_KEY,
     NEW_CAMPAIGN_KIND_KEY,
+    PROVENANCE_POLICY_KEY,
+    PROVENANCE_RECOVERY_KEY,
+    VALIDATION_CACHE_KEY,
+    _clear_observation_inputs,
+    _clear_report_preview,
     _clear_staged_suggestions,
+    _flash_and_rerun,
+    _refresh_validation_cache,
 )
 
 
@@ -71,6 +79,12 @@ def _render_load_existing_campaign(st: Any) -> None:
                 value=st.session_state.get(LOG_PATH_KEY, ""),
                 placeholder="examples/01_simple_2d_maximise_logei_working_log.csv",
             )
+        require_provenance = st.checkbox(
+            "Require provenance manifest",
+            value=bool(st.session_state.get(PROVENANCE_POLICY_KEY, False)),
+            key=PROVENANCE_POLICY_KEY,
+            help="Reject legacy CSV campaigns that do not have a managed manifest.",
+        )
         action_col, reload_col = st.columns([1, 1])
         with action_col:
             load_clicked = st.form_submit_button("Load campaign", type="primary")
@@ -79,17 +93,89 @@ def _render_load_existing_campaign(st: Any) -> None:
 
     if _path_changed(config_value, LOG_PATH_KEY, log_value):
         _clear_staged_suggestions(st)
+    loaded = st.session_state.get(SESSION_KEY)
+    loaded_policy = getattr(
+        loaded,
+        "provenance_policy",
+        getattr(getattr(loaded, "session", loaded), "_provenance_policy", None),
+    )
+    selected_policy = "required" if require_provenance else "compatible"
+    if loaded_policy is not None and loaded_policy != selected_policy:
+        _clear_staged_suggestions(st)
+        st.session_state.pop(VALIDATION_CACHE_KEY, None)
 
     if load_clicked:
-        _load_campaign_from_inputs(st, config_value, log_value)
+        _load_campaign_from_inputs(
+            st,
+            config_value,
+            log_value,
+            require_provenance=require_provenance,
+        )
     if reload_clicked:
         _clear_staged_suggestions(st)
-        _load_campaign_from_inputs(st, config_value, log_value)
+        _load_campaign_from_inputs(
+            st,
+            config_value,
+            log_value,
+            require_provenance=require_provenance,
+        )
+
+    _render_provenance_recovery_action(st)
 
     current_config = st.session_state.get(CONFIG_PATH_KEY)
     current_log = st.session_state.get(LOG_PATH_KEY)
     if current_config or current_log:
         _render_file_cards(st, str(current_config or ""), str(current_log or ""))
+
+
+def _render_provenance_recovery_action(st: Any) -> None:
+    recovery = st.session_state.get(PROVENANCE_RECOVERY_KEY)
+    if not isinstance(recovery, dict) or recovery.get("reason_code") not in {
+        "pending_previous_state",
+        "pending_resulting_state",
+    }:
+        return
+    _render_callout(
+        st,
+        "Provenance recovery required",
+        str(recovery["recovery_action"]),
+    )
+    confirmed = st.checkbox(
+        "I understand recovery changes the provenance manifest",
+        key="bo_forge_confirm_provenance_recovery",
+    )
+    if not st.button("Recover provenance", disabled=not confirmed):
+        return
+    from pathlib import Path
+
+    from bo_forge.application import CampaignAppService
+
+    config_path = Path(str(recovery["config_path"]))
+    log_path = Path(str(recovery["log_path"]))
+    try:
+        CampaignAppService.recover_provenance(
+            config_path,
+            log_path,
+            expected_log_fingerprint=str(recovery["expected_log_fingerprint"]),
+        )
+        policy = "required" if recovery.get("require_provenance") else "compatible"
+        campaign = CampaignAppService.load(
+            config_path,
+            log_path,
+            provenance_policy=policy,
+        )
+    except (BOForgeError, OSError, ValueError) as exc:
+        st.error(str(exc))
+        return
+    st.session_state[CONFIG_PATH_KEY] = str(config_path)
+    st.session_state[LOG_PATH_KEY] = str(log_path)
+    st.session_state[SESSION_KEY] = campaign
+    st.session_state.pop(PROVENANCE_RECOVERY_KEY, None)
+    _clear_staged_suggestions(st)
+    _clear_observation_inputs(st)
+    _clear_report_preview(st)
+    _refresh_validation_cache(st, campaign, config_path, log_path)
+    _flash_and_rerun(st, "Provenance recovered and campaign reloaded.")
 
 
 def _render_create_new_campaign(st: Any) -> None:

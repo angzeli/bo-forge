@@ -16,7 +16,13 @@ import pytest
 
 import bo_forge._campaign.provenance as provenance_module
 import bo_forge._campaign.provenance_environment as provenance_environment
-from bo_forge import CampaignSession, ProvenanceError, provenance_summary
+from bo_forge import (
+    CampaignSession,
+    ProvenanceError,
+    ProvenanceRecoveryRequired,
+    provenance_summary,
+    recover_provenance,
+)
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import LogConflictError, LogWriteError
 from bo_forge.logs import append_suggestions
@@ -120,7 +126,7 @@ def test_initialize_writes_deterministic_schema_v1_manifest(tmp_path: Path) -> N
     }
     assert event["operation"] == "initialize"
     environment = manifest["environments"][0]
-    assert environment["bo_forge"] == "3.1.0"
+    assert environment["bo_forge"] == "3.1.1"
     assert event["environment_id"] == environment["environment_id"]
     assert manifest["pending_transaction"] is None
     assert campaign.is_provenance_managed is True
@@ -281,6 +287,7 @@ def test_initialize_rolls_back_exact_new_artifacts_when_session_load_fails(
         _cls: type[CampaignSession],
         _config_path: str | Path,
         _log_path: str | Path,
+        **_kwargs: object,
     ) -> CampaignSession:
         raise RuntimeError("load failed")
 
@@ -666,7 +673,7 @@ def test_rollback_failure_retains_recovery_backup(
     assert manifest_path.read_bytes() == before_manifest
 
 
-def test_interrupted_transaction_is_reported_then_finalized_on_next_mutation(
+def test_interrupted_transaction_requires_explicit_finalization(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -696,6 +703,26 @@ def test_interrupted_transaction_is_reported_then_finalized_on_next_mutation(
 
     summary = provenance_summary(config_path, campaign.log_path)
     assert bool(summary.set_index("field").loc["pending_transaction", "value"])
+    values = summary.set_index("field")["value"]
+    assert values["resume_status"] == "recovery_required"
+    assert values["reason_code"] == "pending_resulting_state"
+    before_log = campaign.log_path.read_bytes()
+    before_manifest = provenance_module.manifest_path_for_log(campaign.log_path).read_bytes()
+    with pytest.raises(ProvenanceRecoveryRequired, match="provenance recovery"):
+        CampaignSession.from_files(config_path, campaign.log_path)
+    with pytest.raises(ProvenanceRecoveryRequired, match="provenance recovery"):
+        append_suggestions(
+            campaign.log_path,
+            _suggestion(campaign.config, "row_2", 0.8),
+            config=campaign.config,
+        )
+    assert campaign.log_path.read_bytes() == before_log
+    assert (
+        provenance_module.manifest_path_for_log(campaign.log_path).read_bytes()
+        == before_manifest
+    )
+
+    recover_provenance(config_path, campaign.log_path)
     reloaded = CampaignSession.from_files(config_path, campaign.log_path)
     assert reloaded.is_provenance_managed is True
     append_suggestions(
@@ -713,7 +740,7 @@ def test_interrupted_transaction_is_reported_then_finalized_on_next_mutation(
     assert manifest["pending_transaction"] is None
 
 
-def test_pending_transaction_is_cancelled_when_log_kept_previous_hash(
+def test_pending_transaction_requires_explicit_cancellation_when_log_is_previous(
     tmp_path: Path,
 ) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
@@ -730,8 +757,12 @@ def test_pending_transaction_is_cancelled_when_log_kept_previous_hash(
     )
     provenance_module._write_json_atomic(manifest_path, pending)
 
-    reloaded = CampaignSession.from_files(config_path, campaign.log_path)
-    assert reloaded.is_provenance_managed is True
+    summary = provenance_summary(config_path, campaign.log_path).set_index("field")["value"]
+    assert summary["reason_code"] == "pending_previous_state"
+    with pytest.raises(ProvenanceRecoveryRequired, match="provenance recovery"):
+        CampaignSession.from_files(config_path, campaign.log_path)
+
+    recover_provenance(config_path, campaign.log_path)
 
     append_suggestions(
         campaign.log_path,
@@ -867,9 +898,9 @@ def test_legacy_campaign_remains_manifest_free_and_report_compatible(
     campaign.append_suggestions(_suggestion(cfg, "row_1", 0.5))
 
     assert not provenance_module.manifest_path_for_log(log_path).exists()
-    assert campaign.provenance_summary().to_dict("records") == [
-        {"field": "provenance_status", "value": "legacy"}
-    ]
+    summary = dict(campaign.provenance_summary().itertuples(index=False, name=None))
+    assert summary["provenance_status"] == "legacy"
+    assert summary["resume_status"] == "legacy"
     assert list(campaign.report()) == before_report_keys
 
 

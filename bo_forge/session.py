@@ -69,50 +69,30 @@ class CampaignSession:
     log_fingerprint: str | None = None
     config_fingerprint: str | None = None
     _provenance_managed: bool | None = field(default=None, init=False, repr=False)
+    _provenance_policy: str = field(default="compatible", init=False, repr=False)
 
     @classmethod
     def initialize(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
         """Create an empty provenance-managed campaign and return its session."""
         from bo_forge._campaign.provenance import initialize_campaign_session
         return initialize_campaign_session(cls, config_path, log_path)
-
     @classmethod
-    def from_files(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
+    def from_files(
+        cls,
+        config_path: str | Path,
+        log_path: str | Path,
+        *,
+        provenance_policy: str = "compatible",
+    ) -> CampaignSession:
         """Create a campaign session from a YAML config and CSV campaign log."""
-        parsed_config_path = Path(config_path)
-        parsed_log_path = Path(log_path)
-        config_fingerprint = _log_file_fingerprint(parsed_config_path)
-        config = CampaignConfig.from_yaml(parsed_config_path)
-        if _log_file_fingerprint(parsed_config_path) != config_fingerprint:
-            raise LogConflictError(
-                "Campaign config changed while it was being loaded. Reload the campaign."
-            )
-        df, fingerprint = _load_campaign_log_snapshot(parsed_log_path, config)
-        if _log_file_fingerprint(parsed_config_path) != config_fingerprint:
-            raise LogConflictError(
-                "Campaign config changed while it was being loaded. Reload the campaign."
-            )
-        from bo_forge._campaign.provenance import validate_manifest_for_load
-        manifest = validate_manifest_for_load(
-            parsed_config_path,
-            parsed_log_path,
-            config=config,
-            log_row_count=len(df),
+        from bo_forge._campaign.provenance_resume import load_campaign_session
+
+        return load_campaign_session(
+            cls,
+            config_path,
+            log_path,
+            provenance_policy=provenance_policy,
         )
-        if manifest is not None and _log_file_fingerprint(parsed_log_path) != fingerprint:
-            raise LogConflictError(
-                "Campaign log changed while it was being loaded. Reload the campaign."
-            )
-        session = cls(
-            config_path=parsed_config_path,
-            log_path=parsed_log_path,
-            config=config,
-            df=df,
-            log_fingerprint=fingerprint,
-            config_fingerprint=config_fingerprint,
-        )
-        session._provenance_managed = manifest is not None
-        return session
 
     def reload(self) -> pd.DataFrame:
         """Reload the campaign log from disk into the session."""
@@ -123,6 +103,7 @@ class CampaignSession:
             self.log_path,
             config=self.config,
             log_row_count=len(df),
+            provenance_policy=self._provenance_policy,
         )
         managed = manifest is not None
         if self._provenance_managed is not None and managed != self._provenance_managed:
@@ -138,6 +119,7 @@ class CampaignSession:
 
     def validate(self) -> None:
         """Validate the current session DataFrame."""
+        self._assert_provenance_resumable()
         validate_campaign_data(self.config, self.df)
 
     def summary(self) -> pd.DataFrame:
@@ -505,16 +487,16 @@ class CampaignSession:
 
     def report(self) -> dict[str, pd.DataFrame]:
         """Return read-only campaign report tables for notebook display."""
+        self._assert_provenance_resumable()
         tables = _base_report_tables(self)
         for name, reader in _optional_report_readers(self):
             tables[name] = reader()
         if self.is_provenance_managed:
             tables["provenance"] = self.provenance_summary()
         return tables
-
     @property
     def is_provenance_managed(self) -> bool:
-        """Return whether this campaign has a valid provenance manifest."""
+        """Return whether this session loaded as a provenance-managed campaign."""
         return bool(self._provenance_managed)
 
     def provenance_summary(self) -> pd.DataFrame:
@@ -623,6 +605,7 @@ class CampaignSession:
         """Return suggested candidates without mutating session state or writing to disk."""
         from bo_forge.suggestions import suggest_next
 
+        self._assert_provenance_resumable()
         return suggest_next(
             self.config,
             self.df.copy(deep=True),
@@ -702,52 +685,72 @@ class CampaignSession:
             return fingerprint
         return _session_log_fingerprint(fingerprint, managed=self._provenance_managed)
 
+    def _assert_provenance_resumable(self) -> None:
+        from bo_forge._campaign.provenance_resume import (
+            enforce_resumable,
+            inspect_provenance,
+        )
+
+        inspection = inspect_provenance(
+            self.config_path,
+            self.log_path,
+            provenance_policy=self._provenance_policy,
+            config=self.config,
+            include_environment=False,
+        )
+        managed = inspection.manifest is not None
+        if self._provenance_managed is not None and managed != self._provenance_managed:
+            raise LogConflictError(
+                "Campaign provenance state changed after it was loaded. Reload from files."
+            )
+        enforce_resumable(inspection)
+
     def plot_progress(self, **kwargs: Any) -> Any:
         """Plot campaign progress and return figure/axes objects."""
         from bo_forge.diagnostics import plot_progress as _plot_progress
-
+        self._assert_provenance_resumable()
         return _plot_progress(self.config, self.df, **kwargs)
 
     def plot_diagnostics(self, **kwargs: Any) -> Any:
         """Plot campaign diagnostics and return figure/axes objects."""
         from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
-
+        self._assert_provenance_resumable()
         return _plot_diagnostics(self.config, self.df, **kwargs)
 
     def plot_cost_progress(self, **kwargs: Any) -> Any:
         """Plot best observed objective against cumulative effective cost."""
         from bo_forge.diagnostics import plot_cost_progress as _plot_cost_progress
-
+        self._assert_provenance_resumable()
         return _plot_cost_progress(self.config, self.df, **kwargs)
 
     def plot_replicates(self, **kwargs: Any) -> Any:
         """Plot replicate-group objective summaries and return figure/axes objects."""
         from bo_forge.diagnostics import plot_replicates as _plot_replicates
-
+        self._assert_provenance_resumable()
         return _plot_replicates(self.config, self.df, **kwargs)
 
     def plot_pareto(self, **kwargs: Any) -> Any:
         """Plot observed Pareto diagnostics for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_pareto as _plot_pareto
-
+        self._assert_provenance_resumable()
         return _plot_pareto(self.config, self.df, **kwargs)
 
     def plot_pareto_parallel(self, **kwargs: Any) -> Any:
         """Plot Pareto-front rows with normalized parallel coordinates."""
         from bo_forge.diagnostics import plot_pareto_parallel as _plot_pareto_parallel
-
+        self._assert_provenance_resumable()
         return _plot_pareto_parallel(self.config, self.df, **kwargs)
 
     def plot_hypervolume(self, **kwargs: Any) -> Any:
         """Plot hypervolume progress for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_hypervolume as _plot_hypervolume
-
+        self._assert_provenance_resumable()
         return _plot_hypervolume(self.config, self.df, **kwargs)
 
     def plot_stage_diagnostics(self, **kwargs: Any) -> Any:
         """Plot structured-campaign stage diagnostics."""
         from bo_forge.diagnostics import plot_stage_diagnostics as _plot_stage_diagnostics
-
+        self._assert_provenance_resumable()
         return _plot_stage_diagnostics(self.config, self.df, **kwargs)
 
     def plot_fidelity_diagnostics(self, **kwargs: Any) -> Any:
@@ -755,13 +758,13 @@ class CampaignSession:
         from bo_forge.diagnostics import (
             plot_fidelity_diagnostics as _plot_fidelity_diagnostics,
         )
-
+        self._assert_provenance_resumable()
         return _plot_fidelity_diagnostics(self.config, self.df, **kwargs)
 
     def plot_fidelity_progress(self, **kwargs: Any) -> Any:
         """Plot fidelity use and target-fidelity objective progress."""
         from bo_forge.diagnostics import plot_fidelity_progress as _plot_fidelity_progress
-
+        self._assert_provenance_resumable()
         return _plot_fidelity_progress(self.config, self.df, **kwargs)
 
     def plot_context_diagnostics(self, **kwargs: Any) -> Any:
@@ -769,7 +772,7 @@ class CampaignSession:
         from bo_forge.diagnostics import (
             plot_context_diagnostics as _plot_context_diagnostics,
         )
-
+        self._assert_provenance_resumable()
         return _plot_context_diagnostics(self.config, self.df, **kwargs)
 
     def plot_model_diagnostics(self, **kwargs: Any) -> Any:
@@ -777,7 +780,7 @@ class CampaignSession:
         from bo_forge.diagnostics import (
             plot_model_diagnostics as _plot_model_diagnostics,
         )
-
+        self._assert_provenance_resumable()
         return _plot_model_diagnostics(self.config, self.df, **kwargs)
 
     def plot_model_comparison(self, **kwargs: Any) -> Any:
@@ -785,7 +788,7 @@ class CampaignSession:
         from bo_forge.diagnostics import (
             plot_model_comparison as _plot_model_comparison,
         )
-
+        self._assert_provenance_resumable()
         return _plot_model_comparison(self.config, self.df, **kwargs)
 
     def plot_qlog_nei_diagnostics(self, **kwargs: Any) -> Any:
@@ -793,5 +796,5 @@ class CampaignSession:
         from bo_forge.diagnostics import (
             plot_qlog_nei_diagnostics as _plot_qlog_nei_diagnostics,
         )
-
+        self._assert_provenance_resumable()
         return _plot_qlog_nei_diagnostics(self.config, self.df, **kwargs)

@@ -495,6 +495,26 @@ def test_cached_validation_status_detects_changed_file_metadata(tmp_path: Path) 
         "Reload to validate"
     )
 
+
+def test_validation_cache_signature_tracks_manifest_and_policy(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    log_path = tmp_path / "campaign.csv"
+    manifest_path = tmp_path / "campaign.csv.manifest.json"
+    config_path.write_text("campaign_name: cached\n", encoding="utf-8")
+    log_path.write_text("row_id\n", encoding="utf-8")
+    compatible = streamlit_app._validation_cache_signature(config_path, log_path)
+
+    manifest_path.write_text('{"schema_version": 1}\n', encoding="utf-8")
+    with_manifest = streamlit_app._validation_cache_signature(config_path, log_path)
+    required = streamlit_app._validation_cache_signature(
+        config_path,
+        log_path,
+        require_provenance=True,
+    )
+
+    assert with_manifest != compatible
+    assert required != with_manifest
+
 def test_overview_uses_cached_validation_without_validating(tmp_path: Path) -> None:
     log_path = copy_example_log(tmp_path, "01_simple_2d_maximise_logei_campaign_log.csv")
     campaign = load_campaign_session("configs/01_simple_2d_maximise_logei.yaml", log_path)

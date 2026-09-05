@@ -12,11 +12,13 @@ import pytest
 from fastapi.testclient import TestClient
 from filelock import FileLock
 
+import bo_forge._campaign.provenance as provenance_module
 import bo_forge.logs as logs_module
 import bo_forge_app.api as api_module
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import LogWriteError
 from bo_forge.io import empty_campaign_log
+from bo_forge.session import CampaignSession
 from bo_forge_app.api import _error_recovery, create_app
 from bo_forge_app.service import CampaignAppService
 from bo_forge_app.stages import InMemoryStageStore, StageStoreError
@@ -936,6 +938,46 @@ def test_server_stages_only_keeps_server_managed_append_operational(
     assert response.status_code == 200, response.text
     assert response.json()["stage"]["status"] == "consumed"
     assert len(pd.read_csv(log_path, keep_default_na=False)) == before_rows + 1
+
+
+def test_server_stage_preserves_required_provenance_policy(tmp_path: Path) -> None:
+    ref = _copy_campaign(tmp_path)
+    config_path = tmp_path / ref["config_path"]
+    log_path = tmp_path / ref["log_path"]
+    log_path.unlink()
+    CampaignSession.initialize(config_path, log_path)
+    api_client = TestClient(create_app(tmp_path))
+    staged = api_client.post(
+        "/campaign/suggestions/dry-run",
+        json={**ref, "require_provenance": True},
+    ).json()["stage"]
+    before = log_path.read_bytes()
+    provenance_module.manifest_path_for_log(log_path).unlink()
+
+    response = api_client.post(f"/campaign/stages/{staged['stage_id']}/append")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "stage_stale"
+    assert log_path.read_bytes() == before
+    assert api_client.get(f"/campaign/stages/{staged['stage_id']}").status_code == 409
+
+
+def test_server_stage_detects_removed_manifest_in_compatible_mode(tmp_path: Path) -> None:
+    ref = _copy_campaign(tmp_path)
+    config_path = tmp_path / ref["config_path"]
+    log_path = tmp_path / ref["log_path"]
+    log_path.unlink()
+    CampaignSession.initialize(config_path, log_path)
+    api_client = TestClient(create_app(tmp_path))
+    staged = api_client.post("/campaign/suggestions/dry-run", json=ref).json()["stage"]
+    before = log_path.read_bytes()
+    provenance_module.manifest_path_for_log(log_path).unlink()
+
+    response = api_client.post(f"/campaign/stages/{staged['stage_id']}/append")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "stage_stale"
+    assert log_path.read_bytes() == before
 
 
 def test_concurrent_server_stage_append_writes_exactly_once(

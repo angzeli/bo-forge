@@ -9,7 +9,7 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `status='observed' but objective ... is blank`: fill the objective value or change the row back to `suggested`.
 - `status='suggested' but objective ... is filled`: suggested rows must leave the objective blank until `mark_observed()` is called.
 - `Cannot generate new suggestions while unresolved status='suggested' rows exist`: run the experiment and call `mark_observed()` before requesting another suggestion; in review-enabled campaigns, resolve `pending` or `accepted` review rows first.
-- `Row ... has invalid source`: use only the sources supported by the config, such as `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `cost_log_ei`, `qmf_kg`, `qlog_ehvi`, or `cost_qlog_ehvi`.
+- `Row ... has invalid source`: use only the sources supported by the config, such as `manual`, `sobol`, `random`, `log_ei`, `qlog_ei`, `qlog_nei`, `cost_log_ei`, `qmf_kg`, `qlog_ehvi`, `qlog_nehvi`, or `cost_qlog_ehvi`.
 - `Duplicate row_id`: every row needs a unique `row_id`.
 - `Variable ... is outside bounds`: check the variable value against the YAML bounds.
 - `violates constraint`: check the row values against the YAML `constraints` block.
@@ -23,6 +23,12 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
   mutating campaign files. Keep a managed CSV and its `.manifest.json` sidecar
   together when moving or restoring files; a fresh schema-v1 load cannot infer that a
   missing sidecar was deleted from a formerly managed campaign.
+- `provenance manifest is required`: either restore/initialize the sidecar or omit
+  `--require-provenance` only when legacy-compatible loading is intentional.
+- `pending_previous_state` or `pending_resulting_state`: run `bo-forge provenance`
+  to inspect the state, then `bo-forge provenance-recover` explicitly. Ordinary
+  load and mutation paths do not repair pending transactions. An unknown pending
+  state must be restored to the recorded previous or intended resulting CSV hash.
 
 ## ⚙️ Config Errors
 

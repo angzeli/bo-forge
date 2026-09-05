@@ -1,8 +1,8 @@
-"""BO Forge v3.1.0."""
+"""BO Forge v3.1.1."""
 
 from importlib import import_module
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 
 from bo_forge.config import (
     BOConfig,
@@ -29,6 +29,7 @@ from bo_forge.errors import (
     LogValidationError,
     LogWriteError,
     ProvenanceError,
+    ProvenanceRecoveryRequired,
     SuggestionError,
 )
 
@@ -49,6 +50,7 @@ __all__ = [
     "ModelConfig",
     "ObjectiveConfig",
     "ProvenanceError",
+    "ProvenanceRecoveryRequired",
     "ReplicateConfig",
     "ReviewConfig",
     "StageConfig",
@@ -75,6 +77,7 @@ __all__ = [
     "pareto_front",
     "pareto_summary",
     "provenance_summary",
+    "recover_provenance",
     "qlog_nei_summary",
     "review_suggestion",
     "replicate_summary",
@@ -106,6 +109,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "pareto_front": ("bo_forge.multi_objective", "pareto_front"),
     "pareto_summary": ("bo_forge.multi_objective", "pareto_summary"),
     "provenance_summary": ("bo_forge.provenance", "provenance_summary"),
+    "recover_provenance": ("bo_forge.provenance", "recover_provenance"),
     "qlog_nei_summary": ("bo_forge.noisy", "qlog_nei_summary"),
     "replicate_summary": ("bo_forge.replicates", "replicate_summary"),
     "review_suggestion": ("bo_forge.logs", "review_suggestion"),

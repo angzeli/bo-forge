@@ -1,13 +1,13 @@
-# 🧪 BO Forge v3.1.0
+# 🧪 BO Forge v3.1.1
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.1.0 adds an opt-in durable provenance foundation around the v3 architecture
-without changing BO numerical behavior or YAML/CSV campaign schemas. Newly
-initialized campaigns receive a versioned JSON sidecar with config identity,
-log integrity, bounded environment snapshots, and an append-only mutation
-ledger. Existing campaigns remain legacy-compatible and are not silently
-adopted.
+v3.1.1 hardens the opt-in durable provenance foundation introduced in v3.1.0
+without changing BO numerical behavior or YAML/CSV campaign schemas. Campaign
+loading now supports compatible or managed-only resume policy, provenance
+mismatches have stable diagnostic reason codes, and interrupted managed writes
+require an explicit recovery action. Existing campaigns remain
+legacy-compatible and are not silently adopted.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
 notebooks, service calls, API payloads, and launcher safeguards remain
@@ -163,6 +163,8 @@ Initialize a new provenance-managed campaign with:
 ```bash
 bo-forge init-log --config configs/my_campaign.yaml --log work/campaign.csv
 bo-forge provenance --config configs/my_campaign.yaml --log work/campaign.csv
+bo-forge validate --config configs/my_campaign.yaml --log work/campaign.csv \
+  --require-provenance
 ```
 
 The first command creates both the canonical CSV and
@@ -170,6 +172,8 @@ The first command creates both the canonical CSV and
 continue unchanged. Move and back up a managed CSV together with its sidecar; schema v1
 cannot distinguish a deliberately removed sidecar from a genuine legacy CSV. See
 [docs/PROVENANCE.md](https://github.com/angzeli/bo-forge/blob/main/docs/PROVENANCE.md).
+If inspection reports a recoverable interrupted transaction, run
+`bo-forge provenance-recover` with the current log fingerprint before resuming.
 
 ```mermaid
 flowchart LR

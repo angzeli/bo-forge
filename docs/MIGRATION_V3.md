@@ -8,10 +8,16 @@ does not require YAML or CSV migration.
 Existing YAML configuration keys, defaults, canonical CSV columns, status
 transitions, fingerprints, write locking, and explicit append behavior remain
 compatible. YAML and CSV continue to be campaign source data. Starting in
-v3.1.0, `CampaignSession.initialize()` and `bo-forge init-log` create an
+v3.1.0 and later, `CampaignSession.initialize()` and `bo-forge init-log` create an
 additional versioned provenance manifest beside a new CSV log. Existing
 campaigns without this sidecar remain legacy-compatible and are not adopted
 silently. Pickled internal Python objects are not a compatibility target.
+
+Starting in v3.1.1, compatible loading remains the default, while
+`CampaignSession.from_files(..., provenance_policy="required")` can enforce
+managed-only resume. Interrupted schema-v1 transactions now require explicit
+`recover_provenance()` or `bo-forge provenance-recover`; ordinary load and mutation
+paths do not repair them automatically. No manifest, YAML, or CSV migration is needed.
 
 ## Python Imports
 
