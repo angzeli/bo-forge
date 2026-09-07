@@ -65,6 +65,7 @@ class StagedBundlePayload(BaseModel):
     log_path: str
     log_fingerprint: str
     appended: bool = False
+    manifest_fingerprint: str | None = None
     context_values: dict[str, object] | None = None
     context_values_fingerprint: str | None = None
     stage: str | None = None
@@ -172,6 +173,7 @@ def _staged_bundle_payload(bundle: dict[str, object], root: Path) -> dict[str, o
         "log_path": _relative_to_root(root, bundle.get("log_path", "")),
         "log_fingerprint": str(bundle.get("log_fingerprint", "")),
         "appended": bool(bundle.get("appended", False)),
+        "manifest_fingerprint": bundle.get("manifest_fingerprint"),
         "context_values": bundle.get("context_values"),
         "context_values_fingerprint": bundle.get("context_values_fingerprint"),
         "stage": bundle.get("stage"),
@@ -187,6 +189,7 @@ def _rehydrate_staged_bundle(payload: StagedBundlePayload, root: Path) -> dict[s
         "log_path": str(_resolve_under_root(root, payload.log_path, "staged.log_path")),
         "log_fingerprint": payload.log_fingerprint,
         "appended": payload.appended,
+        "manifest_fingerprint": payload.manifest_fingerprint,
     }
     if payload.context_values is not None:
         bundle["context_values"] = payload.context_values

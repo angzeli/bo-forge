@@ -163,6 +163,26 @@ the refreshed provenance table. Ordinary endpoints return HTTP `409` with code
 `provenance_recovery_required` while a recoverable transaction is pending. See
 [PROVENANCE.md](PROVENANCE.md).
 
+Explicit lifecycle routes are `POST /campaign/provenance/adopt`, `/migrate`,
+`/accept-config`, and `/fork`. Send the usual root-relative campaign reference
+for a preview. Fork additionally takes `destination` and optional `config_changes`
+(`campaign_name`, `bo`, `model`). Apply by resending those fields with `apply: true`,
+a nonempty `reason`, and the preview's exact `expected_identities` mapping:
+
+```json
+{
+  "config_path": "campaign.yaml", "log_path": "campaign.csv",
+  "apply": true, "reason": "Start tracking validated legacy data",
+  "expected_identities": {"...": "exact mapping from the adoption preview"}
+}
+```
+
+Source, destination, snapshot, and archive paths remain root-bounded. Stale preview
+identities use the existing `stale_log` error contract. Adoption cannot overwrite
+any manifest; fork cannot overwrite any directory. Lifecycle changes invalidate
+server stages and client-carried staged bundles even when CSV bytes are unchanged.
+These actions remain trusted-client operations, not authorization mechanisms.
+
 Generate dry-run suggestions without mutating the CSV:
 
 ```bash

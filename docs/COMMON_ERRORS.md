@@ -17,7 +17,15 @@ BO Forge tries to fail early with specific messages. Most errors come from hand-
 - `require an explicit stage`, `unknown stage`, or `inactive variable`: check structured-campaign `stages:`, pass `--stage` for structured suggestions, and keep inactive variable cells blank.
 - `Contextual suggestions require values`: pass every configured context value through `context.default_values`, `context_values={...}`, the app context inputs, API `context_values`, or CLI `--context NAME=VALUE`.
 - `Non-default model profiles`: use `model.profile: default` for multi-objective, multi-fidelity, or structured campaigns.
-- `Provenance manifest ...`: restore a readable schema-v1 manifest that matches
+- `Lifecycle preview is stale`: inspect a new lifecycle preview and apply that exact
+  preview with a reason. Config, CSV, or manifest changed since the previous preview.
+- `Explicit v2 migration is required`: restore a coherent v1 campaign, migrate it,
+  then make formatting-only YAML edits and preview acceptance.
+- `Resolve the observation queue before forking`: finish active suggestions and pending
+  reviews. Rejected/deferred rows are retained as inherited history.
+- `Provenance archive ...`: restore the exact referenced sibling snapshot from backup;
+  do not substitute a mutable parent path or silently recreate history.
+- `Provenance manifest ...`: restore a readable supported-schema manifest that matches
   its recorded config/log paths. Malformed or unsupported manifests raise
   `ProvenanceError`; config/log hash mismatches raise `LogConflictError` without
   mutating campaign files. Keep a managed CSV and its `.manifest.json` sidecar

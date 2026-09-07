@@ -168,6 +168,7 @@ def _should_clear_staged_bundle(reason: str) -> bool:
         "Context values changed after suggestions were staged.",
         "Config file changed after suggestions were staged.",
         "Log file changed after suggestions were staged.",
+        "Campaign manifest changed after suggestions were staged.",
         "Staged suggestions changed after they were staged.",
     }
 

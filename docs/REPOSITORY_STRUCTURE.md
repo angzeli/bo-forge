@@ -91,7 +91,12 @@ The compatibility facades and remaining focused modules include:
 - `plot_registry.py`: internal plot labels and `CampaignSession` method routing shared by adapters.
 - `plot_style.py`: shared matplotlib styling helpers.
 - `io.py`: canonical empty-log creation.
-- `provenance.py`: public provenance-summary and explicit-recovery facade.
+- `provenance.py`: public inspection, recovery, adoption, migration, formatting, and fork facade.
+- `_campaign/provenance_lifecycle.py`, `provenance_v2.py`, and `provenance_fork.py`:
+  preview/apply lifecycle transactions, schema-v2 metadata/archives, and child publication.
+- `_cli/provenance_lifecycle.py`: preview-first lifecycle command adapters.
+- `bo_forge_api/provenance.py` and `bo_forge_app/ui/provenance.py`:
+  root-bounded API lifecycle routes and Streamlit preview/confirm/reload controls.
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 

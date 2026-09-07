@@ -1,8 +1,8 @@
-"""BO Forge v3.1.1."""
+"""BO Forge v3.1.2."""
 
 from importlib import import_module
 
-__version__ = "3.1.1"
+__version__ = "3.1.2"
 
 from bo_forge.config import (
     BOConfig,
@@ -78,6 +78,10 @@ __all__ = [
     "pareto_summary",
     "provenance_summary",
     "recover_provenance",
+    "adopt_provenance",
+    "migrate_provenance",
+    "accept_provenance_config",
+    "fork_campaign",
     "qlog_nei_summary",
     "review_suggestion",
     "replicate_summary",
@@ -88,6 +92,10 @@ __all__ = [
 ]
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "adopt_provenance": ("bo_forge.provenance", "adopt_provenance"),
+    "migrate_provenance": ("bo_forge.provenance", "migrate_provenance"),
+    "accept_provenance_config": ("bo_forge.provenance", "accept_provenance_config"),
+    "fork_campaign": ("bo_forge.provenance", "fork_campaign"),
     "CampaignSession": ("bo_forge.session", "CampaignSession"),
     "aggregate_observed_replicates": (
         "bo_forge.replicates",

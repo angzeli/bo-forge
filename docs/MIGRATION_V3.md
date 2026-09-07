@@ -19,6 +19,13 @@ managed-only resume. Interrupted schema-v1 transactions now require explicit
 `recover_provenance()` or `bo-forge provenance-recover`; ordinary load and mutation
 paths do not repair them automatically. No manifest, YAML, or CSV migration is needed.
 
+v3.1.2 initializes new manifests in schema v2 and continues to read/write existing
+v1 campaigns without silently upgrading. Explicit adoption, migration, formatting
+acceptance, and forks use previews and reasons. Schema-v1-only older versions cannot
+read v2. Move/back up all referenced sibling archives together with YAML/CSV/manifest
+files. Child lineage uses captured snapshots and remains inspectable after the parent
+moves. See [PROVENANCE.md](PROVENANCE.md) before changing an existing managed campaign.
+
 ## Python Imports
 
 The documented names in `bo_forge.__all__` retain their v2 names and

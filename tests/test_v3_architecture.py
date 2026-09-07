@@ -69,6 +69,10 @@ EXPECTED_PUBLIC_EXPORTS = {
     "pareto_summary",
     "provenance_summary",
     "recover_provenance",
+    "adopt_provenance",
+    "migrate_provenance",
+    "accept_provenance_config",
+    "fork_campaign",
     "qlog_nei_summary",
     "replicate_summary",
     "review_suggestion",
@@ -250,7 +254,14 @@ def test_core_public_call_signatures_remain_keyword_compatible() -> None:
         for name in PUBLIC_SIGNATURE_NAMES
     }
 
-    assert callable_exports == PUBLIC_SIGNATURE_NAMES | PUBLIC_EXCEPTION_EXPORTS
+    lifecycle_exports = {"adopt_provenance", "migrate_provenance",
+                         "accept_provenance_config", "fork_campaign"}
+    assert callable_exports == PUBLIC_SIGNATURE_NAMES | PUBLIC_EXCEPTION_EXPORTS | lifecycle_exports
+    for name in lifecycle_exports:
+        parameters = inspect.signature(getattr(bo_forge, name)).parameters
+        assert parameters["apply"].default is False
+        assert parameters["apply"].kind == inspect.Parameter.KEYWORD_ONLY
+        assert parameters["expected_identities"].default is None
     assert _signature_digest(signatures) == PUBLIC_SIGNATURE_DIGEST, signatures
 
 

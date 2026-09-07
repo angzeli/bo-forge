@@ -96,6 +96,7 @@ class StageValidationSnapshot:
     config_fingerprint: str
     log_fingerprint: str
     provenance_managed: bool
+    manifest_fingerprint: str | None = None
 
 
 @dataclass
@@ -670,6 +671,7 @@ class InMemoryStageStore:
             config_fingerprint=str(record.bundle.get("config_fingerprint", "")),
             log_fingerprint=str(record.bundle.get("log_fingerprint", "")),
             provenance_managed=record.provenance_managed,
+            manifest_fingerprint=record.bundle.get("manifest_fingerprint"),
         )
 
     @staticmethod
@@ -685,6 +687,7 @@ class InMemoryStageStore:
             and str(record.bundle.get("log_fingerprint", ""))
             == snapshot.log_fingerprint
             and record.provenance_managed == snapshot.provenance_managed
+            and record.bundle.get("manifest_fingerprint") == snapshot.manifest_fingerprint
         )
 
     @staticmethod

@@ -96,6 +96,9 @@ def create_app(
         server_stages_only=server_stages_only,
     )
     _register_provenance_recovery_route(app, resolved_root)
+    from bo_forge_api.provenance import register_lifecycle_routes
+
+    register_lifecycle_routes(app, resolved_root)
     _register_server_stage_routes(app, resolved_root, stage_store)
     return app
 
@@ -565,6 +568,12 @@ def _server_stage_file_invalidation_reason(
     manifest_path = staged.log_path.with_name(f"{staged.log_path.name}.manifest.json")
     if manifest_path.exists() != staged.provenance_managed:
         return "Campaign provenance state changed after suggestions were staged."
+    from bo_forge._campaign.provenance import manifest_fingerprint
+
+    expected_manifest = (staged.manifest_fingerprint if isinstance(staged, StageValidationSnapshot)
+                         else staged.bundle.get("manifest_fingerprint"))
+    if manifest_fingerprint(staged.log_path) != expected_manifest:
+        return "Campaign manifest changed after suggestions were staged."
     config_fingerprint, config_unreadable = _cached_stage_file_fingerprint(
         staged.config_path,
         fingerprint_cache,

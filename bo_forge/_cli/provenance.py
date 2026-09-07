@@ -29,6 +29,9 @@ def register_provenance_commands(
         help="Optional current log fingerprint required before recovery.",
     )
     recover_parser.set_defaults(handler=_cmd_provenance_recover)
+    from bo_forge._cli.provenance_lifecycle import register_lifecycle_commands
+
+    register_lifecycle_commands(subparsers, add_config_log_arguments)
 
 
 def _cmd_provenance(args: argparse.Namespace) -> int:

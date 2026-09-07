@@ -4,9 +4,9 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.1.1`. It adds fail-closed resume policy, stable
-provenance mismatch classification, and explicit interrupted-transaction
-recovery while keeping legacy YAML/CSV campaigns compatible by default.
+Current prepared baseline: `v3.1.2`. It adds explicit
+adoption, schema-v2 migration, formatting acceptance, and captured parent/child
+lineage while keeping legacy campaigns compatible. v3.1.x remains active.
 
 ## Roadmap So Far
 
@@ -62,9 +62,9 @@ flowchart LR
     class v31 majorActive
     class v32,v33,v34 majorFuture
     class v300,v301,v302 patchDone
-    class v310 patchDone
-    class v311 patchActive
-    class v312,v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v310,v311 patchDone
+    class v312 patchActive
+    class v313,v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -83,6 +83,7 @@ flowchart LR
 | `v3.0.2` | prepared | Canonical API factory probes and independent package-extra validation |
 | `v3.1.0` | prepared | Versioned campaign manifests, mutation ledger, and managed transaction recovery |
 | `v3.1.1` | prepared | Fail-closed resume policy, mismatch classification, and explicit recovery |
+| `v3.1.2` | prepared | Explicit adoption, migration, config formatting acceptance, and lineage |
 | `v3.1.x` | active | Durable campaign provenance and lineage |
 | `v3.2.x` | planned | Predictive diagnostics correctness and explicit fit metadata |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
@@ -222,9 +223,14 @@ Status: prepared; publication requires separate authorization and exact-commit C
 
 ### v3.1.2 - Explicit Migration And Lineage
 
-- Add explicit legacy campaign adoption without fabricating unknown history.
-- Preserve parent/child identity and old/new manifests.
-- Record migrations and authorized overrides append-only.
+Status: prepared; publication requires separate authorization and exact-commit CI
+
+- Explicitly adopt legacy data with unknown earlier history, without modifying YAML/CSV.
+- Migrate v1 manifests to v2 with exact immutable archives; initialize new campaigns in v2.
+- Accept formatting-only config changes after semantic equality checks and explicit migration.
+- Fork coherent campaigns into new directories with inherited CSVs and captured parent snapshots.
+- Restrict child changes to campaign name, BO settings, and model profile under existing validation.
+- Require preview identities and reasons on apply; retain explicit recovery and reject force overrides.
 
 ### v3.1.3 - Provenance Acceptance And Documentation
 

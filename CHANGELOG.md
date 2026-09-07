@@ -1,5 +1,15 @@
 # 📝 BO Forge Changelog
 
+## v3.1.2 - Explicit Campaign Adoption, Migration, And Lineage
+
+- Adds preview-first adoption, v1-to-v2 migration, formatting-only config acceptance,
+  and linked child campaigns across Python, CLI, Streamlit, and the experimental API.
+- Records unknown legacy history and inherited child baselines without fabricating
+  observation events; preserves exact prior manifests and config snapshots in archives.
+- Newly initialized campaigns use schema v2. Existing v1 campaigns remain supported
+  without silent upgrades; manifest identity changes invalidate loaded and staged state.
+- Preserves BO behavior, supported combinations, YAML keys, and canonical CSV columns.
+
 ## v3.1.1 - Fail-Closed Provenance Resume
 
 This release makes managed-campaign resume decisions explicit while preserving

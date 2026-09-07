@@ -72,7 +72,7 @@ def _append_in_process(
         results.put((row_id, "ok", ""))
 
 
-def test_initialize_writes_deterministic_schema_v1_manifest(tmp_path: Path) -> None:
+def test_initialize_writes_deterministic_schema_v2_manifest(tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
     config_path = write_config(tmp_path / "config" / "campaign.yaml")
     log_path = tmp_path / "data" / "campaign.csv"
@@ -95,8 +95,10 @@ def test_initialize_writes_deterministic_schema_v1_manifest(tmp_path: Path) -> N
         "pending_transaction",
         "schema_version",
         "updated_at",
+        "origin",
+        "archives",
     }
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     uuid.UUID(str(manifest["campaign_id"]))
     assert datetime.fromisoformat(str(manifest["created_at"]).replace("Z", "+00:00"))
     assert manifest["created_at"] == manifest["updated_at"]
@@ -126,7 +128,7 @@ def test_initialize_writes_deterministic_schema_v1_manifest(tmp_path: Path) -> N
     }
     assert event["operation"] == "initialize"
     environment = manifest["environments"][0]
-    assert environment["bo_forge"] == "3.1.1"
+    assert environment["bo_forge"] == "3.1.2"
     assert event["environment_id"] == environment["environment_id"]
     assert manifest["pending_transaction"] is None
     assert campaign.is_provenance_managed is True

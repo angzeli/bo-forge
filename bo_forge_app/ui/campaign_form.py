@@ -121,6 +121,9 @@ def _render_load_existing_campaign(st: Any) -> None:
         )
 
     _render_provenance_recovery_action(st)
+    from bo_forge_app.ui.provenance import render_lifecycle_actions
+
+    render_lifecycle_actions(st, config_value, log_value)
 
     current_config = st.session_state.get(CONFIG_PATH_KEY)
     current_log = st.session_state.get(LOG_PATH_KEY)

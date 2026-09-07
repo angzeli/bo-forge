@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from bo_forge._campaign.provenance import manifest_fingerprint
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError, LogConflictError, ProvenanceRecoveryRequired
 from bo_forge.plot_registry import _PLOT_ROUTES
@@ -74,6 +75,9 @@ def make_staged_suggestion_bundle(
         else file_fingerprint(resolved_log_path),
         "appended": False,
     }
+    current_manifest = manifest_fingerprint(resolved_log_path)
+    if current_manifest is not None:
+        bundle["manifest_fingerprint"] = current_manifest
     if stage is not None:
         bundle["stage"] = stage
     if context_values is not None:
@@ -112,6 +116,8 @@ def staged_bundle_invalidation_reason(
         return "Config file changed after suggestions were staged."
     if file_fingerprint(resolved_log_path) != bundle.get("log_fingerprint"):
         return "Log file changed after suggestions were staged."
+    if manifest_fingerprint(resolved_log_path) != bundle.get("manifest_fingerprint"):
+        return "Campaign manifest changed after suggestions were staged."
     return None
 
 
@@ -571,6 +577,31 @@ class CampaignAppService:
             expected_log_fingerprint=expected_log_fingerprint,
         )
 
+    @staticmethod
+    def provenance_lifecycle_actions(config_path, log_path) -> list[str]:
+        """Inspect lifecycle eligibility only when explicitly requested by an adapter."""
+        from bo_forge._campaign.provenance_resume import inspect_provenance
+
+        inspection = inspect_provenance(config_path, log_path, include_environment=False)
+        if inspection.provenance_status == "legacy":
+            return ["adopt"]
+        manifest = inspection.manifest
+        if inspection.resume_status == "ready":
+            return ["migrate", "fork"] if manifest["schema_version"] == 1 else ["fork"]
+        if inspection.reason_code == "config_bytes_changed_semantics_same" and (
+            manifest["schema_version"] == 2 and manifest["pending_transaction"] is None
+            and inspection.log_bytes_match
+        ):
+            return ["accept-config"]
+        return []
+
+    @staticmethod
+    def provenance_lifecycle(operation: str, config_path, log_path, **kwargs) -> dict:
+        """Preview or explicitly apply one backend-owned provenance lifecycle operation."""
+        from bo_forge._campaign.provenance_lifecycle import lifecycle
+
+        return lifecycle(operation, config_path, log_path, **kwargs)
+
     def suggest_dry_run(
         self,
         batch_size: int,
@@ -585,6 +616,7 @@ class CampaignAppService:
             context_values=context_values,
         )
         quality = self.session.suggestion_quality(suggestions)
+        self.session._check_manifest_identity()
         if (
             file_fingerprint(self.config_path) != config_fingerprint
             or file_fingerprint(self.log_path) != log_fingerprint
@@ -602,6 +634,10 @@ class CampaignAppService:
             config_fingerprint=config_fingerprint,
             log_fingerprint=log_fingerprint,
         )
+        if self.session._provenance_managed is False:
+            bundle.pop("manifest_fingerprint", None)
+        elif self.session._provenance_managed is True:
+            bundle["manifest_fingerprint"] = self.session._manifest_fingerprint
         return StagedSuggestionResult(suggestions, bundle, quality)
 
     def append_staged(

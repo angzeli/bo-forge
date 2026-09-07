@@ -22,12 +22,7 @@ from bo_forge.costs import (
     budget_remaining,
     observed_effective_cost,
 )
-from bo_forge.errors import LogConflictError
-from bo_forge.logs import (
-    _load_campaign_log_snapshot,
-    _log_file_fingerprint,
-    _session_log_fingerprint,
-)
+from bo_forge.logs import _session_log_fingerprint
 from bo_forge.logs import (
     append_suggestions as _append_suggestions,
 )
@@ -70,6 +65,8 @@ class CampaignSession:
     config_fingerprint: str | None = None
     _provenance_managed: bool | None = field(default=None, init=False, repr=False)
     _provenance_policy: str = field(default="compatible", init=False, repr=False)
+    _manifest_fingerprint: str | None = field(default=None, init=False, repr=False)
+    _lifecycle_identity: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def initialize(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
@@ -96,26 +93,9 @@ class CampaignSession:
 
     def reload(self) -> pd.DataFrame:
         """Reload the campaign log from disk into the session."""
-        from bo_forge._campaign.provenance import validate_manifest_for_load
-        df, fingerprint = _load_campaign_log_snapshot(self.log_path, self.config)
-        manifest = validate_manifest_for_load(
-            self.config_path,
-            self.log_path,
-            config=self.config,
-            log_row_count=len(df),
-            provenance_policy=self._provenance_policy,
-        )
-        managed = manifest is not None
-        if self._provenance_managed is not None and managed != self._provenance_managed:
-            raise LogConflictError(
-                "Campaign provenance state changed after it was loaded. Reload from files."
-            )
-        if managed and _log_file_fingerprint(self.log_path) != fingerprint:
-            raise LogConflictError(
-                "Campaign log changed while it was being reloaded. Reload the campaign."
-            )
-        self.df, self.log_fingerprint = df, fingerprint
-        return self.df
+        from bo_forge._campaign.provenance_resume import reload_campaign_session
+
+        return reload_campaign_session(self)
 
     def validate(self) -> None:
         """Validate the current session DataFrame."""
@@ -637,7 +617,7 @@ class CampaignSession:
             config=self.config,
             expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
-        return self.reload()
+        return self._reload_after_mutation()
 
     def mark_observed(
         self,
@@ -658,7 +638,7 @@ class CampaignSession:
             config=self.config,
             expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
-        return self.reload()
+        return self._reload_after_mutation()
 
     def review_suggestion(
         self,
@@ -677,33 +657,31 @@ class CampaignSession:
             config=self.config,
             expected_log_fingerprint=self._mutation_fingerprint(expected_log_fingerprint),
         )
-        return self.reload()
+        return self._reload_after_mutation()
 
     def _mutation_fingerprint(self, expected: str | None) -> str | None:
         fingerprint = self.log_fingerprint if expected is None else expected
         if self._provenance_managed is None:
             return fingerprint
-        return _session_log_fingerprint(fingerprint, managed=self._provenance_managed)
+        return _session_log_fingerprint(
+            fingerprint, managed=self._provenance_managed,
+            manifest_fingerprint=self._manifest_fingerprint,
+        )
+
+    def _check_manifest_identity(self) -> None:
+        from bo_forge._campaign.provenance_resume import check_session_manifest_identity
+        check_session_manifest_identity(self)
+
+    def _reload_after_mutation(self) -> pd.DataFrame:
+        from bo_forge._campaign.provenance import manifest_fingerprint
+
+        self._manifest_fingerprint = manifest_fingerprint(self.log_path)
+        return self.reload()
 
     def _assert_provenance_resumable(self) -> None:
-        from bo_forge._campaign.provenance_resume import (
-            enforce_resumable,
-            inspect_provenance,
-        )
+        from bo_forge._campaign.provenance_resume import enforce_session_provenance
 
-        inspection = inspect_provenance(
-            self.config_path,
-            self.log_path,
-            provenance_policy=self._provenance_policy,
-            config=self.config,
-            include_environment=False,
-        )
-        managed = inspection.manifest is not None
-        if self._provenance_managed is not None and managed != self._provenance_managed:
-            raise LogConflictError(
-                "Campaign provenance state changed after it was loaded. Reload from files."
-            )
-        enforce_resumable(inspection)
+        enforce_session_provenance(self)
 
     def plot_progress(self, **kwargs: Any) -> Any:
         """Plot campaign progress and return figure/axes objects."""

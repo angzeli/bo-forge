@@ -624,6 +624,11 @@ def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> bool |
     expected_managed: bool | None = None
     if expected.startswith(f"{_SESSION_FINGERPRINT_PREFIX}:"):
         _, expected_mode, expected = expected.split(":", maxsplit=2)
+        if "|" in expected_mode:
+            from bo_forge._campaign.provenance_resume import assert_manifest_fingerprint
+
+            expected_mode, manifest_hash = expected_mode.split("|", maxsplit=1)
+            assert_manifest_fingerprint(path, expected_mode == "managed", manifest_hash)
         expected_managed = expected_mode == "managed"
         manifest_exists = path.with_name(f"{path.name}.manifest.json").exists()
         if manifest_exists != expected_managed:
@@ -640,7 +645,9 @@ def _assert_expected_log_fingerprint(path: Path, expected: str | None) -> bool |
     return expected_managed
 
 
-def _session_log_fingerprint(fingerprint: str | None, *, managed: bool) -> str:
+def _session_log_fingerprint(
+    fingerprint: str | None, *, managed: bool, manifest_fingerprint: str | None = None,
+) -> str:
     value = fingerprint or _MISSING_LOG_FINGERPRINT
     mode = "managed" if managed else "legacy"
-    return f"{_SESSION_FINGERPRINT_PREFIX}:{mode}:{value}"
+    return f"{_SESSION_FINGERPRINT_PREFIX}:{mode}|{manifest_fingerprint or 'absent'}:{value}"

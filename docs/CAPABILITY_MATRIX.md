@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.1.1 keeps the YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v3.1.2 keeps the YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while adding fail-closed resume policy and
 explicit recovery to opt-in campaign provenance.
 BO capability statuses are unchanged from v2.5.3.
@@ -17,10 +17,11 @@ Legend:
 
 | Capability | Status | Notes |
 | --- | --- | --- |
-| New managed campaign initialization | supported | Creates canonical CSV plus schema-v1 manifest and refuses overwrite. |
+| New managed campaign initialization | supported | Creates canonical CSV plus schema-v2 manifest and refuses overwrite. Existing v1 campaigns remain supported. |
 | Managed append/review/observation lineage | supported | Uses the existing same-machine log lock and atomic replacement boundary. |
 | Existing campaign without manifest | supported | Legacy behavior; no silent adoption or fabricated history. |
-| Legacy adoption and parent/child lineage | deferred | Reserved for v3.1.2. |
+| Legacy adoption and parent/child lineage | supported | Explicit preview/apply with reasons; unknown earlier history and inherited child data are recorded. |
+| Manifest migration and config formatting acceptance | supported | Explicit v1-to-v2 migration; semantic changes cannot be accepted as formatting. |
 | Signed or tamper-proof provenance | out of scope | Manifest integrity metadata is not authentication or authorization. |
 
 ## Core Campaign Capabilities

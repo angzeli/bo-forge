@@ -250,8 +250,10 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     )
 
     assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
-    assert "durable provenance foundation" in readme
-    assert f"## v{PROJECT_VERSION} - Fail-Closed Provenance Resume" in changelog
+    assert "schema-v2 migration" in readme
+    assert (
+        f"## v{PROJECT_VERSION} - Explicit Campaign Adoption, Migration, And Lineage" in changelog
+    )
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog
@@ -704,8 +706,9 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     assert 'v302["v3.0.2<br/>CI + packaging stabilization"]' in v3_roadmap
     assert 'v310["v3.1.0<br/>Provenance schema + identity"]' in v3_roadmap
     assert 'v311["v3.1.1<br/>Fail-closed resume"]' in v3_roadmap
-    assert "class v310 patchDone" in v3_roadmap
-    assert "class v311 patchActive" in v3_roadmap
+    assert "class v310,v311 patchDone" in v3_roadmap
+    assert "class v312 patchActive" in v3_roadmap
+    assert 'v312["v3.1.2<br/>Migration + lineage"]' in v3_roadmap
     provenance_docs = (PROJECT_ROOT / "docs" / "PROVENANCE.md").read_text(
         encoding="utf-8"
     )

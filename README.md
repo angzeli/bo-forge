@@ -1,13 +1,12 @@
-# 🧪 BO Forge v3.1.1
+# 🧪 BO Forge v3.1.2
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.1.1 hardens the opt-in durable provenance foundation introduced in v3.1.0
-without changing BO numerical behavior or YAML/CSV campaign schemas. Campaign
-loading now supports compatible or managed-only resume policy, provenance
-mismatches have stable diagnostic reason codes, and interrupted managed writes
-require an explicit recovery action. Existing campaigns remain
-legacy-compatible and are not silently adopted.
+v3.1.2 adds explicit legacy adoption, schema-v2 migration, formatting-only config
+acceptance, and parent/child lineage. Each lifecycle action starts with a preview
+and requires confirmation with a reason before applying. Existing campaigns remain
+legacy-compatible; schema-v1 campaigns continue without silent upgrades. See
+[Campaign Provenance](docs/PROVENANCE.md) for archive portability and lifecycle examples.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
 notebooks, service calls, API payloads, and launcher safeguards remain

@@ -1,4 +1,4 @@
-"""Schema-v1 structural validation for campaign provenance manifests."""
+"""Structural validation for schema-v1 and schema-v2 campaign manifests."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def validate_manifest_payload(
     semantic_hash: Callable[[CampaignConfig], str],
     optimization_identity: Callable[[CampaignConfig], dict[str, Any]],
 ) -> None:
-    """Validate the complete schema-v1 manifest contract."""
+    """Validate the supported manifest schema, ledger, and lifecycle metadata."""
     if not isinstance(payload, dict):
         raise ProvenanceError(f"Provenance manifest '{path}' must contain a JSON object.")
     required = {
@@ -58,11 +58,14 @@ def validate_manifest_payload(
         "events",
         "pending_transaction",
     }
-    if payload.get("schema_version") != 1:
+    version = payload.get("schema_version")
+    if type(version) is not int or version not in {1, 2}:
         raise ProvenanceError(
             f"Unsupported provenance schema_version in '{path}': "
             f"{payload.get('schema_version')!r}."
         )
+    if version == 2:
+        required.update({"origin", "archives"})
     if set(payload) != required:
         raise ProvenanceError(f"Provenance manifest '{path}' has invalid top-level fields.")
 
@@ -75,9 +78,13 @@ def validate_manifest_payload(
         raise ProvenanceError(f"Provenance manifest '{path}' has invalid optimization identity.")
     _validate_log(payload["log"], path)
     environment_ids = _validate_environments(payload["environments"], path)
-    events = _validate_events(payload["events"], environment_ids, path)
+    events = _validate_events(payload["events"], environment_ids, path, version=version)
     _validate_ledger_identity(payload, events, created_at, updated_at, path)
     _validate_pending(payload["pending_transaction"], payload, environment_ids, path)
+    if version == 2:
+        from bo_forge._campaign.provenance_v2 import validate_lifecycle_metadata
+
+        validate_lifecycle_metadata(payload, path)
 
 
 def validate_current_manifest_state(
@@ -207,7 +214,9 @@ def _validate_environment_details(environment: dict[str, Any], path: Path) -> No
         raise ProvenanceError(f"Provenance manifest '{path}' has invalid Git identity.")
 
 
-def _validate_events(value: object, environment_ids: set[str], path: Path) -> list[dict[str, Any]]:
+def _validate_events(
+    value: object, environment_ids: set[str], path: Path, *, version: int = 1,
+) -> list[dict[str, Any]]:
     if not isinstance(value, list) or not value:
         raise ProvenanceError(f"Provenance manifest '{path}' has invalid event ledger.")
     events: list[dict[str, Any]] = []
@@ -215,7 +224,7 @@ def _validate_events(value: object, environment_ids: set[str], path: Path) -> li
     previous_timestamp: datetime | None = None
     event_ids: set[str] = set()
     for sequence, event in enumerate(value, start=1):
-        _validate_event(event, sequence, environment_ids, path)
+        _validate_event(event, sequence, environment_ids, path, version=version)
         event_id = str(event["event_id"])
         if event_id in event_ids:
             raise ProvenanceError(f"Provenance manifest '{path}' has duplicate event IDs.")
@@ -230,8 +239,11 @@ def _validate_events(value: object, environment_ids: set[str], path: Path) -> li
             raise ProvenanceError(f"Provenance manifest '{path}' has a broken event hash chain.")
         previous_hash = event["resulting_log_sha256"]
         events.append(event)
-    if events[0]["operation"] != "initialize":
-        raise ProvenanceError(f"Provenance manifest '{path}' must start with initialize.")
+    origins = {"initialize"} if version == 1 else {"initialize", "adopt", "fork"}
+    if events[0]["operation"] not in origins:
+        raise ProvenanceError(f"Provenance manifest '{path}' has an invalid origin event.")
+    if any(event["operation"] in origins for event in events[1:]):
+        raise ProvenanceError(f"Provenance manifest '{path}' repeats an origin event.")
     return events
 
 
@@ -240,6 +252,8 @@ def _validate_event(
     sequence: int,
     environment_ids: set[str],
     path: Path,
+    *,
+    version: int = 1,
 ) -> None:
     required = {
         "sequence",
@@ -256,7 +270,10 @@ def _validate_event(
         raise ProvenanceError(f"Provenance manifest '{path}' has an invalid event record.")
     _validate_uuid(event["event_id"], "event_id", path)
     _validate_timestamp(event["timestamp"], "event timestamp", path)
-    if event["operation"] not in _OPERATIONS:
+    operations = _OPERATIONS | (
+        {"adopt", "migrate", "accept_config", "fork"} if version == 2 else set()
+    )
+    if not isinstance(event["operation"], str) or event["operation"] not in operations:
         raise ProvenanceError(f"Provenance manifest '{path}' has an unsupported operation.")
     if not isinstance(event["affected_row_ids"], list) or not all(
         isinstance(row_id, str) for row_id in event["affected_row_ids"]
@@ -314,7 +331,7 @@ def _validate_pending(
         raise ProvenanceError(
             f"Provenance manifest '{path}' has a non-monotonic pending timestamp."
         )
-    if event["operation"] == "initialize" or not _is_nonnegative_int(
+    if event["operation"] not in _OPERATIONS - {"initialize"} or not _is_nonnegative_int(
         pending["resulting_log_row_count"]
     ):
         raise ProvenanceError(f"Provenance manifest '{path}' has an invalid pending transaction.")

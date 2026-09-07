@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.1.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.1.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The app is intentionally thin: it loads a YAML config and CSV log from local
 paths, then calls `bo_forge.application`, an internal non-HTTP service layer
@@ -327,6 +327,14 @@ transaction, the app shows its reason and requires explicit confirmation before
 manifest-only recovery. Successful recovery reloads the campaign and clears staged and
 row-scoped mutation state. Legacy campaigns show no fabricated provenance block. See
 [PROVENANCE.md](PROVENANCE.md).
+
+The load area's `Provenance lifecycle` expander offers `Inspect lifecycle actions`
+to list eligible adoption, migration, formatting acceptance, and fork previews.
+Review the preview, enter a reason,
+confirm, and apply. Ineligible actions report the backend validation reason without
+writing. Successful actions reload the campaign and clear staged/row-scoped state.
+Adoption starts tracking now and does not reconstruct earlier history. Forks inherit
+existing CSV rows and predictions; use a new destination directory.
 
 ## ⚠️ Write Actions
 

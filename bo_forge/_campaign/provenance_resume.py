@@ -1,4 +1,4 @@
-"""Fail-closed provenance inspection and explicit schema-v1 recovery."""
+"""Fail-closed provenance inspection and explicit supported-schema recovery."""
 
 from __future__ import annotations
 
@@ -113,6 +113,95 @@ def normalize_provenance_policy(value: str) -> str:
     return value
 
 
+def enforce_session_provenance(session) -> None:
+    inspection = inspect_provenance(
+        session.config_path, session.log_path, provenance_policy=session._provenance_policy,
+        config=session.config, include_environment=False,
+    )
+    managed = inspection.manifest is not None
+    if session._provenance_managed is not None and managed != session._provenance_managed:
+        raise LogConflictError(
+            "Campaign provenance state changed after it was loaded. Reload from files."
+        )
+    enforce_resumable(inspection)
+    session._check_manifest_identity()
+
+
+def assert_manifest_fingerprint(log_path: Path, managed: bool, expected: str) -> None:
+    current = manifest_io.manifest_fingerprint(log_path)
+    if (current is not None) != managed:
+        raise LogConflictError(
+            "Campaign provenance state changed after it was loaded. Reload from files."
+        )
+    if (current or "absent") == expected:
+        return
+    if managed:
+        # Preserve explicit recovery and malformed-manifest errors before stale-state errors.
+        manifest_io._prepare_managed_state(
+            manifest_io.manifest_path_for_log(log_path), log_path, None,
+        )
+    raise LogConflictError("Campaign manifest changed after it was loaded. Reload from files.")
+
+
+def check_session_manifest_identity(session) -> None:
+    if session._provenance_managed is not None:
+        assert_manifest_fingerprint(
+            session.log_path, session._provenance_managed,
+            session._manifest_fingerprint or "absent",
+        )
+
+
+def _lifecycle_identity(manifest: dict | None) -> str | None:
+    if manifest is None:
+        return None
+    # Ordinary ledger growth is refreshable; identity/config/lifecycle changes are not.
+    identity = {key: value for key, value in manifest.items() if key not in {
+        "log", "environments", "events", "updated_at", "pending_transaction",
+    }}
+    identity["events"] = [event for event in manifest["events"] if event["operation"] not in {
+        "append_suggestions", "review_suggestion", "mark_observed",
+    }]
+    return manifest_io._sha256_bytes(manifest_io._canonical_json_bytes(identity))
+
+
+def reload_campaign_session(session) -> pd.DataFrame:
+    """Refresh a coherent snapshot, retaining fail-closed lifecycle and recovery policy."""
+    from bo_forge.logs import (
+        _MISSING_LOG_FINGERPRINT,
+        _campaign_log_lock,
+        _log_file_fingerprint,
+        load_campaign_log,
+    )
+
+    with _campaign_log_lock(session.log_path):
+        manifest_hash = manifest_io.manifest_fingerprint(session.log_path)
+        df = load_campaign_log(session.log_path, session.config)
+        fingerprint = _log_file_fingerprint(session.log_path) or _MISSING_LOG_FINGERPRINT
+        manifest = manifest_io.validate_manifest_for_load(
+            session.config_path, session.log_path, config=session.config,
+            log_row_count=len(df), provenance_policy=session._provenance_policy,
+        )
+        managed = manifest is not None
+        identity = _lifecycle_identity(manifest)
+        if session._provenance_managed is not None:
+            if managed != session._provenance_managed:
+                raise LogConflictError(
+                    "Campaign provenance state changed after it was loaded. Reload from files."
+                )
+            if identity != session._lifecycle_identity:
+                raise LogConflictError(
+                    "Campaign manifest changed after it was loaded. Reload from files."
+                )
+        if managed and (
+            _log_file_fingerprint(session.log_path) != fingerprint
+            or manifest_io.manifest_fingerprint(session.log_path) != manifest_hash
+        ):
+            raise LogConflictError("Campaign changed while reloading. Reload the campaign.")
+        session.df, session.log_fingerprint = df, fingerprint
+        session._manifest_fingerprint = manifest_hash
+        return session.df
+
+
 def load_campaign_session(
     session_type: Any,
     config_path: str | Path,
@@ -127,6 +216,7 @@ def load_campaign_session(
     parsed_config_path = Path(config_path)
     parsed_log_path = Path(log_path)
     config_fingerprint = _log_file_fingerprint(parsed_config_path)
+    manifest_fingerprint = manifest_io.manifest_fingerprint(parsed_log_path)
     try:
         config = CampaignConfig.from_yaml(parsed_config_path)
     except ConfigError as exc:
@@ -167,6 +257,10 @@ def load_campaign_session(
     )
     session._provenance_managed = manifest is not None
     session._provenance_policy = policy
+    if manifest_io.manifest_fingerprint(parsed_log_path) != manifest_fingerprint:
+        raise LogConflictError("Campaign manifest changed while loading; reload from files.")
+    session._manifest_fingerprint = manifest_fingerprint
+    session._lifecycle_identity = _lifecycle_identity(manifest)
     return session
 
 
@@ -446,7 +540,7 @@ def _managed_detail_rows(inspection: ProvenanceInspection) -> list[tuple[str, ob
     manifest = inspection.manifest
     events = manifest["events"]
     last_event = events[-1] if events else None
-    return [
+    rows = [
         ("campaign_id", manifest["campaign_id"]),
         ("schema_version", manifest["schema_version"]),
         ("config_byte_sha256", manifest["config"]["byte_sha256"]),
@@ -463,3 +557,14 @@ def _managed_detail_rows(inspection: ProvenanceInspection) -> list[tuple[str, ob
         ("updated_at", manifest["updated_at"]),
         ("pending_transaction", manifest.get("pending_transaction") is not None),
     ]
+    if manifest["schema_version"] == 2:
+        origin = manifest["origin"]
+        parent = origin["parent"]
+        rows.extend([
+            ("origin", origin["kind"]), ("history", origin["history"]),
+            ("baseline_row_count", origin["baseline_row_count"]),
+            ("archive_count", len(manifest["archives"])),
+            ("parent_campaign_id", None if parent is None else parent["campaign_id"]),
+            ("parent_manifest_sha256", None if parent is None else parent["manifest"]["sha256"]),
+        ])
+    return rows

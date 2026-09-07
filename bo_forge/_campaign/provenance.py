@@ -25,7 +25,7 @@ from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError, LogConflictError, LogWriteError, ProvenanceError
 from bo_forge.validation import validate_campaign_data
 
-MANIFEST_SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 _MISSING_LOG_HASH = "<missing-log>"
 
 
@@ -33,6 +33,11 @@ def manifest_path_for_log(log_path: str | Path) -> Path:
     """Return the canonical sidecar path for a campaign log."""
     canonical = Path(log_path).expanduser().resolve(strict=False)
     return canonical.with_name(f"{canonical.name}.manifest.json")
+
+
+def manifest_fingerprint(log_path: str | Path) -> str | None:
+    """Return sidecar identity, including explicit absence for legacy campaigns."""
+    return _sha256_file_or_none(manifest_path_for_log(log_path))
 
 
 def config_semantic_sha256(config: CampaignConfig) -> str:
@@ -56,7 +61,7 @@ def config_semantic_sha256(config: CampaignConfig) -> str:
 def load_manifest(log_path: str | Path) -> dict[str, Any] | None:
     """Load and structurally validate a campaign manifest when one exists."""
     path = manifest_path_for_log(log_path)
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -94,6 +99,9 @@ def validate_manifest_references(
             reason_code="manifest_path_mismatch",
             recovery_action="Use the config and log referenced by this manifest.",
         )
+    from bo_forge._campaign.provenance_v2 import verify_archives
+
+    verify_archives(manifest, manifest_path)
     return manifest
 
 
@@ -121,7 +129,7 @@ def validate_manifest_for_load(
 
 
 def initialize_campaign(config_path: str | Path, log_path: str | Path) -> tuple[Path, Path]:
-    """Create an empty canonical log and schema-v1 manifest without overwriting files."""
+    """Create an empty canonical log and schema-v2 manifest without overwriting files."""
     from bo_forge.io import empty_campaign_log
     from bo_forge.logs import _campaign_log_lock
     config_file = Path(config_path).expanduser().resolve(strict=False)
@@ -349,6 +357,12 @@ def _initial_manifest(
         "environments": [environment],
         "events": [event],
         "pending_transaction": None,
+        "origin": {
+            "kind": "initialize", "history": "tracked_from_initialization",
+            "baseline_log_sha256": log_hash, "baseline_row_count": row_count,
+            "parent": None,
+        },
+        "archives": [],
     }
 
 
@@ -365,6 +379,9 @@ def _prepare_managed_state(
     manifest = load_manifest(log_path)
     if manifest is None:
         raise ProvenanceError(f"Managed manifest disappeared during mutation: '{manifest_path}'.")
+    from bo_forge._campaign.provenance_v2 import verify_archives
+
+    verify_archives(manifest, manifest_path)
     config_file, referenced_log = _resolved_manifest_paths(manifest_path, manifest)
     if referenced_log != log_path.resolve(strict=False):
         raise ProvenanceError(

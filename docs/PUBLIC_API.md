@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.1.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.2.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -182,6 +182,16 @@ transaction. It changes only manifest bytes. Ordinary session operations raise
 or path-invalid manifests. Because schema v1 has no marker inside legacy CSVs, callers
 must move and back up a managed CSV with its sidecar. See
 [PROVENANCE.md](PROVENANCE.md) for reason codes, recovery, and the trust boundary.
+
+The top-level helpers `adopt_provenance(config_path, log_path)`,
+`migrate_provenance(config_path, log_path)`, and
+`accept_provenance_config(config_path, log_path)` return JSON-compatible preview mappings.
+`fork_campaign(config_path, log_path, destination, config_changes=None)` previews a child;
+`config_changes` is keyword-only and allows `campaign_name`, `bo`, and `model`.
+All four accept keyword-only `apply=False`, `reason=""`, and `expected_identities=None`.
+Apply with a reason and the unchanged preview's `expected_identities`; then load a new
+session. Existing sessions reject manifest identity changes even when CSV bytes agree.
+New campaigns use schema v2; older schema-v1-only BO Forge releases cannot load them.
 
 qLogNEI pending-state diagnostics expose `qlog_nei_summary` through the
 top-level package for read-only inspection. Use `qlog_nei_summary(config, df)`

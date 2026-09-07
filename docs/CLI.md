@@ -505,6 +505,10 @@ bo-forge plot \
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |
 | `bo-forge report --config PATH --log PATH [--output PATH]` | Print or export a deterministic campaign report. |
 | `bo-forge provenance --config PATH --log PATH` | Print managed/legacy provenance status, identities, hashes, environment count, event count, and pending-transaction state. |
+| `bo-forge provenance-adopt --config PATH --log PATH` | Preview legacy adoption; tracking starts now and earlier history is unknown. |
+| `bo-forge provenance-migrate --config PATH --log PATH` | Preview explicit schema-v1 to schema-v2 migration. |
+| `bo-forge provenance-accept-config --config PATH --log PATH` | Preview formatting-only config acceptance after explicit v2 migration. |
+| `bo-forge provenance-fork --config PATH --log PATH --destination DIR [--config-changes JSON]` | Preview a child with inherited CSV bytes and restricted config changes. |
 | `bo-forge provenance-recover --config PATH --log PATH [--expected-log-fingerprint SHA256]` | Explicitly finalize or cancel a recoverable pending manifest transaction without changing YAML or CSV bytes. |
 | `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
@@ -530,6 +534,20 @@ The commands that can change files are:
 
 - `bo-forge init-log`: creates a new empty campaign log and provenance manifest and refuses to overwrite either file.
 - `bo-forge provenance-recover`: updates only a managed manifest to resolve a recoverable interrupted transaction.
+
+Lifecycle commands default to JSON previews. Redirect the preview to a file, inspect
+it, then pass `--apply --reason "..." --preview FILE`. Apply rechecks all source
+identities under lock; stale previews fail without modifying campaign data.
+
+```bash
+bo-forge provenance-adopt --config campaign.yaml --log campaign.csv > adoption-preview.json
+bo-forge provenance-adopt --config campaign.yaml --log campaign.csv \
+  --apply --reason "Start tracking validated legacy data" --preview adoption-preview.json
+```
+
+Fork `--config-changes` accepts a JSON mapping such as
+`'{"campaign_name":"child","bo":{"random_seed":42}}'`. Resolve suggested rows first;
+the destination must not exist. Back up referenced archives with managed campaign files.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
 - `bo-forge review`: updates `review_status` and `review_note` for one suggested row.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.

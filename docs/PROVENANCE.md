@@ -1,6 +1,6 @@
 # Campaign Provenance
 
-BO Forge 3.1.1 can initialize a campaign with a versioned provenance manifest while
+BO Forge 3.1.2 can initialize a campaign with a versioned provenance manifest while
 keeping the YAML configuration and CSV log as the campaign source data.
 
 ## Managed And Legacy Campaigns
@@ -17,8 +17,8 @@ created in Streamlit use the same initialization path.
 
 Existing CSV campaigns without a manifest remain legacy campaigns. They load, suggest,
 append, review, observe, report, and plot as before under the default `compatible`
-resume policy. BO Forge does not silently create a manifest for them. Explicit legacy
-adoption is deferred to v3.1.2.
+resume policy. BO Forge does not silently create a manifest for them. Explicit adoption
+starts tracking at the current state and records that earlier history is unknown.
 
 Manifest presence identifies a managed campaign. Keep the CSV and its manifest together
 when moving, restoring, or backing up a campaign. A newly loaded CSV whose sidecar was
@@ -39,6 +39,11 @@ manifest` toggle. `CampaignSession.initialize()` always returns a managed sessio
 the required policy, and `reload()` preserves the session's selected policy. A present
 manifest is always enforced under either policy; there is no ignore-invalid-manifest
 mode.
+
+After another process appends, reviews, or observes rows, an explicit `reload()` can
+refresh a coherent managed session. Until that refresh, mutations from its stale
+snapshot remain blocked. Lifecycle changes require a new `CampaignSession.from_files()`
+instead; `reload()` does not acknowledge adoption, migration, or config acceptance.
 
 Inspect either kind with:
 
@@ -62,8 +67,9 @@ does not update the manifest.
 
 ## Manifest Location And Format
 
-The sidecar is stored beside the canonical log as `<log>.manifest.json`. Schema version
-1 is UTF-8 JSON with stable key ordering, two-space indentation, and a final newline.
+The sidecar is stored beside the canonical log as `<log>.manifest.json`. Supported schema
+versions 1 and 2 use UTF-8 JSON with stable key ordering, two-space indentation, and a final newline.
+New campaigns use v2; existing v1 campaigns remain readable and mutable without upgrading.
 It records:
 
 - an immutable UUID campaign ID and UTC creation/update timestamps;
@@ -91,6 +97,11 @@ Schema version 1 records these explicit operations:
 - `append_suggestions`;
 - `review_suggestion`;
 - `mark_observed`.
+
+Schema v2 also records `adopt`, `migrate`, `accept_config`, and `fork`. It adds
+`origin` (kind, history, baseline hash/count, optional parent) and `archives`.
+An adopted ledger begins with `adopt`; a child ledger begins with `fork`. Neither
+fabricates historical initialization, suggestion, review, or observation events.
 
 Each event has a monotonic sequence, UUID, UTC timestamp, ordered affected row IDs,
 previous/resulting log hashes, environment ID, and bounded operation metadata. Dry-run
@@ -158,6 +169,66 @@ Stable reason codes are `manifest_required`, `manifest_invalid`,
 `config_semantics_changed`, `log_missing`, `log_hash_changed`,
 `log_row_count_changed`, `pending_previous_state`, `pending_resulting_state`, and
 `pending_unknown_state`.
+
+## Explicit Lifecycle Operations
+
+All four helpers default to read-only preview. Applying requires a nonempty reason
+and the preview's `expected_identities`; config, log, manifest (including absence),
+operation, destination, and config changes must still match under the campaign lock.
+
+```python
+from bo_forge import adopt_provenance, migrate_provenance, accept_provenance_config, fork_campaign
+
+preview = adopt_provenance("campaign.yaml", "campaign.csv")
+adopt_provenance(
+    "campaign.yaml", "campaign.csv", apply=True,
+    reason="Start tracking the validated existing dataset",
+    expected_identities=preview["expected_identities"],
+)
+```
+
+- **Adoption** refuses every existing manifest, even malformed ones. It records the
+  current baseline and a new identity; earlier history is explicitly unknown.
+- **Migration** preserves v1 campaign ID, creation time, and all events, archives the
+  exact previous manifest, then appends `migrate`. Preview rejects missing or invalid
+  initialization row-count metadata before preparing archives. Already-v2 migration
+  is a read-only no-op.
+- **Formatting acceptance** requires schema v2, unchanged CSV, equal parsed semantics,
+  and no pending transaction. It archives the old manifest and exact config snapshot.
+  A v1 campaign must be coherent and explicitly migrated before editing its YAML.
+- **Forking** takes `destination` and optional `config_changes`, a mapping limited to
+  `campaign_name`, `bo`, and `model`. BO/model mappings merge with current settings.
+  All other definitions remain equal; existing config and CSV validation still applies.
+  Active suggestions and pending reviews must be resolved before forking; rejected
+  and deferred rows remain inherited audit data. The destination's parent must
+  exist and the destination must not exist, including an empty directory or symlink.
+  The child contains `campaign.yaml`, a byte-identical `campaign.csv`, a new manifest,
+  and an exact parent-manifest snapshot. Inherited rows keep their IDs, metadata,
+  and historical predictions; those predictions were not generated by the child.
+
+Fork directory publication uses atomic no-overwrite rename on the supported macOS/Linux
+platforms. Failed preparation can leave a hidden `.preparing-...` directory or an
+unreferenced archive; it never publishes a partial destination as a usable campaign.
+Source YAML, CSV, and the active manifest remain unchanged on failed lifecycle actions.
+Once adoption publishes its manifest, the operation is committed. Failure to remove
+the temporary link does not turn that success into an error; a harmless temporary
+file may remain.
+
+Archives use `<manifest>.<sha256>.archive.json` or `.yaml` sibling filenames and
+read-only file modes. They are content-addressed and never overwritten. Move/back up
+the config, CSV, manifest, and **all referenced sibling archives** together, preserving
+relative layout. Child lineage inspection uses its captured parent snapshot, so moving
+or deleting the original parent does not break the child. It does not recursively browse
+parent campaigns. Missing, altered, or symlinked referenced archives fail validation.
+Recorded child configuration differences are checked against the captured parent and
+child configurations, including semantic preservation of protected definitions.
+Filesystem permissions are advisory, not a tamper-proof security boundary.
+
+Older BO Forge versions that only support schema v1 cannot open v2 campaigns. Preserve
+archives for evidence; do not replace an active manifest with an old archive to bypass
+current hashes. Loaded sessions and staged suggestions become stale after lifecycle
+changes even if CSV bytes did not change; reopen with `CampaignSession.from_files()`
+before continuing. The Streamlit lifecycle flow reopens the campaign after applying.
 
 ## Trust Boundary
 

@@ -52,6 +52,8 @@ coverage directly:
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider \
   tests/test_provenance.py \
   tests/test_provenance_resume.py \
+  tests/test_provenance_lifecycle.py \
+  tests/test_provenance_lifecycle_adapters.py \
   tests/test_cli_core_and_analysis.py \
   tests/test_app_service.py \
   tests/test_api.py \
@@ -282,4 +284,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.1.1 does none of those actions.
+separate explicit authorization. Preparing v3.1.2 does none of those actions.
