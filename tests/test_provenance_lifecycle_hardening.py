@@ -22,8 +22,8 @@ from bo_forge.provenance import (
     migrate_provenance,
 )
 from bo_forge_api.api import create_app
+from tests._provenance_support import _downgrade, apply, legacy, snapshot, v1
 from tests._session_support import write_cost_review_config
-from tests.test_provenance_lifecycle import apply, legacy, snapshot, v1
 
 
 def _review_campaign(tmp_path, operation):
@@ -221,14 +221,6 @@ def test_child_snapshot_cannot_reinterpret_protected_definitions(tmp_path):
     with pytest.raises(ProvenanceError, match="protected campaign definitions"):
         CampaignSession.from_files(child_cfg, child_log)
     assert snapshot(child_cfg, child_log) == before
-
-
-def _downgrade(log):
-    manifest = io.load_manifest(log)
-    manifest["schema_version"] = 1
-    manifest.pop("origin")
-    manifest.pop("archives")
-    io._write_json_atomic(io.manifest_path_for_log(log), manifest)
 
 
 def _process_race(cfg, log, operation, batch, preview, barrier, results):

@@ -153,6 +153,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
         "tests/",
     )
     assert not any(name.startswith(excluded_prefixes) for name in names)
+    assert "START_HERE.md" not in names
     assert "Provides-Extra: app" in metadata
     assert "Provides-Extra: api" in metadata
     assert 'Requires-Dist: streamlit>=1.57; extra == "app"' in metadata
@@ -169,6 +170,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
 
     required_paths = {
         "README.md",
+        "START_HERE.md",
         "CONTRIBUTING.md",
         "LICENSE",
         "SECURITY.md",
@@ -178,6 +180,12 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "ROADMAP_V3_X.md",
         "docs/PUBLIC_API.md",
         "docs/PROVENANCE.md",
+        "tests/test_provenance_acceptance.py",
+        "tests/test_provenance_closeout.py",
+        "tests/fixtures/provenance_v1.json",
+        "tests/test_provenance_lifecycle_hardening.py",
+        "tests/__init__.py",
+        "tests/_session_support.py",
         "docs/MIGRATION_V3.md",
         "docs/STREAMLIT_DEPLOYMENT.md",
         "docs/API_PROBE.md",
@@ -252,6 +260,8 @@ def _assert_sdist_test_fixture_works(
             "no:cacheprovider",
             "-q",
             "tests/test_app_service.py::test_app_service_review_and_single_objective_mark_observed",
+            "tests/test_provenance_acceptance.py",
+            "tests/test_provenance_closeout.py::test_original_v310_writer_fixture_remains_mutable_and_migratable",
         ],
         cwd=source_root,
         env=env,
@@ -361,6 +371,43 @@ builtins.__import__ = block_optional_app_deps
 from bo_forge.cli import run
 assert run(["doctor"]) == 0
 """
+    script += '''
+from bo_forge import (
+    CampaignSession, adopt_provenance, accept_provenance_config, fork_campaign,
+)
+from bo_forge.io import empty_campaign_log
+import pandas as pd
+
+config_path, log_path = Path("campaign.yaml"), Path("campaign.csv")
+config_path.write_text("""campaign_name: artifact
+objective: {name: score, direction: maximize}
+variables: [{name: x, type: continuous, lower: 0, upper: 1}]
+bo: {initial_design_size: 4}
+""", encoding="utf-8")
+from bo_forge import CampaignConfig
+config = CampaignConfig.from_yaml(config_path)
+empty_campaign_log(config).to_csv(log_path, index=False)
+def apply_lifecycle(helper, *args):
+    preview = helper(*args)
+    return helper(*args, apply=True, reason="Artifact acceptance",
+                  expected_identities=preview["expected_identities"])
+apply_lifecycle(adopt_provenance, config_path, log_path)
+session = CampaignSession.from_files(config_path, log_path, provenance_policy="required")
+row = dict.fromkeys(session.df.columns, "")
+row.update(row_id="artifact_1", status="suggested", source="sobol", iteration=0, x=0.25)
+session.append_suggestions(pd.DataFrame([row], columns=session.df.columns))
+session.mark_observed("artifact_1", 1.5)
+config_path.write_bytes(config_path.read_bytes() + b"\\n# formatting only\\n")
+apply_lifecycle(accept_provenance_config, config_path, log_path)
+apply_lifecycle(fork_campaign, config_path, log_path, Path("child"))
+child = CampaignSession.from_files("child/campaign.yaml", "child/campaign.csv",
+                                   provenance_policy="required")
+child.validate()
+assert child.log_path.read_bytes() == log_path.read_bytes()
+assert dict(child.provenance_summary().values)["history"] == "inherited_parent_data"
+assert len(child.df) == 1
+print("Installed provenance lifecycle acceptance passed")
+'''
     subprocess.run(
         [str(python), "-c", script],
         cwd=probe_dir,

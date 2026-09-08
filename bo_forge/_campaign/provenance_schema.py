@@ -266,7 +266,8 @@ def _validate_event(
         "environment_id",
         "metadata",
     }
-    if not isinstance(event, dict) or set(event) != required or event["sequence"] != sequence:
+    if (not isinstance(event, dict) or set(event) != required
+            or type(event["sequence"]) is not int or event["sequence"] != sequence):
         raise ProvenanceError(f"Provenance manifest '{path}' has an invalid event record.")
     _validate_uuid(event["event_id"], "event_id", path)
     _validate_timestamp(event["timestamp"], "event timestamp", path)
@@ -282,7 +283,9 @@ def _validate_event(
     _validate_hash(event["resulting_log_sha256"], "event resulting hash", path)
     if event["previous_log_sha256"] != _MISSING_LOG_HASH:
         _validate_hash(event["previous_log_sha256"], "event previous hash", path)
-    if event["environment_id"] not in environment_ids or not isinstance(event["metadata"], dict):
+    if (not isinstance(event["environment_id"], str)
+            or event["environment_id"] not in environment_ids
+            or not isinstance(event["metadata"], dict)):
         raise ProvenanceError(f"Provenance manifest '{path}' has invalid event metadata.")
 
 

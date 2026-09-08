@@ -128,7 +128,9 @@ def test_initialize_writes_deterministic_schema_v2_manifest(tmp_path: Path) -> N
     }
     assert event["operation"] == "initialize"
     environment = manifest["environments"][0]
-    assert environment["bo_forge"] == "3.1.2"
+    from bo_forge import __version__
+
+    assert environment["bo_forge"] == __version__
     assert event["environment_id"] == environment["environment_id"]
     assert manifest["pending_transaction"] is None
     assert campaign.is_provenance_managed is True

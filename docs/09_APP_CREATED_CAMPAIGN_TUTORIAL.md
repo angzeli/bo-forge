@@ -9,10 +9,17 @@ The example campaign is named `09_app_created_practical_catalyst`. It deliberate
 - deterministic cost and human review from the cost-aware campaign;
 - explicit replicate metadata from the replicate-aware campaign.
 
-The app writes both files:
+Need to install and launch the app first? Follow [Start Here](../START_HERE.md).
+
+The app creates three campaign files together:
 
 - config: `configs/09_app_created_practical_catalyst.yaml`
 - log: `examples/09_app_created_practical_catalyst_campaign_log.csv`
+- provenance: `examples/09_app_created_practical_catalyst_campaign_log.csv.manifest.json`
+
+Keep these files together. The manifest tracks identity and mutations; later
+lifecycle actions can add sibling archives. See [Campaign Provenance](PROVENANCE.md)
+for backup, recovery, and legacy campaign behavior.
 
 ## ▶️ Start The App
 
@@ -129,6 +136,7 @@ Expected result:
 
 - the YAML config file is created;
 - the empty canonical CSV log is created;
+- the schema-v2 provenance manifest is created;
 - the campaign is loaded immediately;
 - the source bar and `Campaign` area show the campaign as valid;
 - the log contains headers only and no observed rows yet.

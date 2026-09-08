@@ -175,7 +175,9 @@ def test_require_provenance_rejects_legacy_campaign(
 
     captured = capsys.readouterr()
     assert "provenance manifest is required" in captured.err
-    assert "Initialize a managed campaign" in captured.err
+    assert "provenance-adopt for existing legacy data" in captured.err
+    assert "initialize a new campaign" in captured.err
+    assert "compatible loading" in captured.err
 
 
 def test_provenance_recover_command_resolves_pending_previous_state(

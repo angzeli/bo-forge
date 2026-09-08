@@ -133,6 +133,12 @@ jobs:
           tests/test_logs.py
           tests/test_session_mutations.py
           tests/test_v253_operational_freeze.py
+          tests/test_provenance.py
+          tests/test_provenance_resume.py
+          tests/test_provenance_lifecycle.py
+          tests/test_provenance_lifecycle_hardening.py
+          tests/test_provenance_acceptance.py
+          tests/test_provenance_closeout.py
       - name: Core and CLI smoke
         run: |
           python -m bo_forge --version

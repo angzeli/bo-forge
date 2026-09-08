@@ -75,6 +75,7 @@ def test_manifest_uses_expected_release_directives() -> None:
         "include CONTRIBUTING.md",
         "include LICENSE",
         "include README.md",
+        "include START_HERE.md",
         "include ROADMAP_V0_TO_V1.md",
         "include ROADMAP_V1_X.md",
         "include ROADMAP_V2_X.md",
@@ -86,7 +87,8 @@ def test_manifest_uses_expected_release_directives() -> None:
         "recursive-include examples *_campaign_log.csv",
         "recursive-include notebooks *.ipynb",
         "recursive-include requirements *.md *.txt",
-        "include tests/conftest.py",
+        "recursive-include tests *.py",
+        "include tests/fixtures/provenance_v1.json",
     }
 
     assert set(lines) == expected
@@ -252,7 +254,7 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
     assert "schema-v2 migration" in readme
     assert (
-        f"## v{PROJECT_VERSION} - Explicit Campaign Adoption, Migration, And Lineage" in changelog
+        f"## v{PROJECT_VERSION} - Provenance Acceptance And Beginner Setup" in changelog
     )
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
@@ -706,8 +708,8 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     assert 'v302["v3.0.2<br/>CI + packaging stabilization"]' in v3_roadmap
     assert 'v310["v3.1.0<br/>Provenance schema + identity"]' in v3_roadmap
     assert 'v311["v3.1.1<br/>Fail-closed resume"]' in v3_roadmap
-    assert "class v310,v311 patchDone" in v3_roadmap
-    assert "class v312 patchActive" in v3_roadmap
+    assert "class v310,v311,v312,v313 patchDone" in v3_roadmap
+    assert "class v313 patchActive" not in v3_roadmap
     assert 'v312["v3.1.2<br/>Migration + lineage"]' in v3_roadmap
     provenance_docs = (PROJECT_ROOT / "docs" / "PROVENANCE.md").read_text(
         encoding="utf-8"

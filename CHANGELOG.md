@@ -1,5 +1,25 @@
 # 📝 BO Forge Changelog
 
+## v3.1.3 - Provenance Acceptance And Beginner Setup
+
+- Closes v3.1.x with lifecycle acceptance for legacy, v1, initialized v2, adopted,
+  migrated, and forked campaigns, including recovery and portable captured lineage.
+- Marks implementation complete, not publication-approved; release publication
+  requires passing CI on the exact commit and separate authorization.
+- Adds `START_HERE.md` for downloading the source and opening the local Streamlit
+  interface in an isolated environment; includes it in the sdist, not the wheel.
+- Extends macOS provenance filesystem/process coverage and external artifact
+  lifecycle checks; corrects the app tutorial to include the provenance manifest.
+- Includes shared Python test helpers in source distributions so provenance
+  acceptance can run from extracted archives; runtime wheel boundaries stay unchanged.
+- Fixes initialization rollback ownership so a later committed writer is preserved,
+  rejects malformed event field types with structured errors, and aligns recovery
+  guidance with explicit adoption, migration, and formatting acceptance.
+- Adds a compatibility fixture emitted by the original v3.1.0 writer and checks
+  its ordinary mutations and explicit migration from extracted source distributions.
+- Preserves BO capabilities, public interfaces, YAML/CSV formats, provenance
+  schemas, optional dependencies, and explicit mutation/recovery semantics.
+
 ## v3.1.2 - Explicit Campaign Adoption, Migration, And Lineage
 
 - Adds preview-first adoption, v1-to-v2 migration, formatting-only config acceptance,

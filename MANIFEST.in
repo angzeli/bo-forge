@@ -2,6 +2,7 @@ include CHANGELOG.md
 include CONTRIBUTING.md
 include LICENSE
 include README.md
+include START_HERE.md
 include ROADMAP_V0_TO_V1.md
 include ROADMAP_V1_X.md
 include ROADMAP_V2_X.md
@@ -13,4 +14,5 @@ include examples/quickstart.py
 recursive-include examples *_campaign_log.csv
 recursive-include notebooks *.ipynb
 recursive-include requirements *.md *.txt
-include tests/conftest.py
+recursive-include tests *.py
+include tests/fixtures/provenance_v1.json

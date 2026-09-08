@@ -4,6 +4,11 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
+The v3.1.3 closeout marks v3.1.x implementation complete after local acceptance.
+Commit only the reviewed release changes. Publication still requires passing required
+CI on that exact commit; push, tagging, and release publication each require separate
+authorization. Implementation completion does not grant publication approval.
+
 ## 1. Prepare An Isolated Environment
 
 Use Python 3.11 or 3.12 on Linux, or Python 3.12 on macOS, and choose the
@@ -54,6 +59,9 @@ coverage directly:
   tests/test_provenance_resume.py \
   tests/test_provenance_lifecycle.py \
   tests/test_provenance_lifecycle_adapters.py \
+  tests/test_provenance_lifecycle_hardening.py \
+  tests/test_provenance_acceptance.py \
+  tests/test_provenance_closeout.py \
   tests/test_cli_core_and_analysis.py \
   tests/test_app_service.py \
   tests/test_api.py \
@@ -64,6 +72,16 @@ Verify that managed campaign fixtures keep each CSV with its manifest, cross-dir
 initialization uses `~/...` rather than serializing author-home components, mismatched
 managed files fail closed on load, and rollback-failure tests retain a recoverable CSV
 backup.
+
+For v3.1.3 acceptance, follow [Start Here](../START_HERE.md) from a freshly
+extracted source archive outside the checkout, using a clean Python 3.12
+environment and `python -m pip install ".[app]"`. Check `pip check`, version,
+doctor, and the actual installed launcher in a browser: `Campaign`, `Run`, and
+`Analyze` must render. Stop the server afterward. Record platform/interpreter,
+archive identity, and any unverified OS instructions or environment limitations.
+The wheel must exclude `START_HERE.md`; the sdist must contain it and the
+lifecycle-hardening/acceptance tests. Existing artifact probes also exercise
+bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
@@ -284,4 +302,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.1.2 does none of those actions.
+separate explicit authorization. Preparing v3.1.3 does none of those actions.

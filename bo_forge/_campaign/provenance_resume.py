@@ -21,11 +21,14 @@ from bo_forge.errors import (
 PROVENANCE_POLICIES = {"compatible", "required"}
 
 _RECOVERY_ACTIONS = {
-    "manifest_required": "Initialize a managed campaign or use compatible loading.",
-    "manifest_invalid": "Repair or restore the schema-v1 manifest before resuming.",
+    "manifest_required": (
+        "Preview provenance-adopt for existing legacy data, initialize a new campaign, "
+        "or use compatible loading."
+    ),
+    "manifest_invalid": "Repair or restore the recorded manifest before resuming.",
     "manifest_path_mismatch": "Use the config and log referenced by this manifest.",
     "config_bytes_changed_semantics_same": (
-        "Restore the exact recorded YAML bytes or initialize a new managed campaign."
+        "Restore the exact recorded YAML bytes before resuming."
     ),
     "config_semantics_changed": (
         "Restore the recorded YAML semantics or initialize a new managed campaign."
@@ -345,7 +348,7 @@ def inspect_loaded_manifest(
         integrity_status=state[0],
         resume_status=state[1],
         reason_code=state[2],
-        recovery_action=_RECOVERY_ACTIONS.get(state[2]),
+        recovery_action=_recovery_action(state[2], manifest),
         config_bytes_match=byte_match,
         config_semantic_match=semantic_match,
         current_log_sha256=state[3],
@@ -354,6 +357,22 @@ def inspect_loaded_manifest(
         environment_match=environment[1],
         environment_changes=environment[2],
     )
+
+
+def _recovery_action(reason: str | None, manifest: dict[str, Any]) -> str | None:
+    if reason == "config_bytes_changed_semantics_same":
+        if manifest["pending_transaction"] is not None:
+            return "Restore the recorded YAML bytes, then run provenance-recover before editing."
+        if manifest["schema_version"] == 1:
+            return (
+                "Restore the recorded YAML bytes, preview and apply provenance-migrate, "
+                "then reapply formatting and preview provenance-accept-config."
+            )
+        return (
+            "Preview provenance-accept-config to acknowledge formatting-only changes "
+            "with an unchanged CSV, or restore the recorded YAML bytes."
+        )
+    return _RECOVERY_ACTIONS.get(reason)
 
 
 def enforce_resumable(inspection: ProvenanceInspection) -> None:

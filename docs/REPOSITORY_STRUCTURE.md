@@ -179,10 +179,15 @@ Run checks before committing:
 
 ## 📁 Campaign Files
 
-A campaign needs two files:
+A legacy campaign uses two source files:
 
 - A YAML config in `configs/`, such as `configs/01_simple_2d_maximise_logei.yaml`.
 - A canonical CSV log in `examples/` or another working directory.
+
+Newly initialized campaigns also have `<log>.manifest.json`. Keep that manifest
+and any sibling provenance archives with the campaign; see [Provenance](PROVENANCE.md).
+First-time local setup is covered separately in [Start Here](../START_HERE.md),
+which is included in source archives but not the runtime wheel.
 
 The repository also includes:
 - `configs/02_simple_2d_minimise_qlogei.yaml` as a small minimisation example,

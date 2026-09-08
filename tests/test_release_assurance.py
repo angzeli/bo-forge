@@ -113,6 +113,47 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
     assert all(int(job["timeout-minutes"]) > 0 for job in jobs.values())
 
 
+def test_provenance_filesystem_acceptance_is_in_macos_ci_and_checklist() -> None:
+    workflow = _workflow(".github/workflows/ci.yml")
+    steps = workflow["jobs"]["macos-filesystem"]["steps"]
+    command = next(step["run"] for step in steps if step.get("name") ==
+                   "Path, lock, rollback, and mutation tests")
+    for name in ("test_provenance.py", "test_provenance_resume.py",
+                 "test_provenance_lifecycle.py", "test_provenance_lifecycle_hardening.py",
+                 "test_provenance_acceptance.py", "test_provenance_closeout.py"):
+        assert f"tests/{name}" in command
+        assert f"tests/{name}" in _read("docs/RELEASE_CHECKLIST.md")
+
+
+def test_beginner_setup_contract_and_links() -> None:
+    guide = _read("START_HERE.md")
+    assert re.findall(r"^## (\d+)\.", guide, re.M) == [str(i) for i in range(1, 11)]
+    for command in ('python3.12 -m venv .venv', 'source .venv/bin/activate',
+                    'python -m pip install ".[app]"', 'python -m pip check',
+                    'python -m bo_forge --version', 'python -m bo_forge doctor',
+                    'python -m bo_forge_app', 'python -m bo_forge_app --port 8502'):
+        assert command in guide
+    assert f"bo-forge {PROJECT_VERSION}" in guide
+    assert "Nothing loaded yet." in guide
+    assert "After you load or create a campaign" in guide
+    for text in ("Code > Download ZIP", "pyproject.toml", "Ctrl+C", "Command Prompt",
+                 "Windows is not in the tested platform matrix", "Campaign", "Run", "Analyze",
+                 "http://127.0.0.1:8501", "http://127.0.0.1:8502"):
+        assert text in guide
+    for forbidden in ("sudo pip", "--break-system-packages", "--trusted-host",
+                      "--allow-network-access", 'pip install "bo-forge[app]"'):
+        assert forbidden not in guide
+    for target in re.findall(r"\]\(([^)]+)\)", guide):
+        if not target.startswith("https://"):
+            assert (PROJECT_ROOT / target).is_file(), target
+    for name in ("README.md", "docs/INSTALLATION.md", "docs/STREAMLIT_APP.md"):
+        assert "START_HERE.md" in _read(name)
+    assert "include START_HERE.md" in _read("MANIFEST.in")
+    tutorial = _read("docs/09_APP_CREATED_CAMPAIGN_TUTORIAL.md")
+    assert "both files" not in tutorial
+    assert "campaign_log.csv.manifest.json" in tutorial
+
+
 def test_future_tag_gate_validates_without_publishing() -> None:
     workflow = _read(".github/workflows/release-gate.yml")
     workflow_data = _workflow(".github/workflows/release-gate.yml")
@@ -223,10 +264,17 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in roadmap
     assert "Status: prepared; publication requires separate authorization" in roadmap
     assert f"### v{PROJECT_VERSION} - " in roadmap
-    assert "class v30 majorDone" in roadmap
-    assert "class v31 majorActive" in roadmap
-    assert "class v310,v311 patchDone" in roadmap
-    assert "class v312 patchActive" in roadmap
+    assert "class v30,v31 majorDone" in roadmap
+    assert "class v310,v311,v312,v313 patchDone" in roadmap
+    assert "class v313 patchActive" not in roadmap
+    assert (
+        "### v3.1.3 - Provenance Acceptance And Beginner Setup\n\n"
+        "Status: implementation complete; publication requires separate authorization "
+        "and exact-commit CI"
+    ) in roadmap
+    checklist = _read("docs/RELEASE_CHECKLIST.md")
+    assert "CI on that exact commit" in checklist
+    assert "Implementation completion does not grant publication approval." in checklist
     assert "## v3.0.x - Architecture And Release Assurance\n\nStatus: completed" in roadmap
-    assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: active" in roadmap
+    assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: completed" in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap

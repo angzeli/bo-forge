@@ -130,6 +130,13 @@ def validate_manifest_for_load(
 
 def initialize_campaign(config_path: str | Path, log_path: str | Path) -> tuple[Path, Path]:
     """Create an empty canonical log and schema-v2 manifest without overwriting files."""
+    return _initialize_campaign_files(config_path, log_path)[:2]
+
+
+def _initialize_campaign_files(
+    config_path: str | Path, log_path: str | Path,
+) -> tuple[Path, Path, bytes, bytes]:
+    """Return published paths and the exact prepared bytes owned by initialization."""
     from bo_forge.io import empty_campaign_log
     from bo_forge.logs import _campaign_log_lock
     config_file = Path(config_path).expanduser().resolve(strict=False)
@@ -163,12 +170,13 @@ def initialize_campaign(config_path: str | Path, log_path: str | Path) -> tuple[
                 row_count=len(empty_log),
             )
             manifest_temp = _prepare_json_temp(manifest_file, manifest)
+            log_bytes, manifest_bytes = log_temp.read_bytes(), manifest_temp.read_bytes()
             _link_initialized_files(log_temp, log_file, manifest_temp, manifest_file)
         finally:
             _remove_file(log_temp)
             if "manifest_temp" in locals():
                 _remove_file(manifest_temp)
-    return log_file, manifest_file
+    return log_file, manifest_file, log_bytes, manifest_bytes
 
 
 def initialize_campaign_session(
@@ -178,10 +186,10 @@ def initialize_campaign_session(
 ) -> Any:
     """Initialize and load a session, removing only unchanged artifacts on failure."""
     from bo_forge.logs import _campaign_log_lock
-    initialized_log, initialized_manifest = initialize_campaign(config_path, log_path)
+    initialized_log, initialized_manifest, log_bytes, manifest_bytes = _initialize_campaign_files(
+        config_path, log_path,
+    )
     try:
-        log_bytes = initialized_log.read_bytes()
-        manifest_bytes = initialized_manifest.read_bytes()
         return session_type.from_files(
             config_path,
             initialized_log,
@@ -192,9 +200,7 @@ def initialize_campaign_session(
         try:
             with _campaign_log_lock(initialized_log):
                 unchanged = (
-                    "log_bytes" in locals()
-                    and "manifest_bytes" in locals()
-                    and initialized_log.exists()
+                    initialized_log.exists()
                     and initialized_manifest.exists()
                     and initialized_log.read_bytes() == log_bytes
                     and initialized_manifest.read_bytes() == manifest_bytes

@@ -1,6 +1,6 @@
 # Campaign Provenance
 
-BO Forge 3.1.2 can initialize a campaign with a versioned provenance manifest while
+BO Forge 3.1.3 can initialize a campaign with a versioned provenance manifest while
 keeping the YAML configuration and CSV log as the campaign source data.
 
 ## Managed And Legacy Campaigns
@@ -15,6 +15,9 @@ The command creates both `work/my_campaign.csv` and
 `work/my_campaign.csv.manifest.json`. It refuses to overwrite either file. Campaigns
 created in Streamlit use the same initialization path.
 
+If loading a newly initialized session fails, cleanup removes only files still
+matching the exact initialization bytes. A later writer's committed state is preserved.
+
 Existing CSV campaigns without a manifest remain legacy campaigns. They load, suggest,
 append, review, observe, report, and plot as before under the default `compatible`
 resume policy. BO Forge does not silently create a manifest for them. Explicit adoption
@@ -22,7 +25,7 @@ starts tracking at the current state and records that earlier history is unknown
 
 Manifest presence identifies a managed campaign. Keep the CSV and its manifest together
 when moving, restoring, or backing up a campaign. A newly loaded CSV whose sidecar was
-deleted or omitted is indistinguishable from a genuine legacy campaign in schema v1
+deleted or omitted is indistinguishable from a genuine legacy campaign
 under compatible loading. Use `provenance_policy="required"` whenever sidecar absence
 must fail closed:
 
@@ -157,7 +160,14 @@ optional expected log fingerprint. Reload the campaign after successful recovery
 
 Campaign load and managed mutation both fail with `LogConflictError` when current config
 or log bytes no longer match the manifest. Byte-only YAML edits are classified
-separately from semantic changes, but both remain blocking. `bo-forge provenance` and
+separately from semantic changes, but both remain blocking. Recovery hints distinguish
+v2 formatting acceptance from the v1 prerequisite:
+restore the recorded YAML, explicitly migrate, then reapply formatting and preview
+`provenance-accept-config`. Recover pending transactions before changing config formatting.
+For a required manifest missing from an existing legacy campaign, preview `provenance-adopt`
+rather than initializing over the existing CSV. No hint authorizes an automatic repair.
+
+`bo-forge provenance` and
 the provenance API remain read-only diagnostic paths: they report `mismatch` or
 `pending_recovery`, and the CLI exits nonzero until the managed state is finalized and
 valid. `ProvenanceError` covers unreadable, malformed, unsupported,

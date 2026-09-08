@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.1.2 keeps the YAML, CSV, session, CLI, Streamlit, service, and
+BO Forge v3.1.3 keeps the YAML, CSV, session, CLI, Streamlit, service, and
 experimental API workflows stable while adding fail-closed resume policy and
 explicit recovery to opt-in campaign provenance.
 BO capability statuses are unchanged from v2.5.3.

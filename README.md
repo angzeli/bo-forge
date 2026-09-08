@@ -1,11 +1,15 @@
-# 🧪 BO Forge v3.1.2
+# 🧪 BO Forge v3.1.3
+
+**New here? [Start here](START_HERE.md)** to download BO Forge and open the local
+Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.1.2 adds explicit legacy adoption, schema-v2 migration, formatting-only config
-acceptance, and parent/child lineage. Each lifecycle action starts with a preview
-and requires confirmation with a reason before applying. Existing campaigns remain
-legacy-compatible; schema-v1 campaigns continue without silent upgrades. See
+v3.1.3 closes the provenance line with lifecycle acceptance, package checks, and
+a beginner setup guide. Explicit legacy adoption, schema-v2 migration,
+formatting-only config acceptance, and captured parent/child lineage retain their
+preview-and-confirm contracts. Existing campaigns remain legacy-compatible;
+schema-v1 campaigns continue without silent upgrades. See
 [Campaign Provenance](docs/PROVENANCE.md) for archive portability and lifecycle examples.
 
 Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
