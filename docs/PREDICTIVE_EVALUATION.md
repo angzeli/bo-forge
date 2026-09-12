@@ -1,7 +1,7 @@
 # Predictive Evaluation
 
-This is the scientific and workflow reference for the v3.2.0 predictive-diagnostics
-foundation. It describes the implementation and how to inspect its results; it
+This is the scientific and workflow reference for predictive diagnostics through
+v3.2.1. It describes the implementation and how to inspect its results; it
 does not certify that release gates, calibration studies, or v3.2.x acceptance
 have passed. See the [release checklist](RELEASE_CHECKLIST.md) and
 [roadmap](../ROADMAP_V3_X.md) for those separate gates.
@@ -83,6 +83,11 @@ where `c = 1.959963984540054` and `I_i` is a nominal 95% Gaussian predictive
 interval. Coverage uses inclusive endpoints. Nonfinite means, nonpositive or
 nonfinite variance, or nonfinite derived prediction metrics fail the fold.
 
+Coverage is computed as `abs(z_i) <= c`, and width as `2 * c * sigma_i`,
+without comparing or subtracting rounded original-unit endpoints. At large
+objective offsets, the stored floating-point endpoints can coincide even when
+predictive uncertainty and interval width are positive.
+
 For a **hand-calculated illustration**, not an executed campaign result, take
 `y = 12 U`, `mu = 10 U`, and observation-inclusive variance `4 U^2`. Then
 `sigma = 2 U`, `r = 2 U`, `z = 1`, NLPD is approximately `2.1121`, and the interval
@@ -102,7 +107,7 @@ fold_outcomes, metadata)`.
 
 | Member | Meaning |
 | --- | --- |
-| `summary` | One row per requested profile, scope, `fit_status`, observed-row count, completed/total folds, and the five aggregate metrics below. |
+| `summary` | One row per requested profile, scope, `fit_status`, observed-row count, completed/total folds, the five aggregate metrics below, and appended `fit_message`. |
 | `predictions` | One row per observed row per profile, with `row_id`, `fold`, `observed`, `fit_status`, `fit_message`, and predictive quantities. |
 | `fold_outcomes` | One row per fold/profile, training and held-out counts, completion/failure status, message, and fit-warning evidence. |
 | `metadata` | Method, split seed, profiles, fold membership, objective name/direction, input identities, software versions, units, interval probability, and interpretation limits. |
@@ -119,8 +124,8 @@ per observation, not equal weight per fold:
 | `rmse` | `sqrt(sum(r_i^2) / n)` | Error magnitude in `U`, with greater weight on large errors. |
 | `mae` | `sum(abs(r_i)) / n` | Mean absolute error in `U`. |
 | `mean_nlpd` | `sum(NLPD_i) / n` | Gaussian predictive-density score; compare only on the same outcomes and units. |
-| `interval_coverage` | `sum(y_i in I_i) / n` | Fraction covered, between 0 and 1; nominal target is 0.95. |
-| `mean_interval_width` | `sum(upper_i - lower_i) / n` | Interval width in `U`; read together with coverage, not alone. |
+| `interval_coverage` | `sum(abs(z_i) <= c) / n` | Fraction covered, between 0 and 1; nominal target is 0.95. |
+| `mean_interval_width` | `sum(2 * c * sigma_i) / n` | Interval width in `U`; read together with coverage, not alone. |
 
 Summary `fit_status` is `complete` or `incomplete`; prediction/fold status is
 `complete` or `failed`. If any fold fails, that profile's aggregate metrics are
@@ -129,6 +134,11 @@ remain inspectable, failed rows remain present with missing predictive values,
 and other profiles continue. Nonfinite aggregate metrics also produce an
 incomplete summary. Inspect warnings and failures even when some plots look good.
 `complete` means computational completion, not scientific validation.
+Summary `fit_message` is empty for complete profiles. For an incomplete profile,
+it lists failed folds and their messages, or explains an aggregate numerical
+failure even when every fold completed. Successful row predictions remain visible.
+Scaled, equivalent reductions avoid unnecessary overflow; outcomes and variances
+are never clipped or replaced by artificial floors or zero-valued failures.
 
 Warning evidence is not an exhaustive optimizer history. BO Forge serializes
 model construction and fitting together so their captured warnings belong to
@@ -169,7 +179,24 @@ result.plot_residuals(save_path=output_dir / "residuals.png")
 returns its path. It writes exactly `summary.csv`, `predictions.csv`,
 `fold_outcomes.csv`, and `metadata.json`. It does not export plots or mutate
 campaign state. Use a different new directory for a later evaluation; do not
-pre-create the export directory. A failed export is not a completed artifact set.
+pre-create the export directory. Missing parent directories may be created.
+The files are prepared in a temporary sibling directory and published together
+with atomic no-overwrite directory publication on macOS/Linux. A serialization
+or publication failure leaves the requested destination absent unless another
+process created it; that other destination is never removed or overwritten.
+Retry `result.export(output_dir)` from the retained in-memory result after fixing
+the cause, without fitting again. A competing or existing destination raises
+`FileExistsError`; choose a different destination. A killed process or failed
+temporary-directory cleanup may leave an unpublished `.preparing-` sibling,
+not a partial final bundle. Cleanup errors never mask the original failure.
+
+Each evaluation uses an isolated config/data snapshot, so predictions, fold
+membership, and recorded identities describe the same inputs. Standalone calls
+need no campaign files. File-loaded sessions (and the CLI/service wrappers)
+check config, log, and manifest identity before and after fitting, including for
+legacy campaigns. A changed source raises `LogConflictError`; reload and run
+again. Existing provenance/recovery policies remain enforced. Returned results
+are historical snapshots, not live views of a subsequently changed campaign.
 
 `result.plot_predictions(save_path=None)` and
 `result.plot_residuals(save_path=None)` use the stored result without refitting;
@@ -211,6 +238,10 @@ The CLI prints fold outcomes, including failure messages, and returns exit code
 An incomplete evaluation still exports its diagnostic tables when requested.
 Existing output destinations are rejected before fitting and checked again
 before export.
+Streamlit shows incomplete-profile and captured-warning notices above the
+result tables. Fold details remain available, and successful exports of incomplete
+results are labeled incomplete. Export errors retain the result for retry without
+refitting. Campaign/input/policy changes still invalidate the current-result cache.
 
 ## Existing Notebook Walkthrough
 

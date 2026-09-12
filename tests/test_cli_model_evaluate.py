@@ -74,14 +74,16 @@ def test_model_evaluate_backend_errors_do_not_export(evaluator, error, capsys, t
     assert list(tmp_path.iterdir()) == []
 
 
-def test_model_evaluate_export_failure_is_cli_error(evaluator, capsys, tmp_path):
+@pytest.mark.parametrize("error", [OSError("read-only directory"),
+                                   TypeError("invalid metadata"), ValueError("nonfinite metadata")])
+def test_model_evaluate_export_failure_is_cli_error(evaluator, capsys, tmp_path, error):
     campaign, result, _ = evaluator
-    result.export.side_effect = OSError("read-only directory")
+    result.export.side_effect = error
     assert cli.run([*_args(), "--output-dir", str(tmp_path / "new-output")]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Could not export predictive evaluation" in captured.err
-    assert "read-only directory" in captured.err
+    assert str(error) in captured.err
     assert campaign.model_predictive_evaluation.call_count == 1
 
 
@@ -211,3 +213,18 @@ def test_failed_folds_are_visible_and_nonzero_without_losing_exports(
         assert len(list(output.iterdir())) == 4
     else:
         assert not output.exists()
+
+
+def test_all_folds_complete_but_aggregate_failure_is_nonzero_and_visible(
+    evaluator, capsys, tmp_path,
+):
+    _, result, _ = evaluator
+    result.summary.loc[0, "fit_status"] = "incomplete"
+    result.summary.loc[0, "rmse"] = None
+    result.summary["fit_message"] = "Aggregate metrics failed: overflow"
+    assert cli.run([*_args(), "--output-dir", str(tmp_path / "evaluation")]) == 1
+    captured = capsys.readouterr()
+    assert "Aggregate metrics failed: overflow" in captured.out
+    assert "Wrote incomplete predictive evaluation" in captured.out
+    assert "Inspect the summary and fold outcomes" in captured.err
+    result.export.assert_called_once()

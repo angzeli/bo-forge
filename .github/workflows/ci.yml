@@ -139,6 +139,8 @@ jobs:
           tests/test_provenance_lifecycle_hardening.py
           tests/test_provenance_acceptance.py
           tests/test_provenance_closeout.py
+          tests/test_predictive_exports.py
+          tests/test_predictive_hardening.py
       - name: Core and CLI smoke
         run: |
           python -m bo_forge --version

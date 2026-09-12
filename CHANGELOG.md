@@ -1,5 +1,30 @@
 # 📝 BO Forge Changelog
 
+## v3.2.1 - Predictive Diagnostics Hardening
+
+Status: prepared hardening patch; publication requires exact-commit CI and
+separate authorization. v3.2.x remains active.
+
+- Publishes the four predictive-evaluation exports from a temporary sibling
+  directory with atomic no-overwrite publication, reusing the provenance-fork
+  primitive while preserving fork behavior and errors. Failed exports can retry
+  from the retained result without a partial final bundle.
+- Appends summary `fit_message`, retains fold failures and captured warnings,
+  and uses scaled reductions to avoid unnecessary overflow on finite inputs.
+  Unrepresentable metrics remain missing rather than clipped or fabricated.
+- Evaluates isolated config/data snapshots and checks file-loaded session
+  config/log/manifest identities before and after evaluation, including legacy
+  campaigns. Changed sources raise `LogConflictError` without export.
+- Makes incomplete/warning notices and export retry available in Streamlit;
+  CLI exit status remains nonzero for incomplete evaluations or export failures.
+- Computes interval coverage and width independently of rounded endpoints,
+  preserves valid long export-directory names, and points CLI failure guidance
+  to both summary and fold outcomes.
+- Adds export-failure, concurrent-publication, snapshot, metadata-isolation,
+  and adapter regressions to the existing Linux/macOS acceptance paths.
+- Changes no BO algorithm, fitting RNG or retry behavior, dependency, supported
+  campaign combination, evaluation bounds, YAML/CSV schema, or notebook.
+
 ## v3.2.0 - Predictive Diagnostics Foundation
 
 Status: prepared foundation; publication requires exact-commit CI and separate

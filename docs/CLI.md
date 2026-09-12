@@ -250,7 +250,7 @@ bo-forge plot \
   --output /tmp/bo_forge_model_comparison.png
 ```
 
-For explicit held-out evaluation in v3.2.0, supply a standard single-objective
+For explicit held-out evaluation, supply a standard single-objective
 config and a log containing 5..200 observations with no duplicate designs:
 
 ```bash
@@ -273,10 +273,18 @@ or run automatically as part of suggestion generation or normal reporting.
 It exits `0` only when every requested profile is complete, and exits `1` if any
 profile is incomplete. Failed-fold reasons remain visible without export;
 requested diagnostic exports are retained even when evaluation exits `1`.
+The appended summary `fit_message` distinguishes failed folds from aggregate
+numerical failures. Export success messages identify incomplete results explicitly.
 The export destination must not exist: export refuses overwrite and writes only
 `summary.csv`, `predictions.csv`, `fold_outcomes.csv`, and `metadata.json`.
 An existing destination is rejected before fitting; export checks again before
 writing in case another process created that destination during evaluation.
+The four files are prepared in a temporary sibling and published atomically
+without overwrite on macOS/Linux. Failed serialization or publication leaves no
+partial final bundle; a competing destination is never removed. The Python and
+Streamlit result can retry export without refitting; rerunning the CLI starts a
+new evaluation. File-loaded config/log/manifest changes during evaluation raise
+`LogConflictError`; reload campaign state before retrying.
 Plots require the explicit result plotting methods described in the Python API.
 Summary metrics are `rmse`, `mae`, `mean_nlpd`, `interval_coverage`, and
 `mean_interval_width`, with `fit_status=complete` or `incomplete`.

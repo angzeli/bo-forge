@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import ctypes
-import errno
-import os
-import sys
 from pathlib import Path
 from tempfile import mkdtemp
 
 from bo_forge._campaign import provenance as io
 from bo_forge._campaign.provenance_v2 import archive_bytes
+from bo_forge._filesystem import _DirectoryPublicationUnavailable, rename_directory_exclusive
 from bo_forge.errors import ProvenanceError
 
 
@@ -60,17 +57,9 @@ def publish_fork(config_file, log_file, parent, reason, identities, destination,
 
 def _rename_directory_exclusive(source: Path, destination: Path) -> None:
     """Use OS no-replace rename, including when a competing empty directory appears."""
-    libc = ctypes.CDLL(None, use_errno=True)
-    if sys.platform == "darwin":
-        rename = libc.renamex_np
-        result = rename(os.fsencode(source), os.fsencode(destination), 4)  # RENAME_EXCL
-    elif sys.platform.startswith("linux"):
-        rename = libc.renameat2
-        result = rename(-100, os.fsencode(source), -100, os.fsencode(destination), 1)
-    else:
-        raise ProvenanceError("Atomic no-overwrite directory publication requires macOS or Linux.")
-    if result:
-        code = ctypes.get_errno()
-        if code in {errno.EEXIST, errno.ENOTEMPTY}:
-            raise ProvenanceError("Fork destination already exists.")
-        raise OSError(code, os.strerror(code), str(destination))
+    try:
+        rename_directory_exclusive(source, destination)
+    except FileExistsError as exc:
+        raise ProvenanceError("Fork destination already exists.") from exc
+    except _DirectoryPublicationUnavailable as exc:
+        raise ProvenanceError(exc.strerror) from exc

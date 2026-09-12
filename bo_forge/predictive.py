@@ -6,16 +6,20 @@ import hashlib
 import json
 import math
 import platform
+import shutil
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from importlib.metadata import version
 from pathlib import Path
+from tempfile import mkdtemp
 
 import numpy as np
 import pandas as pd
 
+from bo_forge._filesystem import rename_directory_exclusive
 from bo_forge._fit_metadata import config_identity
 from bo_forge.config import CampaignConfig, ModelConfig
-from bo_forge.errors import ConfigError
+from bo_forge.errors import ConfigError, LogConflictError
 from bo_forge.validation import design_tuples, get_observed_data, validate_campaign_data
 
 _PROFILES = ("default", "smooth", "rough", "robust")
@@ -48,15 +52,29 @@ class PredictiveEvaluationResult:
     metadata: dict
 
     def export(self, output_dir: str | Path) -> Path:
-        """Write tables and metadata into a new directory; refuse overwrites."""
+        """Publish a complete table bundle atomically; refuse overwrites."""
         destination = Path(output_dir)
-        destination.mkdir(parents=True, exist_ok=False)
-        for name in ("summary", "predictions", "fold_outcomes"):
-            getattr(self, name).to_csv(destination / f"{name}.csv", index=False)
-        (destination / "metadata.json").write_text(
-            json.dumps(self.metadata, sort_keys=True, indent=2, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError(
+                f"Predictive evaluation destination already exists: {destination}"
+            )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = Path(mkdtemp(prefix=".evaluation.preparing-", dir=destination.parent))
+        try:
+            for name in ("summary", "predictions", "fold_outcomes"):
+                getattr(self, name).to_csv(temporary / f"{name}.csv", index=False)
+            (temporary / "metadata.json").write_text(
+                json.dumps(self.metadata, sort_keys=True, indent=2, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
+            rename_directory_exclusive(temporary, destination)
+        except BaseException:
+            # Rollback owns only the unpublished temporary directory, never the destination.
+            try:
+                shutil.rmtree(temporary)
+            except OSError:
+                pass  # Cleanup must not replace the serialization/publication failure.
+            raise
         return destination
 
     def plot_predictions(self, *, save_path: str | Path | None = None):
@@ -86,7 +104,8 @@ def model_predictive_evaluation(
     retrospective checks on adaptively collected data, not estimates of future
     optimization performance or evidence of calibrated uncertainty.
     """
-    names, observed = _prepare_evaluation(config, df, profiles, folds, seed)
+    config = deepcopy(config)
+    names, observed = _prepare_evaluation(config, df.copy(deep=True), profiles, folds, seed)
     groups = np.array_split(np.random.default_rng(seed).permutation(len(observed)), folds)
     membership = []
     predictions, outcomes = [], []
@@ -119,6 +138,44 @@ def model_predictive_evaluation(
         ["model_profile", "fold", "fitting_rng_fingerprint"]
     ].to_dict(orient="records")
     return PredictiveEvaluationResult(summary, prediction_frame, outcome_frame, metadata)
+
+
+def _session_predictive_evaluation(session, profiles, folds, seed):
+    """Guard file-loaded evaluations without imposing filesystem state on standalone calls."""
+    session._assert_provenance_resumable()
+    before = _session_sources(session)
+    if before is not None and before[-3:] != (
+        session.config_fingerprint, session.log_fingerprint, session._manifest_fingerprint,
+    ):
+        raise LogConflictError(
+            "Campaign changed after loading. Reload before predictive evaluation."
+        )
+    result = model_predictive_evaluation(
+        session.config, session.df, profiles=profiles, folds=folds, seed=seed,
+    )
+    if _session_sources(session) != before:
+        raise LogConflictError(
+            "Campaign changed during predictive evaluation. Reload and run again."
+        )
+    session._assert_provenance_resumable()
+    return result
+
+
+def _session_sources(session):
+    from bo_forge._campaign.provenance import manifest_fingerprint
+    from bo_forge.logs import _MISSING_LOG_FINGERPRINT, _log_file_fingerprint
+
+    if session._provenance_managed is None and session.config_fingerprint is None:
+        return None
+    paths = tuple(Path(path).expanduser().resolve() for path in (
+        session.config_path, session.log_path,
+    ))
+    return (
+        paths, session._provenance_policy,
+        _log_file_fingerprint(paths[0]),
+        _log_file_fingerprint(paths[1]) or _MISSING_LOG_FINGERPRINT,
+        manifest_fingerprint(paths[1]),
+    )
 
 
 def _prepare_evaluation(config, df, profiles, folds, seed):
@@ -229,6 +286,7 @@ def _prediction_metrics(observed, predicted, variance):
     std = float(np.sqrt(variance))
     residual = float(observed - predicted)
     standardized = residual / std
+    # Rounded original-unit endpoints can coincide even with positive uncertainty.
     lower, upper = float(predicted - _Z95 * std), float(predicted + _Z95 * std)
     return {
         "predicted_mean": float(predicted),
@@ -237,11 +295,11 @@ def _prediction_metrics(observed, predicted, variance):
         "residual": residual,
         "standardized_residual": standardized,
         "negative_log_predictive_density": float(
-            0.5 * (np.log(2 * np.pi) + np.log(variance) + standardized**2)
+            0.5 * (np.log(2 * np.pi) + np.log(variance)) + (standardized / np.sqrt(2.0))**2
         ),
         "interval_lower": lower,
         "interval_upper": upper,
-        "interval_covered": bool(lower <= observed <= upper),
+        "interval_covered": bool(abs(standardized) <= _Z95),
     }
 
 
@@ -269,17 +327,15 @@ def _profile_summary(profile, predictions, outcomes, count):
     folds = outcomes.loc[outcomes.model_profile == profile]
     complete = bool(folds.fit_status.eq("complete").all())
     metrics = dict.fromkeys(_METRICS, None)
+    failed = folds.loc[folds.fit_status.ne("complete")]
+    message = "; ".join(f"Fold {row.fold}: {row.fit_message}" for row in failed.itertuples())
     if complete:
-        residual = rows.residual.to_numpy(dtype=float)
-        metrics.update(
-            rmse=float(np.sqrt(np.mean(residual**2))),
-            mae=float(np.mean(np.abs(residual))),
-            mean_nlpd=float(rows.negative_log_predictive_density.mean()),
-            interval_coverage=float(rows.interval_covered.astype(float).mean()),
-            mean_interval_width=float((rows.interval_upper - rows.interval_lower).mean()),
-        )
-        if not all(np.isfinite(value) for value in metrics.values()):
+        try:
+            with np.errstate(over="raise", invalid="raise", divide="raise"):
+                metrics = _aggregate_metrics(rows)
+        except (FloatingPointError, OverflowError, ValueError) as exc:
             complete, metrics = False, dict.fromkeys(_METRICS, None)
+            message = f"Aggregate metrics failed: {exc}"
     return {
         "model_profile": profile,
         "evaluation_scope": "out_of_fold",
@@ -288,7 +344,32 @@ def _profile_summary(profile, predictions, outcomes, count):
         "completed_folds": int(folds.fit_status.eq("complete").sum()),
         "total_folds": len(folds),
         **metrics,
+        "fit_message": message,
     }
+
+
+def _finite_mean(values):
+    values = np.asarray(values, dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("non-finite values in aggregate inputs")
+    scale = float(np.max(np.abs(values)))
+    return float(np.mean(values / scale) * scale) if scale else 0.0
+
+
+def _aggregate_metrics(rows):
+    residual = rows.residual.to_numpy(dtype=float)
+    scale = float(np.max(np.abs(residual)))
+    # Scale before squaring/summing: finite large residuals can have a finite RMS.
+    metrics = dict(
+        rmse=float(scale * np.sqrt(_finite_mean((residual / scale)**2))) if scale else 0.0,
+        mae=_finite_mean(np.abs(residual)),
+        mean_nlpd=_finite_mean(rows.negative_log_predictive_density),
+        interval_coverage=_finite_mean(rows.interval_covered.astype(float)),
+        mean_interval_width=_finite_mean(2 * _Z95 * rows.predicted_std.to_numpy(dtype=float)),
+    )
+    if not all(np.isfinite(value) for value in metrics.values()):
+        raise ValueError("non-finite aggregate metrics")
+    return metrics
 
 
 def _evaluation_metadata(config, observed, profiles, folds, seed, membership):

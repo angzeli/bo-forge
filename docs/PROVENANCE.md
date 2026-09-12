@@ -1,6 +1,6 @@
 # Campaign Provenance
 
-BO Forge 3.2.0 can initialize a campaign with a versioned provenance manifest while
+BO Forge can initialize a campaign with a versioned provenance manifest while
 keeping the YAML configuration and CSV log as the campaign source data.
 
 ## Managed And Legacy Campaigns

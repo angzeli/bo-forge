@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.2.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.2.1.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -192,13 +192,15 @@ a model or generates campaign suggestions.
 
 Summary metrics are `rmse`, `mae`, `mean_nlpd`, `interval_coverage`, and
 `mean_interval_width`; summary `fit_status` is `complete` or `incomplete`.
+An appended `fit_message` is empty on completion and otherwise explains failed
+folds or aggregate numerical failure. Incomplete profiles retain no aggregate metrics.
 Prediction rows identify `model_profile`, `fold`, and `row_id` and include
 `predicted_mean`, `predicted_variance`, `predicted_std`, `residual`,
 `standardized_residual`, `negative_log_predictive_density`, `interval_lower`,
 `interval_upper`, and `interval_covered`. Inspect fold failures rather than
 treating an incomplete profile as a successful comparison.
 
-The v3.2.0 evaluator supports standard single-objective campaigns only. Context,
+The evaluator supports standard single-objective campaigns only. Context,
 replicates, structured stages, fidelity, and multi-objective campaigns are
 rejected. It requires 5..200 observed rows, 2..5 folds, at least two training
 rows in every fold, and no duplicate designs. Use the same profiles, folds, seed,
@@ -230,6 +232,14 @@ result.plot_residuals(save_path="reports/evaluation/residuals.png")
 overwrite. It creates exactly `summary.csv`, `predictions.csv`, `fold_outcomes.csv`,
 and `metadata.json`, not plots or campaign state. Do not pre-create `output_dir`.
 The example's plots are separate explicit writes after export.
+The four files are prepared in a temporary sibling directory and published
+atomically without overwrite on macOS/Linux. Failed exports leave no partial
+final bundle and can retry from the same result; an existing or concurrently
+created destination raises `FileExistsError` and is never removed.
+Evaluation owns a config/data snapshot. File-loaded sessions verify config/log/
+manifest identity before and after evaluation and reject changes with
+`LogConflictError`. Standalone calls remain filesystem-independent, and returned
+results remain historical snapshots. See [Predictive Evaluation](PREDICTIVE_EVALUATION.md).
 `result.plot_predictions(save_path=None)` and
 `result.plot_residuals(save_path=None)` plot the stored held-out results without
 refitting; omit `save_path` for an unsaved figure. The existing model-diagnostics

@@ -27,6 +27,7 @@ from tests.test_models import (
     multi_fidelity_config,
     multi_fidelity_log,
 )
+from tests.test_predictive_evaluation import evaluation_data
 
 
 @pytest.fixture
@@ -41,7 +42,7 @@ def fake_gp(monkeypatch: pytest.MonkeyPatch) -> list[object]:
             self.train_y = train_y
             created.append(self)
 
-        def posterior(self, x):
+        def posterior(self, x, **_kwargs):
             mean = torch.zeros((len(x), self.train_y.shape[-1]), dtype=torch.double)
             return SimpleNamespace(mean=mean, variance=torch.full_like(mean, 0.04))
 
@@ -111,6 +112,61 @@ def test_interleaved_fits_keep_each_models_explicit_evidence(fake_gp: list[objec
         assert _values(model_summary(cfg, df, metadata=own))["last_fit_status"] == "ok"
         assert _values(model_summary(cfg, df, metadata=other))["last_fit_status"] == "not_recorded"
         assert _values(model_summary(cfg, df))["last_fit_status"] == "not_recorded"
+
+
+@pytest.mark.parametrize("fail_evaluation", [False, True])
+def test_evaluation_comparison_and_suggestions_keep_owned_warnings(
+    fake_gp, tmp_path, monkeypatch, fail_evaluation,
+):
+    config, frame = evaluation_data(8)
+    config = replace(config, model=ModelConfig("robust"))
+    config_path = write_config(tmp_path / "campaign.yaml")
+    config_path.write_text(config_path.read_text() + "\nmodel:\n  profile: robust\n")
+    log = tmp_path / "campaign.csv"
+    frame.to_csv(log, index=False)
+    session = CampaignSession.from_files(config_path, log)
+    owner = local()
+    owner.name = "suggestion"
+
+    def fit(model):
+        warnings.warn(f"{owner.name} warning", RuntimeWarning, stacklevel=2)
+        time.sleep(0.005)
+        if owner.name == "evaluation" and fail_evaluation:
+            raise RuntimeError("evaluation fit failed")
+
+    monkeypatch.setattr(models_module, "fit_gpytorch_mll", fit)
+    monkeypatch.setattr(suggestions_module, "optimize_log_ei", lambda **kwargs: (
+        torch.tensor([[0.99]], dtype=torch.double), torch.tensor([0.1]), "log_ei",
+    ))
+    before = {path: path.read_bytes() for path in (config_path, log)}
+    session.suggest_next()
+    metadata = session._fit_metadata
+    assert _values(session.model_summary())["last_fit_warnings"] == "suggestion warning"
+    start = Barrier(2)
+
+    def evaluation():
+        owner.name = "evaluation"
+        start.wait(timeout=10)
+        return session.model_predictive_evaluation(folds=2)
+
+    def comparison():
+        owner.name = "comparison"
+        start.wait(timeout=10)
+        return session.model_profile_comparison(["robust"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = pool.submit(evaluation), pool.submit(comparison)
+        evaluated, compared = first.result(timeout=20), second.result(timeout=20)
+    assert evaluated.fold_outcomes.fit_warning_count.tolist() == [1, 1]
+    assert evaluated.fold_outcomes.fit_warnings.tolist() == ["evaluation warning"] * 2
+    assert evaluated.summary.fit_status.tolist() == [
+        "incomplete" if fail_evaluation else "complete",
+    ]
+    assert compared.fit_warning_count.tolist() == [1]
+    assert compared.fit_status.tolist() == ["ok_with_warnings"]
+    assert session._fit_metadata is metadata
+    assert _values(session.model_summary())["last_fit_warnings"] == "suggestion warning"
+    assert {path: path.read_bytes() for path in before} == before
 
 
 @pytest.mark.parametrize("profile", ["default", "robust"])

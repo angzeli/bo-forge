@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.2.0 adds explicit bounded predictive diagnostics while keeping
+BO Forge v3.2.1 retains explicit bounded predictive diagnostics while keeping
 YAML/CSV schemas, suggestion algorithms, campaign combinations, and provenance
 contracts unchanged. Predictive evaluation has its own narrower scope below;
 support for a BO campaign combination does not imply evaluator support.

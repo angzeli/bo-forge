@@ -116,6 +116,15 @@ def render_predictive_evaluation(st: Any, campaign: Any) -> None:
 def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
     from bo_forge_app.views.analyze import _render_plot_controls
 
+    incomplete = result.summary.loc[result.summary.fit_status.ne("complete")]
+    if not incomplete.empty:
+        st.warning(
+            "Incomplete predictive evaluation; aggregate metrics withheld for: "
+            + ", ".join(incomplete.model_profile) + ". Inspect summary and fold messages."
+        )
+    warning_count = int(result.fold_outcomes.fit_warning_count.sum())
+    if warning_count:
+        st.warning(f"Captured {warning_count} fit warning(s). Inspect the fold evidence below.")
     st.dataframe(result.summary, hide_index=True, width="stretch")
     with st.expander("Held-out predictions and fold outcomes"):
         st.dataframe(result.predictions, hide_index=True, width="stretch")
@@ -140,7 +149,13 @@ def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
     if export:
         try:
             result.export(Path(output_dir))
-        except (BOForgeError, OSError, ValueError) as exc:
-            st.error(str(exc))
+        except (BOForgeError, OSError, ValueError, TypeError) as exc:
+            st.error(
+                f"Could not export predictive evaluation: {exc}. The result is retained for retry."
+            )
         else:
-            st.success(f"Wrote predictive evaluation: {output_dir}")
+            label = (
+                "incomplete predictive evaluation"
+                if not incomplete.empty else "predictive evaluation"
+            )
+            st.success(f"Wrote {label}: {output_dir}")

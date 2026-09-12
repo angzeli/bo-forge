@@ -125,6 +125,19 @@ def test_provenance_filesystem_acceptance_is_in_macos_ci_and_checklist() -> None
         assert f"tests/{name}" in _read("docs/RELEASE_CHECKLIST.md")
 
 
+def test_predictive_publication_and_snapshot_checks_run_on_linux_and_macos() -> None:
+    workflow = _workflow(".github/workflows/ci.yml")
+    linux = workflow["jobs"]["core-tests"]
+    assert linux["runs-on"] == "ubuntu-latest"
+    assert any(step.get("run") == "python -m pytest -p no:cacheprovider" for step in linux["steps"])
+    steps = workflow["jobs"]["macos-filesystem"]["steps"]
+    command = next(step["run"] for step in steps if step.get("name") ==
+                   "Path, lock, rollback, and mutation tests")
+    for name in ("test_predictive_exports.py", "test_predictive_hardening.py"):
+        assert f"tests/{name}" in command
+        assert f"tests/{name}" in _read("docs/RELEASE_CHECKLIST.md")
+
+
 def test_beginner_setup_contract_and_links() -> None:
     guide = _read("START_HERE.md")
     assert re.findall(r"^## (\d+)\.", guide, re.M) == [str(i) for i in range(1, 11)]
@@ -268,9 +281,10 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "class v310,v311,v312,v313 patchDone" in roadmap
     assert "class v313 patchActive" not in roadmap
     assert "class v32 majorActive" in roadmap
-    assert "class v320 patchDone" in roadmap
+    assert "class v320,v321 patchDone" in roadmap
     assert "| `v3.2.0` | prepared | Complete foundation:" in roadmap
-    for version in ("3.2.1", "3.2.2", "3.2.3"):
+    assert "| `v3.2.1` | prepared | Atomic exports," in roadmap
+    for version in ("3.2.2", "3.2.3"):
         assert f"| `v{version}` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
@@ -313,3 +327,14 @@ def test_predictive_foundation_docs_preserve_scope_and_interpretation() -> None:
         assert option in _read("docs/CLI.md")
     for path in ("README.md", "docs/PUBLIC_API.md", "docs/CLI.md", "docs/RELEASE_CHECKLIST.md"):
         assert "notebooks/23_predictive_diagnostics.ipynb" in _read(path)
+
+
+def test_predictive_hardening_docs_describe_exports_failures_and_snapshots() -> None:
+    for path in ("docs/PREDICTIVE_EVALUATION.md", "docs/PUBLIC_API.md", "docs/CLI.md"):
+        content = _read(path)
+        for fragment in ("fit_message", "temporary sibling", "LogConflictError"):
+            assert fragment in content, (path, fragment)
+    guide = _read("docs/PREDICTIVE_EVALUATION.md")
+    for fragment in ("historical snapshots", "FileExistsError", "without fitting again",
+                     "aggregate numerical", "Failed", "never removed"):
+        assert fragment.lower() in guide.lower()

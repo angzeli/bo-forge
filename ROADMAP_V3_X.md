@@ -4,10 +4,10 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.2.0`. It prepares the complete predictive-diagnostics
-foundation: honest in-sample labels, explicit fit metadata ownership, and bounded
-held-out evaluation. v3.2.1 hardening, v3.2.2 interpretation, and v3.2.3 acceptance
-remain planned. Completed statuses below describe implementation, not publication
+Current prepared baseline: `v3.2.1`. It hardens the predictive-diagnostics
+foundation with atomic exports, failure messages, and isolated snapshots while
+preserving scientific scope. v3.2.2 interpretation and v3.2.3 acceptance remain
+planned. Completed statuses below describe implementation, not publication
 approval or completion of future acceptance work. Release publication still requires
 exact-commit CI and separate authorization.
 
@@ -66,8 +66,8 @@ flowchart LR
     class v33,v34 majorFuture
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
-    class v320 patchDone
-    class v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v320,v321 patchDone
+    class v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -90,10 +90,10 @@ flowchart LR
 | `v3.1.3` | implementation complete | Lifecycle acceptance, beginner setup, and package verification |
 | `v3.1.x` | completed | Durable campaign provenance and lineage |
 | `v3.2.0` | prepared | Complete foundation: in-sample labels, explicit metadata, bounded predictive evaluation |
-| `v3.2.1` | planned | Diagnostics hardening |
+| `v3.2.1` | prepared | Atomic exports, failure visibility, and evaluation snapshots |
 | `v3.2.2` | planned | Interpretation and calibration guidance |
 | `v3.2.3` | planned | Synthetic acceptance |
-| `v3.2.x` | in progress | Foundation prepared; hardening, interpretation, and acceptance remain |
+| `v3.2.x` | in progress | Foundation and hardening prepared; interpretation and acceptance remain |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
@@ -256,7 +256,7 @@ Status: implementation complete; publication requires separate authorization and
 
 ## v3.2.x - Predictive Diagnostics Correctness
 
-Status: in progress; foundation prepared, full-line acceptance remains planned
+Status: in progress; foundation and hardening prepared, full-line acceptance remains planned
 
 ### v3.2.0 - Predictive Diagnostics Foundation
 
@@ -282,12 +282,17 @@ Audit mapping: `ARC-001`, diagnostics foundation of `SCI-001`.
 
 ### v3.2.1 - Diagnostics Hardening
 
-Status: planned
+Status: prepared; publication requires separate authorization and exact-commit CI
 
-- Harden failure visibility, export behavior, and adapter parity around the
-  foundation without expanding campaign combinations or relaxing evaluation bounds.
-- Extend interleaved/concurrent fit ownership and stale-input regressions.
-- Preserve suggestion numerics and existing diagnostic column compatibility.
+- Publish the four evaluation files atomically without overwrite, with retry from
+  retained results and unchanged provenance-fork publication behavior.
+- Append summary failure messages, use safer equivalent reductions, and expose
+  incomplete/warning notices through CLI and Streamlit without hiding fold evidence.
+- Isolate config/data snapshots; check loaded config/log/manifest identity before
+  and after evaluation across Python, CLI, and service.
+- Cover interleaved fit ownership, stale inputs, export rollback, and publication
+  races in the existing Linux/macOS gates. Preserve suggestions, evaluation bounds,
+  campaign combinations, fitting RNG/retries, and existing diagnostic columns.
 
 ### v3.2.2 - Interpretation And Calibration Guidance
 

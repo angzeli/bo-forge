@@ -54,19 +54,20 @@ def _cmd_model_evaluate(args: argparse.Namespace) -> int:
     if args.output_dir is not None:
         try:
             result.export(args.output_dir)
-        except OSError as exc:
+        except (OSError, ValueError, TypeError) as exc:
             raise _CLIOutputError(
                 f"Could not export predictive evaluation to '{args.output_dir}': {exc}"
             ) from exc
     _print_table(result.summary)
     print("Fold outcomes:")
     _print_table(result.fold_outcomes)
-    if args.output_dir is not None:
-        print(f"Wrote predictive evaluation: {args.output_dir}")
     incomplete = bool(result.summary["fit_status"].ne("complete").any())
+    if args.output_dir is not None:
+        label = "incomplete predictive evaluation" if incomplete else "predictive evaluation"
+        print(f"Wrote {label}: {args.output_dir}")
     if incomplete:
         print(
             "Predictive evaluation is incomplete; aggregate metrics are withheld for "
-            "incomplete profiles. Inspect the fold outcomes above.", file=sys.stderr,
+            "incomplete profiles. Inspect the summary and fold outcomes above.", file=sys.stderr,
         )
     return 1 if incomplete else 0

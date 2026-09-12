@@ -4,9 +4,9 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.2.0 preparation covers the complete predictive-diagnostics foundation.
-The v3.1.x provenance line remains complete; v3.2.1 hardening, v3.2.2
-interpretation, and v3.2.3 acceptance remain planned.
+The v3.2.1 preparation hardens the complete predictive-diagnostics foundation.
+The v3.1.x provenance line remains complete; v3.2.2 interpretation and v3.2.3
+acceptance remain planned.
 Commit only the reviewed release changes. Publication still requires passing required
 CI on that exact commit; push, tagging, and release publication each require separate
 authorization. Implementation completion does not grant publication approval.
@@ -87,7 +87,7 @@ bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
-For the v3.2.0 foundation, run the output-free
+For v3.2.1, run the output-free
 `notebooks/23_predictive_diagnostics.ipynb` in an isolated working directory with
 the installed package. Its temporary-directory setup creates 20 synthetic rows
 through the existing config parser, evaluates `default` and `smooth` with three
@@ -100,6 +100,14 @@ with config/log paths, and Streamlit `Analyze`; loading or rerunning the page mu
 not start evaluation. Confirm in-sample labels and session-owned metadata, as well
 as rejected unsupported campaigns, observation/fold bounds, and duplicate designs.
 These focused checks supplement, not replace, full preflight and exact-commit CI.
+Include `tests/test_predictive_exports.py`, `tests/test_predictive_hardening.py`,
+`tests/test_fit_metadata.py`, `tests/test_cli_model_evaluate.py`, and
+`tests/test_streamlit_predictive_evaluation.py`. Verify failures at every export
+write and publication, concurrent no-overwrite publication, retry without refit,
+incomplete summary messages, and legacy/managed file changes during evaluation.
+The existing Linux full-suite and macOS filesystem jobs exercise the new export
+publication path as well as unchanged provenance-fork publication. Inspect summary,
+predictions, fold outcomes, and JSON from clean installed-artifact probes too.
 
 ```bash
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider
@@ -318,4 +326,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.2.0 does none of those actions.
+separate explicit authorization. Preparing v3.2.1 does none of those actions.

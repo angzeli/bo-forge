@@ -50,9 +50,13 @@ def evaluation_ui(tmp_path, monkeypatch):
     log.write_bytes(Path("examples/17_model_profile_campaign_log.csv").read_bytes())
     service = CampaignAppService.load(config, log)
     result = SimpleNamespace(
-        summary=pd.DataFrame([{"profile": "default", "rmse": 0.2}]),
+        summary=pd.DataFrame([{
+            "model_profile": "default", "rmse": 0.2, "fit_status": "complete", "fit_message": "",
+        }]),
         predictions=pd.DataFrame([{"observed": 1.0, "predicted": 0.8}]),
-        fold_outcomes=pd.DataFrame([{"fold": 0, "status": "ok"}]),
+        fold_outcomes=pd.DataFrame([{
+            "fold": 1, "fit_status": "complete", "fit_warning_count": 0, "fit_message": "",
+        }]),
         metadata={"folds": 5, "seed": 0}, export=Mock(),
         plot_predictions=Mock(side_effect=_plot_result),
         plot_residuals=Mock(side_effect=_plot_result),
@@ -224,6 +228,55 @@ def test_export_error_preserves_result_without_refitting(evaluation_ui):
     _click(ui.app, "Export predictive evaluation")
     assert "already exists" in ui.app.error[0].value
     assert EVALUATION_CACHE_KEY in ui.app.session_state
+    assert ui.evaluate.call_count == 1
+
+
+@pytest.mark.parametrize("error", [OSError("disk full"), TypeError("invalid metadata"),
+                                   ValueError("nonfinite metadata")])
+def test_export_failure_can_retry_same_result_without_refitting(evaluation_ui, monkeypatch, error):
+    import bo_forge.predictive as predictive
+
+    ui = evaluation_ui
+    tables = predictive.PredictiveEvaluationResult(
+        ui.result.summary, ui.result.predictions, ui.result.fold_outcomes, ui.result.metadata,
+    )
+    ui.result.export.side_effect = tables.export
+    _run(ui)
+    output = ui.root / "evaluation"
+    ui.app.text_input(key="evaluation_output_dir").set_value(str(output))
+    before = {path: path.read_bytes() for path in (ui.config, ui.log)}
+    def failed_export(path):
+        with monkeypatch.context() as patch:
+            patch.setattr(predictive.json, "dumps", Mock(side_effect=error))
+            return tables.export(path)
+
+    ui.result.export.side_effect = failed_export
+    _click(ui.app, "Export predictive evaluation")
+    assert not output.exists()
+    assert "retained for retry" in ui.app.error[0].value
+    assert EVALUATION_CACHE_KEY in ui.app.session_state
+    ui.result.export.side_effect = tables.export
+    _click(ui.app, "Export predictive evaluation")
+    assert len(list(output.iterdir())) == 4
+    assert ui.evaluate.call_count == 1
+    assert {path: path.read_bytes() for path in before} == before
+
+
+def test_incomplete_and_warning_notices_are_visible_and_export_is_labeled(evaluation_ui):
+    ui = evaluation_ui
+    ui.result.summary.loc[0, ["fit_status", "fit_message", "rmse"]] = [
+        "incomplete", "Fold 1: did not converge", None,
+    ]
+    ui.result.fold_outcomes.loc[0, ["fit_status", "fit_message", "fit_warning_count"]] = [
+        "failed", "did not converge", 2,
+    ]
+    _run(ui)
+    notices = " ".join(item.value for item in ui.app.warning)
+    assert "Incomplete predictive evaluation" in notices
+    assert "default" in notices and "Captured 2 fit warning(s)" in notices
+    assert len(ui.app.dataframe) == 3
+    _click(ui.app, "Export predictive evaluation")
+    assert any("Wrote incomplete predictive evaluation" in item.value for item in ui.app.success)
     assert ui.evaluate.call_count == 1
 
 

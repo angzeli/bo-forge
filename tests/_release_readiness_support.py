@@ -124,6 +124,8 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge/plot_registry.py" in names
     assert "bo_forge/structured.py" in names
     assert "bo_forge/application.py" in names
+    assert "bo_forge/predictive.py" in names
+    assert "bo_forge/_filesystem.py" in names
     assert "bo_forge/_config/parser.py" in names
     assert "bo_forge/_campaign/validation.py" in names
     assert "bo_forge/_optimization/router.py" in names
@@ -237,6 +239,8 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "notebooks/20_contextual_cost_review_logei_campaign.ipynb",
         "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb",
         "notebooks/23_predictive_diagnostics.ipynb",
+        "tests/test_predictive_exports.py",
+        "tests/test_predictive_hardening.py",
         "tests/conftest.py",
         "tests/test_v253_operational_freeze.py",
     }
@@ -408,6 +412,31 @@ assert child.log_path.read_bytes() == log_path.read_bytes()
 assert dict(child.provenance_summary().values)["history"] == "inherited_parent_data"
 assert len(child.df) == 1
 print("Installed provenance lifecycle acceptance passed")
+from bo_forge import PredictiveEvaluationResult
+import json
+
+before = (config_path.read_bytes(), log_path.read_bytes())
+diagnostics = PredictiveEvaluationResult(
+    pd.DataFrame([{"model_profile": "default", "fit_status": "incomplete",
+                   "rmse": None, "fit_message": "Fold 1: diagnostic probe"}]),
+    pd.DataFrame([{"row_id": "artifact_1", "fit_status": "failed"}]),
+    pd.DataFrame([{"fold": 1, "fit_message": "diagnostic probe"}]),
+    {"evaluation_scope": "out_of_fold"},
+)
+exported = diagnostics.export(Path("diagnostics/evaluation"))
+assert {p.name for p in exported.iterdir()} == {
+    "summary.csv", "predictions.csv", "fold_outcomes.csv", "metadata.json",
+}
+assert pd.read_csv(exported / "summary.csv").rmse.isna().all()
+assert json.loads((exported / "metadata.json").read_text()) == diagnostics.metadata
+try:
+    diagnostics.export(exported)
+except FileExistsError:
+    pass
+else:
+    raise AssertionError("Installed predictive export overwrote its destination")
+assert before == (config_path.read_bytes(), log_path.read_bytes())
+print("Installed predictive export acceptance passed")
 '''
     subprocess.run(
         [str(python), "-c", script],

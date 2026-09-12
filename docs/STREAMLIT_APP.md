@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.2.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.2.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 For first-time download, installation, and launch instructions, read
 [Start Here](../START_HERE.md). This page describes operating the workbench.
@@ -98,6 +98,12 @@ changed campaign inputs or evaluation options invalidate the previous result.
 Results expose summary, held-out predictions, fold outcomes, metadata, and
 prediction/residual plots. Exporting results is explicit and never changes the
 campaign's CSV or configured model profile.
+Incomplete-profile and captured-warning notices appear above the tables; summary
+`fit_message` and fold details explain failures. Exports prepare all four files
+in a temporary sibling directory and publish without overwrite. Failed exports
+retain the evaluation for retry without refitting; exported incomplete results
+are labeled incomplete. Files changed during fitting are rejected, and changed
+campaigns cannot expose a stale cached result as current.
 
 This evaluator supports standard single-objective campaigns with 5..200 observed
 rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.

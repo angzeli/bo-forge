@@ -576,14 +576,9 @@ class CampaignSession:
 
     def model_predictive_evaluation(self, profiles=None, *, folds=5, seed=0):
         """Run explicit retrospective held-out checks without campaign mutation."""
-        from bo_forge.predictive import model_predictive_evaluation
+        from bo_forge.predictive import _session_predictive_evaluation
 
-        self._assert_provenance_resumable()
-        result = model_predictive_evaluation(
-            self.config, self.df, profiles=profiles, folds=folds, seed=seed
-        )
-        self._assert_provenance_resumable()
-        return result
+        return _session_predictive_evaluation(self, profiles, folds, seed)
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
