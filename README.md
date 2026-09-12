@@ -1,12 +1,14 @@
-# 🧪 BO Forge v3.1.3
+# 🧪 BO Forge v3.2.0
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.1.3 closes the provenance line with lifecycle acceptance, package checks, and
-a beginner setup guide. Explicit legacy adoption, schema-v2 migration,
+v3.2.0 prepares the predictive-diagnostics foundation: explicit in-sample labels,
+session-owned fit metadata, and opt-in bounded cross-validation. This is release
+preparation, not publication or completion of the full v3.2.x acceptance line.
+Explicit legacy adoption, schema-v2 migration,
 formatting-only config acceptance, and captured parent/child lineage retain their
 preview-and-confirm contracts. Existing campaigns remain legacy-compatible;
 schema-v1 campaigns continue without silent upgrades. See
@@ -236,10 +238,26 @@ The bundled model-profile example is `configs/17_model_profile_logei.yaml` with
 seed log `examples/17_model_profile_campaign_log.csv`. Inspect profile and
 fitting inputs with `campaign.model_summary()` or `bo-forge model-summary`, and
 compare candidate profiles with `campaign.model_profile_comparison()` or
-`bo-forge model-compare`. Model comparison is diagnostic only. It does not automatically select a model or change the configured profile. Export
+`bo-forge model-compare`. Existing comparison columns are retained, with
+`evaluation_scope=in_sample`: these training-row metrics are not held-out
+predictive evidence. Model comparison is diagnostic only. It does not automatically select a model or change the configured profile. Export
 posterior-vs-observed diagnostics with `bo-forge plot --kind model-diagnostics`
 and profile comparison diagnostics with `bo-forge plot --kind model-comparison`.
 The notebook walkthrough is `notebooks/17_model_profile_logei_campaign.ipynb`.
+
+For held-out checks, explicitly call `campaign.model_predictive_evaluation()` or
+`bo-forge model-evaluate --config campaign.yaml --log observed.csv --profile default --profile smooth --folds 3 --seed 0 --output-dir reports/evaluation`.
+The evaluator supports standard single-objective campaigns with 5..200 observed
+rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
+Context, replicates, stages, fidelity, and multi-objective campaigns are rejected.
+Predictive variance includes observation noise in original objective units squared;
+means and standard deviations use original objective units. Nothing runs
+automatically or selects a model. The compact, fixture-free
+[predictive diagnostics notebook](notebooks/23_predictive_diagnostics.ipynb)
+uses 20 synthetic rows in a temporary directory, `default`/`smooth`, and three folds.
+See [Predictive Evaluation](docs/PREDICTIVE_EVALUATION.md) for a worked scientific
+explanation, result/export contracts, and adaptive-data limitations, and
+[Public API](docs/PUBLIC_API.md) for public imports.
 
 The bundled qLogNEI example is `configs/18_noisy_pending_qlognei.yaml` with
 seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates

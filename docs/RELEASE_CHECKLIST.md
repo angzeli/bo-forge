@@ -4,7 +4,9 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.1.3 closeout marks v3.1.x implementation complete after local acceptance.
+The v3.2.0 preparation covers the complete predictive-diagnostics foundation.
+The v3.1.x provenance line remains complete; v3.2.1 hardening, v3.2.2
+interpretation, and v3.2.3 acceptance remain planned.
 Commit only the reviewed release changes. Publication still requires passing required
 CI on that exact commit; push, tagging, and release publication each require separate
 authorization. Implementation completion does not grant publication approval.
@@ -84,6 +86,20 @@ lifecycle-hardening/acceptance tests. Existing artifact probes also exercise
 bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
+
+For the v3.2.0 foundation, run the output-free
+`notebooks/23_predictive_diagnostics.ipynb` in an isolated working directory with
+the installed package. Its temporary-directory setup creates 20 synthetic rows
+through the existing config parser, evaluates `default` and `smooth` with three
+folds, and explicitly exports/plots the result without a campaign fixture.
+Check summary, predictions, fold outcomes, and metadata; verify original-unit,
+noise-inclusive uncertainty and unchanged input CSV/config bytes. Keep the
+committed notebook output-free. Inspect the same explicit evaluation route through
+`bo-forge model-evaluate --profile default --profile smooth --folds 3 --seed 0`
+with config/log paths, and Streamlit `Analyze`; loading or rerunning the page must
+not start evaluation. Confirm in-sample labels and session-owned metadata, as well
+as rejected unsupported campaigns, observation/fold bounds, and duplicate designs.
+These focused checks supplement, not replace, full preflight and exact-commit CI.
 
 ```bash
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider
@@ -302,4 +318,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.1.3 does none of those actions.
+separate explicit authorization. Preparing v3.2.0 does none of those actions.

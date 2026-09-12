@@ -118,9 +118,9 @@ def plot_model_diagnostics(
         residual_ax.scatter(x, residual_values, color=WARNING_COLOR)
         residual_ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    set_title(fit_ax, "Observed vs posterior mean")
+    set_title(fit_ax, "In-sample: observed vs posterior mean")
     set_axis_labels(fit_ax, f"Observed {config.objective.name}", "Posterior mean")
-    set_title(residual_ax, "Residuals on fitting rows")
+    set_title(residual_ax, "In-sample residuals on fitting rows")
     set_axis_labels(residual_ax, "Fitting row", "Observed - posterior mean")
     fig.suptitle(
         f"{config.campaign_name}: model diagnostics ({config.model.profile})",
@@ -168,9 +168,9 @@ def plot_model_comparison(
         error_ax,
         std_ax,
     )
-    set_title(error_ax, "Model-space residual metrics")
+    set_title(error_ax, "In-sample model-space residual metrics")
     set_axis_labels(error_ax, "Model profile", "Error")
-    set_title(std_ax, "Mean predicted uncertainty")
+    set_title(std_ax, "In-sample latent uncertainty")
     set_axis_labels(std_ax, "Model profile", "Posterior std")
     fig.suptitle(
         f"{config.campaign_name}: model profile comparison (diagnostic only)",

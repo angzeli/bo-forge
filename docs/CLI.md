@@ -216,9 +216,12 @@ bo-forge suggest \
 
 For single-objective model profiles, the CSV schema is unchanged. Inspect the
 configured profile and fitting inputs, compare profiles read-only, then export
-model diagnostics. The `last_fit_*` fields are process-local and show
-`not_recorded` until a model fit has happened in the same Python process for
-the same current fitting inputs. `model-compare` is diagnostic only; it does
+model diagnostics. Fit metadata belongs to the session, not ambient process
+history; a fresh `model-summary` invocation shows `not_recorded` for
+`last_fit_status` and `fallback_status`, with warning count `0` and empty warning
+text. `model-compare` retains its columns and adds
+`evaluation_scope=in_sample`. These are training-row metrics, not held-out
+predictive evidence. `model-compare` is diagnostic only; it does
 not change the configured profile or automatically select a model. Repeated
 `--profile` flags must name distinct profiles. Failed or insufficient profile
 fits are reported in `fit_status` with details in `fit_message`.
@@ -246,6 +249,41 @@ bo-forge plot \
   --kind model-comparison \
   --output /tmp/bo_forge_model_comparison.png
 ```
+
+For explicit held-out evaluation in v3.2.0, supply a standard single-objective
+config and a log containing 5..200 observations with no duplicate designs:
+
+```bash
+bo-forge model-evaluate \
+  --config campaign.yaml \
+  --log observed.csv \
+  --profile default \
+  --profile smooth \
+  --folds 3 \
+  --seed 0 \
+  --output-dir reports/evaluation
+```
+
+`--profile` is repeatable. `--folds` defaults to `5` and accepts `2..5`;
+`--seed` defaults to `0`. Every fold needs at least two training rows.
+Context, replicates, stages, fidelity, and multi-objective campaigns are rejected.
+The command reports profile summaries and fold outcomes; `--output-dir` requests
+artifact export. It does not append observations, change the configured profile,
+or run automatically as part of suggestion generation or normal reporting.
+It exits `0` only when every requested profile is complete, and exits `1` if any
+profile is incomplete. Failed-fold reasons remain visible without export;
+requested diagnostic exports are retained even when evaluation exits `1`.
+The export destination must not exist: export refuses overwrite and writes only
+`summary.csv`, `predictions.csv`, `fold_outcomes.csv`, and `metadata.json`.
+An existing destination is rejected before fitting; export checks again before
+writing in case another process created that destination during evaluation.
+Plots require the explicit result plotting methods described in the Python API.
+Summary metrics are `rmse`, `mae`, `mean_nlpd`, `interval_coverage`, and
+`mean_interval_width`, with `fit_status=complete` or `incomplete`.
+Predictive variance includes observation noise in original objective units
+squared. Held-out metrics on small adaptive datasets are not proof of calibration
+or automatic model-selection evidence. See [Public API](PUBLIC_API.md) and the
+[temporary-directory tutorial](../notebooks/23_predictive_diagnostics.ipynb).
 
 For single-objective multi-fidelity configs, the fidelity variable is a normal
 CSV variable column. Continuous fidelity and ordered numeric levels use the
@@ -498,8 +536,9 @@ bo-forge plot \
 | `bo-forge fidelity-summary --config PATH --log PATH` | Print observed fidelity counts, target-fidelity coverage, pending qMFKG count, and direction-aware best rows. |
 | `bo-forge fidelity-coverage --config PATH --log PATH` | Print per-fidelity modeled cost, observed statistics, active suggestion counts, and direction-aware best rows. |
 | `bo-forge context-summary --config PATH --log PATH` | Print contextual observed counts, pending suggestions, and direction-aware best rows by context combination. |
-| `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, train-Y variance use, and process-local latest fit metadata when available. |
+| `bo-forge model-summary --config PATH --log PATH` | Print configured model profile, model class, covariance profile, fitting-row count, and train-Y variance use; a fresh CLI invocation has no session-owned fit evidence. |
 | `bo-forge model-compare --config PATH --log PATH [--profile NAME ...]` | Compare model profiles on current observed fitting rows without changing CSV logs or the configured profile. |
+| `bo-forge model-evaluate --config PATH --log PATH [--profile NAME ...] [--folds N] [--seed N] [--output-dir PATH]` | Explicit bounded held-out predictive evaluation; no automatic execution or model selection. |
 | `bo-forge qlog-nei-summary --config PATH --log PATH` | Print qLogNEI observed baseline rows, active pending rows, review blockers, initial-design readiness, train-Y variance availability, and model profile. |
 | `bo-forge pareto-front --config PATH --log PATH` | Print nondominated observed rows for a multi-objective campaign. |
 | `bo-forge pareto-summary --config PATH --log PATH` | Print objective count, reference points, Pareto count, and hypervolume fields. |

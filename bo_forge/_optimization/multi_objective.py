@@ -10,6 +10,7 @@ import torch
 from botorch.exceptions.errors import BotorchError
 from torch.quasirandom import SobolEngine
 
+from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
     _candidate_batch_rejection_message,
     _empty_row,
@@ -142,7 +143,7 @@ def _suggest_multi_objective_model_based(
         row["acquisition"] = acquisition_scalar
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _suggest_qlog_nehvi_model_based(
@@ -225,7 +226,7 @@ def _suggest_qlog_nehvi_model_based(
         row["acquisition"] = acquisition_scalar
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _x_pending_for_qlog_nehvi(
@@ -344,7 +345,7 @@ def _suggest_cost_aware_multi_objective_model_based(
         row["utility"] = utility_scalar
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _cost_aware_multi_objective_candidate_batches(

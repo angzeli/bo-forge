@@ -30,6 +30,7 @@ from bo_forge_app.ui.state import (
     REPORT_PREVIEW_KEY,
     _current_paths,
 )
+from bo_forge_app.views.predictive_evaluation import render_predictive_evaluation
 
 
 def _render_reports(
@@ -74,6 +75,7 @@ def _render_reports(
 
     _render_report_text_actions(st, campaign, log_path)
     _render_model_comparison_action(st, campaign)
+    render_predictive_evaluation(st, campaign)
     plot_options = _available_plot_options(campaign, flags, log_path)
     if not plot_options:
         _render_empty_state(st, *empty_state_message("plots"))
@@ -94,8 +96,9 @@ def _render_reports(
 
 def _render_model_comparison_action(st: Any, campaign: Any) -> None:
     if _supports_model_profile_comparison(campaign.config):
+        st.markdown("Training error is not predictive quality.")
         with st.form("model_comparison_form"):
-            run_comparison = st.form_submit_button("Run model comparison")
+            run_comparison = st.form_submit_button("Run in-sample model comparison")
         if run_comparison:
             try:
                 comparison = campaign.model_profile_comparison()
@@ -104,7 +107,7 @@ def _render_model_comparison_action(st: Any, campaign: Any) -> None:
             else:
                 _render_table_section(
                     st,
-                    "Model Profile Comparison",
+                    "In-sample Model Profile Comparison",
                     comparison,
                     empty_kind="report_preview",
                     expanded_raw=False,

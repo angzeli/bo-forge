@@ -254,8 +254,9 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert f"# 🧪 BO Forge v{PROJECT_VERSION}" in readme
     assert "schema-v2 migration" in readme
     assert (
-        f"## v{PROJECT_VERSION} - Provenance Acceptance And Beginner Setup" in changelog
+        "## v3.1.3 - Provenance Acceptance And Beginner Setup" in changelog
     )
+    assert f"## v{PROJECT_VERSION} - Predictive Diagnostics Foundation" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog

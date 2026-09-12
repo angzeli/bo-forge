@@ -418,6 +418,11 @@ bo-forge plot \
 Model comparison is diagnostic only. It does not update the YAML profile,
 rewrite the CSV log, or automatically select a model.
 
+These comparison metrics are in-sample (`evaluation_scope=in_sample`). For
+explicit held-out checks, see [Predictive Evaluation](PREDICTIVE_EVALUATION.md):
+supported inputs, original-unit observation-inclusive uncertainty, Python/CLI
+usage, and limitations on adaptively collected campaign data.
+
 The tutorial notebook is:
 
 - `notebooks/17_model_profile_logei_campaign.ipynb`.
@@ -777,7 +782,15 @@ repeat-vs-explore contracts covered by the public example and regression tests.
 
 ## 📓 Example Notebooks
 
-The example notebooks now run deeper simulated campaigns. Each notebook finishes with 15 completed observed campaign units, including seed data; the replicate-aware notebook finishes with 15 observed replicate groups.
+Most campaign notebooks finish with 15 completed observed campaign units,
+including seed data; the replicate-aware notebook targets 15 observed replicate
+groups, and the four-objective tutorial targets 50 observed rows.
+
+The standalone [predictive diagnostics notebook](../notebooks/23_predictive_diagnostics.ipynb)
+instead creates 20 synthetic observations in a temporary directory and evaluates
+`default` and `smooth` with three folds. It does not run a sequential campaign or
+need a seed-log fixture. Follow the [worked guide](PREDICTIVE_EVALUATION.md) for
+execution, new-directory export, cleanup, and interpretation instructions.
 
 Open `notebooks/01_maximisation_logei_campaign.ipynb` for a simulated end-to-end maximisation campaign using `configs/01_simple_2d_maximise_logei.yaml` and `examples/01_simple_2d_maximise_logei_campaign_log.csv`.
 

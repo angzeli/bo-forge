@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import warnings
 from dataclasses import dataclass, replace
+from threading import RLock
 
 import pandas as pd
 import torch
@@ -15,6 +16,7 @@ from botorch.models.transforms import Normalize, Standardize
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
+from bo_forge._fit_metadata import FitMetadata, FitResult, config_identity
 from bo_forge.config import CampaignConfig, ModelConfig
 from bo_forge.errors import ConfigError
 from bo_forge.multi_objective import objectives_to_model_space
@@ -27,8 +29,9 @@ from bo_forge.transforms import (
 )
 from bo_forge.validation import get_observed_data, validate_campaign_data
 
-_LAST_FIT_METADATA: dict[str, object] = {}
 _DEFAULT_COMPARISON_PROFILES = ("default", "smooth", "rough", "robust")
+# Python 3.11/3.12 warning capture is process-global; serialize construction and fitting.
+_FIT_WARNING_LOCK = RLock()
 _MODEL_PROFILE_COMPARISON_COLUMNS = [
     "model_profile",
     "model_class",
@@ -42,6 +45,7 @@ _MODEL_PROFILE_COMPARISON_COLUMNS = [
     "rmse_model_space",
     "mae_model_space",
     "mean_predicted_std",
+    "evaluation_scope",
 ]
 
 
@@ -99,23 +103,30 @@ def dataframe_to_training_tensors(
 
 def fit_gp_model(config: CampaignConfig, observed_df: pd.DataFrame) -> SingleTaskGP:
     """Fit a standard BoTorch SingleTaskGP to observed campaign data."""
+    return _fit_gp_result(config, observed_df).model
+
+
+def _fit_gp_result(config: CampaignConfig, observed_df: pd.DataFrame) -> FitResult:
     training = dataframe_to_training_tensors(config, observed_df)
+    return _fit_model_with_profile_metadata(
+        config, training, model_factory=_new_gp_model, model_class="SingleTaskGP"
+    )
+
+
+def _new_gp_model(config: CampaignConfig, training: TrainingTensors) -> SingleTaskGP:
     kwargs = {}
     if training.train_yvar is not None:
         kwargs["train_Yvar"] = training.train_yvar
     covar_module = _covar_module_for_profile(config, training.train_x.shape[-1])
     if covar_module is not None:
         kwargs["covar_module"] = covar_module
-    model = SingleTaskGP(
+    return SingleTaskGP(
         training.train_x,
         training.train_y,
         input_transform=Normalize(d=training.train_x.shape[-1]),
         outcome_transform=Standardize(m=training.train_y.shape[-1]),
         **kwargs,
     )
-    mll = ExactMarginalLogLikelihood(model.likelihood, model)
-    _fit_mll_with_profile_metadata(config, mll, training, model_class="SingleTaskGP")
-    return model
 
 
 def fit_multi_fidelity_gp_model(
@@ -124,31 +135,30 @@ def fit_multi_fidelity_gp_model(
 ) -> SingleTaskMultiFidelityGP:
     """Fit BoTorch's single-task multi-fidelity GP to observed campaign data."""
     training = dataframe_to_training_tensors(config, observed_df)
+    return _fit_model_with_profile_metadata(
+        config, training, model_factory=_new_multi_fidelity_model,
+        model_class="SingleTaskMultiFidelityGP",
+    ).model
+
+
+def _new_multi_fidelity_model(
+    config: CampaignConfig, training: TrainingTensors
+) -> SingleTaskMultiFidelityGP:
     kwargs = {}
     if training.train_yvar is not None:
         kwargs["train_Yvar"] = training.train_yvar
-    model = SingleTaskMultiFidelityGP(
+    return SingleTaskMultiFidelityGP(
         training.train_x,
         training.train_y,
         data_fidelities=[fidelity_feature_index(config)],
         outcome_transform=Standardize(m=training.train_y.shape[-1]),
         **kwargs,
     )
-    mll = ExactMarginalLogLikelihood(model.likelihood, model)
-    fit_gpytorch_mll(mll)
-    _record_fit_metadata(
-        config,
-        training,
-        model_class="SingleTaskMultiFidelityGP",
-        covariance_profile="multi_fidelity",
-        fit_status="ok",
-        fit_warnings=[],
-        fallback_status="not_needed",
-    )
-    return model
 
 
-def model_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
+def model_summary(
+    config: CampaignConfig, df: pd.DataFrame, *, metadata: FitMetadata | None = None
+) -> pd.DataFrame:
     """Return read-only model-profile and fitting-input summary fields."""
     validate_campaign_data(config, df)
     observed = get_observed_data(config, df)
@@ -179,6 +189,7 @@ def model_summary(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
             "train_yvar_used": train_yvar_used,
             "training_fingerprint": training_fingerprint,
         },
+        metadata,
     )
     rows = [
         ("model_profile", config.model.profile),
@@ -235,57 +246,51 @@ def model_profile_comparison(
         )
 
     rows: list[dict[str, object]] = []
-    previous_metadata = dict(_LAST_FIT_METADATA)
-    try:
-        for profile in profile_names:
-            profile_config = replace(config, model=ModelConfig(profile=profile))
-            try:
-                model = fit_gp_model(profile_config, observed)
-                metadata = _comparison_fit_metadata(profile)
-                posterior = model.posterior(training.train_x)
-                predicted = posterior.mean.detach().reshape(-1)
-                observed_model = training.train_y.detach().reshape(-1)
-                predicted_std = (
-                    posterior.variance.detach().clamp_min(0.0).sqrt().reshape(-1)
+    for profile in profile_names:
+        profile_config = replace(config, model=ModelConfig(profile=profile))
+        model = None
+        try:
+            model = fit_gp_model(profile_config, observed)
+            metadata = _comparison_fit_metadata(model)
+            posterior = model.posterior(training.train_x)
+            predicted = posterior.mean.detach().reshape(-1)
+            observed_model = training.train_y.detach().reshape(-1)
+            predicted_std = posterior.variance.detach().clamp_min(0.0).sqrt().reshape(-1)
+            residual = observed_model - predicted
+            rmse = float(torch.sqrt(torch.mean(residual.square())).item())
+            mae = float(torch.mean(torch.abs(residual)).item())
+            mean_std = float(torch.mean(predicted_std).item())
+            rows.append(
+                _comparison_row(
+                    profile_config,
+                    profile,
+                    model_class=model_class,
+                    encoded_dim=encoded_dim,
+                    observed_rows_used=observed_rows_used,
+                    train_yvar_used=train_yvar_used,
+                    fit_status=str(metadata.get("fit_status", "ok")),
+                    fit_warning_count=int(metadata.get("fit_warning_count", 0)),
+                    rmse_model_space=rmse,
+                    mae_model_space=mae,
+                    mean_predicted_std=mean_std,
                 )
-                residual = observed_model - predicted
-                rmse = float(torch.sqrt(torch.mean(residual.square())).item())
-                mae = float(torch.mean(torch.abs(residual)).item())
-                mean_std = float(torch.mean(predicted_std).item())
-                rows.append(
-                    _comparison_row(
-                        profile_config,
-                        profile,
-                        model_class=model_class,
-                        encoded_dim=encoded_dim,
-                        observed_rows_used=observed_rows_used,
-                        train_yvar_used=train_yvar_used,
-                        fit_status=str(metadata.get("fit_status", "ok")),
-                        fit_warning_count=int(metadata.get("fit_warning_count", 0)),
-                        rmse_model_space=rmse,
-                        mae_model_space=mae,
-                        mean_predicted_std=mean_std,
-                    )
+            )
+        except Exception as exc:
+            # A comparison is diagnostic: one failed profile must not hide the others.
+            metadata = _comparison_fit_metadata(model if model is not None else exc)
+            rows.append(
+                _comparison_row(
+                    profile_config,
+                    profile,
+                    model_class=model_class,
+                    encoded_dim=encoded_dim,
+                    observed_rows_used=observed_rows_used,
+                    train_yvar_used=train_yvar_used,
+                    fit_status="failed",
+                    fit_message=str(exc) or exc.__class__.__name__,
+                    fit_warning_count=int(metadata.get("fit_warning_count", 0)),
                 )
-            except Exception as exc:
-                # A comparison is diagnostic: one failed profile must not hide the others.
-                metadata = _comparison_fit_metadata(profile)
-                rows.append(
-                    _comparison_row(
-                        profile_config,
-                        profile,
-                        model_class=model_class,
-                        encoded_dim=encoded_dim,
-                        observed_rows_used=observed_rows_used,
-                        train_yvar_used=train_yvar_used,
-                        fit_status="failed",
-                        fit_message=str(exc) or exc.__class__.__name__,
-                        fit_warning_count=int(metadata.get("fit_warning_count", 0)),
-                    )
-                )
-    finally:
-        _LAST_FIT_METADATA.clear()
-        _LAST_FIT_METADATA.update(previous_metadata)
+            )
 
     return pd.DataFrame(rows, columns=_MODEL_PROFILE_COMPARISON_COLUMNS)
 
@@ -294,13 +299,9 @@ def _validate_model_profile_comparison_supported(config: CampaignConfig) -> None
     if config.is_multi_objective:
         raise ConfigError("model_profile_comparison() requires a single-objective config.")
     if config.fidelity is not None:
-        raise ConfigError(
-            "model_profile_comparison() does not support multi-fidelity configs."
-        )
+        raise ConfigError("model_profile_comparison() does not support multi-fidelity configs.")
     if config.is_structured_campaign:
-        raise ConfigError(
-            "model_profile_comparison() does not support structured configs."
-        )
+        raise ConfigError("model_profile_comparison() does not support structured configs.")
 
 
 def _normalise_comparison_profiles(
@@ -320,10 +321,9 @@ def _normalise_comparison_profiles(
     return normalised
 
 
-def _comparison_fit_metadata(profile: str) -> dict[str, object]:
-    if _LAST_FIT_METADATA.get("profile") != profile:
-        return {}
-    return dict(_LAST_FIT_METADATA)
+def _comparison_fit_metadata(owner: object) -> dict[str, object]:
+    metadata = getattr(owner, "_bo_forge_fit_metadata", None)
+    return metadata.as_dict() if isinstance(metadata, FitMetadata) else {}
 
 
 def _comparison_row(
@@ -354,6 +354,7 @@ def _comparison_row(
         "rmse_model_space": rmse_model_space,
         "mae_model_space": mae_model_space,
         "mean_predicted_std": mean_predicted_std,
+        "evaluation_scope": "in_sample",
     }
 
 
@@ -368,55 +369,55 @@ def _covar_module_for_profile(config: CampaignConfig, dimension: int):
     raise AssertionError(f"Unexpected model profile: {profile}")
 
 
-def _fit_mll_with_profile_metadata(
+def _fit_model_with_profile_metadata(
     config: CampaignConfig,
-    mll: ExactMarginalLogLikelihood,
     training: TrainingTensors,
     *,
+    model_factory,
     model_class: str,
-) -> None:
-    covariance_profile = _covariance_profile_name(config)
-    if config.model.profile != "robust":
-        fit_gpytorch_mll(mll)
-        _record_fit_metadata(
+) -> FitResult:
+    with _FIT_WARNING_LOCK:
+        rng_fingerprint = None
+        caught = []
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                model = model_factory(config, training)
+                mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                if config.model.profile == "robust":
+                    warnings.simplefilter("always")
+                rng_fingerprint = hashlib.sha256(
+                    torch.get_rng_state().numpy().tobytes()
+                ).hexdigest()
+                fit_gpytorch_mll(mll)
+        except Exception as exc:
+            # Diagnostic boundary: preserve the fitter exception and its own evidence.
+            exc._bo_forge_fit_metadata = _record_fit_metadata(
+                config,
+                training,
+                model_class=model_class,
+                covariance_profile=_covariance_profile_name(config),
+                fit_status="failed",
+                fit_warnings=[str(item.message) for item in caught],
+                fallback_status="raised",
+                rng_fingerprint=rng_fingerprint,
+            )
+            raise
+        finally:
+            if config.model.profile != "robust":
+                for item in caught:
+                    warnings.warn_explicit(item.message, item.category, item.filename, item.lineno)
+        metadata = _record_fit_metadata(
             config,
             training,
             model_class=model_class,
-            covariance_profile=covariance_profile,
-            fit_status="ok",
-            fit_warnings=[],
+            covariance_profile=_covariance_profile_name(config),
+            fit_status="ok_with_warnings" if caught else "ok",
+            fit_warnings=[str(item.message) for item in caught],
             fallback_status="not_needed",
+            rng_fingerprint=rng_fingerprint,
         )
-        return
-
-    caught_warnings: list[str] = []
-    try:
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            fit_gpytorch_mll(mll)
-            caught_warnings = [str(item.message) for item in caught]
-    except Exception:
-        # Record robust-profile diagnostics for any fitter failure, then preserve its type.
-        _record_fit_metadata(
-            config,
-            training,
-            model_class=model_class,
-            covariance_profile=covariance_profile,
-            fit_status="failed",
-            fit_warnings=caught_warnings,
-            fallback_status="raised",
-        )
-        raise
-
-    _record_fit_metadata(
-        config,
-        training,
-        model_class=model_class,
-        covariance_profile=covariance_profile,
-        fit_status="ok_with_warnings" if caught_warnings else "ok",
-        fit_warnings=caught_warnings,
-        fallback_status="not_needed",
-    )
+        model._bo_forge_fit_metadata = metadata
+        return FitResult(model, metadata)
 
 
 def _record_fit_metadata(
@@ -428,40 +429,47 @@ def _record_fit_metadata(
     fit_status: str,
     fit_warnings: list[str],
     fallback_status: str,
-) -> None:
-    _LAST_FIT_METADATA.clear()
-    _LAST_FIT_METADATA.update(
-        {
-            "campaign_name": config.campaign_name,
-            "profile": config.model.profile,
-            "model_class": model_class,
-            "covariance_profile": covariance_profile,
-            "encoded_dimension": int(training.train_x.shape[-1]),
-            "observed_rows_used_for_fitting": int(training.train_x.shape[0]),
-            "objective_count": int(training.train_y.shape[-1]),
-            "train_yvar_used": training.train_yvar is not None,
-            "training_fingerprint": _training_fingerprint(training),
-            "fit_status": fit_status,
-            "fit_warning_count": len(fit_warnings),
-            "fit_warnings": "; ".join(fit_warnings),
-            "fallback_status": fallback_status,
-        }
+    rng_fingerprint: str | None = None,
+) -> FitMetadata:
+    return FitMetadata(
+        tuple(
+            {
+                "config_identity": config_identity(config),
+                "campaign_name": config.campaign_name,
+                "profile": config.model.profile,
+                "model_class": model_class,
+                "covariance_profile": covariance_profile,
+                "encoded_dimension": int(training.train_x.shape[-1]),
+                "observed_rows_used_for_fitting": int(training.train_x.shape[0]),
+                "objective_count": int(training.train_y.shape[-1]),
+                "train_yvar_used": training.train_yvar is not None,
+                "training_fingerprint": _training_fingerprint(training),
+                "fit_status": fit_status,
+                "fit_warning_count": len(fit_warnings),
+                "fit_warnings": "; ".join(fit_warnings),
+                "fallback_status": fallback_status,
+                "fitting_rng_fingerprint": rng_fingerprint,
+            }.items()
+        )
     )
 
 
 def _matching_last_fit_metadata(
     config: CampaignConfig,
     expected: dict[str, object],
+    metadata: FitMetadata | None = None,
 ) -> dict[str, object]:
-    if (
-        _LAST_FIT_METADATA.get("campaign_name") != config.campaign_name
-        or _LAST_FIT_METADATA.get("profile") != config.model.profile
-    ):
+    if metadata is None:
+        return {}
+    if not isinstance(metadata, FitMetadata):
+        raise TypeError("metadata must be FitMetadata or None.")
+    values = metadata.as_dict()
+    if values.get("config_identity") != config_identity(config):
         return {}
     for key, value in expected.items():
-        if _LAST_FIT_METADATA.get(key) != value:
+        if values.get(key) != value:
             return {}
-    return dict(_LAST_FIT_METADATA)
+    return values
 
 
 def _training_fingerprint(training: TrainingTensors) -> str:

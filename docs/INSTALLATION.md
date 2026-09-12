@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v3.1.3.
+This page shows the recommended `pip install` paths for BO Forge v3.2.0.
 
 New to Python or Streamlit? Follow [Start Here](../START_HERE.md) to install your
 downloaded project and open the local interface before using these alternatives.

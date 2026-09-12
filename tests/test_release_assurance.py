@@ -267,6 +267,14 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "class v30,v31 majorDone" in roadmap
     assert "class v310,v311,v312,v313 patchDone" in roadmap
     assert "class v313 patchActive" not in roadmap
+    assert "class v32 majorActive" in roadmap
+    assert "class v320 patchDone" in roadmap
+    assert "| `v3.2.0` | prepared | Complete foundation:" in roadmap
+    for version in ("3.2.1", "3.2.2", "3.2.3"):
+        assert f"| `v{version}` | planned |" in roadmap
+    assert "### v3.2.1 - Diagnostics Hardening" in roadmap
+    assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
+    assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap
     assert (
         "### v3.1.3 - Provenance Acceptance And Beginner Setup\n\n"
         "Status: implementation complete; publication requires separate authorization "
@@ -278,3 +286,30 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "## v3.0.x - Architecture And Release Assurance\n\nStatus: completed" in roadmap
     assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: completed" in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap
+
+
+def test_predictive_foundation_docs_preserve_scope_and_interpretation() -> None:
+    for path in (
+        "README.md", "docs/PUBLIC_API.md", "docs/CLI.md",
+        "docs/STREAMLIT_APP.md", "docs/CAPABILITY_MATRIX.md",
+    ):
+        content = _read(path)
+        for fragment in (
+            "evaluation_scope=in_sample", "5..200", "2..5",
+            "duplicate designs", "observation noise", "original objective units",
+        ):
+            assert fragment in content, (path, fragment)
+    public_api = _read("docs/PUBLIC_API.md")
+    for fragment in (
+        "FitMetadata", "frozen record", "metadata=None", "no ambient fit history",
+        "PredictiveEvaluationResult", "model_predictive_evaluation",
+        "new destination directory", "summary.csv", "predictions.csv",
+        "fold_outcomes.csv", "metadata.json", "rmse", "mae", "mean_nlpd",
+        "interval_coverage", "mean_interval_width", "incomplete",
+        "result.plot_predictions(save_path=None)", "result.plot_residuals(save_path=None)",
+    ):
+        assert fragment in public_api
+    for option in ("model-evaluate", "--profile", "--folds", "--seed", "--output-dir"):
+        assert option in _read("docs/CLI.md")
+    for path in ("README.md", "docs/PUBLIC_API.md", "docs/CLI.md", "docs/RELEASE_CHECKLIST.md"):
+        assert "notebooks/23_predictive_diagnostics.ipynb" in _read(path)

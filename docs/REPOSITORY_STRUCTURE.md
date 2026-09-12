@@ -32,6 +32,7 @@ bo-forge/
 │   ├── CSV_SCHEMA.md
 │   ├── COMMON_ERRORS.md
 │   ├── PUBLIC_API.md
+│   ├── PREDICTIVE_EVALUATION.md
 │   ├── MIGRATION_V3.md
 │   ├── RELEASE_CHECKLIST.md
 │   └── REPOSITORY_STRUCTURE.md
@@ -53,6 +54,13 @@ bo-forge/
 The local tutorial directory `PyTorch & BoTorch/` is intentionally ignored. It is reference material, not package source.
 
 `reports/` is for local outputs created by notebooks, such as campaign reports and diagnostic figures. It is not source data.
+
+[PREDICTIVE_EVALUATION.md](PREDICTIVE_EVALUATION.md) is the canonical scientific
+reference for held-out metrics, uncertainty units, result/export contracts, and
+adaptive-data limitations. Its existing walkthrough,
+[23_predictive_diagnostics.ipynb](../notebooks/23_predictive_diagnostics.ipynb),
+is fixture-free and creates/cleans up a temporary workspace instead of writing
+a campaign working log or reports into the checkout.
 
 ## 📦 Backend Package
 

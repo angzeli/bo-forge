@@ -837,9 +837,9 @@ def test_plot_model_diagnostics_writes_file_and_labels(tmp_path: Path) -> None:
     fig, axes = plot_model_diagnostics(cfg, observed_log(), save_path=save_path)
 
     assert save_path.exists()
-    assert axes[0].get_title() == "Observed vs posterior mean"
+    assert axes[0].get_title() == "In-sample: observed vs posterior mean"
     assert axes[0].get_xlabel() == "Observed activity"
-    assert axes[1].get_title() == "Residuals on fitting rows"
+    assert axes[1].get_title() == "In-sample residuals on fitting rows"
     assert axes[1].get_ylabel() == "Observed - posterior mean"
     plt.close(fig)
 
@@ -866,9 +866,9 @@ def test_plot_model_comparison_writes_file_and_labels(tmp_path: Path) -> None:
     fig, axes = plot_model_comparison(cfg, observed_log(), save_path=save_path)
 
     assert save_path.exists()
-    assert axes[0].get_title() == "Model-space residual metrics"
+    assert axes[0].get_title() == "In-sample model-space residual metrics"
     assert axes[0].get_xlabel() == "Model profile"
-    assert axes[1].get_title() == "Mean predicted uncertainty"
+    assert axes[1].get_title() == "In-sample latent uncertainty"
     assert axes[1].get_ylabel() == "Posterior std"
     assert any("diagnostic only" in text.get_text() for text in fig.texts)
     plt.close(fig)

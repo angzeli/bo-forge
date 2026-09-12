@@ -54,8 +54,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     _register_environment_commands(subparsers)
     _register_read_commands(subparsers)
+    from bo_forge._cli.model_evaluate import register_model_evaluate_command
     from bo_forge._cli.provenance import register_provenance_commands
 
+    register_model_evaluate_command(subparsers, _add_config_log_arguments)
     register_provenance_commands(subparsers, _add_config_log_arguments)
     _register_mutation_commands(subparsers)
     _register_plot_command(subparsers)

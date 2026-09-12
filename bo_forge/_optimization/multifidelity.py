@@ -9,6 +9,7 @@ import pandas as pd
 import torch
 from botorch.exceptions.errors import BotorchError
 
+from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
     _candidate_batch_rejection_message,
     _CandidateGenerationExhausted,
@@ -164,7 +165,7 @@ def _suggest_multi_fidelity_model_based(
         row["predicted_std"] = float(std.reshape(-1)[index])
         row["acquisition"] = acquisition_scalar
         rows.append(row)
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _qmfkg_optimizer_deadline(config: CampaignConfig) -> float | None:

@@ -8,6 +8,7 @@ from dataclasses import replace
 import pandas as pd
 import torch
 
+from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
     _CandidateGenerationExhausted,
     _empty_row,
@@ -126,7 +127,9 @@ def _suggest_uncertain_best_replicate(
         row["acquisition"] = 0.0
         _populate_cost_fields(config, row, candidate)
         rows.append(row)
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    result = pd.DataFrame(rows, columns=canonical_columns(config))
+    result.attrs.update(best_group.attrs)
+    return result
 
 
 def _best_replicate_model_choice(
@@ -155,7 +158,8 @@ def _best_replicate_model_choice(
     eligible_positions = torch.tensor(eligible.index.tolist(), dtype=torch.long)
     eligible_best = int(torch.argmax(mean_model[eligible_positions]).item())
     best_index = int(eligible_positions[eligible_best].item())
-    return aggregate.iloc[best_index], best_index, mean_model, float(std[best_index])
+    best_group = attach_fit_metadata(aggregate.iloc[best_index].copy(), model)
+    return best_group, best_index, mean_model, float(std[best_index])
 
 
 def _repeat_count_for_candidate(
@@ -224,10 +228,12 @@ def _fill_replicate_batch_with_exploration(
 
     filler = filler.copy()
     filler.loc[:, "iteration"] = repeat_suggestions["iteration"].iloc[0]
-    return pd.concat([repeat_suggestions, filler], ignore_index=True).loc[
+    result = pd.concat([repeat_suggestions, filler], ignore_index=True).loc[
         :,
         canonical_columns(config),
     ]
+    result.attrs.update(filler.attrs or repeat_suggestions.attrs)
+    return result
 
 
 def _config_with_repeat_budget_reserved(

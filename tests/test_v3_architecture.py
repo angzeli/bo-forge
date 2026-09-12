@@ -25,6 +25,9 @@ PRODUCTION_ROOTS = (
     PROJECT_ROOT / "bo_forge_api",
 )
 EXPECTED_PUBLIC_EXPORTS = {
+    "FitMetadata",
+    "PredictiveEvaluationResult",
+    "model_predictive_evaluation",
     "BOConfig",
     "BOForgeError",
     "CampaignConfig",
@@ -256,12 +259,23 @@ def test_core_public_call_signatures_remain_keyword_compatible() -> None:
 
     lifecycle_exports = {"adopt_provenance", "migrate_provenance",
                          "accept_provenance_config", "fork_campaign"}
-    assert callable_exports == PUBLIC_SIGNATURE_NAMES | PUBLIC_EXCEPTION_EXPORTS | lifecycle_exports
+    evaluation_exports = {
+        "FitMetadata", "PredictiveEvaluationResult", "model_predictive_evaluation",
+    }
+    assert callable_exports == (
+        PUBLIC_SIGNATURE_NAMES | PUBLIC_EXCEPTION_EXPORTS | lifecycle_exports | evaluation_exports
+    )
     for name in lifecycle_exports:
         parameters = inspect.signature(getattr(bo_forge, name)).parameters
         assert parameters["apply"].default is False
         assert parameters["apply"].kind == inspect.Parameter.KEYWORD_ONLY
         assert parameters["expected_identities"].default is None
+    summary_signature = inspect.signature(bo_forge.model_summary)
+    metadata = summary_signature.parameters["metadata"]
+    assert metadata.kind == inspect.Parameter.KEYWORD_ONLY and metadata.default is None
+    signatures["model_summary"] = str(summary_signature.replace(parameters=[
+        parameter for name, parameter in summary_signature.parameters.items() if name != "metadata"
+    ]))
     assert _signature_digest(signatures) == PUBLIC_SIGNATURE_DIGEST, signatures
 
 
@@ -277,7 +291,11 @@ def test_campaign_session_public_method_signatures_remain_compatible() -> None:
         name: str(inspect.signature(member)) for name, member in public_methods.items()
     }
 
-    assert set(public_methods) == SESSION_METHOD_NAMES
+    assert set(public_methods) == SESSION_METHOD_NAMES | {"model_predictive_evaluation"}
+    evaluation_signature = inspect.signature(public_methods["model_predictive_evaluation"])
+    assert evaluation_signature.parameters["folds"].default == 5
+    assert evaluation_signature.parameters["seed"].default == 0
+    signatures.pop("model_predictive_evaluation")
     assert _signature_digest(signatures) == SESSION_METHOD_SIGNATURE_DIGEST, signatures
 
 

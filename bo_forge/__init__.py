@@ -1,8 +1,8 @@
-"""BO Forge v3.1.3."""
+"""BO Forge v3.2.0."""
 
 from importlib import import_module
 
-__version__ = "3.1.3"
+__version__ = "3.2.0"
 
 from bo_forge.config import (
     BOConfig,
@@ -74,6 +74,9 @@ __all__ = [
     "mark_observed",
     "model_summary",
     "model_profile_comparison",
+    "model_predictive_evaluation",
+    "PredictiveEvaluationResult",
+    "FitMetadata",
     "pareto_front",
     "pareto_summary",
     "provenance_summary",
@@ -114,6 +117,9 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "mark_observed": ("bo_forge.logs", "mark_observed"),
     "model_profile_comparison": ("bo_forge.models", "model_profile_comparison"),
     "model_summary": ("bo_forge.models", "model_summary"),
+    "model_predictive_evaluation": ("bo_forge.predictive", "model_predictive_evaluation"),
+    "PredictiveEvaluationResult": ("bo_forge.predictive", "PredictiveEvaluationResult"),
+    "FitMetadata": ("bo_forge._fit_metadata", "FitMetadata"),
     "pareto_front": ("bo_forge.multi_objective", "pareto_front"),
     "pareto_summary": ("bo_forge.multi_objective", "pareto_summary"),
     "provenance_summary": ("bo_forge.provenance", "provenance_summary"),

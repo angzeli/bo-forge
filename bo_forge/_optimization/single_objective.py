@@ -10,6 +10,7 @@ from botorch.acquisition import LogExpectedImprovement
 from botorch.exceptions.errors import BotorchError
 from torch.quasirandom import SobolEngine
 
+from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
     _candidate_batch_rejection_message,
     _candidate_rejection_message,
@@ -151,7 +152,7 @@ def _suggest_model_based(
         row["acquisition"] = acquisition_scalar
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _suggest_qlog_nei_model_based(
@@ -231,7 +232,7 @@ def _suggest_qlog_nei_model_based(
         row["acquisition"] = acquisition_scalar
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _suggest_cost_aware_model_based(
@@ -306,7 +307,7 @@ def _suggest_cost_aware_model_based(
         row["utility"] = chosen["utility"]
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=canonical_columns(config))
+    return attach_fit_metadata(pd.DataFrame(rows, columns=canonical_columns(config)), model)
 
 
 def _choose_cost_aware_candidate(

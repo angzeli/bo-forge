@@ -236,6 +236,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "notebooks/18_noisy_pending_qlognei_campaign.ipynb",
         "notebooks/20_contextual_cost_review_logei_campaign.ipynb",
         "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb",
+        "notebooks/23_predictive_diagnostics.ipynb",
         "tests/conftest.py",
         "tests/test_v253_operational_freeze.py",
     }

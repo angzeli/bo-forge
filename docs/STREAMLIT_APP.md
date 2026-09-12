@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.1.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.2.0 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 For first-time download, installation, and launch instructions, read
 [Start Here](../START_HERE.md). This page describes operating the workbench.
@@ -84,8 +84,28 @@ use the same model-summary visibility. Multi-objective, multi-fidelity, and
 structured create/load paths keep the default model profile.
 Loaded campaigns show Model Summary tables and expose Model Diagnostics plus
 read-only Model Comparison controls in `Analyze` when the backend supports
-them. Model comparison is diagnostic only and does not change the configured
-profile.
+them. Model comparison is in-sample (`evaluation_scope=in_sample`), retains its
+existing columns, and does not change the configured profile. Its metrics and
+posterior plots are not held-out predictive evidence. Model Summary uses
+session-owned fit metadata, never ambient fit history from another session.
+
+v3.2.0 adds opt-in predictive evaluation in `Analyze`, with profile selection,
+fold count, and seed controls. Evaluation happens only after an explicit user
+request, not on page load, rerun, campaign load, or ordinary report generation.
+Selected profiles, folds, seed, and completed results survive navigation to
+Campaign or Run and back to Analyze. Switching campaigns resets these options;
+changed campaign inputs or evaluation options invalidate the previous result.
+Results expose summary, held-out predictions, fold outcomes, metadata, and
+prediction/residual plots. Exporting results is explicit and never changes the
+campaign's CSV or configured model profile.
+
+This evaluator supports standard single-objective campaigns with 5..200 observed
+rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
+Context, replicates, stages, fidelity, and multi-objective campaigns are rejected,
+even where other model diagnostics remain available. Predictive variance includes
+observation noise in original objective units squared. Inspect failed folds before
+interpreting summaries; small-sample held-out metrics do not prove calibration or
+select a model automatically. See [Public API](PUBLIC_API.md) for the shared contract.
 
 v2.2.1 adds Streamlit-facing qLogNEI diagnostics for supported loaded
 single-objective configs with `bo.acquisition: qlog_nei`. The app shows

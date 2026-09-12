@@ -4,10 +4,11 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.1.3`. It closes the v3.1.x provenance line with
-lifecycle acceptance, portable lineage checks, package verification, and a
-beginner download-to-Streamlit guide. Completed statuses below describe implementation
-and local acceptance, not publication approval. Release publication still requires
+Current prepared baseline: `v3.2.0`. It prepares the complete predictive-diagnostics
+foundation: honest in-sample labels, explicit fit metadata ownership, and bounded
+held-out evaluation. v3.2.1 hardening, v3.2.2 interpretation, and v3.2.3 acceptance
+remain planned. Completed statuses below describe implementation, not publication
+approval or completion of future acceptance work. Release publication still requires
 exact-commit CI and separate authorization.
 
 ## Roadmap So Far
@@ -23,9 +24,9 @@ flowchart LR
     v311["v3.1.1<br/>Fail-closed resume"]
     v312["v3.1.2<br/>Migration + lineage"]
     v313["v3.1.3<br/>Provenance acceptance + setup"]
-    v320["v3.2.0<br/>Honest fit metrics"]
-    v321["v3.2.1<br/>Explicit fit metadata"]
-    v322["v3.2.2<br/>Small-data prediction checks"]
+    v320["v3.2.0<br/>Predictive diagnostics foundation"]
+    v321["v3.2.1<br/>Diagnostics hardening"]
+    v322["v3.2.2<br/>Interpretation + calibration guidance"]
     v323["v3.2.3<br/>Synthetic acceptance"]
     v330["v3.3.0<br/>Benchmark harness"]
     v331["v3.3.1<br/>Mixed + noisy routes"]
@@ -61,10 +62,12 @@ flowchart LR
     v34 -.-> v344
 
     class v30,v31 majorDone
-    class v32,v33,v34 majorFuture
+    class v32 majorActive
+    class v33,v34 majorFuture
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
-    class v320,v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v320 patchDone
+    class v321,v322,v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -86,7 +89,11 @@ flowchart LR
 | `v3.1.2` | prepared | Explicit adoption, migration, config formatting acceptance, and lineage |
 | `v3.1.3` | implementation complete | Lifecycle acceptance, beginner setup, and package verification |
 | `v3.1.x` | completed | Durable campaign provenance and lineage |
-| `v3.2.x` | planned | Predictive diagnostics correctness and explicit fit metadata |
+| `v3.2.0` | prepared | Complete foundation: in-sample labels, explicit metadata, bounded predictive evaluation |
+| `v3.2.1` | planned | Diagnostics hardening |
+| `v3.2.2` | planned | Interpretation and calibration guidance |
+| `v3.2.3` | planned | Synthetic acceptance |
+| `v3.2.x` | in progress | Foundation prepared; hardening, interpretation, and acceptance remain |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
@@ -249,32 +256,51 @@ Status: implementation complete; publication requires separate authorization and
 
 ## v3.2.x - Predictive Diagnostics Correctness
 
+Status: in progress; foundation prepared, full-line acceptance remains planned
+
+### v3.2.0 - Predictive Diagnostics Foundation
+
+Status: prepared; publication requires separate authorization and exact-commit CI
+
+Audit mapping: `ARC-001`, diagnostics foundation of `SCI-001`.
+
+- Retain existing comparison columns and add `evaluation_scope=in_sample`;
+  distinguish training diagnostics from held-out predictive evidence everywhere.
+- Remove ambient fit history from `model_summary(config, df, *, metadata=None)`;
+  keep fit metadata explicitly owned by the session without changing BO numerics.
+- Add `model_predictive_evaluation` and `PredictiveEvaluationResult` with summary,
+  prediction, fold-outcome, and metadata outputs, explicit export, and two plots.
+- Add explicit Python/session, `bo-forge model-evaluate`, and Streamlit evaluation
+  entrypoints; do not run evaluation automatically or select a profile.
+- Restrict evaluation to standard single-objective campaigns with 5..200 observed
+  rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
+  Reject context, replicates, stages, fidelity, and multi-objective campaigns.
+- Include observation noise in predictive variance and restore original objective
+  units; preserve visible failures and state small-sample interpretation limits.
+- Add a compact output-free tutorial with 20 synthetic observations in a temporary
+  directory, profiles `default`/`smooth`, and three folds; no fixture or dependency changes.
+
+### v3.2.1 - Diagnostics Hardening
+
 Status: planned
 
-### v3.2.0 - Honest In-Sample Metric Labelling
+- Harden failure visibility, export behavior, and adapter parity around the
+  foundation without expanding campaign combinations or relaxing evaluation bounds.
+- Extend interleaved/concurrent fit ownership and stale-input regressions.
+- Preserve suggestion numerics and existing diagnostic column compatibility.
 
-- Rename or explicitly label training RMSE/MAE as in-sample diagnostics.
-- Prevent CLI, app, plot, and documentation wording from implying predictive
-  model ranking.
-- Preserve compatible facades where practical.
+### v3.2.2 - Interpretation And Calibration Guidance
 
-### v3.2.1 - Explicit Fit Result And Metadata Ownership
+Status: planned
 
-Audit mapping: `ARC-001`.
-
-- Replace process-global mutable `last_fit_*` metadata with an explicit fit
-  result/diagnostics object or equivalent owned state.
-- Add interleaved and concurrent-fit tests.
-- Preserve suggestion numerics and documented summaries during migration.
-
-### v3.2.2 - Small-Data Predictive Diagnostics
-
-- Add carefully bounded LOO and/or cross-validation where statistically useful.
-- Report standardized residuals, predictive log-density where appropriate,
-  interval coverage, and calibration behavior.
-- State small-sample limits and avoid automatic profile selection claims.
+- Deepen interpretation of standardized residuals, predictive log-density,
+  interval coverage, and calibration limitations for small adaptive datasets.
+- Explain valid and invalid comparisons, noisy observations, and split sensitivity.
+- Keep evaluation opt-in and avoid automatic profile selection claims.
 
 ### v3.2.3 - Synthetic Acceptance And Interpretation Contract
+
+Status: planned
 
 Audit mapping: diagnostics portion of `SCI-001`.
 

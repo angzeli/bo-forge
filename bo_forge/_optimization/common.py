@@ -82,6 +82,7 @@ def _suggest_structured_stage(
     )
     combined = pd.concat([df, suggestions], ignore_index=True)
     validate_campaign_data(config, combined)
+    suggestions.attrs.update(local_suggestions.attrs)
     return suggestions
 
 

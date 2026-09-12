@@ -1,5 +1,33 @@
 # 📝 BO Forge Changelog
 
+## v3.2.0 - Predictive Diagnostics Foundation
+
+Status: prepared foundation; publication requires exact-commit CI and separate
+authorization. The v3.2.x hardening, interpretation, and acceptance work remains
+allocated to v3.2.1, v3.2.2, and v3.2.3 respectively.
+
+- Retains model-comparison columns and appends `evaluation_scope=in_sample`;
+  training RMSE/MAE and posterior plots are not held-out predictive evidence.
+- Makes fit metadata explicit: `model_summary(config, df, *, metadata=None)`
+  reads no ambient fit history, while `CampaignSession` owns its fit metadata;
+  the top-level `FitMetadata` export is a frozen record.
+- Adds opt-in `model_predictive_evaluation(config, df, profiles=None, *, folds=5,
+  seed=0)` and the matching session method, returning `PredictiveEvaluationResult`
+  with `summary`, `predictions`, `fold_outcomes`, and `metadata`.
+- Adds explicit result export, prediction and residual plots, and
+  `bo-forge model-evaluate` with repeatable `--profile`, `--folds`, `--seed`, and
+  `--output-dir`; Streamlit exposes evaluation only on explicit request.
+- Bounds evaluation to standard single-objective campaigns, 5..200 observed rows,
+  2..5 folds, and at least two training rows per fold. Context, replicates, stages,
+  fidelity, multi-objective campaigns, and duplicate designs are rejected.
+- Uses noise-inclusive predictive variance in original objective units squared.
+  Failed folds remain visible; small-data diagnostics do not establish calibration
+  or justify automatic model selection.
+- Adds an output-free, temporary-directory tutorial using 20 synthetic rows,
+  profiles `default` and `smooth`, and three folds, without a campaign fixture.
+- Changes no dependency requirements or constraints, YAML/CSV schema, suggestion
+  algorithm, automatic execution policy, or configured model selection.
+
 ## v3.1.3 - Provenance Acceptance And Beginner Setup
 
 - Closes v3.1.x with lifecycle acceptance for legacy, v1, initialized v2, adopted,

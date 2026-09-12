@@ -278,6 +278,7 @@ _SESSION_READ_HELPERS = {
     "qlog_nei_summary",
     "model_summary",
     "model_profile_comparison",
+    "model_predictive_evaluation",
     "provenance_summary",
 }
 

@@ -101,6 +101,11 @@ def test_reports_model_comparison_is_lazy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
+    evaluation_renders: list[object] = []
+    monkeypatch.setattr(
+        streamlit_app, "render_predictive_evaluation",
+        lambda _st, campaign: evaluation_renders.append(campaign),
+    )
 
     class _Context:
         def __enter__(self) -> "_Context":
@@ -180,6 +185,7 @@ def test_reports_model_comparison_is_lazy(
     )
 
     assert calls == []
+    assert len(evaluation_renders) == 1
 
 def test_multi_objective_observation_keys_are_row_scoped(tmp_path: Path) -> None:
     cfg = CampaignConfig(

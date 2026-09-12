@@ -1,9 +1,9 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.1.3 keeps the YAML, CSV, session, CLI, Streamlit, service, and
-experimental API workflows stable while adding fail-closed resume policy and
-explicit recovery to opt-in campaign provenance.
-BO capability statuses are unchanged from v2.5.3.
+BO Forge v3.2.0 adds explicit bounded predictive diagnostics while keeping
+YAML/CSV schemas, suggestion algorithms, campaign combinations, and provenance
+contracts unchanged. Predictive evaluation has its own narrower scope below;
+support for a BO campaign combination does not imply evaluator support.
 
 Legend:
 
@@ -77,10 +77,23 @@ Legend:
 | Multi-fidelity + cost | rejected | qMFKG fidelity cost is separate from BO Forge `cost:`. |
 | Multi-fidelity + replicates | rejected | Replicate-aware qMFKG is not implemented. |
 | Multi-fidelity + multi-objective | rejected | qMFKG support is single-objective only. |
-| Model-profile comparison diagnostics | supported | Read-only comparison of `default`, `smooth`, `rough`, and `robust` on current single-objective fitting rows; not automatic model selection. |
+| Model-profile comparison diagnostics | supported | Read-only comparison of `default`, `smooth`, `rough`, and `robust` on current single-objective fitting rows; existing columns retained plus `evaluation_scope=in_sample`; not held-out evidence or automatic model selection. |
 | Non-default model profile + multi-objective | rejected | Non-default profiles require supported single-objective configs with `bo.acquisition: log_ei` or `qlog_nei`. |
 | Non-default model profile + multi-fidelity | rejected | qMFKG keeps its existing multi-fidelity GP path. |
 | Non-default model profile + structured stages | rejected | Stage-specific model-profile support is deferred. |
+
+## Predictive Diagnostics
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| Explicit held-out evaluation | read-only/reporting only | `model_predictive_evaluation` and matching session method; Python, CLI `model-evaluate`, and opt-in Streamlit Analyze controls. |
+| Standard single-objective evaluation | supported | 5..200 observed rows, 2..5 folds, at least two training rows per fold, and no duplicate designs. |
+| Evaluation with context, replicates, stages, fidelity, or multi-objective data | rejected | Existing BO support for these combinations does not extend this evaluator. |
+| Prediction uncertainty | supported | Predictive variance includes observation noise in original objective units squared; means and standard deviations retain original units. |
+| Result inspection and export | read-only/reporting only | `PredictiveEvaluationResult`: summary, predictions, fold_outcomes, metadata; explicit export and prediction/residual plots. |
+| Fit metadata ownership | supported | `model_summary(config, df, *, metadata=None)` reads no ambient fit history; sessions own their metadata. |
+| Automatic evaluation or model selection | out of scope | No load/rerun/report-triggered evaluation or automatic profile changes; small-sample metrics are not calibration proof. |
+| Predictive-evaluation HTTP endpoint | deferred | No new experimental FastAPI endpoint is part of this foundation. |
 
 ## Interface Coverage
 

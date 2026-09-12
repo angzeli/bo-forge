@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.1.3.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.2.0.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -33,12 +33,14 @@ These names are supported imports from `bo_forge`:
 - `ContextConfig`
 - `CostConfig`
 - `FidelityConfig`
+- `FitMetadata`
 - `LogBusyError`
 - `LogConflictError`
 - `LogValidationError`
 - `LogWriteError`
 - `ModelConfig`
 - `ObjectiveConfig`
+- `PredictiveEvaluationResult`
 - `ProvenanceError`
 - `ProvenanceRecoveryRequired`
 - `ReplicateConfig`
@@ -64,6 +66,7 @@ These names are supported imports from `bo_forge`:
 - `mark_observed`
 - `model_summary`
 - `model_profile_comparison`
+- `model_predictive_evaluation`
 - `pareto_front`
 - `pareto_summary`
 - `provenance_summary`
@@ -154,15 +157,84 @@ Model profiles expose `ModelConfig`, `model_summary`, and
 and read-only inspection. Supported profiles are `default`, `smooth`, `rough`,
 and `robust`; non-default profiles require single-objective configs with
 `bo.acquisition: log_ei` or `qlog_nei`.
-Use `model_summary(config, df)` or `CampaignSession.model_summary()` to inspect
+Use `model_summary(config, df, *, metadata=None)` or `CampaignSession.model_summary()` to inspect
 the configured profile, model class, covariance profile, fitting-row count, and
 train-Y variance use. Use `model_profile_comparison(config, df)` or
 `CampaignSession.model_profile_comparison()` to compare supported profiles on
 the current observed fitting rows without changing the configured profile or
 CSV log. Comparison rows include `fit_status` and `fit_message` so failed or
 insufficient profile fits stay visible in tables and plots.
-`last_fit_*` fields are process-local and report `not_recorded` unless a model
-fit has happened in the same Python process for matching current fitting inputs.
+Existing comparison columns (`rmse_model_space`, `mae_model_space`, and
+`mean_predicted_std` included) are retained with an added
+`evaluation_scope=in_sample`. They describe training-row fit, not held-out
+prediction or evidence for selecting a profile.
+`FitMetadata` is a top-level exported frozen record of fit evidence, supplied as
+`model_summary(config, df, metadata=fit_metadata)`. Its `as_dict()` method returns
+a mapping for inspection; it does not own or expose a fitted model.
+`model_summary(config, df)` reads no ambient fit history: without explicit
+`metadata`, `last_fit_status` and `fallback_status` report `not_recorded`;
+`last_fit_warning_count` is `0` and `last_fit_warnings` is empty. `CampaignSession` owns
+its matching fit metadata; another session or an unrelated fit cannot populate
+that session's history. Fit metadata is not durable campaign provenance.
+
+### Predictive Evaluation
+
+```python
+model_predictive_evaluation(config, df, profiles=None, *, folds=5, seed=0)
+campaign.model_predictive_evaluation(profiles=None, *, folds=5, seed=0)
+```
+
+Both return `PredictiveEvaluationResult(summary, predictions, fold_outcomes,
+metadata)`: profile summary and held-out prediction tables, explicit per-fold
+outcomes (including failures), and evaluation metadata. Evaluation runs only
+when explicitly requested, does not mutate config/CSV inputs, and never selects
+a model or generates campaign suggestions.
+
+Summary metrics are `rmse`, `mae`, `mean_nlpd`, `interval_coverage`, and
+`mean_interval_width`; summary `fit_status` is `complete` or `incomplete`.
+Prediction rows identify `model_profile`, `fold`, and `row_id` and include
+`predicted_mean`, `predicted_variance`, `predicted_std`, `residual`,
+`standardized_residual`, `negative_log_predictive_density`, `interval_lower`,
+`interval_upper`, and `interval_covered`. Inspect fold failures rather than
+treating an incomplete profile as a successful comparison.
+
+The v3.2.0 evaluator supports standard single-objective campaigns only. Context,
+replicates, structured stages, fidelity, and multi-objective campaigns are
+rejected. It requires 5..200 observed rows, 2..5 folds, at least two training
+rows in every fold, and no duplicate designs. Use the same profiles, folds, seed,
+and input rows for a reproducible comparison. Small adaptive datasets and one
+split do not establish generalization, calibrated uncertainty, or a best model.
+Omitting `profiles` evaluates the configured profile only. An explicit sequence
+must contain distinct supported profile names; `seed` is a nonnegative integer.
+
+Predictive variance includes observation noise and is in original objective
+units squared, not latent-function variance or standardized model units.
+Means, residuals, and standard deviations use original objective units,
+including the original sign for minimization objectives; standardized residuals
+are dimensionless. Read fold failures alongside aggregate metrics.
+
+```python
+result = campaign.model_predictive_evaluation(
+    profiles=["default", "smooth"], folds=3, seed=0,
+)
+result.summary
+result.predictions
+result.fold_outcomes
+result.metadata
+result.export("reports/evaluation")
+result.plot_predictions(save_path="reports/evaluation/predictions.png")
+result.plot_residuals(save_path="reports/evaluation/residuals.png")
+```
+
+`result.export(output_dir)` requires a **new destination directory** and refuses
+overwrite. It creates exactly `summary.csv`, `predictions.csv`, `fold_outcomes.csv`,
+and `metadata.json`, not plots or campaign state. Do not pre-create `output_dir`.
+The example's plots are separate explicit writes after export.
+`result.plot_predictions(save_path=None)` and
+`result.plot_residuals(save_path=None)` plot the stored held-out results without
+refitting; omit `save_path` for an unsaved figure. The existing model-diagnostics
+and model-comparison plots remain in-sample. See the self-contained
+[20-row tutorial](../notebooks/23_predictive_diagnostics.ipynb).
 
 New campaigns initialized with `CampaignSession.initialize(config_path, log_path)`
 receive a versioned provenance manifest beside the CSV log. Use

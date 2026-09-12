@@ -358,9 +358,9 @@ def test_model_summary_reports_profile_and_fit_metadata(
     monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
     df = model_profile_log(cfg)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
 
-    summary = model_summary(cfg, df)
+    summary = model_summary(cfg, df, metadata=model._bo_forge_fit_metadata)
     values = dict(zip(summary["field"], summary["value"], strict=True))
 
     assert values["model_profile"] == "robust"
@@ -383,7 +383,10 @@ def test_model_summary_ignores_stale_fit_metadata_when_log_changes(
     monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
     df = model_profile_log(cfg)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
+    assert model_summary(cfg, df, metadata=model._bo_forge_fit_metadata).set_index("field").loc[
+        "last_fit_status", "value"
+    ] == "ok"
     changed_df = pd.concat(
         [
             df,
@@ -407,7 +410,7 @@ def test_model_summary_ignores_stale_fit_metadata_when_log_changes(
         ignore_index=True,
     )
 
-    summary = model_summary(cfg, changed_df)
+    summary = model_summary(cfg, changed_df, metadata=model._bo_forge_fit_metadata)
     values = dict(zip(summary["field"], summary["value"], strict=True))
 
     assert values["observed_rows_used_for_fitting"] == 2
@@ -434,11 +437,14 @@ def test_model_summary_ignores_stale_fit_metadata_when_same_shape_values_change(
     monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
     df = model_profile_log(cfg)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
+    assert model_summary(cfg, df, metadata=model._bo_forge_fit_metadata).set_index("field").loc[
+        "last_fit_status", "value"
+    ] == "ok"
     changed_df = df.copy()
     changed_df.loc[0, column] = value
 
-    summary = model_summary(cfg, changed_df)
+    summary = model_summary(cfg, changed_df, metadata=model._bo_forge_fit_metadata)
     values = dict(zip(summary["field"], summary["value"], strict=True))
 
     assert values["observed_rows_used_for_fitting"] == 1
@@ -458,12 +464,15 @@ def test_model_summary_ignores_stale_fit_metadata_when_same_shape_yvar_changes(
     monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
     df = replicate_log(cfg)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
+    assert model_summary(cfg, df, metadata=model._bo_forge_fit_metadata).set_index("field").loc[
+        "last_fit_status", "value"
+    ] == "ok"
     changed_df = df.copy()
     changed_df.loc[0, "activity"] = 0.9
     changed_df.loc[1, "activity"] = 1.5
 
-    summary = model_summary(cfg, changed_df)
+    summary = model_summary(cfg, changed_df, metadata=model._bo_forge_fit_metadata)
     values = dict(zip(summary["field"], summary["value"], strict=True))
 
     assert values["observed_rows_used_for_fitting"] == 1
@@ -493,7 +502,11 @@ def test_model_summary_ignores_stale_fit_metadata_when_config_shape_changes(
     monkeypatch.setattr(models_module, "ExactMarginalLogLikelihood", lambda *_args: object())
     monkeypatch.setattr(models_module, "fit_gpytorch_mll", lambda *_args: None)
 
-    fit_gp_model(cfg, model_profile_log(cfg))
+    df = model_profile_log(cfg)
+    model = fit_gp_model(cfg, df)
+    assert model_summary(cfg, df, metadata=model._bo_forge_fit_metadata).set_index("field").loc[
+        "last_fit_status", "value"
+    ] == "ok"
     wider_df = pd.DataFrame(
         [
             {
@@ -512,7 +525,7 @@ def test_model_summary_ignores_stale_fit_metadata_when_config_shape_changes(
         columns=canonical_columns(wider_cfg),
     )
 
-    summary = model_summary(wider_cfg, wider_df)
+    summary = model_summary(wider_cfg, wider_df, metadata=model._bo_forge_fit_metadata)
     values = dict(zip(summary["field"], summary["value"], strict=True))
 
     assert values["encoded_dimension"] == 2
@@ -595,18 +608,19 @@ def test_model_profile_comparison_marks_insufficient_observed_without_fitting(
     assert pd.isna(comparison.loc[0, "rmse_model_space"])
 
 
-def test_model_profile_comparison_restores_model_summary_metadata(
+def test_model_profile_comparison_preserves_explicit_model_summary_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = model_profile_config("robust")
     df = model_profile_two_row_log(cfg)
     patch_fake_gp(monkeypatch)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
+    metadata = model._bo_forge_fit_metadata
 
-    before_summary = model_summary(cfg, df)
+    before_summary = model_summary(cfg, df, metadata=metadata)
     before = dict(zip(before_summary["field"], before_summary["value"], strict=True))
     comparison = model_profile_comparison(cfg, df, profiles=["smooth"])
-    after_summary = model_summary(cfg, df)
+    after_summary = model_summary(cfg, df, metadata=metadata)
     after = dict(zip(after_summary["field"], after_summary["value"], strict=True))
 
     assert comparison["model_profile"].tolist() == ["smooth"]
@@ -614,45 +628,52 @@ def test_model_profile_comparison_restores_model_summary_metadata(
     assert before["last_fit_status"] == "ok"
     assert after["model_profile"] == "robust"
     assert after["last_fit_status"] == "ok"
+    assert model._bo_forge_fit_metadata is metadata
+    pd.testing.assert_frame_equal(before_summary, after_summary)
 
 
-def test_model_profile_comparison_restores_metadata_after_profile_fit_failure(
+def test_model_profile_comparison_preserves_explicit_metadata_after_profile_fit_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = model_profile_config("robust")
     df = model_profile_two_row_log(cfg)
     patch_fake_gp(monkeypatch)
-    fit_gp_model(cfg, df)
+    model = fit_gp_model(cfg, df)
+    metadata = model._bo_forge_fit_metadata
 
-    before_summary = model_summary(cfg, df)
+    before_summary = model_summary(cfg, df, metadata=metadata)
     before = dict(zip(before_summary["field"], before_summary["value"], strict=True))
     training = dataframe_to_training_tensors(model_profile_config("smooth"), df)
 
     def fail_after_metadata(profile_config: CampaignConfig, _observed: pd.DataFrame) -> object:
-        models_module._record_fit_metadata(
+        error = RuntimeError("synthetic profile fit failure")
+        error._bo_forge_fit_metadata = models_module._record_fit_metadata(
             profile_config,
             training,
             model_class="SingleTaskGP",
             covariance_profile="RBF/ARD",
             fit_status="failed",
-            fit_warnings=[],
+            fit_warnings=["synthetic fit warning"],
             fallback_status="raised",
         )
-        raise RuntimeError("synthetic profile fit failure")
+        raise error
 
     monkeypatch.setattr(models_module, "fit_gp_model", fail_after_metadata)
 
     comparison = model_profile_comparison(cfg, df, profiles=["smooth"])
-    after_summary = model_summary(cfg, df)
+    after_summary = model_summary(cfg, df, metadata=metadata)
     after = dict(zip(after_summary["field"], after_summary["value"], strict=True))
 
     assert comparison.loc[0, "model_profile"] == "smooth"
     assert comparison.loc[0, "fit_status"] == "failed"
     assert comparison.loc[0, "fit_message"] == "synthetic profile fit failure"
+    assert comparison.loc[0, "fit_warning_count"] == 1
     assert before["model_profile"] == "robust"
     assert before["last_fit_status"] == "ok"
     assert after["model_profile"] == "robust"
     assert after["last_fit_status"] == "ok"
+    assert model._bo_forge_fit_metadata is metadata
+    pd.testing.assert_frame_equal(before_summary, after_summary)
 
 
 def test_model_profile_comparison_reports_replicate_train_yvar(

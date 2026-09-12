@@ -10,6 +10,8 @@ from nbformat.validator import validate
 from bo_forge import CampaignSession
 
 NOTEBOOKS = sorted(Path("notebooks").glob("*.ipynb"))
+PREDICTIVE_NOTEBOOK = Path("notebooks/23_predictive_diagnostics.ipynb")
+CAMPAIGN_NOTEBOOKS = [path for path in NOTEBOOKS if path != PREDICTIVE_NOTEBOOK]
 API_NOTEBOOKS = [
     notebook_path
     for notebook_path in NOTEBOOKS
@@ -54,7 +56,7 @@ def notebook_source(notebook_path: Path) -> str:
     return "\n".join(cell.source for cell in notebook.cells)
 
 
-@pytest.mark.parametrize("notebook_path", NOTEBOOKS)
+@pytest.mark.parametrize("notebook_path", CAMPAIGN_NOTEBOOKS)
 def test_notebook_defines_15_step_target(notebook_path: Path) -> None:
     source = notebook_source(notebook_path)
     if notebook_path == REPLICATE_NOTEBOOK:
@@ -79,13 +81,75 @@ def test_cli_notebook_uses_package_module_invocation() -> None:
     assert '"bo_forge"' in source
 
 
-@pytest.mark.parametrize("notebook_path", NOTEBOOKS)
+@pytest.mark.parametrize("notebook_path", CAMPAIGN_NOTEBOOKS)
 def test_notebooks_write_to_ignored_working_artifacts(notebook_path: Path) -> None:
     source = notebook_source(notebook_path)
 
     assert "_working_log.csv" in source
     assert "_latest_suggestions.csv" in source
     assert 'PROJECT_ROOT / "reports"' in source or 'Path("reports/' in source
+
+
+def test_predictive_notebook_is_bounded_and_self_contained() -> None:
+    source = notebook_source(PREDICTIVE_NOTEBOOK)
+
+    for fragment in (
+        "TemporaryDirectory(",
+        "CampaignConfig.from_yaml(config_path)",
+        "canonical_columns(config)",
+        "N_OBSERVATIONS = 20",
+        'profiles=["default", "smooth"], folds=3, seed=0',
+        "result.summary",
+        "result.predictions",
+        "result.fold_outcomes",
+        "result.metadata",
+        "result.export(output_dir)",
+        "result.plot_predictions(",
+        "result.plot_residuals(",
+        "workspace.cleanup()",
+        "evaluation_scope=in_sample",
+        "observation noise",
+        "original objective units",
+    ):
+        assert fragment in source
+    for forbidden in ("suggest_next(", "append_suggestions(", "mark_observed(", "examples/"):
+        assert forbidden not in source
+
+
+def test_predictive_notebook_executes_without_campaign_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    notebook = nbformat.read(PREDICTIVE_NOTEBOOK, as_version=4)
+    monkeypatch.chdir(tmp_path)
+    namespace = {"__name__": "__main__"}
+    try:
+        for cell in notebook.cells:
+            if cell.cell_type == "code":
+                exec(compile(cell.source, f"{PREDICTIVE_NOTEBOOK}:{cell.id}", "exec"), namespace)
+        result = namespace["result"]
+        assert len(namespace["campaign"].df) == 20
+        assert len(result.summary) == 2
+        assert len(result.predictions) == 40
+        assert len(result.fold_outcomes) == 6
+        assert result.summary["fit_status"].eq("complete").all()
+        assert result.fold_outcomes["fit_status"].eq("complete").all()
+        assert {
+            "rmse", "mae", "mean_nlpd", "interval_coverage", "mean_interval_width",
+        } <= set(result.summary.columns)
+        assert result.metadata
+        assert set(namespace["exported_files"]) == {
+            "summary.csv", "predictions.csv", "fold_outcomes.csv", "metadata.json",
+            "predictions.png", "residuals.png",
+        }
+        assert not namespace["work_dir"].exists()
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        if "workspace" in namespace:
+            namespace["workspace"].cleanup()
+        plt.close("all")
 
 
 def test_multi_fidelity_notebook_uses_existing_qmfkg_assets() -> None:

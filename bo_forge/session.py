@@ -67,6 +67,7 @@ class CampaignSession:
     _provenance_policy: str = field(default="compatible", init=False, repr=False)
     _manifest_fingerprint: str | None = field(default=None, init=False, repr=False)
     _lifecycle_identity: str | None = field(default=None, init=False, repr=False)
+    _fit_metadata: Any = field(default=None, init=False, repr=False)
 
     @classmethod
     def initialize(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
@@ -558,7 +559,11 @@ class CampaignSession:
         """Return model-profile and fitting-input summary fields."""
         from bo_forge.models import model_summary
 
-        return model_summary(self.config, self.df)
+        self._assert_provenance_resumable()
+        summary = model_summary(self.config, self.df, metadata=self._fit_metadata)
+        if summary.set_index("field").loc["last_fit_status", "value"] == "not_recorded":
+            self._fit_metadata = None
+        return summary
 
     def model_profile_comparison(
         self, profiles: list[str] | tuple[str, ...] | None = None
@@ -566,7 +571,19 @@ class CampaignSession:
         """Return read-only model-profile comparison diagnostics."""
         from bo_forge.models import model_profile_comparison
 
+        self._assert_provenance_resumable()
         return model_profile_comparison(self.config, self.df, profiles=profiles)
+
+    def model_predictive_evaluation(self, profiles=None, *, folds=5, seed=0):
+        """Run explicit retrospective held-out checks without campaign mutation."""
+        from bo_forge.predictive import model_predictive_evaluation
+
+        self._assert_provenance_resumable()
+        result = model_predictive_evaluation(
+            self.config, self.df, profiles=profiles, folds=folds, seed=seed
+        )
+        self._assert_provenance_resumable()
+        return result
 
     def replicate_summary(self) -> pd.DataFrame:
         """Return observed replicate-group summary statistics."""
@@ -583,16 +600,10 @@ class CampaignSession:
         context_values: dict[str, object] | None = None,
     ) -> pd.DataFrame:
         """Return suggested candidates without mutating session state or writing to disk."""
-        from bo_forge.suggestions import suggest_next
+        from bo_forge._fit_metadata import session_suggestions
 
         self._assert_provenance_resumable()
-        return suggest_next(
-            self.config,
-            self.df.copy(deep=True),
-            batch_size=batch_size,
-            stage=stage,
-            context_values=context_values,
-        )
+        return session_suggestions(self, batch_size, stage, context_values)
 
     def suggestion_quality(self, suggestions: pd.DataFrame) -> pd.DataFrame:
         """Return read-only quality diagnostics for suggested rows."""
