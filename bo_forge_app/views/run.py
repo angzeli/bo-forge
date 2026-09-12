@@ -372,6 +372,8 @@ def _render_staged_suggestion_export(
     suggestions: pd.DataFrame,
     log_path: Path,
 ) -> None:
+    from bo_forge._campaign.exports import _validate_export_destination
+
     with st.form("staged_suggestions_export_form"):
         export_path = Path(
             st.text_input(
@@ -384,12 +386,13 @@ def _render_staged_suggestion_export(
     if not export_clicked:
         return
     try:
+        _validate_export_destination(export_path.expanduser(), campaign.config_path, log_path)
         written_path = (
             campaign.export_staged_suggestions(bundle, export_path)
             if hasattr(campaign, "export_staged_suggestions")
             else export_staged_suggestions_csv(suggestions, export_path)
         )
-    except OSError as exc:
+    except (BOForgeError, OSError) as exc:
         st.error(str(exc))
     else:
         st.success(f"Wrote staged suggestions CSV: {written_path}")

@@ -1,7 +1,7 @@
 # Predictive Evaluation
 
 This is the scientific and workflow reference for predictive diagnostics through
-v3.2.1. It describes the implementation and how to inspect its results; it
+v3.2.2. It describes the implementation and how to inspect its results; it
 does not certify that release gates, calibration studies, or v3.2.x acceptance
 have passed. See the [release checklist](RELEASE_CHECKLIST.md) and
 [roadmap](../ROADMAP_V3_X.md) for those separate gates.
@@ -88,17 +88,30 @@ without comparing or subtracting rounded original-unit endpoints. At large
 objective offsets, the stored floating-point endpoints can coincide even when
 predictive uncertainty and interval width are positive.
 
-For a **hand-calculated illustration**, not an executed campaign result, take
-`y = 12 U`, `mu = 10 U`, and observation-inclusive variance `4 U^2`. Then
-`sigma = 2 U`, `r = 2 U`, `z = 1`, NLPD is approximately `2.1121`, and the interval
-is approximately `[6.0801, 13.9199] U`; this observation is covered. Using latent
-variance instead would answer a different question and typically narrow the
-interval incorrectly for an observed outcome.
+For a **hand-worked example**, not fitted profiles or an executed campaign
+result, hold `y = 12 U` and `mu = 10 U` fixed. Both illustrations have absolute
+error `2 U` (and single-row RMSE and MAE of `2 U`):
+
+| Illustration | Observation std (U) | Standardized residual | Covered | Interval width (U) | NLPD |
+| --- | --- | --- | --- | --- | --- |
+| A | 0.5 | 4.0 | no | 1.9600 | 8.2258 |
+| B | 2.0 | 1.0 | yes | 7.8399 | 2.1121 |
+
+The intervals are approximately `[9.0200, 10.9800] U` and
+`[6.0801, 13.9199] U`, respectively. Increasing uncertainty changes coverage,
+width, and density despite identical errors. This one outcome cannot establish
+that either illustration is calibrated or recommend a BO Forge profile.
+Using latent variance instead would answer a different question and typically
+narrow the interval incorrectly for an observed outcome.
 
 NLPD uses natural logarithms and the numerical objective units in the input.
 Lower is better for the same outcomes and units, but NLPD is not unit-invariant:
 rescaling the objective by a factor `a` shifts NLPD by `log(abs(a))`. Negative
 NLPD is possible for a continuous density and is not itself an error.
+For example, multiply `y`, `mu`, and `sigma` by `10`: error and width multiply
+by `10`, variance by `100`, standardized residual and coverage stay unchanged,
+and NLPD increases by approximately `2.3026`. This is a change of numerical
+units, not a change in predictive quality.
 
 ## Result Contract
 
@@ -119,13 +132,13 @@ Prediction quantities are `predicted_mean`, `predicted_variance`, `predicted_std
 For a complete profile, the `n` out-of-fold rows are pooled with equal weight
 per observation, not equal weight per fold:
 
-| Summary metric | Definition | Interpretation |
-| --- | --- | --- |
-| `rmse` | `sqrt(sum(r_i^2) / n)` | Error magnitude in `U`, with greater weight on large errors. |
-| `mae` | `sum(abs(r_i)) / n` | Mean absolute error in `U`. |
-| `mean_nlpd` | `sum(NLPD_i) / n` | Gaussian predictive-density score; compare only on the same outcomes and units. |
-| `interval_coverage` | `sum(abs(z_i) <= c) / n` | Fraction covered, between 0 and 1; nominal target is 0.95. |
-| `mean_interval_width` | `sum(2 * c * sigma_i) / n` | Interval width in `U`; read together with coverage, not alone. |
+| Summary metric | Measures / definition | Units | Valid comparison | Does not establish |
+| --- | --- | --- | --- | --- |
+| `rmse` | Error magnitude, weighted toward large errors: `sqrt(sum(r_i^2) / n)`. | `U` | Same held-out outcomes, units, splits, and fitting conditions; lower means less squared error here. | Calibration or future BO performance. |
+| `mae` | Mean absolute error: `sum(abs(r_i)) / n`. | `U` | Same comparison inputs as RMSE; lower means less absolute error here. | Absence of a few large errors or reliable uncertainty. |
+| `mean_nlpd` | Gaussian density assigned to outcomes: `sum(NLPD_i) / n`. | Natural-log density score; depends on numerical units | Same outcomes, units, splits, and observation-inclusive variance convention; lower is better here. | A unit-independent score or a calibration certificate. |
+| `interval_coverage` | Fraction inside nominal 95% intervals: `sum(abs(z_i) <= c) / n`. | Dimensionless fraction | Same inputs and nominal probability; read with width and residuals, not as a higher-is-better ranking. | Calibration from proximity to 0.95 on one small dataset. |
+| `mean_interval_width` | Mean interval span: `sum(2 * c * sigma_i) / n`. | `U` | Same inputs and nominal probability; read with coverage, not as a lower-is-better ranking. | Accuracy or calibration from narrow intervals alone. |
 
 Summary `fit_status` is `complete` or `incomplete`; prediction/fold status is
 `complete` or `failed`. If any fold fails, that profile's aggregate metrics are
@@ -150,6 +163,68 @@ numerical warning or internal retry occurred. A posterior-prediction failure
 retains the successful fit's captured warning evidence while marking the fold
 failed and withholding aggregate metrics. Interpret these fields alongside
 `fit_status` and `fit_message`, not as a convergence or calibration certificate.
+
+## Read A Result
+
+1. **Check completeness and warnings.** Read `fit_status`, `fit_message`, and
+   fold evidence first. Do not compare withheld metrics with complete scores or
+   replace missing values with zeros. A complete run is only a completed computation.
+2. **Confirm comparison inputs.** Use the same observation IDs and values,
+   objective units, held-out membership, and documented fitting conditions.
+   Compare `metadata` source identities, `fold_membership`, software versions,
+   and the per-fold fitting RNG fingerprints. Record intended differences such
+   as profile settings; do not attribute every difference to the profile when
+   fitting conditions also differ. Requested profile order is not a ranking.
+3. **Inspect predictive errors.** Read RMSE and MAE in the objective's units,
+   then inspect individual held-out predictions. Relate error sizes to the
+   experiment's requirements; BO Forge supplies no universal acceptable threshold.
+4. **Read uncertainty jointly.** Inspect standardized residuals, NLPD, coverage,
+   and width together. A large standardized residual is an error large relative
+   to its reported observation uncertainty, not an automatic outlier diagnosis.
+5. **State the limits.** Distinguish computational completion, retrospective
+   predictive error, uncertainty calibration, and future BO performance. These
+   are different claims; none follows automatically from the previous one.
+
+Gneiting and Raftery distinguish calibration from forecast concentration and
+develop proper scores for distributions and intervals. Their interval-score
+discussion considers both width and missed coverage; a log score also evaluates
+the density assigned to the realized outcome. BO Forge reports the existing
+metrics separately, not a new interval or composite score. Neither coverage nor
+width alone tests calibration. See [Gneiting and Raftery (2007), sections 1, 4,
+and 6](https://doi.org/10.1198/016214506000001437)
+([author-hosted paper](https://sites.stat.washington.edu/people/raftery/Research/PDF/Gneiting2007jasa.pdf)).
+
+| Pattern | What to inspect next, without an automatic diagnosis |
+| --- | --- |
+| Low RMSE with poor coverage | Check residuals relative to reported uncertainty, units, individual rows, and fold messages. Small absolute error can still be large relative to a narrow interval. |
+| High coverage with wide intervals | Examine whether the intervals are informative at the experimental scale. Covering outcomes by broad intervals does not establish accurate or calibrated predictions. |
+| A few large standardized residuals | Inspect row identity, recorded outcome, predicted mean/variance, and fold evidence. Data errors, model mismatch, and underestimated uncertainty are possibilities to investigate, not conclusions. Do not delete rows merely to improve metrics. |
+| Incomplete profiles | Keep failed rows and messages; resolve the reported failure before interpreting that profile's aggregate metrics. Successful predictions remain diagnostic evidence, not a substitute aggregate score. |
+
+## Manual Split Sensitivity
+
+This is a manual reporting protocol, not an extra evaluation mode or notebook loop:
+
+1. Before inspecting results, predeclare a small seed set, for example `{0, 7, 19}`,
+   the profile order, fold count, fixed source snapshot, and intended fitting
+   conditions. Keep observations, objective units, and software environment fixed.
+2. Run each declared seed explicitly with the existing evaluator. Within each
+   run, give all requested profiles the same held-out membership. Export each
+   run to its own new directory; retain every result, warning, and failure.
+3. Report per-run metrics, completion counts, and descriptive variability such
+   as the range across complete runs. List excluded/incomplete runs and their
+   reasons alongside that range; never select only the best seed or profile.
+4. Record that the split seed controls membership, not all fitting randomness.
+   Without separately controlled fitting conditions, variability includes both
+   split and fitting effects. These runs reuse observations and are not independent
+   replications: do not attach significance claims or independent-binomial
+   confidence intervals to their correlated coverage outcomes.
+
+Repeatedly trying profiles or seeds and reporting only the best observed score
+selects on finite-sample noise as well as model quality. Cawley and Talbot show
+how overfitting a model-selection criterion can bias performance evaluation;
+retaining the search history does not make the chosen score unbiased. See
+[Cawley and Talbot (2010)](https://www.jmlr.org/beta/papers/v11/cawley10a.html).
 
 ## Python And Export
 
@@ -242,6 +317,8 @@ Streamlit shows incomplete-profile and captured-warning notices above the
 result tables. Fold details remain available, and successful exports of incomplete
 results are labeled incomplete. Export errors retain the result for retry without
 refitting. Campaign/input/policy changes still invalidate the current-result cache.
+The collapsed **Interpret these results** reference beside the tables is static;
+it neither fits nor exports and does not modify evaluation or campaign state.
 
 ## Existing Notebook Walkthrough
 

@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 
+from bo_forge._campaign.exports import _validate_export_destination
 from bo_forge._campaign.reports import (
     _base_report_tables,
     _bo_suggestion_reason,
@@ -487,6 +488,7 @@ class CampaignSession:
 
     def export_report(self, path: str | Path) -> Path:
         """Write a deterministic plain-text campaign report and return its path."""
+        _validate_export_destination(path, self.config_path, self.log_path)
         report_path = Path(path)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         text = _format_campaign_report(self.report())

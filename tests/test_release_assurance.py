@@ -281,11 +281,11 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "class v310,v311,v312,v313 patchDone" in roadmap
     assert "class v313 patchActive" not in roadmap
     assert "class v32 majorActive" in roadmap
-    assert "class v320,v321 patchDone" in roadmap
+    assert "class v320,v321,v322 patchDone" in roadmap
     assert "| `v3.2.0` | prepared | Complete foundation:" in roadmap
     assert "| `v3.2.1` | prepared | Atomic exports," in roadmap
-    for version in ("3.2.2", "3.2.3"):
-        assert f"| `v{version}` | planned |" in roadmap
+    assert "| `v3.2.2` | prepared | Practical interpretation" in roadmap
+    assert "| `v3.2.3` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
     assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap
@@ -338,3 +338,33 @@ def test_predictive_hardening_docs_describe_exports_failures_and_snapshots() -> 
     for fragment in ("historical snapshots", "FileExistsError", "without fitting again",
                      "aggregate numerical", "Failed", "never removed"):
         assert fragment.lower() in guide.lower()
+
+
+def test_predictive_interpretation_links_and_release_scope() -> None:
+    import json
+
+    guide = _read("docs/PREDICTIVE_EVALUATION.md")
+    notebook = json.loads(_read("notebooks/23_predictive_diagnostics.ipynb"))
+    markdown = "\n".join("".join(cell["source"]) for cell in notebook["cells"]
+                         if cell["cell_type"] == "markdown")
+    for text in (guide, markdown):
+        for link in ("https://doi.org/10.1198/016214506000001437",
+                     "https://www.jmlr.org/beta/papers/v11/cawley10a.html"):
+            assert link in text
+    assert "## Read A Result" in guide
+    assert "## Manual Split Sensitivity" in guide
+    assert "No automatic" in guide
+    assert "v3.2.3 synthetic acceptance" in _read("docs/RELEASE_CHECKLIST.md")
+    assert "Guidance is not calibration certification" in _read("docs/RELEASE_CHECKLIST.md")
+    for relative, text in (("docs/PREDICTIVE_EVALUATION.md", guide),
+                           ("notebooks/23_predictive_diagnostics.ipynb", markdown)):
+        for target in re.findall(r"\]\(([^)]+)\)", text):
+            if target.startswith("https://"):
+                continue
+            filename, _, anchor = target.partition("#")
+            path = (PROJECT_ROOT / relative).parent / filename
+            assert path.is_file(), target
+            if anchor:
+                headings = re.findall(r"^## (.+)$", path.read_text(encoding="utf-8"), re.M)
+                assert anchor in {re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
+                                  for h in headings}, target

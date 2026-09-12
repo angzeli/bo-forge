@@ -596,10 +596,18 @@ Fork `--config-changes` accepts a JSON mapping such as
 `'{"campaign_name":"child","bo":{"random_seed":42}}'`. Resolve suggested rows first;
 the destination must not exist. Back up referenced archives with managed campaign files.
 - `bo-forge suggest --append`: appends generated suggestions as `status=suggested`.
+- `bo-forge suggest --output`: writes a standalone suggestions CSV, even without `--append`.
 - `bo-forge review`: updates `review_status` and `review_note` for one suggested row.
 - `bo-forge mark-observed`: marks one existing pending row as `status=observed`.
 - `bo-forge report --output`: writes a report file.
 - `bo-forge plot --output`: writes a figure file.
+
+Suggestion CSV and report exports reject destinations that alias the loaded
+campaign's YAML, CSV, reserved manifest path, or referenced provenance archives.
+The manifest filename is reserved case-insensitively, including for legacy logs.
+Choose a separate artifact path; existing ordinary artifact files can still be
+replaced. A rejected destination leaves campaign files unchanged, including when
+`suggest --output` is combined with `--append`.
 
 `bo-forge suggest --append` never marks suggestions observed. The explicit campaign rhythm remains:
 

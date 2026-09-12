@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
+from bo_forge._campaign.exports import _validate_export_destination
 from bo_forge._campaign.provenance import manifest_fingerprint
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError, LogConflictError, ProvenanceRecoveryRequired
@@ -697,6 +698,7 @@ class CampaignAppService:
 
     def export_staged_suggestions(self, bundle: dict[str, object], path: str | Path) -> Path:
         """Export staged suggestions without mutating campaign state."""
+        _validate_export_destination(Path(path).expanduser(), self.config_path, self.log_path)
         return export_staged_suggestions_csv(staged_suggestions_from_bundle(bundle), path)
 
     def review(

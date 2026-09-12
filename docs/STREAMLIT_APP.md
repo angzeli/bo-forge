@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.2.1 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.2.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 For first-time download, installation, and launch instructions, read
 [Start Here](../START_HERE.md). This page describes operating the workbench.
@@ -104,6 +104,11 @@ in a temporary sibling directory and publish without overwrite. Failed exports
 retain the evaluation for retry without refitting; exported incomplete results
 are labeled incomplete. Files changed during fitting are rejected, and changed
 campaigns cannot expose a stale cached result as current.
+The collapsed **Interpret these results** expander adds a static metric reference
+and links to the [reading guide](PREDICTIVE_EVALUATION.md#read-a-result) and
+[notebook 23](../notebooks/23_predictive_diagnostics.ipynb). It does not fit,
+export, invalidate results, or change campaign state. Existing warning and
+incomplete-result notices stay above the reference and tables.
 
 This evaluator supports standard single-objective campaigns with 5..200 observed
 rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
@@ -369,7 +374,12 @@ existing CSV rows and predictions; use a new destination directory.
 
 Append, review, and mark-observed actions modify the selected CSV log.
 
-Report and plot export actions write files to the selected output path.
+Staged suggestion, report, and plot export actions write files to the selected
+output path. Staged CSV and report exports reject destinations that alias the
+loaded campaign's YAML, CSV, reserved manifest path, or referenced provenance
+archives. The manifest filename is reserved case-insensitively, including for
+legacy logs. Choose a separate artifact path; a rejected export retains the staged
+batch for retry without changing campaign files.
 
 The app invalidates staged suggestions if the selected config path, config file, log path, or log file changes after suggestions are generated.
 

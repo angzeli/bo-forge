@@ -125,6 +125,7 @@ def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
     warning_count = int(result.fold_outcomes.fit_warning_count.sum())
     if warning_count:
         st.warning(f"Captured {warning_count} fit warning(s). Inspect the fold evidence below.")
+    _render_interpretation_reference(st)
     st.dataframe(result.summary, hide_index=True, width="stretch")
     with st.expander("Held-out predictions and fold outcomes"):
         st.dataframe(result.predictions, hide_index=True, width="stretch")
@@ -159,3 +160,29 @@ def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
                 if not incomplete.empty else "predictive evaluation"
             )
             st.success(f"Wrote {label}: {output_dir}")
+
+
+def _render_interpretation_reference(st: Any) -> None:
+    """Static scientific context; no result, campaign, or widget state is needed."""
+    with st.expander("Interpret these results", expanded=False):
+        st.markdown(
+            "- **RMSE / MAE:** held-out errors in original objective units; RMSE gives "
+            "more weight to large errors. Low error does not establish calibration.\n"
+            "- **Standardized residual:** error divided by observation-inclusive standard "
+            "deviation. Large values are not automatic outlier diagnoses.\n"
+            "- **NLPD:** negative log predictive density; lower is better only for the same "
+            "outcomes and numerical units. It depends on both error and uncertainty.\n"
+            "- **Coverage and interval width:** the covered fraction and mean span of nominal "
+            "95% intervals. Read together; wide intervals can cover many outcomes, and "
+            "narrow intervals need not be reliable. Neither alone establishes calibration.\n"
+            "- **Complete:** all folds and aggregate calculations completed, not scientifically "
+            "validated. Incomplete profiles withhold metrics; warning and fold evidence remain "
+            "important.\n\n"
+            "Fair comparisons share observations, units, held-out membership, and documented "
+            "fitting conditions. The split seed does not control all fitting randomness. "
+            "These retrospective checks do not establish future BO performance.\n\n"
+            "[Detailed guide](https://github.com/angzeli/bo-forge/blob/main/docs/"
+            "PREDICTIVE_EVALUATION.md#read-a-result) | "
+            "[Notebook 23](https://github.com/angzeli/bo-forge/blob/main/notebooks/"
+            "23_predictive_diagnostics.ipynb)"
+        )

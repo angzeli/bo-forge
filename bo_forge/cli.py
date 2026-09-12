@@ -11,12 +11,14 @@ import math
 import platform
 import sys
 from collections.abc import Sequence
+from os.path import expanduser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from bo_forge import __version__
+from bo_forge._campaign.exports import _validate_export_destination
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import (
     BOForgeError,
@@ -496,6 +498,13 @@ def _cmd_report(args: argparse.Namespace) -> int:
 
 def _cmd_suggest(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
+    if args.output is not None:
+        try:
+            _validate_export_destination(
+                expanduser(args.output), campaign.config_path, campaign.log_path,
+            )
+        except OSError as exc:
+            raise _CLIOutputError(str(exc)) from exc
     context_values = _parse_context_values(args.context)
     suggestions = campaign.suggest_next(
         batch_size=args.batch_size,
@@ -509,7 +518,7 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
     if args.output is None:
         _print_table(suggestions)
     else:
-        output_path = _write_csv(suggestions, args.output)
+        output_path = _write_csv(suggestions, args.output, campaign)
         print(f"Wrote suggestions CSV: {output_path}")
 
     if args.append:
@@ -662,10 +671,12 @@ def _print_table(df: pd.DataFrame) -> None:
     print(df.to_string(index=False))
 
 
-def _write_csv(df: pd.DataFrame, path: Path) -> Path:
+def _write_csv(df: pd.DataFrame, path: Path, campaign: CampaignSession) -> Path:
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path, index=False)
+        output_path = Path(expanduser(path))
+        _validate_export_destination(output_path, campaign.config_path, campaign.log_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, index=False)
     except OSError as exc:
         raise _CLIOutputError(f"Could not write suggestions CSV '{path}': {exc}") from exc
     return path

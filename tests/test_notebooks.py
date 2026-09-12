@@ -1,3 +1,5 @@
+import hashlib
+import json
 import math
 import shutil
 from pathlib import Path
@@ -114,6 +116,24 @@ def test_predictive_notebook_is_bounded_and_self_contained() -> None:
         assert fragment in source
     for forbidden in ("suggest_next(", "append_suggestions(", "mark_observed(", "examples/"):
         assert forbidden not in source
+
+
+def test_predictive_guidance_preserves_v321_computation_and_notebook_identity() -> None:
+    notebook = json.loads(PREDICTIVE_NOTEBOOK.read_text(encoding="utf-8"))
+    # Freeze every non-prose field from eb59376e, including code, cell IDs, and execution state.
+    protected = {
+        "cells": [cell if cell["cell_type"] == "code" else
+                  {key: value for key, value in cell.items() if key != "source"}
+                  for cell in notebook["cells"]],
+        **{key: value for key, value in notebook.items() if key != "cells"},
+    }
+    assert hashlib.sha256(json.dumps(protected, sort_keys=True).encode()).hexdigest() == (
+        "d9e06e562c6ba32a23ab33c4d469dc60cab8375e83a705af09b7cb0a615b41cf"
+    )
+    source = notebook_source(PREDICTIVE_NOTEBOOK)
+    for fragment in ("Hand-worked example", "Reporting checklist", "five percentage points",
+                     "not all fitting randomness", "Six model fits", "retain every run"):
+        assert fragment in source
 
 
 def test_predictive_notebook_executes_without_campaign_mutation(

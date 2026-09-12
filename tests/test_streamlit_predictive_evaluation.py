@@ -112,6 +112,45 @@ def test_evaluation_explicit_count_cache_and_no_writes(evaluation_ui):
     assert {path: path.read_bytes() for path in ui.root.iterdir()} == before
 
 
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_interpretation_reference_is_static_and_preserves_result(evaluation_ui, incomplete):
+    ui = evaluation_ui
+    assert not any(item.label == "Interpret these results" for item in ui.app.expander)
+    if incomplete:
+        ui.result.summary.loc[0, ["fit_status", "fit_message", "rmse"]] = [
+            "incomplete", "Fold 1: failed", None,
+        ]
+        ui.result.fold_outcomes.loc[0, "fit_warning_count"] = 1
+    before = {path: path.read_bytes() for path in ui.root.iterdir()}
+    tables = [frame.copy(deep=True) for frame in (
+        ui.result.summary, ui.result.predictions, ui.result.fold_outcomes,
+    )]
+    _run(ui)
+    cached = ui.app.session_state[EVALUATION_CACHE_KEY]
+    reference = next(item for item in ui.app.expander if item.label == "Interpret these results")
+    assert reference.proto.expanded is False
+    text = " ".join(item.value for item in reference.markdown)
+    for fragment in ("RMSE / MAE", "Standardized residual", "NLPD", "Coverage and interval width",
+                     "not scientifically validated", "not control all fitting randomness",
+                     "docs/PREDICTIVE_EVALUATION.md#read-a-result",
+                     "notebooks/23_predictive_diagnostics.ipynb"):
+        assert fragment in text
+    # Native expander disclosure is client-side; rendering its full contents needs no callback.
+    ui.app.run(timeout=10)
+    assert not ui.app.exception
+    assert ui.app.session_state[EVALUATION_CACHE_KEY] is cached
+    assert ui.evaluate.call_count == 1
+    ui.result.export.assert_not_called()
+    ui.result.plot_predictions.assert_not_called()
+    ui.result.plot_residuals.assert_not_called()
+    assert {path: path.read_bytes() for path in ui.root.iterdir()} == before
+    for original, displayed in zip(tables, ui.app.dataframe, strict=True):
+        pd.testing.assert_frame_equal(original, displayed.value)
+    if incomplete:
+        assert "Incomplete predictive evaluation" in ui.app.warning[0].value
+        assert "Captured 1 fit warning(s)" in ui.app.warning[1].value
+
+
 def test_evaluation_plots_and_exports_reuse_result(evaluation_ui):
     ui = evaluation_ui
     _run(ui)

@@ -1,5 +1,29 @@
 # 📝 BO Forge Changelog
 
+## v3.2.2 - Predictive Interpretation And Calibration Guidance
+
+Status: prepared interpretation guidance; publication requires exact-commit CI
+and separate authorization. v3.2.x remains active; synthetic acceptance and
+series closeout remain assigned to v3.2.3. Calibration is not established by
+this documentation patch.
+
+- Adds a practical reading sequence, metric comparison limits, uncertainty
+  patterns, and a manual predeclared split-sensitivity protocol to the existing
+  guide, grounded in primary scoring-rule and model-selection literature.
+- Extends notebook 23 with hand-worked uncertainty examples, small-sample
+  coverage caution, and a reporting checklist. Its computation cells, IDs,
+  data, seed, profiles, three folds, six fits, and export operations are unchanged.
+- Adds a collapsed static Streamlit interpretation reference below the existing
+  incomplete-result and warning notices, without new evaluation or state actions.
+- Tests worked arithmetic, NLPD unit rescaling, notebook preservation, links,
+  and result retention for complete and incomplete Streamlit results.
+- Fixes inherited suggestion/report export collisions with campaign sources,
+  including path aliases, manifests, and referenced archives. CLI and app
+  exports fail before destructive writes; ordinary artifact exports remain compatible.
+- Makes interpretation-test fixture paths independent of the working directory.
+- Preserves the v3.2.1 evaluator, numerical behavior, bounds, public contracts,
+  CLI output, atomic exports, provenance guards, dependencies, and campaign scope.
+
 ## v3.2.1 - Predictive Diagnostics Hardening
 
 Status: prepared hardening patch; publication requires exact-commit CI and

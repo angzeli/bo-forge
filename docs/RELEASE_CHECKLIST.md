@@ -4,9 +4,9 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.2.1 preparation hardens the complete predictive-diagnostics foundation.
-The v3.1.x provenance line remains complete; v3.2.2 interpretation and v3.2.3
-acceptance remain planned.
+The v3.2.2 preparation adds interpretation guidance to the hardened evaluator.
+The v3.1.x provenance line remains complete; v3.2.3 synthetic acceptance and
+series closeout remain planned. Guidance is not calibration certification.
 Commit only the reviewed release changes. Publication still requires passing required
 CI on that exact commit; push, tagging, and release publication each require separate
 authorization. Implementation completion does not grant publication approval.
@@ -87,7 +87,7 @@ bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
-For v3.2.1, run the output-free
+For v3.2.2, run the output-free
 `notebooks/23_predictive_diagnostics.ipynb` in an isolated working directory with
 the installed package. Its temporary-directory setup creates 20 synthetic rows
 through the existing config parser, evaluates `default` and `smooth` with three
@@ -108,6 +108,12 @@ incomplete summary messages, and legacy/managed file changes during evaluation.
 The existing Linux full-suite and macOS filesystem jobs exercise the new export
 publication path as well as unchanged provenance-fork publication. Inspect summary,
 predictions, fold outcomes, and JSON from clean installed-artifact probes too.
+Also run `tests/test_predictive_interpretation.py` and `tests/test_notebooks.py`:
+check hand-worked arithmetic, NLPD unit rescaling, all unchanged notebook
+computation/identity fields, and documentation links. Verify the collapsed
+Streamlit interpretation reference for complete and incomplete results; rendering
+it must not refit, export, mutate campaigns, or discard cached results. These
+checks verify interpretation examples and software behavior, not calibration.
 
 ```bash
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider
@@ -326,4 +332,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.2.1 does none of those actions.
+separate explicit authorization. Preparing v3.2.2 does none of those actions.
