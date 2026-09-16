@@ -4,11 +4,11 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.2.2`. It adds practical interpretation guidance,
-hand-worked notebook examples, and a static Streamlit reference without changing
-the hardened evaluator. v3.2.3 synthetic acceptance and series closeout remain
-planned. Completed statuses below describe implementation, not publication
-approval or completion of future acceptance work. Release publication still requires
+Current prepared baseline: `v3.2.3`. Known-distribution diagnostic acceptance,
+cross-surface complete/incomplete workflows, and bounded fitted-model probes close
+v3.2.x without changing the evaluator. Diagnostic correctness is not universal
+model calibration. Completed statuses describe implementation, not publication
+approval or closed-loop BO validation. Release publication still requires
 exact-commit CI and separate authorization.
 
 ## Roadmap So Far
@@ -27,7 +27,7 @@ flowchart LR
     v320["v3.2.0<br/>Predictive diagnostics foundation"]
     v321["v3.2.1<br/>Diagnostics hardening"]
     v322["v3.2.2<br/>Interpretation + calibration guidance"]
-    v323["v3.2.3<br/>Synthetic acceptance"]
+    v323["v3.2.3<br/>Synthetic acceptance + closeout"]
     v330["v3.3.0<br/>Benchmark harness"]
     v331["v3.3.1<br/>Mixed + noisy routes"]
     v332["v3.3.2<br/>MO + MF routes"]
@@ -61,13 +61,12 @@ flowchart LR
     v34 -.-> v343
     v34 -.-> v344
 
-    class v30,v31 majorDone
-    class v32 majorActive
+    class v30,v31,v32 majorDone
     class v33,v34 majorFuture
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
-    class v320,v321,v322 patchDone
-    class v323,v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v320,v321,v322,v323 patchDone
+    class v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -92,8 +91,8 @@ flowchart LR
 | `v3.2.0` | prepared | Complete foundation: in-sample labels, explicit metadata, bounded predictive evaluation |
 | `v3.2.1` | prepared | Atomic exports, failure visibility, and evaluation snapshots |
 | `v3.2.2` | prepared | Practical interpretation and calibration guidance, not calibration certification |
-| `v3.2.3` | planned | Synthetic acceptance |
-| `v3.2.x` | in progress | Foundation, hardening, and interpretation prepared; acceptance remains |
+| `v3.2.3` | implementation complete | Known-distribution diagnostic acceptance and series closeout |
+| `v3.2.x` | completed | Predictive diagnostics, hardening, interpretation, and acceptance; not universal calibration |
 | `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
@@ -256,7 +255,7 @@ Status: implementation complete; publication requires separate authorization and
 
 ## v3.2.x - Predictive Diagnostics Correctness
 
-Status: in progress; foundation, hardening, and interpretation prepared, full-line acceptance remains planned
+Status: completed; diagnostic acceptance is not universal model calibration or publication approval
 
 ### v3.2.0 - Predictive Diagnostics Foundation
 
@@ -303,18 +302,23 @@ Status: prepared; publication requires separate authorization and exact-commit C
 - Extend notebook 23 through Markdown only and add a static Streamlit reference;
   preserve computation cells, evaluator behavior, exports, and state ownership.
 - Verify hand-worked arithmetic and display-only behavior. This guidance does
-  not establish scientific calibration; synthetic acceptance stays in v3.2.3.
+  not establish scientific calibration; synthetic acceptance is covered by v3.2.3.
 - Keep evaluation opt-in and avoid composite scores or automatic profile selection.
 
 ### v3.2.3 - Synthetic Acceptance And Interpretation Contract
 
-Status: planned
+Status: implementation complete; publication requires separate authorization and exact-commit CI
 
 Audit mapping: diagnostics portion of `SCI-001`.
 
-- Add calibrated and intentionally miscalibrated synthetic fixtures.
-- Document valid and invalid metric interpretations.
-- Require evidence before any automatic model-selection recommendation.
+- Test matched, too-narrow, too-wide, and biased known Gaussian predictions
+  through the public evaluator with independent midpoint-quantile arithmetic.
+- Verify complete/incomplete results across existing adapters, plots, and exports.
+- Separate deterministic diagnostic correctness from bounded real-GP integration;
+  run both in CI and evaluate a small campaign from installed wheel/sdist artifacts.
+- Preserve notebook 23 and all evaluator/campaign contracts. No automatic ranking,
+  calibration certification, or closed-loop performance claim is introduced.
+- Keep empirical calibration and the v3.3.x workflow benchmark distinct from this closeout.
 
 ## v3.3.x - Closed-Loop Scientific And Workflow Validation
 

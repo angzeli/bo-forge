@@ -1,5 +1,32 @@
 # 📝 BO Forge Changelog
 
+## v3.2.3 - Synthetic Acceptance And Series Closeout
+
+Status: v3.2.x implementation and diagnostic acceptance complete; publication
+still requires exact-commit CI and separate authorization. Diagnostic correctness
+does not establish universal learned-model calibration or future BO performance.
+
+- Adds test-only matched, too-narrow, too-wide, and biased Gaussian predictions
+  over 200 unique designs using deterministic midpoint normal quantiles.
+  Independent standard-library arithmetic verifies original-unit predictions,
+  pooled metrics, uncertainty, directions, profile ordering, and held-out membership.
+- Adds complete/incomplete acceptance across session, service, CLI, Streamlit,
+  stored-result plots, and exports, preserving missing metrics and failure evidence.
+- Extends external wheel/sdist probes to evaluate five observations with one
+  profile and two folds before export; existing no-overwrite and source guards remain.
+- Adds fast acceptance coverage to macOS CI and explicitly includes the bounded
+  real predictive-GP test alongside qMFKG in numerical CI. No fitted model is
+  required to produce a prescribed score or exactly 95% coverage.
+- Preserves notebook 23's computational cells, IDs, data, six-fit workload, and
+  output-free state; documents analytical versus fitted-model evidence limits.
+- Fixes plot exports following aliases into campaign files and predictive
+  directory exports occupying reserved legacy manifest paths. Campaign-aware
+  exports protect source files and archives; rejected exports retain results for retry.
+- Closes v3.2.x without changing BO algorithms, predictive numerics, public
+  interfaces, result columns, campaign formats, dependencies, or supported scope.
+  Empirical calibration and closed-loop workflow benchmarking remain separate;
+  the broader benchmark is assigned to v3.3.x.
+
 ## v3.2.2 - Predictive Interpretation And Calibration Guidance
 
 Status: prepared interpretation guidance; publication requires exact-commit CI

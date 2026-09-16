@@ -1,9 +1,9 @@
 # Predictive Evaluation
 
 This is the scientific and workflow reference for predictive diagnostics through
-v3.2.2. It describes the implementation and how to inspect its results; it
-does not certify that release gates, calibration studies, or v3.2.x acceptance
-have passed. See the [release checklist](RELEASE_CHECKLIST.md) and
+v3.2.3. It describes the implementation and how to inspect its results; it
+does not certify universal model calibration or publication approval.
+See the [release checklist](RELEASE_CHECKLIST.md) and
 [roadmap](../ROADMAP_V3_X.md) for those separate gates.
 
 ## In-Sample Versus Held-Out
@@ -265,6 +265,15 @@ the cause, without fitting again. A competing or existing destination raises
 temporary-directory cleanup may leave an unpublished `.preparing-` sibling,
 not a partial final bundle. Cleanup errors never mask the original failure.
 
+Session-produced results retain campaign-source protection when exported or
+plotted. CLI and Streamlit exports reject config, log, manifest, and referenced
+archive aliases, including symlinks and hard links. The manifest name and its
+descendants are reserved even for legacy campaigns; choose a separate output
+directory. Plot destinations are checked before rendering and again before
+writing. Ordinary figure files may still be overwritten; evaluation bundles may
+not. Standalone evaluations supplied only config/data have no source-file paths,
+so callers must keep their output paths separate from campaign files.
+
 Each evaluation uses an isolated config/data snapshot, so predictions, fold
 membership, and recorded identities describe the same inputs. Standalone calls
 need no campaign files. File-loaded sessions (and the CLI/service wrappers)
@@ -344,6 +353,38 @@ only export against the same destination is expected to fail. Keep committed
 notebook outputs and execution counts cleared. These are instructions, not a
 claim that this walkthrough or the release suite has passed in every environment.
 
+## Acceptance Evidence
+
+The v3.2.3 acceptance suite separates two evidence levels:
+
+- **Known-distribution diagnostic tests:** 200 unique designs use deterministic
+  midpoint normal quantiles, known means, and observation variance 4. A controlled
+  fitter supplies matched, too-narrow, too-wide, and biased Gaussian predictions
+  through the public evaluator. Scenario names do not identify BO Forge profiles.
+  Independent standard-library calculations check every prediction quantity and
+  pooled metric, directions, profile order, folds, and source metadata. The matched
+  case covers exactly 190/200 outcomes at the nominal 95% level by construction;
+  this is a metric/reporting correctness check, not learned-model calibration.
+- **Bounded fitted-model integration:** a real GP evaluates five observations,
+  one profile, and two folds. It must return complete outputs, finite means and
+  metrics, and positive finite observation variance. No exact score or 95%
+  coverage is required of the fitted model. Numerical CI runs this test alongside
+  qMFKG; installed wheel/sdist probes also evaluate and export a five-row campaign.
+
+Complete and incomplete workflow tests retain the same evidence through session,
+service, CLI, Streamlit, plots, and CSV/JSON exports. Incomplete metrics stay
+missing; stored-result plotting and interpretation help never refit or select a
+profile. Existing snapshot, provenance, metadata-isolation, atomic-export, and
+source-file-protection tests remain part of acceptance, including plot aliases,
+reserved manifest directories, and retained-result export retries. Linux full-suite and
+macOS selections include the fast synthetic and workflow tests.
+
+The existing notebook remains a six-fit workflow demonstration, not a calibration
+study. Passing these checks establishes the tested diagnostic and adapter
+contracts, not empirical calibration of arbitrary learned campaign models,
+prospective performance, or closed-loop BO performance. The broader workflow
+benchmark remains in v3.3.x; exact-commit CI is a separate publication gate.
+
 ## Limits Of Interpretation
 
 Random K-fold evaluation is retrospective, not a replay of sequential BO. In an
@@ -362,6 +403,6 @@ nothing about interval calibration.
 
 Use these diagnostics to expose obvious errors and motivate further checks,
 not to automate model selection. Prospective or suitably chronological validation,
-broader synthetic calibration studies, and full v3.2.x acceptance remain separate
+empirical calibration studies, and closed-loop BO benchmarking remain separate
 work. No automatic campaign execution, profile change, or selection recommendation
 is part of this evaluator.

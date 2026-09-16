@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.2.2.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.2.3.
 
 Top-level exports are resolved lazily. Names, signatures, `__all__`,
 star imports, and `dir(bo_forge)` remain compatible; importing the package alone
@@ -232,6 +232,10 @@ result.plot_residuals(save_path="reports/evaluation/residuals.png")
 overwrite. It creates exactly `summary.csv`, `predictions.csv`, `fold_outcomes.csv`,
 and `metadata.json`, not plots or campaign state. Do not pre-create `output_dir`.
 The example's plots are separate explicit writes after export.
+Results obtained through a session retain source-path guards for table and plot
+exports, including campaign-file aliases and reserved legacy manifest paths.
+Standalone in-memory evaluations cannot identify source files; callers must
+choose separate artifact paths. Exported result metadata remains unchanged.
 The four files are prepared in a temporary sibling directory and published
 atomically without overwrite on macOS/Linux. Failed exports leave no partial
 final bundle and can retry from the same result; an existing or concurrently

@@ -133,9 +133,19 @@ def test_predictive_publication_and_snapshot_checks_run_on_linux_and_macos() -> 
     steps = workflow["jobs"]["macos-filesystem"]["steps"]
     command = next(step["run"] for step in steps if step.get("name") ==
                    "Path, lock, rollback, and mutation tests")
-    for name in ("test_predictive_exports.py", "test_predictive_hardening.py"):
+    for name in ("test_predictive_exports.py", "test_predictive_hardening.py",
+                 "test_predictive_acceptance.py", "test_predictive_workflow_acceptance.py",
+                 "test_diagnostic_export_safety.py"):
         assert f"tests/{name}" in command
         assert f"tests/{name}" in _read("docs/RELEASE_CHECKLIST.md")
+
+
+def test_bounded_predictive_fit_is_explicit_in_numerical_ci() -> None:
+    workflow = _workflow(".github/workflows/ci.yml")
+    commands = "\n".join(step.get("run", "") for step in workflow["jobs"]["numerical"]["steps"])
+    assert "tests/test_predictive_evaluation.py::test_bounded_real_gp_fit" in commands
+    assert "tests/test_suggestions_multifidelity_and_cost.py" in commands
+    assert "-k real_optimizer_returns" in commands
 
 
 def test_beginner_setup_contract_and_links() -> None:
@@ -277,15 +287,16 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert f"Current prepared baseline: `v{PROJECT_VERSION}`" in roadmap
     assert "Status: prepared; publication requires separate authorization" in roadmap
     assert f"### v{PROJECT_VERSION} - " in roadmap
-    assert "class v30,v31 majorDone" in roadmap
+    assert "class v30,v31,v32 majorDone" in roadmap
     assert "class v310,v311,v312,v313 patchDone" in roadmap
     assert "class v313 patchActive" not in roadmap
-    assert "class v32 majorActive" in roadmap
-    assert "class v320,v321,v322 patchDone" in roadmap
+    assert "class v32 majorActive" not in roadmap
+    assert "class v320,v321,v322,v323 patchDone" in roadmap
     assert "| `v3.2.0` | prepared | Complete foundation:" in roadmap
     assert "| `v3.2.1` | prepared | Atomic exports," in roadmap
     assert "| `v3.2.2` | prepared | Practical interpretation" in roadmap
-    assert "| `v3.2.3` | planned |" in roadmap
+    assert "| `v3.2.3` | implementation complete |" in roadmap
+    assert "| `v3.2.x` | completed |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
     assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap
@@ -299,6 +310,7 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "Implementation completion does not grant publication approval." in checklist
     assert "## v3.0.x - Architecture And Release Assurance\n\nStatus: completed" in roadmap
     assert "## v3.1.x - Durable Campaign Provenance\n\nStatus: completed" in roadmap
+    assert "## v3.2.x - Predictive Diagnostics Correctness\n\nStatus: completed" in roadmap
     assert "No tag, GitHub Release, package publication, or push occurs" in roadmap
 
 
@@ -368,3 +380,15 @@ def test_predictive_interpretation_links_and_release_scope() -> None:
                 headings = re.findall(r"^## (.+)$", path.read_text(encoding="utf-8"), re.M)
                 assert anchor in {re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
                                   for h in headings}, target
+
+
+def test_acceptance_docs_separate_known_distributions_from_learned_calibration() -> None:
+    guide = _read("docs/PREDICTIVE_EVALUATION.md")
+    for fragment in ("## Acceptance Evidence", "190/200", "by construction",
+                     "Known-distribution diagnostic tests", "Bounded fitted-model integration",
+                     "No exact score or 95%", "v3.3.x", "exact-commit CI"):
+        assert fragment in guide
+    assert "#acceptance-evidence" in _read("README.md")
+    checklist = _read("docs/RELEASE_CHECKLIST.md")
+    assert "tests/test_predictive_evaluation.py::test_bounded_real_gp_fit" in checklist
+    assert "five rows with one profile and two" in checklist

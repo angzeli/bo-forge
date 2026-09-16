@@ -7,6 +7,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from bo_forge._campaign.exports import _guard_campaign_plot
 from bo_forge.errors import BOForgeError
 from bo_forge.plot_registry import _PLOT_ROUTES
 from bo_forge_app.streamlit_helpers import (
@@ -89,6 +90,7 @@ def _render_reports(
         str(selected_plot["key"]),
         selected_plot["plotter"],
         selected_plot["path"],
+        campaign=campaign,
     )
 
 
@@ -225,6 +227,8 @@ def _render_plot_controls(
     key_suffix: str,
     plotter: Any,
     default_path: Path,
+    *,
+    campaign: Any = None,
 ) -> None:
     st.markdown(
         f"""
@@ -258,7 +262,8 @@ def _render_plot_controls(
             st.pyplot(fig)
     if export_clicked:
         try:
-            plotter(save_path=export_path)
+            sources = None if campaign is None else (campaign.config_path, campaign.log_path)
+            _guard_campaign_plot(plotter, sources, save_path=export_path)
         except (BOForgeError, OSError, ValueError) as exc:
             st.error(str(exc))
         else:

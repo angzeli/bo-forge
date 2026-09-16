@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from bo_forge._campaign.exports import _validate_export_destination
+from bo_forge._campaign.exports import _session_plot, _validate_export_destination
 from bo_forge._campaign.reports import (
     _base_report_tables,
     _bo_suggestion_reason,
@@ -694,93 +694,79 @@ class CampaignSession:
     def plot_progress(self, **kwargs: Any) -> Any:
         """Plot campaign progress and return figure/axes objects."""
         from bo_forge.diagnostics import plot_progress as _plot_progress
-        self._assert_provenance_resumable()
-        return _plot_progress(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_progress, kwargs)
 
     def plot_diagnostics(self, **kwargs: Any) -> Any:
         """Plot campaign diagnostics and return figure/axes objects."""
         from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
-        self._assert_provenance_resumable()
-        return _plot_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_diagnostics, kwargs)
 
     def plot_cost_progress(self, **kwargs: Any) -> Any:
         """Plot best observed objective against cumulative effective cost."""
         from bo_forge.diagnostics import plot_cost_progress as _plot_cost_progress
-        self._assert_provenance_resumable()
-        return _plot_cost_progress(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_cost_progress, kwargs)
 
     def plot_replicates(self, **kwargs: Any) -> Any:
         """Plot replicate-group objective summaries and return figure/axes objects."""
         from bo_forge.diagnostics import plot_replicates as _plot_replicates
-        self._assert_provenance_resumable()
-        return _plot_replicates(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_replicates, kwargs)
 
     def plot_pareto(self, **kwargs: Any) -> Any:
         """Plot observed Pareto diagnostics for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_pareto as _plot_pareto
-        self._assert_provenance_resumable()
-        return _plot_pareto(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_pareto, kwargs)
 
     def plot_pareto_parallel(self, **kwargs: Any) -> Any:
         """Plot Pareto-front rows with normalized parallel coordinates."""
         from bo_forge.diagnostics import plot_pareto_parallel as _plot_pareto_parallel
-        self._assert_provenance_resumable()
-        return _plot_pareto_parallel(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_pareto_parallel, kwargs)
 
     def plot_hypervolume(self, **kwargs: Any) -> Any:
         """Plot hypervolume progress for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_hypervolume as _plot_hypervolume
-        self._assert_provenance_resumable()
-        return _plot_hypervolume(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_hypervolume, kwargs)
 
     def plot_stage_diagnostics(self, **kwargs: Any) -> Any:
         """Plot structured-campaign stage diagnostics."""
         from bo_forge.diagnostics import plot_stage_diagnostics as _plot_stage_diagnostics
-        self._assert_provenance_resumable()
-        return _plot_stage_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_stage_diagnostics, kwargs)
 
     def plot_fidelity_diagnostics(self, **kwargs: Any) -> Any:
         """Plot observed multi-fidelity diagnostics."""
         from bo_forge.diagnostics import (
             plot_fidelity_diagnostics as _plot_fidelity_diagnostics,
         )
-        self._assert_provenance_resumable()
-        return _plot_fidelity_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_fidelity_diagnostics, kwargs)
 
     def plot_fidelity_progress(self, **kwargs: Any) -> Any:
         """Plot fidelity use and target-fidelity objective progress."""
         from bo_forge.diagnostics import plot_fidelity_progress as _plot_fidelity_progress
-        self._assert_provenance_resumable()
-        return _plot_fidelity_progress(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_fidelity_progress, kwargs)
 
     def plot_context_diagnostics(self, **kwargs: Any) -> Any:
         """Plot observed contextual diagnostics."""
         from bo_forge.diagnostics import (
             plot_context_diagnostics as _plot_context_diagnostics,
         )
-        self._assert_provenance_resumable()
-        return _plot_context_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_context_diagnostics, kwargs)
 
     def plot_model_diagnostics(self, **kwargs: Any) -> Any:
         """Plot model posterior-vs-observed diagnostics."""
         from bo_forge.diagnostics import (
             plot_model_diagnostics as _plot_model_diagnostics,
         )
-        self._assert_provenance_resumable()
-        return _plot_model_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_model_diagnostics, kwargs)
 
     def plot_model_comparison(self, **kwargs: Any) -> Any:
         """Plot model-profile comparison diagnostics."""
         from bo_forge.diagnostics import (
             plot_model_comparison as _plot_model_comparison,
         )
-        self._assert_provenance_resumable()
-        return _plot_model_comparison(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_model_comparison, kwargs)
 
     def plot_qlog_nei_diagnostics(self, **kwargs: Any) -> Any:
         """Plot qLogNEI pending-state diagnostics."""
         from bo_forge.diagnostics import (
             plot_qlog_nei_diagnostics as _plot_qlog_nei_diagnostics,
         )
-        self._assert_provenance_resumable()
-        return _plot_qlog_nei_diagnostics(self.config, self.df, **kwargs)
+        return _session_plot(self, _plot_qlog_nei_diagnostics, kwargs)

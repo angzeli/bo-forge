@@ -7,6 +7,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from bo_forge._campaign.exports import _validate_export_destination
 from bo_forge.errors import ConfigError
 
 
@@ -34,6 +35,8 @@ def _cmd_model_evaluate(args: argparse.Namespace) -> int:
 
     campaign = _load_session(args)
     try:
+        if args.output_dir is not None:
+            _validate_export_destination(args.output_dir, campaign.config_path, campaign.log_path)
         existing_output = args.output_dir is not None and (
             args.output_dir.exists() or args.output_dir.is_symlink()
         )

@@ -4,9 +4,10 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.2.2 preparation adds interpretation guidance to the hardened evaluator.
-The v3.1.x provenance line remains complete; v3.2.3 synthetic acceptance and
-series closeout remain planned. Guidance is not calibration certification.
+The v3.2.3 preparation closes predictive diagnostics with known-distribution
+acceptance, adapter verification, and package probes. Deterministic correctness
+and bounded fitted-model integration are distinct evidence levels.
+Guidance is not calibration certification.
 Commit only the reviewed release changes. Publication still requires passing required
 CI on that exact commit; push, tagging, and release publication each require separate
 authorization. Implementation completion does not grant publication approval.
@@ -87,7 +88,7 @@ bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
-For v3.2.2, run the output-free
+For v3.2.3, run the output-free
 `notebooks/23_predictive_diagnostics.ipynb` in an isolated working directory with
 the installed package. Its temporary-directory setup creates 20 synthetic rows
 through the existing config parser, evaluates `default` and `smooth` with three
@@ -114,6 +115,21 @@ computation/identity fields, and documentation links. Verify the collapsed
 Streamlit interpretation reference for complete and incomplete results; rendering
 it must not refit, export, mutate campaigns, or discard cached results. These
 checks verify interpretation examples and software behavior, not calibration.
+
+Run `tests/test_predictive_acceptance.py` and
+`tests/test_predictive_workflow_acceptance.py` for v3.2.3 synthetic acceptance:
+200 midpoint normal quantiles and independent arithmetic, plus complete and
+incomplete session/service/CLI/Streamlit/export paths. New AppTests must restore
+global state for later process tests. Inspect the existing notebook figures in
+an isolated copy without changing its cells, IDs, six-fit workload, or outputs.
+Run `tests/test_predictive_evaluation.py::test_bounded_real_gp_fit` explicitly in
+numerical CI alongside qMFKG. Require finite predictions, positive observation
+variance, and complete outputs, not a prescribed score or learned-model coverage.
+External wheel and sdist probes must evaluate five rows with one profile and two
+folds, then verify tables, metadata, no-overwrite export, and unchanged sources.
+Run `tests/test_diagnostic_export_safety.py` for campaign-file plot aliases,
+reserved legacy manifest directories, final-write guards, and Streamlit retry
+without refitting. These filesystem checks also run in the macOS selection.
 
 ```bash
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider
@@ -162,7 +178,7 @@ Representative read-only CLI checks:
 | `Core tests (Python 3.11)` | Complete Linux pytest suite under Python 3.11 |
 | `Core tests (Python 3.12)` | Complete Linux pytest suite under Python 3.12 |
 | `macOS filesystem and CLI` | Path, symlink, locking, fingerprint, rollback, mode, process, and CLI checks |
-| `Bounded real numerical paths` | CPU-only representative real qMFKG execution with a bounded job timeout |
+| `Bounded real numerical paths` | CPU-only real qMFKG and five-row/two-fold predictive-GP integration with a bounded job timeout |
 | `Build and external artifact probes` | PEP 517 build, Twine, package boundaries, external wheel/sdist installs, `pip check`, packaged entrypoints |
 
 Workflow files use read-only repository permissions and bounded timeouts. They
@@ -332,4 +348,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.2.2 does none of those actions.
+separate explicit authorization. Preparing v3.2.3 does none of those actions.

@@ -286,6 +286,9 @@ Streamlit result can retry export without refitting; rerunning the CLI starts a
 new evaluation. File-loaded config/log/manifest changes during evaluation raise
 `LogConflictError`; reload campaign state before retrying.
 Plots require the explicit result plotting methods described in the Python API.
+Campaign-aware plot and evaluation exports reject campaign-source aliases and
+reserved manifest paths, including directories nested under a missing legacy
+sidecar. Choose a separate artifact path; these errors leave the campaign intact.
 Summary metrics are `rmse`, `mae`, `mean_nlpd`, `interval_coverage`, and
 `mean_interval_width`, with `fit_status=complete` or `incomplete`.
 Predictive variance includes observation noise in original objective units

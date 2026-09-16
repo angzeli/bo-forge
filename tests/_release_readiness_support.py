@@ -241,6 +241,9 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "notebooks/23_predictive_diagnostics.ipynb",
         "tests/test_predictive_exports.py",
         "tests/test_predictive_hardening.py",
+        "tests/test_predictive_acceptance.py",
+        "tests/test_predictive_workflow_acceptance.py",
+        "tests/test_diagnostic_export_safety.py",
         "tests/conftest.py",
         "tests/test_v253_operational_freeze.py",
     }
@@ -412,22 +415,35 @@ assert child.log_path.read_bytes() == log_path.read_bytes()
 assert dict(child.provenance_summary().values)["history"] == "inherited_parent_data"
 assert len(child.df) == 1
 print("Installed provenance lifecycle acceptance passed")
-from bo_forge import PredictiveEvaluationResult
 import json
+import math
 
-before = (config_path.read_bytes(), log_path.read_bytes())
-diagnostics = PredictiveEvaluationResult(
-    pd.DataFrame([{"model_profile": "default", "fit_status": "incomplete",
-                   "rmse": None, "fit_message": "Fold 1: diagnostic probe"}]),
-    pd.DataFrame([{"row_id": "artifact_1", "fit_status": "failed"}]),
-    pd.DataFrame([{"fold": 1, "fit_message": "diagnostic probe"}]),
-    {"evaluation_scope": "out_of_fold"},
-)
+rows = []
+for index, x in enumerate((0.4, 0.55, 0.7, 0.85), start=2):
+    row = dict.fromkeys(child.df.columns, "")
+    row.update(row_id=f"artifact_{index}", status="suggested", source="sobol", iteration=1, x=x)
+    rows.append(row)
+child.append_suggestions(pd.DataFrame(rows, columns=child.df.columns))
+for row in rows:
+    child.mark_observed(row["row_id"], 2 * row["x"] + 1)
+sources = (config_path, log_path, Path("campaign.csv.manifest.json"),
+           child.config_path, child.log_path, Path("child/campaign.csv.manifest.json"))
+before = {path: path.read_bytes() for path in sources}
+diagnostics = child.model_predictive_evaluation(profiles=["default"], folds=2, seed=0)
+assert diagnostics.summary.fit_status.tolist() == ["complete"]
+assert diagnostics.fold_outcomes.fit_status.tolist() == ["complete", "complete"]
+assert len(diagnostics.predictions) == 5
+assert diagnostics.metadata["requested_fit_count"] == 2
+assert diagnostics.predictions.predicted_mean.map(math.isfinite).all()
+assert diagnostics.predictions.predicted_variance.map(math.isfinite).all()
+assert diagnostics.predictions.predicted_variance.gt(0).all()
 exported = diagnostics.export(Path("diagnostics/evaluation"))
 assert {p.name for p in exported.iterdir()} == {
     "summary.csv", "predictions.csv", "fold_outcomes.csv", "metadata.json",
 }
-assert pd.read_csv(exported / "summary.csv").rmse.isna().all()
+assert pd.read_csv(exported / "summary.csv").rmse.map(math.isfinite).all()
+assert len(pd.read_csv(exported / "predictions.csv")) == 5
+assert pd.read_csv(exported / "fold_outcomes.csv").fit_status.eq("complete").all()
 assert json.loads((exported / "metadata.json").read_text()) == diagnostics.metadata
 try:
     diagnostics.export(exported)
@@ -435,8 +451,8 @@ except FileExistsError:
     pass
 else:
     raise AssertionError("Installed predictive export overwrote its destination")
-assert before == (config_path.read_bytes(), log_path.read_bytes())
-print("Installed predictive export acceptance passed")
+assert before == {path: path.read_bytes() for path in sources}
+print("Installed predictive evaluation and export acceptance passed (5 rows, 2 fits)")
 '''
     subprocess.run(
         [str(python), "-c", script],

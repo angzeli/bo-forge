@@ -8,7 +8,7 @@ import math
 import platform
 import shutil
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from importlib.metadata import version
 from pathlib import Path
 from tempfile import mkdtemp
@@ -16,6 +16,7 @@ from tempfile import mkdtemp
 import numpy as np
 import pandas as pd
 
+from bo_forge._campaign.exports import _guard_campaign_plot, _validate_export_destination
 from bo_forge._filesystem import rename_directory_exclusive
 from bo_forge._fit_metadata import config_identity
 from bo_forge.config import CampaignConfig, ModelConfig
@@ -50,6 +51,8 @@ class PredictiveEvaluationResult:
     predictions: pd.DataFrame
     fold_outcomes: pd.DataFrame
     metadata: dict
+    _campaign_sources: tuple[Path, Path] | None = field(default=None, init=False, repr=False,
+                                                     compare=False)
 
     def export(self, output_dir: str | Path) -> Path:
         """Publish a complete table bundle atomically; refuse overwrites."""
@@ -58,6 +61,8 @@ class PredictiveEvaluationResult:
             raise FileExistsError(
                 f"Predictive evaluation destination already exists: {destination}"
             )
+        if self._campaign_sources is not None:
+            _validate_export_destination(destination, *self._campaign_sources)
         destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = Path(mkdtemp(prefix=".evaluation.preparing-", dir=destination.parent))
         try:
@@ -67,6 +72,8 @@ class PredictiveEvaluationResult:
                 json.dumps(self.metadata, sort_keys=True, indent=2, allow_nan=False) + "\n",
                 encoding="utf-8",
             )
+            if self._campaign_sources is not None:
+                _validate_export_destination(destination, *self._campaign_sources)
             rename_directory_exclusive(temporary, destination)
         except BaseException:
             # Rollback owns only the unpublished temporary directory, never the destination.
@@ -81,13 +88,17 @@ class PredictiveEvaluationResult:
         """Plot observed versus held-out predicted outcomes without refitting."""
         from bo_forge._diagnostics.predictive import plot_predictions
 
-        return plot_predictions(self, save_path=save_path)
+        return _guard_campaign_plot(
+            plot_predictions, self._campaign_sources, self, save_path=save_path,
+        )
 
     def plot_residuals(self, *, save_path: str | Path | None = None):
         """Plot observation-standardized held-out residuals without refitting."""
         from bo_forge._diagnostics.predictive import plot_residuals
 
-        return plot_residuals(self, save_path=save_path)
+        return _guard_campaign_plot(
+            plot_residuals, self._campaign_sources, self, save_path=save_path,
+        )
 
 
 def model_predictive_evaluation(
@@ -158,6 +169,9 @@ def _session_predictive_evaluation(session, profiles, folds, seed):
             "Campaign changed during predictive evaluation. Reload and run again."
         )
     session._assert_provenance_resumable()
+    object.__setattr__(result, "_campaign_sources", tuple(
+        Path(path).expanduser().resolve() for path in (session.config_path, session.log_path)
+    ))
     return result
 
 

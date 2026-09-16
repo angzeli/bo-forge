@@ -305,8 +305,15 @@ def test_bounded_real_gp_fit():
     config, frame = evaluation_data(5)
     result = model_predictive_evaluation(config, frame, folds=2)
     assert result.summary.fit_status.tolist() == ["complete"]
+    assert result.fold_outcomes.fit_status.tolist() == ["complete", "complete"]
+    assert result.summary.completed_folds.tolist() == [2]
+    assert sorted(result.predictions.row_id) == sorted(frame.row_id)
     assert np.isfinite(result.predictions.predicted_mean).all()
+    assert np.isfinite(result.predictions.predicted_variance).all()
     assert (result.predictions.predicted_variance > 0).all()
+    assert np.isfinite(result.summary[[
+        "rmse", "mae", "mean_nlpd", "interval_coverage", "mean_interval_width",
+    ]].to_numpy(dtype=float)).all()
 
 
 def test_nonfinite_prediction_and_shape_are_fold_failures(monkeypatch):

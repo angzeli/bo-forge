@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from bo_forge._campaign.exports import _validate_export_destination
 from bo_forge._campaign.provenance import config_semantic_sha256, manifest_fingerprint
 from bo_forge.application import CampaignAppService, dataframe_fingerprint
 from bo_forge.errors import BOForgeError, LogConflictError
@@ -110,12 +111,13 @@ def render_predictive_evaluation(st: Any, campaign: Any) -> None:
             cached = {"identity": identity, "result": result}
             st.session_state[EVALUATION_CACHE_KEY] = cached
     if cached is not None:
-        _render_evaluation_result(st, cached["result"], Path(campaign.log_path))
+        _render_evaluation_result(st, cached["result"], campaign)
 
 
-def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
+def _render_evaluation_result(st: Any, result: Any, campaign: Any) -> None:
     from bo_forge_app.views.analyze import _render_plot_controls
 
+    log_path = Path(campaign.log_path)
     incomplete = result.summary.loc[result.summary.fit_status.ne("complete")]
     if not incomplete.empty:
         st.warning(
@@ -139,6 +141,7 @@ def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
         st, f"Evaluation {suffix}", f"evaluation_{suffix}",
         getattr(result, f"plot_{suffix}"),
         default_export_path(log_path, f"evaluation_{suffix}", "png"),
+        campaign=campaign,
     )
     with st.form("evaluation_export_form"):
         output_dir = st.text_input(
@@ -149,6 +152,7 @@ def _render_evaluation_result(st: Any, result: Any, log_path: Path) -> None:
         export = st.form_submit_button("Export predictive evaluation")
     if export:
         try:
+            _validate_export_destination(output_dir, campaign.config_path, campaign.log_path)
             result.export(Path(output_dir))
         except (BOForgeError, OSError, ValueError, TypeError) as exc:
             st.error(

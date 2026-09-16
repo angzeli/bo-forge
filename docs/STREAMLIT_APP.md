@@ -1,6 +1,10 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.2.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.2.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+
+Plot and predictive-evaluation exports reject campaign-source aliases and
+reserved manifest directories. A rejected export leaves campaign files and the
+cached evaluation intact; choose a separate path and retry without refitting.
 
 For first-time download, installation, and launch instructions, read
 [Start Here](../START_HERE.md). This page describes operating the workbench.

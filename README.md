@@ -1,16 +1,17 @@
-# 🧪 BO Forge v3.2.2
+# 🧪 BO Forge v3.2.3
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.2.2 adds practical predictive-interpretation guidance, hand-worked notebook
-examples, and a static Streamlit reference. The hardened v3.2.1 evaluator,
-atomic exports, and isolated snapshots remain unchanged. See the
-[reading guide](docs/PREDICTIVE_EVALUATION.md#read-a-result) for fair comparisons
-and uncertainty caveats, not automatic model selection. This is release
-preparation, not publication or completion of the full v3.2.x acceptance line.
+v3.2.3 closes the predictive-diagnostics line with deterministic
+known-distribution acceptance, complete/incomplete workflow checks, and bounded
+real-GP package probes. The evaluator, atomic exports, and scientific scope are
+unchanged. See the [acceptance evidence](docs/PREDICTIVE_EVALUATION.md#acceptance-evidence)
+and [reading guide](docs/PREDICTIVE_EVALUATION.md#read-a-result): diagnostic
+correctness is not universal model calibration or future BO performance.
+Implementation completion is not publication approval; exact-commit CI remains required.
 Explicit legacy adoption, schema-v2 migration,
 formatting-only config acceptance, and captured parent/child lineage retain their
 preview-and-confirm contracts. Existing campaigns remain legacy-compatible;

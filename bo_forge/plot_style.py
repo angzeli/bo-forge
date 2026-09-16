@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from cycler import cycler
 from matplotlib.colors import LinearSegmentedColormap
 
+from bo_forge._campaign.exports import _validate_plot_export_path
+
 FIGSIZE = (8, 6)
 AXIS_LABEL_SIZE = 22
 TICK_LABEL_SIZE = 14
@@ -300,6 +302,8 @@ def _save_figure(
     if save_path is None and filename is None:
         return None
     path = Path(save_path) if save_path is not None else Path(fig_folder) / Path(filename)
+    _validate_plot_export_path(path, fig.canvas.get_default_filetype())
     os.makedirs(path.parent, exist_ok=True)
+    _validate_plot_export_path(path, fig.canvas.get_default_filetype())
     fig.savefig(path, dpi=dpi, bbox_inches="tight", facecolor="white", transparent=False)
     return path

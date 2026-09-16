@@ -259,8 +259,9 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "## v3.2.0 - Predictive Diagnostics Foundation" in changelog
     assert "## v3.2.1 - Predictive Diagnostics Hardening" in changelog
     assert (
-        f"## v{PROJECT_VERSION} - Predictive Interpretation And Calibration Guidance" in changelog
+        "## v3.2.2 - Predictive Interpretation And Calibration Guidance" in changelog
     )
+    assert f"## v{PROJECT_VERSION} - Synthetic Acceptance And Series Closeout" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog

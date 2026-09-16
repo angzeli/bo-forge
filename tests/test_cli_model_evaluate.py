@@ -13,7 +13,7 @@ from bo_forge.session import CampaignSession
 
 
 @pytest.fixture
-def evaluator(monkeypatch):
+def evaluator(monkeypatch, tmp_path):
     result = SimpleNamespace(
         summary=pd.DataFrame([{"model_profile": "rough", "fit_status": "complete", "rmse": 0.25}]),
         fold_outcomes=pd.DataFrame([
@@ -22,7 +22,10 @@ def evaluator(monkeypatch):
         export=Mock(),
         plot_predictions=Mock(), plot_residuals=Mock(),
     )
-    campaign = SimpleNamespace(model_predictive_evaluation=Mock(return_value=result))
+    campaign = SimpleNamespace(
+        config_path=tmp_path / "campaign.yaml", log_path=tmp_path / "campaign.csv",
+        model_predictive_evaluation=Mock(return_value=result),
+    )
     loader = Mock(return_value=campaign)
     monkeypatch.setattr(CampaignSession, "from_files", loader)
     return campaign, result, loader

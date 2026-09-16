@@ -141,6 +141,9 @@ jobs:
           tests/test_provenance_closeout.py
           tests/test_predictive_exports.py
           tests/test_predictive_hardening.py
+          tests/test_predictive_acceptance.py
+          tests/test_predictive_workflow_acceptance.py
+          tests/test_diagnostic_export_safety.py
       - name: Core and CLI smoke
         run: |
           python -m bo_forge --version
@@ -174,6 +177,10 @@ jobs:
           python -m pytest -p no:cacheprovider
           tests/test_suggestions_multifidelity_and_cost.py
           -k real_optimizer_returns
+      - name: Run bounded predictive GP
+        run: >-
+          python -m pytest -p no:cacheprovider
+          tests/test_predictive_evaluation.py::test_bounded_real_gp_fit
 
   package:
     name: Build and external artifact probes
