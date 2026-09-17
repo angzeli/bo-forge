@@ -4,9 +4,10 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.2.3 preparation closes predictive diagnostics with known-distribution
-acceptance, adapter verification, and package probes. Deterministic correctness
-and bounded fitted-model integration are distinct evidence levels.
+The v3.3.0 preparation adds a source-only continuous closed-loop benchmark
+harness. Prepared docs, tests, and CI steps do not establish measured acceptance
+or BO superiority. The v3.2.3 diagnostic acceptance remains historical evidence,
+not universal calibration certification.
 Guidance is not calibration certification.
 Commit only the reviewed release changes. Publication still requires passing required
 CI on that exact commit; push, tagging, and release publication each require separate
@@ -87,6 +88,35 @@ lifecycle-hardening/acceptance tests. Existing artifact probes also exercise
 bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
+
+For v3.3.0, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
+source archive. Numerical CI runs the full six-trial smoke sequentially, with
+600 seconds per trial and only four BO suggestion calls:
+
+```bash
+python -m benchmarks run --spec benchmarks/specs/smoke.yaml --output /tmp/bo-forge-benchmark-smoke
+python -m benchmarks report --run /tmp/bo-forge-benchmark-smoke --output /tmp/bo-forge-benchmark-report
+```
+
+Use new output directories. Inspect planned trial IDs, the spec snapshot, all
+statuses, partial traces, and the automatically generated report. Verify that
+regeneration is read-only, fitting-free, and objective-free, and that quality
+summaries are conditioned on completed trials with failure counts disclosed.
+The standard 90-trial run is a separate opt-in acceptance activity, not a CI or
+notebook default; retain all evidence and record inspected results in the guide,
+separately from exact-commit CI approval. The output-free
+`notebooks/24_closed_loop_benchmarks.ipynb` must
+use a temporary workspace and run only `smoke.yaml`, never `standard.yaml`.
+
+Check that `benchmarks/` is absent from the runtime wheel, while Python sources,
+`specs/smoke.yaml`, `specs/standard.yaml`, this guide, and the notebook are in the
+sdist. From a freshly extracted sdist, run `python -m benchmarks --help`,
+`python -m benchmarks run --help`, and `python -m benchmarks report --help`.
+These bounded archive probes require no fitting, objective evaluations, or full
+benchmark suite. Package tests additionally run the controlled-strategy benchmark
+history test from the extracted sdist: this evaluates the objective without GP
+fitting and verifies managed campaign reloads. Existing package tests retain
+their focused provenance checks.
 
 For v3.2.3, run the output-free
 `notebooks/23_predictive_diagnostics.ipynb` in an isolated working directory with
@@ -348,4 +378,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.2.3 does none of those actions.
+separate explicit authorization. Preparing v3.3.0 does none of those actions.

@@ -10,6 +10,8 @@ bo-forge/
 ├── bo_forge/                         # Reusable backend package
 ├── bo_forge_app/                     # Local Streamlit wrapper
 ├── bo_forge_api/                     # Optional FastAPI transport package
+├── benchmarks/                       # Source-only closed-loop runner and report tools
+│   └── specs/                        # Versioned smoke and standard YAML specs
 ├── configs/                          # YAML campaign definitions
 ├── examples/                         # Seed CSV logs and runnable scripts
 ├── notebooks/                        # Notebook-first campaign workflows
@@ -26,6 +28,7 @@ bo-forge/
 │   ├── CAPABILITY_MATRIX.md
 │   ├── PROVENANCE.md
 │   ├── PERFORMANCE_BENCHMARKS.md
+│   ├── BENCHMARKS.md
 │   ├── QLOGNEHVI_FEASIBILITY.md
 │   ├── 09_APP_CREATED_CAMPAIGN_TUTORIAL.md
 │   ├── CLI_ERROR_EXAMPLES.md
@@ -63,6 +66,15 @@ is fixture-free and creates/cleans up a temporary workspace instead of writing
 a campaign working log or reports into the checkout.
 
 ## 📦 Backend Package
+
+The separate `benchmarks/` package and `specs/*.yaml` ship in the source
+distribution, not the runtime wheel. Run `python -m benchmarks` from a checkout
+or extracted source archive. [BENCHMARKS.md](BENCHMARKS.md) describes the run and
+read-only report commands and their artifact layout; these are distinct from
+startup/performance measurements in `PERFORMANCE_BENCHMARKS.md`.
+The output-free [24_closed_loop_benchmarks.ipynb](../notebooks/24_closed_loop_benchmarks.ipynb)
+runs only the six-trial smoke in a temporary workspace, with no new campaign
+fixtures and no standard-run execution on Run All.
 
 `bo_forge/` contains the reusable campaign engine. The familiar public modules
 are thin compatibility facades over focused ownership packages:

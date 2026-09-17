@@ -1,6 +1,12 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v3.2.3.
+This page shows the recommended `pip install` paths for BO Forge v3.3.0.
+
+The optional [benchmark workflow](BENCHMARKS.md) is source-only: use a checkout
+or extracted sdist and run `python -m benchmarks --help` from its root with BO
+Forge's dependencies installed. The runtime wheel deliberately excludes
+`benchmarks/`; installing an sdist also builds a wheel, so retain the extracted
+source tree to run benchmarks. No extra benchmark dependencies are required.
 
 New to Python or Streamlit? Follow [Start Here](../START_HERE.md) to install your
 downloaded project and open the local interface before using these alternatives.

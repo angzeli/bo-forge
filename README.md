@@ -1,11 +1,21 @@
-# 🧪 BO Forge v3.2.3
+# 🧪 BO Forge v3.3.0
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.2.3 closes the predictive-diagnostics line with deterministic
+v3.3.0 prepares a source-only closed-loop benchmark harness for continuous
+single-objective Branin, Hartmann3, and Hartmann6 campaigns, comparing BO with
+random and Sobol baselines in deterministic and noisy modes. Reports retain
+failures and distinguish noisy observations from latent objective quality.
+See [Benchmarks](docs/BENCHMARKS.md) and the output-free
+[smoke notebook](notebooks/24_closed_loop_benchmarks.ipynb). Local standard
+acceptance completed 90/90 trials; the guide records the evidence and limits.
+That is not a general superiority claim or publication approval. No BO,
+Streamlit, or public API behavior changes are introduced by this harness.
+
+The completed v3.2.3 line covers deterministic
 known-distribution acceptance, complete/incomplete workflow checks, and bounded
 real-GP package probes. The evaluator, atomic exports, and scientific scope are
 unchanged. See the [acceptance evidence](docs/PREDICTIVE_EVALUATION.md#acceptance-evidence)

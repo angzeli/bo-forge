@@ -4,12 +4,13 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.2.3`. Known-distribution diagnostic acceptance,
-cross-surface complete/incomplete workflows, and bounded fitted-model probes close
-v3.2.x without changing the evaluator. Diagnostic correctness is not universal
-model calibration. Completed statuses describe implementation, not publication
-approval or closed-loop BO validation. Release publication still requires
-exact-commit CI and separate authorization.
+Current prepared baseline: `v3.3.0`. The source-only benchmark harness begins
+continuous single-objective closed-loop comparison against random and Sobol
+baselines, with deterministic/noisy modes and explicit failure accounting.
+Local standard acceptance completed 90/90 trials; this does not establish general BO superiority.
+The completed v3.2.x diagnostic line does not establish universal calibration.
+Completed statuses describe implementation, not publication approval. Release
+publication still requires exact-commit CI and separate authorization.
 
 ## Roadmap So Far
 
@@ -29,7 +30,7 @@ flowchart LR
     v322["v3.2.2<br/>Interpretation + calibration guidance"]
     v323["v3.2.3<br/>Synthetic acceptance + closeout"]
     v330["v3.3.0<br/>Benchmark harness"]
-    v331["v3.3.1<br/>Mixed + noisy routes"]
+    v331["v3.3.1<br/>Mixed + constrained + pending routes"]
     v332["v3.3.2<br/>MO + MF routes"]
     v333["v3.3.3<br/>Notebook execution"]
     v334["v3.3.4<br/>Performance evidence"]
@@ -62,11 +63,13 @@ flowchart LR
     v34 -.-> v344
 
     class v30,v31,v32 majorDone
-    class v33,v34 majorFuture
+    class v33 majorActive
+    class v34 majorFuture
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
-    class v330,v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v330 patchActive
+    class v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -93,7 +96,12 @@ flowchart LR
 | `v3.2.2` | prepared | Practical interpretation and calibration guidance, not calibration certification |
 | `v3.2.3` | implementation complete | Known-distribution diagnostic acceptance and series closeout |
 | `v3.2.x` | completed | Predictive diagnostics, hardening, interpretation, and acceptance; not universal calibration |
-| `v3.3.x` | planned | Closed-loop scientific and executable-workflow validation |
+| `v3.3.0` | prepared | Source-only continuous benchmark harness; 90/90 local standard trials complete |
+| `v3.3.1` | planned | Mixed, constrained, and pending-aware noisy routes |
+| `v3.3.2` | planned | Multi-objective and multi-fidelity routes |
+| `v3.3.3` | planned | Full notebook execution |
+| `v3.3.4` | planned | Performance evidence and series closeout |
+| `v3.3.x` | active | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
@@ -322,22 +330,34 @@ Audit mapping: diagnostics portion of `SCI-001`.
 
 ## v3.3.x - Closed-Loop Scientific And Workflow Validation
 
-Status: planned
+Status: active
 
 Audit mapping: closed-loop portion of `SCI-001`, plus `TST-001` and `PERF-001`.
 
 ### v3.3.0 - Benchmark Harness Foundation
 
-- Add versioned benchmark configuration and fixed repeated seed sets.
-- Cover continuous single-objective campaigns against random and Sobol
-  baselines.
-- Report regret, failures, runtime, and distributions rather than exact
-  stochastic trajectories.
+Status: prepared; publication requires separate authorization and exact-commit CI.
+Local standard acceptance completed 90/90 trials and 2,160 evaluations; retained
+evidence and interpretation limits are recorded in the benchmark guide.
 
-### v3.3.1 - Mixed, Constrained, And Noisy Routes
+- Versioned specs cover continuous Branin, Hartmann3, and Hartmann6 against
+  random and Sobol baselines in deterministic and noisy modes.
+- The six-trial smoke uses seed 0, four initial/six total evaluations, and four
+  BO suggestion calls. The standard uses seeds 0 through 4, `2 * (d + 1)` initial
+  observations, and 24 total evaluations across 90 trials; it is opt-in.
+- Sequential trials have a 600-second timeout. Retain planned IDs, config/log
+  provenance, status, partial traces, and worker logs; disclose failures and
+  condition summary quality metrics on completed trials.
+- Keep `benchmarks/` source-only, included in the sdist but not the runtime
+  wheel. The smoke notebook uses a temporary workspace; report regeneration is
+  fitting-free and objective-free. See [Benchmarks](docs/BENCHMARKS.md).
+- Preserve BO, Streamlit, and public API behavior. Separate measured local
+  evidence from general performance claims and exact-commit CI approval.
+
+### v3.3.1 - Mixed, Constrained, And Pending-Aware Noisy Routes
 
 - Extend repeated-seed evidence to mixed variables, constraints, and
-  noisy/pending behavior.
+  pending-aware noisy behavior beyond the continuous noisy v3.3.0 baseline.
 - Report feasibility, failures, and runtime without weakening assertions.
 
 ### v3.3.2 - Multi-Objective And Multi-Fidelity Routes

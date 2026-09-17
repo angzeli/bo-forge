@@ -5,6 +5,24 @@ This page covers setup, the quickstart script, CLI workflow, notebook session AP
 For a compact overview of supported, read-only, rejected, and deferred feature
 combinations, see [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md).
 
+## Closed-Loop Benchmark Smoke
+
+From a checkout or extracted source archive with BO Forge installed, choose a
+new output directory and run:
+
+```bash
+python -m benchmarks run --spec benchmarks/specs/smoke.yaml --output /tmp/bo-forge-benchmark-smoke
+python -m benchmarks report --run /tmp/bo-forge-benchmark-smoke --output /tmp/bo-forge-benchmark-report
+```
+
+The six-trial smoke automatically creates a report; the second command
+regenerates it from saved artifacts without fitting or objective evaluations.
+The output-free [24_closed_loop_benchmarks.ipynb](../notebooks/24_closed_loop_benchmarks.ipynb)
+uses temporary directories and never runs the 90-trial standard specification.
+See [Benchmarks](BENCHMARKS.md) for budgets, failure accounting, and interpretation.
+This source-only workflow is absent from the runtime wheel and does not change
+the campaign API or UI.
+
 ## 🧰 Setup
 
 Create a dedicated environment at the project root:

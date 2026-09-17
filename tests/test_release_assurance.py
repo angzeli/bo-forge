@@ -148,6 +148,63 @@ def test_bounded_predictive_fit_is_explicit_in_numerical_ci() -> None:
     assert "-k real_optimizer_returns" in commands
 
 
+def test_benchmark_smoke_is_explicit_and_bounded_in_numerical_ci() -> None:
+    workflow = _workflow(".github/workflows/ci.yml")
+    steps = workflow["jobs"]["numerical"]["steps"]
+    benchmark_steps = [step for step in steps if "-m benchmarks" in step.get("run", "")]
+    assert len(benchmark_steps) == 1
+    assert benchmark_steps[0]["run"] == (
+        "python -m benchmarks run --spec benchmarks/specs/smoke.yaml "
+        "--output /tmp/bo-forge-benchmark-smoke"
+    )
+    assert "standard.yaml" not in _read(".github/workflows/ci.yml")
+    uploads = [step for step in steps if step.get("uses") == "actions/upload-artifact@v4"]
+    assert len(uploads) == 1
+    assert uploads[0]["if"] == "always()"
+    assert uploads[0]["with"] == {
+        "name": "closed-loop-benchmark-smoke", "path": "/tmp/bo-forge-benchmark-smoke/",
+        "if-no-files-found": "warn", "retention-days": "14",
+    }
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    assert "benchmarks/**/*.py" in pyproject["tool"]["ruff"]["include"]
+    assert not any(
+        pattern.startswith("benchmarks")
+        for pattern in pyproject["tool"]["setuptools"]["packages"]["find"]["include"]
+    )
+
+
+def test_benchmark_release_docs_preserve_source_and_acceptance_boundaries() -> None:
+    guide = _read("docs/BENCHMARKS.md")
+    for phrase in (
+        "schema_version: 1", "timeout_seconds: 600", "four BO suggestion calls",
+        "90", "2 * (d + 1)", "twice_dimension_plus_one", "optimum_tolerance",
+        "python -m benchmarks run --spec PATH --output NEW_DIR",
+        "python -m benchmarks report --run DIR --output NEW_DIR",
+        "runtime wheel excludes", "Measured acceptance is", "Local Standard Acceptance",
+        "conditioned on completed trials", "Partial traces", "planned trial IDs",
+        "without", "fitting models, evaluating objectives", "latent",
+        "`pending`, `running`, `complete`, `failed`, `timeout`, and",
+        "`interrupted`", "traces.csv", "summary.csv", "trajectories.csv",
+        "worker.log", "trial.json", "report.md", "figures/",
+        "trials.csv", "contributing_complete", "contributing_partial", "scheduled",
+        "final_regret_median", "final_regret_q25", "final_regret_q75",
+        "optimum_tolerance: 1.0e-6", "BoTorch's rounded reference optima",
+    ):
+        assert phrase in guide
+    for path in (
+        "README.md", "docs/INSTALLATION.md", "docs/PUBLIC_API.md",
+        "docs/CAPABILITY_MATRIX.md", "docs/STREAMLIT_APP.md",
+        "docs/REPOSITORY_STRUCTURE.md", "docs/QUICKSTART.md",
+        "docs/RELEASE_CHECKLIST.md", "ROADMAP_V3_X.md",
+    ):
+        assert "BENCHMARKS.md" in _read(path)
+    for path in (
+        "START_HERE.md", "docs/INSTALLATION.md", "docs/PUBLIC_API.md",
+        "docs/CAPABILITY_MATRIX.md", "docs/STREAMLIT_APP.md",
+    ):
+        assert PROJECT_VERSION in _read(path)
+
+
 def test_beginner_setup_contract_and_links() -> None:
     guide = _read("START_HERE.md")
     assert re.findall(r"^## (\d+)\.", guide, re.M) == [str(i) for i in range(1, 11)]
@@ -297,6 +354,12 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.2.2` | prepared | Practical interpretation" in roadmap
     assert "| `v3.2.3` | implementation complete |" in roadmap
     assert "| `v3.2.x` | completed |" in roadmap
+    assert "class v33 majorActive" in roadmap
+    assert "class v330 patchActive" in roadmap
+    assert "| `v3.3.0` | prepared |" in roadmap
+    assert "| `v3.3.x` | active |" in roadmap
+    for version in ("3.3.1", "3.3.2", "3.3.3", "3.3.4"):
+        assert f"| `v{version}` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
     assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap

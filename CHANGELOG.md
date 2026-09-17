@@ -1,5 +1,37 @@
 # 📝 BO Forge Changelog
 
+## v3.3.0 - Closed-Loop Benchmark Harness
+
+Status: prepared; local standard acceptance recorded, exact-commit CI still required.
+Publication requires separate authorization.
+
+- Adds a source-only `python -m benchmarks` runner and read-only report command
+  for continuous single-objective Branin, Hartmann3, and Hartmann6 campaigns.
+  BO, random, and Sobol strategies share paired seed/problem/mode comparisons;
+  noisy observations remain distinct from latent objective values.
+- Defines schema-version-1 smoke and standard specifications: six smoke trials
+  with four initial and six total evaluations, or 90 standard trials over five
+  seeds with 24 total evaluations. Trials run sequentially with a 600-second
+  per-trial timeout; the smoke requires only four BO suggestion calls.
+- Retains planned trial IDs, specification snapshots, campaign provenance,
+  partial traces, worker logs, and complete/failed/timeout/interrupted outcomes.
+  Automatically generated reports disclose failures and condition quality
+  summaries on completed trials; report regeneration does not fit or evaluate.
+- Handles scheduler SIGTERM and damaged worker metadata without abandoning
+  terminal accounting; report validation rejects incoherent completed campaign
+  evidence and conflicting trace identities. Partial evidence warnings, actual
+  seed counts, distinguishable seed curves, and retained CI smoke artifacts make
+  failures inspectable without retries, recovery, or source-file mutation.
+- Includes benchmark Python sources and YAML specs in the sdist, excludes them
+  from the runtime wheel, and adds a numerical-CI smoke and output-free temporary
+  workspace notebook. No new campaign fixtures, dependencies, BO algorithms,
+  public APIs, or Streamlit features are introduced.
+- Leaves mixed/constrained/pending routes, multi-objective/multi-fidelity
+  evidence, full notebook execution, and performance closeout to later v3.3.x
+  patches. Local standard acceptance completed 90/90 trials and 2,160 evaluations;
+  the benchmark guide records the environment, measurements, and interpretation
+  limits. This is not a general optimizer-superiority or fixed-runner speed claim.
+
 ## v3.2.3 - Synthetic Acceptance And Series Closeout
 
 Status: v3.2.x implementation and diagnostic acceptance complete; publication

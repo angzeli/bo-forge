@@ -13,11 +13,15 @@ from bo_forge import CampaignSession
 
 NOTEBOOKS = sorted(Path("notebooks").glob("*.ipynb"))
 PREDICTIVE_NOTEBOOK = Path("notebooks/23_predictive_diagnostics.ipynb")
-CAMPAIGN_NOTEBOOKS = [path for path in NOTEBOOKS if path != PREDICTIVE_NOTEBOOK]
+BENCHMARK_NOTEBOOK = Path("notebooks/24_closed_loop_benchmarks.ipynb")
+CAMPAIGN_NOTEBOOKS = [
+    path for path in NOTEBOOKS if path not in {PREDICTIVE_NOTEBOOK, BENCHMARK_NOTEBOOK}
+]
 API_NOTEBOOKS = [
     notebook_path
     for notebook_path in NOTEBOOKS
     if notebook_path.name != "04_cli_four_variable_campaign.ipynb"
+    and notebook_path != BENCHMARK_NOTEBOOK
 ]
 CLI_NOTEBOOK = Path("notebooks/04_cli_four_variable_campaign.ipynb")
 REPLICATE_NOTEBOOK = Path("notebooks/08_replicate_aware_campaign.ipynb")
@@ -116,6 +120,40 @@ def test_predictive_notebook_is_bounded_and_self_contained() -> None:
         assert fragment in source
     for forbidden in ("suggest_next(", "append_suggestions(", "mark_observed(", "examples/"):
         assert forbidden not in source
+
+
+def test_benchmark_notebook_is_source_only_bounded_and_output_free() -> None:
+    notebook = nbformat.read(BENCHMARK_NOTEBOOK, as_version=4)
+    code = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "code")
+    source = notebook_source(BENCHMARK_NOTEBOOK)
+    assert BENCHMARK_NOTEBOOK not in CAMPAIGN_NOTEBOOKS
+    assert BENCHMARK_NOTEBOOK not in API_NOTEBOOKS
+    for fragment in (
+        "TemporaryDirectory(", "sys.executable, '-m', 'benchmarks', 'run'",
+        "sys.executable, '-m', 'benchmarks', 'report'", "'smoke.yaml'",
+        "cwd=PROJECT_ROOT", "timeout=3660", "timeout=120", "workspace.cleanup()",
+        "'summary.csv'", "'trajectories.csv'", "'traces.csv'", "'trials.csv'", "'run.json'",
+        "'*/status.json'", "'report.md'",
+    ):
+        assert fragment in code
+    for forbidden in (
+        "standard.yaml", "suggest_next(", "append_suggestions(", "mark_observed(",
+        "examples/", "shell=True",
+    ):
+        assert forbidden not in code
+    for fragment in (
+        "source archive", "Paired comparisons", "noisy versus latent",
+        "conditioned on completed trials", "failed", "timeout", "interrupted",
+        "pending", "running", "worker.log", "partial trace.jsonl",
+        "does not fit models, evaluate objectives", "not a claim of BO superiority",
+        "contributing_complete", "contributing_partial", "scheduled",
+    ):
+        assert fragment in source
+    for cell in notebook.cells:
+        if cell.cell_type == "code":
+            compile(cell.source, f"{BENCHMARK_NOTEBOOK}:{cell.id}", "exec")
+            assert cell.outputs == []
+            assert cell.execution_count is None
 
 
 def test_predictive_guidance_preserves_v321_computation_and_notebook_identity() -> None:

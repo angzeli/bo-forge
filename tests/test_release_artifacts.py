@@ -82,6 +82,8 @@ def test_manifest_uses_expected_release_directives() -> None:
         "include ROADMAP_V3_X.md",
         "include SECURITY.md",
         "recursive-include configs *.yaml",
+        "recursive-include benchmarks *.py",
+        "recursive-include benchmarks/specs *.yaml",
         "recursive-include docs *.md",
         "include examples/quickstart.py",
         "recursive-include examples *_campaign_log.csv",
@@ -261,7 +263,8 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert (
         "## v3.2.2 - Predictive Interpretation And Calibration Guidance" in changelog
     )
-    assert f"## v{PROJECT_VERSION} - Synthetic Acceptance And Series Closeout" in changelog
+    assert "## v3.2.3 - Synthetic Acceptance And Series Closeout" in changelog
+    assert f"## v{PROJECT_VERSION} - Closed-Loop Benchmark Harness" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog

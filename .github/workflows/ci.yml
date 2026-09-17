@@ -37,7 +37,7 @@ jobs:
       - name: Ruff
         run: ruff check . --no-cache
       - name: Syntax
-        run: python -m compileall -q bo_forge bo_forge_app bo_forge_api examples tests
+        run: python -m compileall -q bo_forge bo_forge_app bo_forge_api benchmarks examples tests
       - name: Whitespace
         run: git diff --check HEAD^ HEAD
       - name: Verify generated constraints
@@ -181,6 +181,16 @@ jobs:
         run: >-
           python -m pytest -p no:cacheprovider
           tests/test_predictive_evaluation.py::test_bounded_real_gp_fit
+      - name: Run closed-loop benchmark smoke
+        run: python -m benchmarks run --spec benchmarks/specs/smoke.yaml --output /tmp/bo-forge-benchmark-smoke
+      - name: Preserve benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: closed-loop-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-smoke/
+          if-no-files-found: warn
+          retention-days: 14
 
   package:
     name: Build and external artifact probes

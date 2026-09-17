@@ -1,6 +1,6 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.2.3 retains explicit bounded predictive diagnostics while keeping
+BO Forge v3.3.0 retains explicit bounded predictive diagnostics while keeping
 YAML/CSV schemas, suggestion algorithms, campaign combinations, and provenance
 contracts unchanged. Predictive evaluation has its own narrower scope below;
 support for a BO campaign combination does not imply evaluator support.
@@ -12,6 +12,20 @@ Legend:
   but suggestion generation for the combination is not implemented.
 - `rejected`: config or workflow validation fails clearly.
 - `deferred`: intentionally not part of the current supported surface.
+
+## Closed-Loop Benchmark Scope
+
+The source-only v3.3.0 [benchmark harness](BENCHMARKS.md) covers continuous
+single-objective Branin, Hartmann3, and Hartmann6, with BO/random/Sobol strategies
+and deterministic/noisy observations. This is a harness scope, not a claim that
+measured acceptance already passes or that BO dominates the baselines. It adds
+no backend, public API, or Streamlit capability.
+
+Mixed/constrained and pending-aware routes remain planned for v3.3.1,
+multi-objective/multi-fidelity routes for v3.3.2, full notebook execution for
+v3.3.3, and performance closeout for v3.3.4. Existing campaign support below is
+not equivalent to benchmark coverage. Quality summaries use completed trials;
+failed, timeout, interrupted, pending, and running trials remain visible.
 
 ## Operational Provenance
 

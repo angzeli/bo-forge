@@ -9,6 +9,8 @@ include ROADMAP_V2_X.md
 include ROADMAP_V3_X.md
 include SECURITY.md
 recursive-include configs *.yaml
+recursive-include benchmarks *.py
+recursive-include benchmarks/specs *.yaml
 recursive-include docs *.md
 include examples/quickstart.py
 recursive-include examples *_campaign_log.csv

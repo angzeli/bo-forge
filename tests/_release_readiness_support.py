@@ -147,6 +147,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert f"{DIST_INFO_ROOT}/entry_points.txt" in names
     assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
     excluded_prefixes = (
+        "benchmarks/",
         "docs/",
         "configs/",
         "examples/",
@@ -171,6 +172,12 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         names = set(sdist.getnames())
 
     required_paths = {
+        "benchmarks/__init__.py",
+        "benchmarks/__main__.py",
+        "benchmarks/specs/smoke.yaml",
+        "benchmarks/specs/standard.yaml",
+        "docs/BENCHMARKS.md",
+        "notebooks/24_closed_loop_benchmarks.ipynb",
         "README.md",
         "START_HERE.md",
         "CONTRIBUTING.md",
@@ -248,6 +255,11 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "tests/test_v253_operational_freeze.py",
     }
     assert {f"{SDIST_ROOT}/{path}" for path in required_paths}.issubset(names)
+    benchmark_sources = {
+        f"{SDIST_ROOT}/{path.relative_to(PROJECT_ROOT).as_posix()}"
+        for path in (PROJECT_ROOT / "benchmarks").rglob("*.py")
+    }
+    assert benchmark_sources.issubset(names)
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 
@@ -259,6 +271,19 @@ def _assert_sdist_test_fixture_works(
     with tarfile.open(sdist_path) as sdist:
         sdist.extractall(extract_root)
     source_root = extract_root / SDIST_ROOT
+    benchmark_env = env.copy()
+    benchmark_env.pop("PYTHONPATH", None)
+    for arguments in (["--help"], ["run", "--help"], ["report", "--help"]):
+        completed = subprocess.run(
+            [sys.executable, "-m", "benchmarks", *arguments],
+            cwd=source_root,
+            env=benchmark_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert "usage:" in completed.stdout.lower()
     subprocess.run(
         [
             sys.executable,
@@ -270,6 +295,7 @@ def _assert_sdist_test_fixture_works(
             "tests/test_app_service.py::test_app_service_review_and_single_objective_mark_observed",
             "tests/test_provenance_acceptance.py",
             "tests/test_provenance_closeout.py::test_original_v310_writer_fixture_remains_mutable_and_migratable",
+            "tests/test_benchmark_runner.py::test_runner_pairs_strategies_and_reloads_complete_managed_histories",
         ],
         cwd=source_root,
         env=env,
