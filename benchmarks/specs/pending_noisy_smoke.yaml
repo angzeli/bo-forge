@@ -1,0 +1,16 @@
+schema_version: 2
+route: pending_noisy
+name: pending_noisy-smoke
+problems:
+  - {name: branin, noise_std: 1.0, optimum_tolerance: 0.000001}
+seeds: [0]
+modes: [noisy]
+strategies: [bo, random, sobol]
+evaluations: 6
+initial_observations: 4
+timeout_seconds: 600
+bo:
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 16
+  min_normalized_distance: 0.0

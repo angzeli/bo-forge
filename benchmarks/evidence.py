@@ -9,7 +9,7 @@ from benchmarks.storage import TERMINAL
 from bo_forge._campaign.provenance_resume import inspect_provenance
 from bo_forge.errors import BOForgeError
 
-IDENTITY_FIELDS = {"trial_id", "problem", "mode", "strategy", "seed", "status"}
+IDENTITY_FIELDS = {"trial_id", "problem", "mode", "strategy", "seed", "status", "route"}
 NUMBER_FIELDS = (
     "observed", "latent", "noise", "best_observed", "best_latent", "simple_regret_raw",
     "simple_regret", "incumbent_latent", "incumbent_regret_raw", "incumbent_regret",
@@ -43,12 +43,17 @@ def validate_status(status):
         raise ValueError("completed_evaluations must be a nonnegative integer.")
     if not isinstance(status.get("message", ""), str):
         raise ValueError("Benchmark status message must be text.")
-    finite_number(status.get("wall_seconds", 0.0), "wall_seconds")
-    if status.get("wall_seconds", 0.0) < 0:
+    if status.get("wall_seconds") is None:
+        return
+    finite_number(status["wall_seconds"], "wall_seconds")
+    if status["wall_seconds"] < 0:
         raise ValueError("wall_seconds must be nonnegative.")
 
 
-def validate_rows(rows):
+def validate_rows(rows, trial=None):
+    from benchmarks.definitions import definition
+
+    variables = definition(trial)["variables"] if trial else []
     for row in rows:
         if IDENTITY_FIELDS.intersection(row):
             raise ValueError("Trace rows must not override reserved trial identity fields.")
@@ -57,16 +62,25 @@ def validate_rows(rows):
         for key in ("row_id", "source"):
             if not isinstance(row.get(key), str) or not row[key]:
                 raise ValueError(f"Trace {key} must be nonempty text.")
-        if not isinstance(row.get("x"), list):
-            raise ValueError("Trace x must be a list of finite coordinates.")
-        for value in row["x"]:
-            finite_number(value, "Trace coordinate")
+        _validate_point(row.get("x"), variables)
         for key in NUMBER_FIELDS:
             finite_number(row.get(key), f"Trace {key}")
             if key.endswith("_seconds") and row[key] < 0:
                 raise ValueError(f"Trace {key} must be nonnegative.")
         if not isinstance(row.get("fit_evidence"), dict):
             raise ValueError("Trace fit_evidence must be an object.")
+
+
+def _validate_point(point, variables):
+    if not isinstance(point, list):
+        raise ValueError("Trace x must be a list of finite coordinates.")
+    for index, value in enumerate(point):
+        categorical = index < len(variables) and variables[index]["type"] == "categorical"
+        if categorical:
+            if value not in variables[index]["values"]:
+                raise ValueError("Invalid categorical trace coordinate.")
+        else:
+            finite_number(value, "Trace coordinate")
 
 
 def validate_inputs(inputs, trial):
@@ -90,15 +104,7 @@ def validate_inputs(inputs, trial):
 
 def campaign_evidence(directory, config, log, rows, complete):
     """Complete trials fail closed; incomplete trials disclose missing campaign evidence."""
-    problems = []
-    try:
-        inspection = inspect_provenance(
-            config, log, provenance_policy="required", include_environment=False,
-        )
-        if inspection.resume_status != "ready":
-            problems.append(f"Provenance: {inspection.reason_code}")
-    except (BOForgeError, OSError, ValueError) as exc:
-        problems.append(f"Provenance: {exc}")
+    problems = _provenance_problems(directory, config, log)
     if not log.exists():
         if rows:
             raise ValueError(f"Scored trace has no campaign CSV: {directory}")
@@ -120,3 +126,26 @@ def campaign_evidence(directory, config, log, rows, complete):
         message = "; ".join(problems)
         raise ValueError(f"Incomplete campaign evidence for {directory.name}: {message}")
     return observed, "; ".join(problems)
+
+
+def _provenance_problems(directory, config, log):
+    """Disclose absent/recoverable evidence, but never downgrade contradictory evidence."""
+    try:
+        inspection = inspect_provenance(
+            config, log, provenance_policy="required", include_environment=False,
+        )
+    except (BOForgeError, OSError, ValueError) as exc:
+        missing_manifest = getattr(exc, "reason_code", None) == "manifest_required"
+        missing_config = (isinstance(exc.__cause__, FileNotFoundError)
+                          and exc.__cause__.filename == str(config.resolve()))
+        if missing_manifest or missing_config:
+            return [f"Provenance: {exc}"]
+        raise ValueError(f"Incomplete campaign evidence for {directory.name}: "
+                         f"contradictory provenance: {exc}") from exc
+    if inspection.resume_status == "ready":
+        return []
+    reason = inspection.reason_code
+    if reason not in {"log_missing", "pending_previous_state", "pending_resulting_state"}:
+        raise ValueError(f"Incomplete campaign evidence for {directory.name}: "
+                         f"contradictory provenance: {reason}")
+    return [f"Provenance: {reason}"]

@@ -1,0 +1,16 @@
+schema_version: 2
+route: constrained_mixed
+name: constrained_mixed-standard
+problems:
+  - {name: mixed_quadratic, noise_std: 0.0, optimum_tolerance: 0.000001}
+seeds: [0, 1, 2, 3, 4]
+modes: [deterministic]
+strategies: [bo, random, sobol]
+evaluations: 24
+initial_observations: 8
+timeout_seconds: 600
+bo:
+  raw_samples: 128
+  num_restarts: 5
+  mc_samples: 128
+  min_normalized_distance: 0.0

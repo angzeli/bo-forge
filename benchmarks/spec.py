@@ -11,7 +11,8 @@ import yaml
 
 from benchmarks import SPEC_VERSION
 
-DIMENSIONS = {"branin": 2, "hartmann3": 3, "hartmann6": 6}
+DIMENSIONS = {"branin": 2, "hartmann3": 3, "hartmann6": 6, "mixed_quadratic": 4}
+ROUTES = ("mixed", "constrained_mixed", "pending_noisy")
 MODES = ("deterministic", "noisy")
 STRATEGIES = ("bo", "random", "sobol")
 STREAMS = ("initialization", "baseline", "observation_noise", "fitting")
@@ -65,9 +66,12 @@ def _choices(value, allowed, label):
 
 
 def validate_spec(spec):
-    _keys(spec, ("schema_version", "name", "problems", "seeds", "modes", "strategies",
-                 "evaluations", "initial_observations", "timeout_seconds", "bo"), "spec")
-    _integer(spec["schema_version"], SPEC_VERSION, SPEC_VERSION, "schema_version")
+    if not isinstance(spec, dict):
+        raise SpecError("spec must be a mapping.")
+    _integer(spec.get("schema_version"), 1, 2, "schema_version")
+    keys = ("schema_version", "name", "problems", "seeds", "modes", "strategies",
+            "evaluations", "initial_observations", "timeout_seconds", "bo")
+    _keys(spec, keys + (("route",) if spec["schema_version"] == 2 else ()), "spec")
     if not isinstance(spec["name"], str) or not spec["name"].strip():
         raise SpecError("name must be a nonempty string.")
     _choices(spec["modes"], MODES, "modes")
@@ -85,6 +89,7 @@ def validate_spec(spec):
     if initial != "twice_dimension_plus_one":
         _integer(initial, 2, spec["evaluations"] - 1, "initial_observations")
     _validate_problems(spec)
+    _validate_route(spec)
     _keys(spec["bo"], ("raw_samples", "num_restarts", "mc_samples",
                        "min_normalized_distance"), "bo")
     for key in ("raw_samples", "num_restarts", "mc_samples"):
@@ -93,15 +98,38 @@ def validate_spec(spec):
     return spec
 
 
+def _validate_route(spec):
+    names = [problem["name"] for problem in spec["problems"]]
+    if spec["schema_version"] == 1:
+        if "mixed_quadratic" in names:
+            raise SpecError("mixed_quadratic requires a version-2 route.")
+        return
+    route = spec["route"]
+    if route not in ROUTES:
+        raise SpecError(f"route must be one of {ROUTES}.")
+    pending = route == "pending_noisy"
+    if names != (["branin"] if pending else ["mixed_quadratic"]):
+        raise SpecError("Unsupported route/problem combination.")
+    if spec["modes"] != (["noisy"] if pending else ["deterministic"]):
+        raise SpecError("Unsupported route/mode combination.")
+    if spec["problems"][0]["noise_std"] != (1.0 if pending else 0.0):
+        raise SpecError("Route requires its fixed noise standard deviation.")
+    if pending and (spec["evaluations"] - initial_count(spec, "branin")) % 2:
+        raise SpecError("pending_noisy requires complete two-suggestion cycles.")
+
+
 def _validate_problems(spec):
     problems = spec["problems"]
+    supported = ("branin", "hartmann3", "hartmann6")
+    if spec["schema_version"] == 2:
+        supported = ("branin",) if spec["route"] == "pending_noisy" else ("mixed_quadratic",)
     if not isinstance(problems, list) or not 1 <= len(problems) <= len(DIMENSIONS):
-        raise SpecError("problems must list 1..3 supported problems.")
+        raise SpecError(f"problems must list supported problems: {', '.join(supported)}.")
     names = []
     for problem in problems:
         _keys(problem, ("name", "noise_std", "optimum_tolerance"), "problem")
         if not isinstance(problem["name"], str) or problem["name"] not in DIMENSIONS:
-            raise SpecError("Unknown problem; use branin, hartmann3, or hartmann6.")
+            raise SpecError(f"Unknown problem; use {', '.join(supported)} for this schema/route.")
         names.append(problem["name"])
         _number(problem["noise_std"], 0, 1000, "noise_std")
         if "noisy" in spec["modes"] and problem["noise_std"] == 0:
@@ -114,8 +142,13 @@ def _validate_problems(spec):
 
 
 def load_spec(path):
+    return _parse_spec(Path(path).read_bytes())
+
+
+def _parse_spec(payload):
+    """Parse the same immutable bytes that execution and reporting retain and hash."""
     try:
-        return validate_spec(yaml.load(Path(path).read_text(encoding="utf-8"), Loader=_Loader))
+        return validate_spec(yaml.load(payload, Loader=_Loader))
     except yaml.YAMLError as exc:
         raise SpecError(f"Invalid YAML: {exc}") from exc
 
@@ -125,17 +158,18 @@ def initial_count(spec, problem):
     return 2 * (DIMENSIONS[problem] + 1) if value == "twice_dimension_plus_one" else value
 
 
-def seed_mapping(problem, seed, mode):
+def seed_mapping(problem, seed, mode, *, route=None):
     """SHA-256 tagged streams, independent of strategy and process hash randomization."""
     return {
         stream: int.from_bytes(hashlib.sha256(json.dumps(
-            [SPEC_VERSION, problem, seed, mode, stream], separators=(",", ":"),
+            ([SPEC_VERSION, problem, seed, mode, stream] if route is None
+             else [2, route, problem, seed, mode, stream]), separators=(",", ":"),
         ).encode()).digest()[:4], "big") for stream in STREAMS
     }
 
 
 def schedule(spec):
-    return [
+    trials = [
         {"trial_id": f"{problem['name']}-{mode}-{seed:010d}-{strategy}",
          "problem": problem, "mode": mode, "seed": seed, "strategy": strategy,
          "seeds": seed_mapping(problem["name"], seed, mode),
@@ -145,3 +179,10 @@ def schedule(spec):
         for problem in spec["problems"] for mode in spec["modes"]
         for seed in spec["seeds"] for strategy in spec["strategies"]
     ]
+    if spec["schema_version"] == 2:
+        for trial in trials:
+            trial.update(schema_version=2, route=spec["route"],
+                         trial_id=f"{spec['route']}-{trial['trial_id']}",
+                         seeds=seed_mapping(trial["problem"]["name"], trial["seed"],
+                                            trial["mode"], route=spec["route"]))
+    return trials

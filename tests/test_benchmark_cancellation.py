@@ -75,6 +75,8 @@ def test_interrupted_run_status_write_still_records_terminal_state(tmp_path, mon
     for trial in metadata["trials"]:
         status = json.loads((output / "trials" / trial["trial_id"] / "status.json").read_text())
         assert status["status"] == ("interrupted" if phase == "running" else "failed")
+        assert status["timing_status"] == ("not_started" if phase == "running" else "measured")
+        assert status["wall_seconds"] == (0.0 if phase == "running" else .1)
 
 
 @pytest.mark.parametrize("status", [[], {"status": []}, {"status": {}},
@@ -141,14 +143,17 @@ def test_trace_corruption_does_not_replace_explicit_interruption(tmp_path):
     assert "Malformed evaluation trace" in status["trace_warning"]
 
 
-def test_cleanup_error_does_not_mask_original_or_skip_run_terminal_update(tmp_path, monkeypatch):
+@pytest.mark.parametrize("error", [OSError, KeyboardInterrupt, SystemExit])
+def test_cleanup_error_does_not_mask_original_or_skip_run_terminal_update(
+    tmp_path, monkeypatch, error,
+):
     interruption = KeyboardInterrupt("original cancellation")
 
     def execute(directory, timeout):
         raise interruption
 
-    def cleanup(output, trials):
-        raise OSError("controlled cleanup failure")
+    def cleanup(output, trials, *, started_trials):
+        raise error("controlled cleanup failure")
 
     monkeypatch.setattr(runner, "_execute_trial", execute)
     monkeypatch.setattr(runner, "_terminalize_remaining", cleanup)
@@ -158,6 +163,29 @@ def test_cleanup_error_does_not_mask_original_or_skip_run_terminal_update(tmp_pa
     assert caught.value is interruption
     assert any("controlled cleanup failure" in note for note in interruption.__notes__)
     assert json.loads((output / "run.json").read_text())["status"] == "interrupted"
+
+
+@pytest.mark.parametrize("error", [OSError, KeyboardInterrupt, SystemExit])
+def test_run_persistence_failure_is_noted_without_masking_cancellation(
+    tmp_path, monkeypatch, error,
+):
+    interruption = KeyboardInterrupt("original cancellation")
+    original_write = runner.write_json
+
+    def execute(directory, timeout):
+        raise interruption
+
+    def write(path, value):
+        if path.name == "run.json" and value["status"] == "interrupted":
+            raise error("run status persistence failed")
+        original_write(path, value)
+
+    monkeypatch.setattr(runner, "_execute_trial", execute)
+    monkeypatch.setattr(runner, "write_json", write)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        runner.run_suite(spec_file(tmp_path), tmp_path / "run")
+    assert caught.value is interruption
+    assert any("run status persistence failed" in note for note in interruption.__notes__)
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Controlled POSIX SIGTERM process test")
@@ -213,12 +241,18 @@ runner.run_suite({str(spec)!r}, {str(output)!r})
         metadata = json.loads((output / "run.json").read_text())
         assert metadata["status"] == "interrupted" and metadata["finished_at"]
         assert len(metadata["trials"]) == 6
-        for trial in metadata["trials"]:
+        for number, trial in enumerate(metadata["trials"]):
             status = json.loads(
                 (output / "trials" / trial["trial_id"] / "status.json").read_text(),
             )
             assert status["status"] == "interrupted"
             assert status["completed_evaluations"] == 0 and status["finished_at"]
+            if number == 0:
+                assert status["timing_status"] == "measured"
+                assert status["wall_seconds"] > 0
+            else:
+                assert status["timing_status"] == "not_started"
+                assert status["wall_seconds"] == 0.0
     finally:
         # This session contains only this test's runner and its controlled worker.
         try:

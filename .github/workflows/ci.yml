@@ -192,6 +192,40 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Run mixed benchmark smoke
+        if: ${{ !cancelled() }}
+        run: python -m benchmarks run --spec benchmarks/specs/mixed_smoke.yaml --output /tmp/bo-forge-benchmark-mixed-smoke
+      - name: Preserve mixed benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixed-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-mixed-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Run constrained mixed benchmark smoke
+        if: ${{ !cancelled() }}
+        run: python -m benchmarks run --spec benchmarks/specs/constrained_mixed_smoke.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-smoke
+      - name: Preserve constrained mixed benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: constrained-mixed-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-constrained-mixed-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Run pending noisy benchmark smoke
+        if: ${{ !cancelled() }}
+        run: python -m benchmarks run --spec benchmarks/specs/pending_noisy_smoke.yaml --output /tmp/bo-forge-benchmark-pending-noisy-smoke
+      - name: Preserve pending noisy benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pending-noisy-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-pending-noisy-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
   package:
     name: Build and external artifact probes
     runs-on: ubuntu-latest

@@ -4,8 +4,10 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.3.0 preparation adds a source-only continuous closed-loop benchmark
-harness. Prepared docs, tests, and CI steps do not establish measured acceptance
+The v3.3.1 preparation adds source-only mixed, constrained, and pending-aware
+benchmark routes plus evidence-integrity and cancellation-timing fixes.
+Measured v3.3.1 acceptance is documented in the benchmark guide, including five
+constrained-BO failures. Prepared docs, tests, and CI steps alone do not establish acceptance
 or BO superiority. The v3.2.3 diagnostic acceptance remains historical evidence,
 not universal calibration certification.
 Guidance is not calibration certification.
@@ -89,13 +91,16 @@ bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
-For v3.3.0, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
-source archive. Numerical CI runs the full six-trial smoke sequentially, with
+For v3.3.1, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
+source archive. Numerical CI retains the full six-trial smoke sequentially, with
 600 seconds per trial and only four BO suggestion calls:
 
 ```bash
 python -m benchmarks run --spec benchmarks/specs/smoke.yaml --output /tmp/bo-forge-benchmark-smoke
 python -m benchmarks report --run /tmp/bo-forge-benchmark-smoke --output /tmp/bo-forge-benchmark-report
+python -m benchmarks run --spec benchmarks/specs/mixed_smoke.yaml --output /tmp/bo-forge-benchmark-mixed-smoke
+python -m benchmarks run --spec benchmarks/specs/constrained_mixed_smoke.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-smoke
+python -m benchmarks run --spec benchmarks/specs/pending_noisy_smoke.yaml --output /tmp/bo-forge-benchmark-pending-noisy-smoke
 ```
 
 Use new output directories. Inspect planned trial IDs, the spec snapshot, all
@@ -107,9 +112,19 @@ notebook default; retain all evidence and record inspected results in the guide,
 separately from exact-commit CI approval. The output-free
 `notebooks/24_closed_loop_benchmarks.ipynb` must
 use a temporary workspace and run only `smoke.yaml`, never `standard.yaml`.
+Its new route instructions are Markdown only; computational cells stay unchanged.
+
+The three additional CI smokes schedule 9 trials/54 evaluations in total and
+always retain available artifacts, including failures. Their separate standards
+schedule 45 trials/1,080 evaluations, never as part of CI or notebook Run All.
+Before replacing the guide's pending placeholder, inspect scheduled identity and
+source binding, feasibility, delayed observations and `X_pending`, cancellation
+timing, unknown-duration counts, and read-only report regeneration. Preserve all
+failed/partial attempts and distinguish local results from exact-commit CI.
 
 Check that `benchmarks/` is absent from the runtime wheel, while Python sources,
-`specs/smoke.yaml`, `specs/standard.yaml`, this guide, and the notebook are in the
+all eight YAML specs (the original two plus six schema-v2 route specs), this
+guide, and the notebook are in the
 sdist. From a freshly extracted sdist, run `python -m benchmarks --help`,
 `python -m benchmarks run --help`, and `python -m benchmarks report --help`.
 These bounded archive probes require no fitting, objective evaluations, or full
@@ -378,4 +393,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.3.0 does none of those actions.
+separate explicit authorization. Preparing v3.3.1 does none of those actions.

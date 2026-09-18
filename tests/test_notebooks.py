@@ -138,7 +138,7 @@ def test_benchmark_notebook_is_source_only_bounded_and_output_free() -> None:
         assert fragment in code
     for forbidden in (
         "standard.yaml", "suggest_next(", "append_suggestions(", "mark_observed(",
-        "examples/", "shell=True",
+        "examples/", "shell=True", "mixed_smoke.yaml", "pending_noisy_smoke.yaml",
     ):
         assert forbidden not in code
     for fragment in (
@@ -149,6 +149,17 @@ def test_benchmark_notebook_is_source_only_bounded_and_output_free() -> None:
         "contributing_complete", "contributing_partial", "scheduled",
     ):
         assert fragment in source
+    assert len([cell for cell in notebook.cells if cell.cell_type == "code"]) == 5
+    instructions = notebook.cells[-1]
+    assert instructions.cell_type == "markdown"
+    for fragment in (
+        "v3.3.1", "outside Run All", "original six-trial smoke",
+        "mixed_smoke.yaml", "constrained_mixed_smoke.yaml", "pending_noisy_smoke.yaml",
+        "mixed_standard.yaml", "constrained_mixed_standard.yaml",
+        "pending_noisy_standard.yaml", "9 trials / 54 evaluations",
+        "45 trials / 1,080 evaluations", "40 complete and five failed",
+    ):
+        assert fragment in instructions.source
     for cell in notebook.cells:
         if cell.cell_type == "code":
             compile(cell.source, f"{BENCHMARK_NOTEBOOK}:{cell.id}", "exec")

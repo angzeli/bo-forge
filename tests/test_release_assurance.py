@@ -152,19 +152,35 @@ def test_benchmark_smoke_is_explicit_and_bounded_in_numerical_ci() -> None:
     workflow = _workflow(".github/workflows/ci.yml")
     steps = workflow["jobs"]["numerical"]["steps"]
     benchmark_steps = [step for step in steps if "-m benchmarks" in step.get("run", "")]
-    assert len(benchmark_steps) == 1
+    assert len(benchmark_steps) == 4
     assert benchmark_steps[0]["run"] == (
         "python -m benchmarks run --spec benchmarks/specs/smoke.yaml "
         "--output /tmp/bo-forge-benchmark-smoke"
     )
     assert "standard.yaml" not in _read(".github/workflows/ci.yml")
     uploads = [step for step in steps if step.get("uses") == "actions/upload-artifact@v4"]
-    assert len(uploads) == 1
+    assert len(uploads) == 4
     assert uploads[0]["if"] == "always()"
     assert uploads[0]["with"] == {
         "name": "closed-loop-benchmark-smoke", "path": "/tmp/bo-forge-benchmark-smoke/",
         "if-no-files-found": "warn", "retention-days": "14",
     }
+    for step, upload, route in zip(
+        benchmark_steps[1:], uploads[1:],
+        ("mixed", "constrained_mixed", "pending_noisy"), strict=True,
+    ):
+        slug = route.replace("_", "-")
+        assert step["run"] == (
+            f"python -m benchmarks run --spec benchmarks/specs/{route}_smoke.yaml "
+            f"--output /tmp/bo-forge-benchmark-{slug}-smoke"
+        )
+        assert step["if"] == "${{ !cancelled() }}"
+        assert upload["if"] == "always()"
+        assert upload["with"] == {
+            "name": f"{slug}-benchmark-smoke",
+            "path": f"/tmp/bo-forge-benchmark-{slug}-smoke/",
+            "if-no-files-found": "warn", "retention-days": "14",
+        }
     pyproject = tomllib.loads(_read("pyproject.toml"))
     assert "benchmarks/**/*.py" in pyproject["tool"]["ruff"]["include"]
     assert not any(
@@ -203,6 +219,27 @@ def test_benchmark_release_docs_preserve_source_and_acceptance_boundaries() -> N
         "docs/CAPABILITY_MATRIX.md", "docs/STREAMLIT_APP.md",
     ):
         assert PROJECT_VERSION in _read(path)
+
+
+def test_v331_release_docs_separate_route_budgets_from_acceptance() -> None:
+    guide = _read("docs/BENCHMARKS.md")
+    for route in ("mixed", "constrained_mixed", "pending_noisy"):
+        for size in ("smoke", "standard"):
+            assert f"{route}_{size}.yaml" in guide
+    for phrase in (
+        "schema_version: 2", "mixed_quadratic", "noise_std: 1.0", "X_pending",
+        "9 trials / 54 evaluations", "45 trials / 1,080\nevaluations",
+        "8 / 24", "6 / 24", "0, 1, 2, 3, 4",
+        "v3.3.1 Measured Acceptance", "40 complete, 5 failed", "1,003 evaluations",
+        "Historical v3.3.0 Local Standard Acceptance",
+        "unknown timing", "known-duration subtotals", "worker shutdown",
+        "expected value", "actual value", "inputs.json",
+    ):
+        assert phrase in guide
+    assert "production capability statuses below\nare unchanged" in _read(
+        "docs/CAPABILITY_MATRIX.md"
+    )
+    assert "40 complete and five failed" in _read("README.md")
 
 
 def test_beginner_setup_contract_and_links() -> None:
@@ -355,10 +392,12 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.2.3` | implementation complete |" in roadmap
     assert "| `v3.2.x` | completed |" in roadmap
     assert "class v33 majorActive" in roadmap
-    assert "class v330 patchActive" in roadmap
+    assert "class v330 patchDone" in roadmap
+    assert "class v331 patchActive" in roadmap
     assert "| `v3.3.0` | prepared |" in roadmap
+    assert "| `v3.3.1` | prepared |" in roadmap
     assert "| `v3.3.x` | active |" in roadmap
-    for version in ("3.3.1", "3.3.2", "3.3.3", "3.3.4"):
+    for version in ("3.3.2", "3.3.3", "3.3.4"):
         assert f"| `v{version}` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap

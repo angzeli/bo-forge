@@ -176,6 +176,12 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "benchmarks/__main__.py",
         "benchmarks/specs/smoke.yaml",
         "benchmarks/specs/standard.yaml",
+        "benchmarks/specs/mixed_smoke.yaml",
+        "benchmarks/specs/mixed_standard.yaml",
+        "benchmarks/specs/constrained_mixed_smoke.yaml",
+        "benchmarks/specs/constrained_mixed_standard.yaml",
+        "benchmarks/specs/pending_noisy_smoke.yaml",
+        "benchmarks/specs/pending_noisy_standard.yaml",
         "docs/BENCHMARKS.md",
         "notebooks/24_closed_loop_benchmarks.ipynb",
         "README.md",
@@ -260,6 +266,11 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         for path in (PROJECT_ROOT / "benchmarks").rglob("*.py")
     }
     assert benchmark_sources.issubset(names)
+    benchmark_specs = {
+        f"{SDIST_ROOT}/{path.relative_to(PROJECT_ROOT).as_posix()}"
+        for path in (PROJECT_ROOT / "benchmarks" / "specs").glob("*.yaml")
+    }
+    assert benchmark_specs.issubset(names)
     assert not any("working_log" in name or "latest_suggestions" in name for name in names)
 
 

@@ -13,25 +13,10 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from benchmarks.definitions import campaign_config
 from benchmarks.problems import inputs, problem_for, score, true_value
 from benchmarks.storage import append_trace, sha256, utc_now, write_json
 from bo_forge import CampaignSession
-
-
-def campaign_config(trial, bounds):
-    """Only definitions/settings reach BO. No optimum, latent outcome, or noise parameter."""
-    return {
-        "campaign_name": trial["trial_id"],
-        "objective": {"name": "outcome", "direction": "minimize"},
-        "variables": [{"name": f"x{i + 1}", "type": "continuous",
-                       "lower": float(lower), "upper": float(upper)}
-                      for i, (lower, upper) in enumerate(zip(*bounds, strict=True))],
-        "model": {"profile": "default"},
-        "bo": {**trial["bo"], "batch_size": 1,
-               "initial_design_size": trial["initial_observations"],
-               "initial_design_method": "sobol", "random_seed": trial["seeds"]["fitting"],
-               "acquisition": "qlog_nei" if trial["mode"] == "noisy" else "log_ei"},
-    }
 
 
 def _external_row(campaign, point, index, source):
@@ -39,6 +24,8 @@ def _external_row(campaign, point, index, source):
     row.update(row_id=f"eval_{index + 1:06d}", iteration=index + 1,
                status="suggested", source=source)
     row.update(zip(campaign.config.variable_names, point, strict=True))
+    if campaign.config.review.enabled:
+        row["review_status"] = "pending"
     return pd.DataFrame([row], columns=campaign.df.columns)
 
 
@@ -109,6 +96,10 @@ def run_trial(directory, *, suggest=None, objective=None):
     """Write durable evidence after each observed step; exceptions end the trial visibly."""
     directory = Path(directory)
     trial = json.loads((directory / "trial.json").read_text())
+    if trial.get("schema_version") == 2:
+        from benchmarks.workflows import run_extended
+
+        return run_extended(directory, trial, suggest=suggest, objective=objective)
     problem = problem_for(trial["problem"]["name"])
     bounds = problem.bounds.numpy()
     config_path, log_path = directory / "campaign.yaml", directory / "campaign.csv"

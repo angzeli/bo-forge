@@ -4,10 +4,11 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.3.0`. The source-only benchmark harness begins
-continuous single-objective closed-loop comparison against random and Sobol
-baselines, with deterministic/noisy modes and explicit failure accounting.
-Local standard acceptance completed 90/90 trials; this does not establish general BO superiority.
+Current prepared baseline: `v3.3.1`. The source-only benchmark harness extends
+continuous single-objective comparisons with mixed, constrained, and pending-aware
+routes plus evidence-integrity and cancellation-timing fixes. Local acceptance
+retained 40 complete and five failed standard trials. Historical v3.3.0 acceptance completed
+90/90 trials; this does not establish general BO superiority.
 The completed v3.2.x diagnostic line does not establish universal calibration.
 Completed statuses describe implementation, not publication approval. Release
 publication still requires exact-commit CI and separate authorization.
@@ -68,8 +69,9 @@ flowchart LR
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
-    class v330 patchActive
-    class v331,v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v330 patchDone
+    class v331 patchActive
+    class v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -97,7 +99,7 @@ flowchart LR
 | `v3.2.3` | implementation complete | Known-distribution diagnostic acceptance and series closeout |
 | `v3.2.x` | completed | Predictive diagnostics, hardening, interpretation, and acceptance; not universal calibration |
 | `v3.3.0` | prepared | Source-only continuous benchmark harness; 90/90 local standard trials complete |
-| `v3.3.1` | planned | Mixed, constrained, and pending-aware noisy routes |
+| `v3.3.1` | prepared | Evidence integrity, cancellation timing, mixed/constrained/pending routes; 40 complete and 5 failed standard trials retained |
 | `v3.3.2` | planned | Multi-objective and multi-fidelity routes |
 | `v3.3.3` | planned | Full notebook execution |
 | `v3.3.4` | planned | Performance evidence and series closeout |
@@ -356,9 +358,23 @@ evidence and interpretation limits are recorded in the benchmark guide.
 
 ### v3.3.1 - Mixed, Constrained, And Pending-Aware Noisy Routes
 
-- Extend repeated-seed evidence to mixed variables, constraints, and
-  pending-aware noisy behavior beyond the continuous noisy v3.3.0 baseline.
-- Report feasibility, failures, and runtime without weakening assertions.
+Status: prepared; local acceptance and constrained-BO failures recorded. Publication requires separate
+authorization and exact-commit CI.
+
+- Bind report evidence to scheduled configuration, sources, seed mapping, and
+  inputs; retain cancellation elapsed time and distinguish unknown timing from zero.
+- Add schema-v2 `mixed` and `constrained_mixed` routes on `mixed_quadratic`,
+  plus `pending_noisy` on noisy Branin (`noise_std: 1.0`, `qlog_nei`, `X_pending`).
+- Six route specs plan 9 smoke trials/54 evaluations (seed 0, 4 initial/6 total)
+  and 45 standard trials/1,080 evaluations (seeds 0 through 4, 24 total;
+  8 initial for mixed routes and 6 for pending). Counts are budgets, not results.
+- Preserve schema-v1 specs and historical evidence, the original CI smoke, and
+  notebook #24 computational cells. Add route smokes to numerical CI and opt-in
+  Markdown notebook instructions; keep tooling source-only and outside the wheel.
+- Report feasibility, pending rows, failures, and runtime without weakening
+  assertions or changing production capability statuses. Record inspected
+  acceptance in [Benchmarks](docs/BENCHMARKS.md), including retained failures
+  and the limits of these controlled comparisons.
 
 ### v3.3.2 - Multi-Objective And Multi-Fidelity Routes
 

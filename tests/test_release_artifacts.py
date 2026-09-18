@@ -264,7 +264,8 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
         "## v3.2.2 - Predictive Interpretation And Calibration Guidance" in changelog
     )
     assert "## v3.2.3 - Synthetic Acceptance And Series Closeout" in changelog
-    assert f"## v{PROJECT_VERSION} - Closed-Loop Benchmark Harness" in changelog
+    assert "## v3.3.0 - Closed-Loop Benchmark Harness" in changelog
+    assert f"## v{PROJECT_VERSION} - Benchmark Integrity And Workflow Routes" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog

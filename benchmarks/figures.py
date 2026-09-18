@@ -37,7 +37,8 @@ def _figure(trace, curve, metadata, problem, mode, directory):
         _seed_lines(axes[0], trace, metadata["spec"]["seeds"])
         _curves(axes[1], curve)
         _final_distribution(axes[2], trace, metadata)
-        set_title(axes[0], f"{problem}, {mode}\nPer-seed regret (hollow: partial)")
+        route = metadata["spec"].get("route", "continuous")
+        set_title(axes[0], f"{route}: {problem}, {mode}\nPer-seed regret (hollow: partial)")
         set_title(axes[1], "Complete trials only\nMedian and interquartile range")
         set_title(axes[2], "Complete trials only\nFinal regret distribution")
         for ax in axes[:2]:

@@ -1,8 +1,8 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.3.0.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.3.1.
 
-The v3.3.0 [benchmark harness](BENCHMARKS.md) adds no public `bo_forge` imports,
+The v3.3.1 [benchmark harness](BENCHMARKS.md) adds no public `bo_forge` imports,
 campaign CLI commands, or HTTP routes. Its `python -m benchmarks` commands run
 from a checkout or extracted source archive; benchmark Python helpers are not a
 stable public API and are excluded from the runtime wheel.

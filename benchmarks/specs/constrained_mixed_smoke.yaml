@@ -1,0 +1,16 @@
+schema_version: 2
+route: constrained_mixed
+name: constrained_mixed-smoke
+problems:
+  - {name: mixed_quadratic, noise_std: 0.0, optimum_tolerance: 0.000001}
+seeds: [0]
+modes: [deterministic]
+strategies: [bo, random, sobol]
+evaluations: 6
+initial_observations: 4
+timeout_seconds: 600
+bo:
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 16
+  min_normalized_distance: 0.0

@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from benchmarks.spec import load_spec, schedule
+from benchmarks.spec import _parse_spec, schedule
 from benchmarks.storage import TERMINAL, environment, read_trace, sha256, utc_now, write_json
 
 
@@ -74,24 +74,38 @@ def _execute_trial(directory, timeout, *, command=None):
     command = command or [sys.executable, "-m", "benchmarks.worker", str(directory)]
     started = time.monotonic()
     outcome, message = None, ""
-    with (directory / "worker.log").open("xb") as output:
-        try:
-            process = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],
-                                       env=_worker_environment(), stdout=output, stderr=output)
+    process = None
+    try:
+        with (directory / "worker.log").open("xb") as output:
             try:
-                code = process.wait(timeout=timeout)
-                if code != 0:
-                    outcome, message = "failed", f"Worker exited with code {code}; see worker.log."
-            except subprocess.TimeoutExpired:
+                process = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],
+                                           env=_worker_environment(), stdout=output, stderr=output)
+            except OSError as exc:
+                outcome, message = "failed", f"Worker startup failed: {exc}"
+            else:
+                try:
+                    code = process.wait(timeout=timeout)
+                    if code != 0:
+                        outcome = "failed"
+                        message = f"Worker exited with code {code}; see worker.log."
+                except subprocess.TimeoutExpired:
+                    _stop(process)
+                    outcome, message = "timeout", f"Trial exceeded {timeout:g} seconds; no retry."
+                process = None
+        _finalize_status(directory, outcome, message, time.monotonic() - started)
+    except BaseException as exc:
+        # Finalize only after owned-worker shutdown, without replacing the cancellation.
+        if process is not None:
+            try:
                 _stop(process)
-                outcome, message = "timeout", f"Trial exceeded {timeout:g} seconds; no retry."
-            except BaseException:
-                # Cancellation owns this worker; stop it before recording remaining trials.
-                _stop(process)
-                raise
-        except OSError as exc:
-            outcome, message = "failed", f"Worker startup failed: {exc}"
-    _finalize_status(directory, outcome, message, time.monotonic() - started)
+            except BaseException as cleanup_error:
+                exc.add_note(f"Worker cleanup failed: {cleanup_error}")
+        try:
+            _finalize_status(directory, "interrupted", "Trial interrupted; no automatic resume.",
+                             time.monotonic() - started)
+        except BaseException as cleanup_error:
+            exc.add_note(f"Trial timing/status cleanup failed: {cleanup_error}")
+        raise
 
 
 def _finalize_status(directory, outcome, message, seconds):
@@ -110,7 +124,7 @@ def _finalize_status(directory, outcome, message, seconds):
     trial = json.loads((directory / "trial.json").read_text())
     if status["status"] == "complete" and len(rows) != trial["evaluations"]:
         status.update(status="failed", message="Complete status has missing evaluation evidence.")
-    status.update(completed_evaluations=len(rows), wall_seconds=seconds,
+    status.update(completed_evaluations=len(rows), wall_seconds=seconds, timing_status="measured",
                   trace_warning=warning, finished_at=utc_now())
     write_json(status_path, status)
 
@@ -123,17 +137,20 @@ def run_suite(spec_path, output):
 
 def _run_suite(spec_path, output):
     spec_path, output = Path(spec_path), Path(output).expanduser().absolute()
-    spec = load_spec(spec_path)
+    spec_bytes = spec_path.read_bytes()
+    spec = _parse_spec(spec_bytes)
     trials = schedule(spec)
     print(f"{spec['name']}: {len(trials)} trials; {spec['evaluations']} evaluations/trial "
           f"({len(trials) * spec['evaluations']} total); "
           f"{spec['timeout_seconds']:g}s/trial; sequential CPU, 1 thread.", flush=True)
     output.mkdir(parents=True, exist_ok=False)
-    (output / "spec.yaml").write_bytes(spec_path.read_bytes())
-    metadata = {"schema_version": 1, "created_at": utc_now(), "status": "running",
-                "spec": spec, "spec_sha256": sha256((output / "spec.yaml").read_bytes()),
+    (output / "spec.yaml").write_bytes(spec_bytes)
+    metadata = {"schema_version": spec["schema_version"], "created_at": utc_now(),
+                "status": "running",
+                "spec": spec, "spec_sha256": sha256(spec_bytes),
                 "environment": environment(), "trials": trials}
     started = time.monotonic()
+    started_trials = set()
     try:
         write_json(output / "run.json", metadata)
         for trial in trials:
@@ -143,6 +160,7 @@ def _run_suite(spec_path, output):
             write_json(directory / "status.json", {"status": "pending", "completed_evaluations": 0})
         for number, trial in enumerate(trials, 1):
             directory = output / "trials" / trial["trial_id"]
+            started_trials.add(trial["trial_id"])
             _execute_trial(directory, spec["timeout_seconds"])
             status = json.loads((directory / "status.json").read_text())["status"]
             print(f"[{number}/{len(trials)}] {trial['trial_id']}: {status}", flush=True)
@@ -156,20 +174,20 @@ def _run_suite(spec_path, output):
     except BaseException as exc:
         # Scheduler boundary: preserve completed trials and explicitly cancel all unfinished work.
         try:
-            _terminalize_remaining(output, trials)
-        except Exception as cleanup_error:
+            _terminalize_remaining(output, trials, started_trials=started_trials)
+        except BaseException as cleanup_error:
             exc.add_note(f"Trial cleanup failed: {cleanup_error}")
-        metadata.update(status="interrupted", finished_at=utc_now(),
-                        wall_seconds=time.monotonic() - started)
         try:
+            metadata.update(status="interrupted", finished_at=utc_now(),
+                            wall_seconds=time.monotonic() - started)
             write_json(output / "run.json", metadata)
-        except Exception as cleanup_error:
+        except BaseException as cleanup_error:
             exc.add_note(f"Run cleanup failed: {cleanup_error}")
         raise
     return output
 
 
-def _terminalize_remaining(output, trials):
+def _terminalize_remaining(output, trials, *, started_trials):
     for trial in trials:
         directory = output / "trials" / trial["trial_id"]
         directory.mkdir(parents=True, exist_ok=True)
@@ -177,6 +195,11 @@ def _terminalize_remaining(output, trials):
             write_json(directory / "trial.json", trial)
         status_path = directory / "status.json"
         status = _read_status(status_path)
+        original_status = status.copy()
+        if trial["trial_id"] not in started_trials:
+            status.update(wall_seconds=0.0, timing_status="not_started")
+        elif status.get("timing_status") != "measured":
+            status.update(wall_seconds=None, timing_status="unknown")
         if status.get("status") not in TERMINAL:
             try:
                 rows, warning = read_trace(directory / "trace.jsonl")
@@ -185,4 +208,5 @@ def _terminalize_remaining(output, trials):
             status.update(status="interrupted", completed_evaluations=len(rows),
                           message="Run interrupted; no automatic resume.",
                           trace_warning=warning, finished_at=utc_now())
+        if status != original_status:
             write_json(status_path, status)

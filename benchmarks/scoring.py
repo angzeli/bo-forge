@@ -2,6 +2,9 @@
 
 import math
 
+from benchmarks.binding import require_equal
+from benchmarks.definitions import definition, expected_source
+
 
 def verify_rows(rows, observed, inputs, trial):
     best_latent, best_observed, incumbent = math.inf, math.inf, None
@@ -13,13 +16,12 @@ def verify_rows(rows, observed, inputs, trial):
         if row["row_id"] not in observed.index:
             raise ValueError("Trace row is missing from observed campaign history.")
         actual = observed.loc[row["row_id"]]
+        require_equal(trial, f"trace row {index} source", expected_source(trial, index - 1),
+                      row["source"])
         if actual.source != row["source"]:
             raise ValueError("Trace source differs from observed campaign history.")
         _close(float(actual.outcome), row["observed"], "campaign outcome")
-        if len(row["x"]) != len(inputs["bounds"][0]):
-            raise ValueError("Trace design dimension mismatch.")
-        for column, value in enumerate(row["x"], 1):
-            _close(float(actual[f"x{column}"]), value, "campaign design")
+        _verify_design(actual, row["x"], trial)
         _close(row["observed"] - row["latent"], row["noise"], "observation noise")
         if trial["mode"] == "deterministic":
             _close(row["noise"], 0.0, "deterministic observation")
@@ -36,6 +38,17 @@ def verify_rows(rows, observed, inputs, trial):
                 raise ValueError("Stored scores imply an invalid negative regret.")
             _close(row[f"{prefix}_regret_raw"], raw, "raw regret")
             _close(row[f"{prefix}_regret"], max(raw, 0.0), "regret")
+
+
+def _verify_design(actual, point, trial):
+    variables = definition(trial)["variables"]
+    if len(point) != len(variables):
+        raise ValueError("Trace design dimension mismatch.")
+    for variable, value in zip(variables, point, strict=True):
+        if variable["type"] == "categorical":
+            require_equal(trial, f"design.{variable['name']}", actual[variable["name"]], value)
+        else:
+            _close(float(actual[variable["name"]]), value, "campaign design")
 
 
 def _close(actual, expected, label):

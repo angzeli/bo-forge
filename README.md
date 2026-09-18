@@ -1,17 +1,21 @@
-# 🧪 BO Forge v3.3.0
+# 🧪 BO Forge v3.3.1
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.3.0 prepares a source-only closed-loop benchmark harness for continuous
-single-objective Branin, Hartmann3, and Hartmann6 campaigns, comparing BO with
-random and Sobol baselines in deterministic and noisy modes. Reports retain
-failures and distinguish noisy observations from latent objective quality.
+v3.3.1 prepares benchmark evidence-integrity and cancellation-timing fixes plus
+source-only `mixed`, `constrained_mixed`, and `pending_noisy` routes, comparing
+BO with random and Sobol baselines. Schema-v1 continuous Branin, Hartmann3,
+and Hartmann6 specs remain supported. Reports retain failures and distinguish
+noisy observations from latent objective quality and unknown timing from zero.
 See [Benchmarks](docs/BENCHMARKS.md) and the output-free
-[smoke notebook](notebooks/24_closed_loop_benchmarks.ipynb). Local standard
-acceptance completed 90/90 trials; the guide records the evidence and limits.
+[smoke notebook](notebooks/24_closed_loop_benchmarks.ipynb), whose default remains
+the original six-trial smoke. Local v3.3.1 acceptance completed all nine smoke
+trials; the standard retained 40 complete and five failed constrained-BO trials,
+with 1,003 of 1,080 budgeted evaluations. Historical v3.3.0 acceptance completed 90/90 trials;
+the guide preserves that evidence and its limits separately.
 That is not a general superiority claim or publication approval. No BO,
 Streamlit, or public API behavior changes are introduced by this harness.
 

@@ -1,10 +1,13 @@
 # Closed-Loop Benchmarks
 
-BO Forge v3.3.0 prepares a bounded, source-only benchmark harness for continuous
-single-objective optimisation. It compares `bo`, `random`, and `sobol` on Branin,
-Hartmann3, and Hartmann6 in `deterministic` and `noisy` modes. It changes no BO
+BO Forge v3.3.1 prepares evidence-integrity and cancellation-timing fixes plus
+bounded `mixed`, `constrained_mixed`, and `pending_noisy` routes. The source-only
+harness retains continuous Branin, Hartmann3, and Hartmann6 comparisons between
+`bo`, `random`, and `sobol` in `deterministic` and `noisy` modes. It changes no BO
 algorithm, public campaign API, or Streamlit workflow. Measured acceptance is
-recorded below; it does not establish general superiority over either baseline.
+recorded below, including five constrained-BO failures; historical v3.3.0
+results remain recorded separately.
+Neither preparation nor those results establish general baseline superiority.
 
 ## Run From Source
 
@@ -30,7 +33,7 @@ fitting models, evaluating objectives, or mutating the run directory.
 
 ## Budgets And Specifications
 
-Both checked-in specs use `schema_version: 1`. Evaluation totals include initial
+The original two specs retain `schema_version: 1`. Evaluation totals include initial
 observations, not additional post-initialisation steps.
 
 | Spec | Problems | Seeds | Modes/strategies | Initial / total evaluations | Trials |
@@ -41,7 +44,8 @@ observations, not additional post-initialisation steps.
 Trials run sequentially, one trial worker process at a time, with
 `timeout_seconds: 600` per trial and no trial parallelism. The smoke has two BO
 trials with two post-initialisation steps each: only four BO suggestion calls.
-The CI numerical job and notebook use the full six-trial smoke, not the standard.
+The notebook uses only the full six-trial smoke. The CI numerical job retains
+that smoke and adds the three schema-v2 route smokes below, never the standards.
 The timeout is a per-trial bound, not a promised whole-run duration.
 
 The standard is an explicit, separately launched run, never part of notebook
@@ -85,21 +89,83 @@ Standard BO settings are `raw_samples: 128`, `num_restarts: 5`,
 16, and 0 respectively. These small smoke settings are for integration coverage,
 not an optimisation-quality recommendation.
 
+### Schema-v2 Route Specifications
+
+Six additional files use `schema_version: 2` and an explicit `route` selector.
+All paths below are under `benchmarks/specs/`; each uses `bo`, `random`, and
+`sobol` with the same per-route seeds, initialization, and noise streams.
+
+| Spec | Route / problem | Mode | Seeds | Initial / total evaluations | Trials |
+| --- | --- | --- | --- | --- | --- |
+| `mixed_smoke.yaml` | `mixed` / `mixed_quadratic` | deterministic | 0 | 4 / 6 | 3 |
+| `constrained_mixed_smoke.yaml` | `constrained_mixed` / `mixed_quadratic` | deterministic | 0 | 4 / 6 | 3 |
+| `pending_noisy_smoke.yaml` | `pending_noisy` / `branin` | noisy, `noise_std: 1.0` | 0 | 4 / 6 | 3 |
+| `mixed_standard.yaml` | `mixed` / `mixed_quadratic` | deterministic | 0, 1, 2, 3, 4 | 8 / 24 | 15 |
+| `constrained_mixed_standard.yaml` | `constrained_mixed` / `mixed_quadratic` | deterministic | 0, 1, 2, 3, 4 | 8 / 24 | 15 |
+| `pending_noisy_standard.yaml` | `pending_noisy` / `branin` | noisy, `noise_std: 1.0` | 0, 1, 2, 3, 4 | 6 / 24 | 15 |
+
+The new smoke budget is **9 trials / 54 evaluations** in total; each route has
+3 trials / 18 evaluations. The new standard budget is **45 trials / 1,080
+evaluations**; each route has 15 trials / 360 evaluations. These totals exclude
+the original schema-v1 runs and describe scheduled budgets, not results.
+The 600-second per-trial bound and sequential worker model remain unchanged.
+
+```bash
+python -m benchmarks run --spec benchmarks/specs/mixed_smoke.yaml --output /tmp/bo-forge-benchmark-mixed-smoke
+python -m benchmarks run --spec benchmarks/specs/constrained_mixed_smoke.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-smoke
+python -m benchmarks run --spec benchmarks/specs/pending_noisy_smoke.yaml --output /tmp/bo-forge-benchmark-pending-noisy-smoke
+# Standards are separate, explicit acceptance runs, never notebook Run All.
+python -m benchmarks run --spec benchmarks/specs/mixed_standard.yaml --output /tmp/bo-forge-benchmark-mixed-standard
+python -m benchmarks run --spec benchmarks/specs/constrained_mixed_standard.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-standard
+python -m benchmarks run --spec benchmarks/specs/pending_noisy_standard.yaml --output /tmp/bo-forge-benchmark-pending-noisy-standard
+```
+
+The mixed routes exercise continuous, integer, discrete, and categorical inputs
+through existing `log_ei` behavior; the constrained variant additionally checks
+feasibility. The pending route uses `qlog_nei` with delayed observations and
+accepted pending rows supplied through `X_pending`. This is a sequential
+workflow check, not an asynchronous-throughput benchmark. Inspect feasibility
+and pending-row evidence alongside quality and timing; never replace failed
+BO with a baseline or hide a failed attempt behind a retry.
+
+The controlled mixed fixture minimizes
+`(x - 0.25)^2 + 0.125*(k - 2)^2 + 0.25*(z - 0.5)^2 + penalty[c]`, with
+`x` in `[-1, 1]`, integer `k` in `[0, 4]`, `z` in `{0, 0.5, 1}`, and
+`c` in `{A, B, C}`. Penalties are `{A: 0.5, B: 0, C: 0.25}`. Its minimum
+is zero. The constrained route adds `c != 'B' or k >= 3` and
+`x + 0.125*k <= 0.625`, giving a feasible minimum of `0.125`.
+Tests independently enumerate the finite choices and minimize the remaining
+one-dimensional quadratic. These are controlled fixtures, not scientific applications.
+
+Finite choices are decoded using equal-width bins. A shared feasible, unique
+Sobol initialization precedes each strategy. A total limit of 10,000 proposal
+draws per trial covers initialization and baseline sampling, including infeasible
+and duplicate rejections. BO candidates are never repaired or retried by the harness.
+For pending trials, initialization is fully observed. Each subsequent cycle
+submits and accepts A, then submits and accepts B while A is pending, before
+computing or observing either outcome. Observation order is A then B; noise is
+indexed by submission. Completion requires an empty pending queue.
+
 ## Scientific And Random-Stream Contract
 
-The simulator uses the installed supported BoTorch `Branin` and `Hartmann`
+The continuous simulator uses the installed supported BoTorch `Branin` and `Hartmann`
 implementations, native bounds, double precision, CPU, and `negate=False`.
 Campaigns minimize `outcome`. Deterministic campaigns use `log_ei`; noisy
 campaigns use `qlog_nei`. Baselines pass external single-point `random` or `sobol`
 suggestions through the same managed initialization, append, mark-observed, and
 reload operations. Strategy identity belongs in `trial.json`, not new CSV columns.
 
-For each problem/seed/mode, SHA-256 of compact JSON
+For each schema-v1 problem/seed/mode, SHA-256 of compact JSON
 `[1, problem, seed, mode, stream_name]`, truncated to the first four bytes as an
 unsigned big-endian integer, derives four streams: `initialization`, `baseline`,
 `observation_noise`, and `fitting`. The mapping is recorded per trial. Strategies
 share scrambled Sobol initial points and initial observations. The Sobol baseline
 continues that sequence; the random baseline uses its separate NumPy generator.
+Version 2 instead hashes `[2, route, problem, seed, mode, stream_name]`; it never
+changes the v1 derivation. Typed mixed designs use canonical compact JSON
+fingerprints, preserving integer and categorical values rather than object-array
+memory bytes. Reports verify v2 typed metadata and the seeded initialization
+fingerprint without fitting a model or evaluating an objective.
 Observation noise uses another local generator indexed by evaluation count, so
 optimizer random-number consumption cannot alter simulator noise. Backend fitting
 receives the fitting seed through existing config semantics; this is not a claim
@@ -156,27 +222,50 @@ unfinished trials as interrupted (exit 130 and 143 respectively). Signal handler
 are restored when the run exits. Forced termination such as SIGKILL, power loss,
 or an unwritable filesystem cannot guarantee cleanup; preserve the directory and
 inspect its evidence rather than treating it as a completed run or resuming it.
-Numerical CI uploads the smoke directory even after step failure, with a 14-day
+Numerical CI uploads each smoke directory even after step failure, with a 14-day
 artifact-retention limit; download evidence needed for longer-lived investigation.
 
 `trials.csv` exposes per-trial outcomes and denominators. `summary.csv` groups
-by problem, mode, and strategy, with completed-trial final regret median and
+by route, problem, mode, and strategy, with completed-trial final regret median and
 interquartile bounds (`final_regret_median`, `final_regret_q25`, and
 `final_regret_q75`). `trajectories.csv` reports `contributing_complete`,
 `contributing_partial`, and `scheduled` at each evaluation count; trajectory
 median and quartiles use completed trials only. Partial traces remain visible
 without contributing to completed-trial quality aggregates. Figures use the
-same problem/mode grouping, not a single pooled cross-problem ranking.
+same route/problem/mode grouping, not a single pooled cross-problem ranking.
+For v2, `feasibility.json` records proposals and rejection counts; `events.jsonl`
+records ordered submission, acceptance, and observation evidence. Reports include
+`proposal_draws`, `infeasible_proposals`, `duplicate_proposals`,
+`workflow_event_count`, and `suggestions_with_pending`. Scoring order must match
+observation order; interrupted trailing events remain explicit warnings.
+
+Reports bind campaign YAML, acquisition, model profile, optimizer settings,
+initialization, source labels, seed mapping, and `inputs.json` to the scheduled
+trial. Internal agreement among copied artifacts alone is insufficient.
+The strictly parsed `spec.yaml` snapshot must also match the resolved specification
+in `run.json`, not merely its stored byte hash. The runner parses and retains one
+byte snapshot so edits to the input spec after loading cannot alter the recorded plan.
+Initialization must use `sobol`; baseline sources must match `random` or `sobol`;
+BO sources must match `log_ei` or `qlog_nei` as scheduled. Contradictions identify
+the trial, field, expected value, and actual value.
 
 Complete trials require a valid matching manifest and exact observed CSV/trace
 agreement. Missing or changed provenance, extra campaign rows, malformed evidence,
-and trace fields that override scheduled identities are rejected. This is an
+and trace fields that override scheduled identities are rejected. Present malformed
+or mismatched provenance is also rejected for failed, timed-out, and interrupted
+trials; a failed status does not turn contradictory evidence into a warning. This is an
 integrity check, not a signature or tamper-proof audit. Reports never recover a
 pending transaction or repair source files. Incomplete trials can retain partial
 traces with an explicit `evidence_warning` in `trials.csv` and the Markdown report;
 in particular, an observation persisted before an interrupted trace write is
 reported as unscored, not silently counted as a scored evaluation. It does not
 enter completed-trial aggregates.
+An absent artifact or a pending transaction whose CSV matches its previous or
+intended resulting hash can be disclosed for incomplete trials without repair.
+An unknown pending state is rejected. Workflow acceptance/observation events must
+agree with persisted review/observation states. A persisted mutation with a missing
+event is disclosed as interrupted event recording, not fabricated as an event;
+an event claiming a mutation absent from the CSV is rejected.
 
 Per-seed plots use strategy colors and distinct seed line patterns. Hollow circle
 markers identify partial trials; filled circles identify completed trials. The
@@ -186,8 +275,15 @@ runs, rather than assuming every run contains five seeds.
 `suggestion_seconds` includes model fitting and acquisition optimization for BO;
 `objective_seconds` covers simulation/scoring, and `mutation_seconds` covers
 campaign persistence and reload. These sum completed steps only. Per-trial wall
-time additionally includes startup and any failed or interrupted work. These are
+time additionally includes startup and any failed or interrupted work. On
+cancellation, active-trial monotonic elapsed time includes worker shutdown.
+Missing historical `wall_seconds` is unknown, never `0.0`; a measured zero
+remains distinct. Reports expose known-duration subtotals and unknown timing
+counts, so partial timing is not presented as a complete runtime total. These are
 diagnostic timings on the recorded environment, not fixed-runner performance claims.
+Summary fields `known_wall_seconds`, `known_timing_trials`, and
+`unknown_timing_trials` accompany `wall_seconds`; the latter stays blank whenever
+any contributor lacks timing. Markdown displays "not available" instead of zero.
 
 ## Read The Evidence
 
@@ -210,11 +306,68 @@ The output-free
 [24_closed_loop_benchmarks.ipynb](../notebooks/24_closed_loop_benchmarks.ipynb)
 runs only the smoke in a temporary directory, displays stored reports and trial
 statuses, and regenerates a report without rerunning optimisation. It deliberately
-does not leave benchmark results in the checkout.
+does not leave benchmark results in the checkout. Its computational cells remain
+unchanged; appended Markdown describes opt-in route commands only.
 
 ## Release Boundary
 
-### Local Standard Acceptance
+### v3.3.1 Measured Acceptance
+
+Local acceptance on 2026-09-18 retained every scheduled terminal outcome. These
+measurements do not certify general scientific performance or exact-commit CI.
+
+| Gate | Planned scope | Measured result |
+| --- | --- | --- |
+| New route smoke | 9 trials / 54 evaluations | 9 complete, 54 evaluations |
+| New route standard | 45 trials / 1,080 evaluations | 40 complete, 5 failed; 1,003 evaluations |
+| Read-only report regeneration | New routes and retained v3.3.0 | Coherent evidence; no optimization rerun |
+| Exact-commit CI | Release commit | Pending; separate from local evidence |
+
+| Route | Complete / failed | Evaluations | Measured worker wall seconds |
+| --- | ---: | ---: | ---: |
+| Mixed | 15 / 0 | 360 | 145.13 |
+| Constrained mixed | 10 / 5 | 283 | 115.86 |
+| Pending noisy | 15 / 0 | 360 | 176.85 |
+
+There were no timeouts, interruptions, unknown timings, or evidence-integrity
+warnings in these standard runs. The five constrained BO trials exhausted the
+existing eight candidate retries on infeasible designs after 8, 8, 9, 9, and 9
+observations (seeds 0 through 4). All remain in failure denominators with partial
+trajectories; their final-regret summaries are unavailable. No optimizer settings,
+seeds, or algorithms were changed to improve those outcomes. Baseline sampling
+recorded 221 infeasible proposals across the constrained suite. All three
+strategies followed the delayed schedule, with 135 total submissions while one
+accepted design was pending; 45 of those submissions belong to BO.
+
+Median final noise-free regret for completed trials only (five seeds per available
+cell; compare within a route, never pool these scales):
+
+| Route | BO | Random | Sobol |
+| --- | ---: | ---: | ---: |
+| Mixed | 0.00140385 | 0.312713 | 0.0746520 |
+| Constrained mixed | not available (0/5 complete) | 0.186451 | 0.232780 |
+| Pending noisy | 0.0616857 | 2.098872 | 0.862824 |
+
+Evidence is retained under `reports/benchmarks/v3.3.1-mixed-standard/`,
+`v3.3.1-constrained-mixed-standard/`, and `v3.3.1-pending-noisy-standard/`.
+Their `report-integrity-reviewed/` directories contain the final regenerated tables and figures;
+original reports remain preserved.
+The corrected route smokes are retained alongside them as `v3.3.1-*-smoke/`.
+An earlier pending smoke failed all three trials before observation because the
+harness passed the status `accepted` instead of the API decision `accept`.
+That corrected harness defect and its original evidence remain separately visible
+under `v3.3.1-pending-smoke-review-call-failure/`; the later passing smoke did not
+replace it. The original v1 smoke also completed 6/6 trials, and the retained v3.3.0
+90-trial evidence passed the stronger checks without rerunning optimization.
+
+Runs recorded BO Forge 3.3.1, Python 3.12.0, BoTorch 0.17.2, Torch 2.11.0,
+macOS 26.3 ARM64, and one computational thread per worker. Source identity was
+`46c00a6614fd9f80ac5f2b17210098f163085be7` with uncommitted v3.3.1 changes.
+Timings include process startup/shutdown, exclude report generation, and are not
+fixed-runner performance evidence. Generated evidence remains local and ignored;
+no publication approval is implied.
+
+### Historical v3.3.0 Local Standard Acceptance
 
 On 2026-09-17, the standard specification completed all 90 scheduled trials and
 2,160 evaluations, with zero failures, timeouts, or interruptions. All 440
@@ -249,6 +402,7 @@ also completed; the notebook's committed execution state remains output-free.
 Local smoke results, standard-run measurements, exact-commit CI, and publication
 authorization are separate gates. Append measured acceptance results only after
 the corresponding runs have been inspected. Mixed/constrained and pending-aware
-routes remain v3.3.1 work; multi-objective/multi-fidelity evidence is v3.3.2,
+routes are prepared in v3.3.1 with the failures disclosed above;
+multi-objective/multi-fidelity evidence is v3.3.2,
 full notebook execution v3.3.3, and performance closeout v3.3.4. See the
 [roadmap](../ROADMAP_V3_X.md) and [release checklist](RELEASE_CHECKLIST.md).

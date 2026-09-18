@@ -1,5 +1,35 @@
 # 📝 BO Forge Changelog
 
+## v3.3.1 - Benchmark Integrity And Workflow Routes
+
+Status: prepared; local route acceptance recorded with five disclosed constrained-BO failures.
+Exact-commit CI and
+publication authorization remain separate gates.
+
+- Binds reported evidence to the scheduled campaign configuration, acquisition,
+  model profile, optimizer settings, source labels, seed mapping, and
+  `inputs.json`, rather than only checking agreement within an artifact bundle.
+- Preserves active-trial monotonic elapsed time through cancellation and worker
+  shutdown. Missing historical timing remains unknown, not measured zero;
+  reports distinguish known-duration subtotals from unknown timing counts.
+- Adds schema-v2 `mixed` and `constrained_mixed` routes on `mixed_quadratic`
+  with `log_ei`, and `pending_noisy` on noisy Branin (`noise_std: 1.0`) with
+  `qlog_nei` and delayed observations through `X_pending`. Schema-v1 specs and
+  historical v3.3.0 evidence remain supported and separate.
+- Adds six route smoke/standard specifications. Across the three routes, smoke
+  plans 9 trials/54 evaluations; standard plans 45 trials/1,080 evaluations.
+  Local smoke completed 9/9; standard retained 40 complete and five failed trials
+  (1,003 evaluations). Constrained BO exhausted existing feasibility retries;
+  partial evidence remains visible and no favorable reruns replace failures.
+- Numerical CI retains the original smoke and adds the three route smokes,
+  with evidence uploaded even after failure. The sdist includes all specs;
+  benchmark tooling remains outside the runtime wheel.
+- Notebook #24 keeps its six-trial smoke computational cells and output-free
+  state, adding only Markdown route instructions. BO algorithms, campaign
+  schemas, public APIs, Streamlit, and production capability statuses are unchanged.
+- Multi-objective/multi-fidelity benchmarks, full notebook execution, and
+  performance closeout remain v3.3.2, v3.3.3, and v3.3.4 work respectively.
+
 ## v3.3.0 - Closed-Loop Benchmark Harness
 
 Status: prepared; local standard acceptance recorded, exact-commit CI still required.

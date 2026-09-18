@@ -12,7 +12,7 @@ from benchmarks import runner
 from benchmarks.__main__ import main
 from benchmarks.figures import COLORS, _seed_lines
 from benchmarks.report import _markdown, generate_report, load_evidence, tables
-from benchmarks.storage import read_trace, write_json
+from benchmarks.storage import read_trace, sha256, write_json
 from bo_forge import CampaignSession
 from tests._benchmark_support import controlled_execute, controlled_suggest, spec_file
 
@@ -47,6 +47,9 @@ def test_complete_trials_require_coherent_campaign_evidence(run, tmp_path, fault
     elif fault == "unscored":
         session = CampaignSession.from_files(config, log)
         suggestion = controlled_suggest(session)
+        trial = json.loads((directory / "trial.json").read_text())
+        if trial["strategy"] != "bo":
+            suggestion["source"] = trial["strategy"]
         session.append_suggestions(suggestion)
         session.mark_observed(str(suggestion.iloc[0].row_id), 42.0)
     else:
@@ -101,6 +104,74 @@ def test_partial_missing_manifest_is_disclosed_without_promoting_success(run):
         "manifest is required"
     ).all()
     assert summary.complete.sum() == 5
+
+
+@pytest.mark.parametrize("status_name", ["failed", "interrupted", "timeout"])
+@pytest.mark.parametrize("fault", ["malformed", "changed_log", "wrong_path"])
+def test_partial_contradictory_provenance_rejects_report(run, tmp_path, status_name, fault):
+    directory = next((run / "trials").iterdir())
+    status = json.loads((directory / "status.json").read_text())
+    status["status"] = status_name
+    write_json(directory / "status.json", status)
+    manifest = directory / "campaign.csv.manifest.json"
+    if fault == "malformed":
+        manifest.write_text("[]")
+    elif fault == "changed_log":
+        log = directory / "campaign.csv"
+        log.write_bytes(log.read_bytes() + b"\n")
+    else:
+        value = json.loads(manifest.read_text())
+        value["paths"]["config"] = "different.yaml"
+        write_json(manifest, value)
+    before = snapshot(run)
+    with pytest.raises(ValueError, match=directory.name):
+        generate_report(run, tmp_path / "report")
+    assert before == snapshot(run)
+    assert not (tmp_path / "report").exists()
+
+
+@pytest.mark.parametrize("state", ["previous", "resulting", "unknown"])
+def test_partial_pending_provenance_is_disclosed_only_for_known_states(run, tmp_path, state):
+    from bo_forge._campaign.provenance import _manifest_with_pending_transaction
+
+    directory = next((run / "trials").iterdir())
+    log, manifest = directory / "campaign.csv", directory / "campaign.csv.manifest.json"
+    previous = log.read_bytes()
+    resulting = previous + b"\n"
+    payload = json.loads(manifest.read_text())
+    pending = _manifest_with_pending_transaction(
+        payload, config_file=directory / "campaign.yaml", operation="mark_observed",
+        affected_row_ids=[pd.read_csv(log).row_id.iloc[-1]], metadata={},
+        resulting_hash=sha256(resulting), resulting_row_count=payload["log"]["row_count"],
+    )
+    write_json(manifest, pending)
+    if state != "previous":
+        log.write_bytes(resulting if state == "resulting" else resulting + b"\n")
+    status = json.loads((directory / "status.json").read_text())
+    status["status"] = "interrupted"
+    write_json(directory / "status.json", status)
+    before = snapshot(run)
+    if state == "unknown":
+        with pytest.raises(ValueError, match="pending_unknown_state"):
+            generate_report(run, tmp_path / "report")
+        assert not (tmp_path / "report").exists()
+    else:
+        _, _, statuses = load_evidence(run)
+        row = statuses.loc[statuses.trial_id.eq(directory.name)].iloc[0]
+        assert f"pending_{state}_state" in row.evidence_warning
+    assert before == snapshot(run)
+
+
+@pytest.mark.parametrize("missing", ["campaign.yaml", "campaign.csv"])
+def test_partial_absent_sources_remain_disclosed(run, missing):
+    directory = next((run / "trials").iterdir())
+    (directory / missing).unlink()
+    (directory / "trace.jsonl").unlink()
+    write_json(directory / "status.json", {"status": "interrupted", "completed_evaluations": 0})
+    before = snapshot(run)
+    _, _, statuses = load_evidence(run)
+    assert statuses.loc[statuses.trial_id.eq(directory.name), "evidence_warning"].iloc[0]
+    assert before == snapshot(run)
 
 
 @pytest.mark.parametrize("field", ["trial_id", "problem", "mode", "strategy", "seed", "status"])
