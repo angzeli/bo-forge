@@ -81,6 +81,11 @@ class Proposals:
             unit = (self.sobol.draw(1, dtype=torch.double)[0].tolist() if source == "sobol"
                     else self.random.random(len(definition(self.trial)["variables"])).tolist())
             point = decode(unit, self.trial)
+            if self.trial.get("route") == "multi_fidelity" and (
+                len(existing) < 2 or (len(existing) >= self.trial["initial_observations"]
+                                      and self.trial["strategy"] != "bo")
+            ):
+                point[-1] = self.trial["fidelity"]["target"]
             if not feasible(point, self.trial):
                 self.counts["infeasible"] += 1
             elif typed_digest(point) in seen:

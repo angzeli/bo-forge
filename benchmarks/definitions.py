@@ -6,6 +6,8 @@ NATIVE = {
     "branin": ([[-5.0, 0.0], [10.0, 15.0]], 0.397887),
     "hartmann3": ([[0.0] * 3, [1.0] * 3], -3.86278),
     "hartmann6": ([[0.0] * 6, [1.0] * 6], -3.32237),
+    "branin_currin": ([[0.0, 0.0], [1.0, 1.0]], None),
+    "augmented_branin": ([[-5.0, 0.0, 0.0], [10.0, 15.0, 1.0]], 0.397887),
 }
 MIXED_VARIABLES = [
     {"name": "x", "type": "continuous", "lower": -1.0, "upper": 1.0},
@@ -50,6 +52,16 @@ def campaign_config(trial, bounds=None):
         result["constraints"] = problem["constraints"]
     if trial.get("route") == "pending_noisy":
         result["review"] = {"enabled": True}
+    if trial.get("route") == "multi_objective":
+        result.pop("objective")
+        result["objectives"] = [
+            {"name": name, "direction": "minimize", "reference_point": reference}
+            for name, reference in zip(("branin", "currin"), trial["reference_point"], strict=True)
+        ]
+        result["bo"]["acquisition"] = "qlog_ehvi"
+    elif trial.get("route") == "multi_fidelity":
+        result["fidelity"] = {"variable": "x3", **trial["fidelity"]}
+        result["bo"]["acquisition"] = "qmf_kg"
     return result
 
 
@@ -58,4 +70,6 @@ def expected_source(trial, index):
         return "sobol"
     if trial["strategy"] != "bo":
         return trial["strategy"]
+    if trial.get("schema_version") == 3:
+        return "qlog_ehvi" if trial["route"] == "multi_objective" else "qmf_kg"
     return "qlog_nei" if trial["mode"] == "noisy" else "log_ei"

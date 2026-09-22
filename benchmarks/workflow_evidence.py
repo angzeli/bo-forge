@@ -35,7 +35,7 @@ def expected_events(ids, trial):
 
 
 def verify_workflow(directory, trial, rows, complete):
-    if trial.get("schema_version") != 2:
+    if trial.get("schema_version", 1) < 2:
         return {}
     values = {"proposal_draws": None, "infeasible_proposals": None, "duplicate_proposals": None,
               "workflow_event_count": 0, "suggestions_with_pending": 0}
@@ -43,8 +43,14 @@ def verify_workflow(directory, trial, rows, complete):
     if counters is not None:
         values.update(proposal_draws=counters["draws"], infeasible_proposals=counters["infeasible"],
                       duplicate_proposals=counters["duplicate"])
+    events, warning = read_trace(directory / "events.jsonl")
+    _verify_event_order(events, trial)
     path = directory / "campaign.csv"
     if not path.exists():
+        values.update(workflow_event_count=len(events), suggestions_with_pending=sum(
+            bool(e["pending_row_ids"]) for e in events if e["operation"] == "submit"),
+            workflow_warning="; ".join(filter(None, [warning,
+                "Workflow events cannot be reconciled without campaign CSV." if events else ""])))
         return values
     frame = pd.read_csv(path, keep_default_na=False)
     if values["proposal_draws"] is not None:
@@ -52,7 +58,10 @@ def verify_workflow(directory, trial, rows, complete):
     names = [v["name"] for v in definition(trial)["variables"]]
     for point in frame[names].values.tolist():
         normalize(point, trial)
-    events, warning = read_trace(directory / "events.jsonl")
+    if trial.get("route") == "multi_fidelity" and trial["strategy"] != "bo":
+        for value in frame[names[-1]].iloc[trial["initial_observations"]:]:
+            require_equal(trial, "target-only baseline fidelity", trial["fidelity"]["target"],
+                          float(value))
     expected = expected_events(frame.row_id.astype(str).tolist(), trial)
     require_equal(trial, "workflow events", expected[:len(events)], events)
     if complete and (warning or len(events) != len(expected)):
@@ -76,6 +85,18 @@ def verify_workflow(directory, trial, rows, complete):
                                              for e in submitted.values())
     values["workflow_warning"] = "; ".join(filter(None, [warning, persistence_warning]))
     return values
+
+
+def _verify_event_order(events, trial):
+    ids = [e.get("row_id") for e in events if e.get("operation") == "submit"]
+    if any(not isinstance(row_id, str) or not row_id for row_id in ids):
+        raise ValueError(f"{trial['trial_id']}: workflow events require nonempty row IDs.")
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"{trial['trial_id']}: workflow events repeat submitted row IDs.")
+    if len(ids) > trial["evaluations"]:
+        raise ValueError(f"{trial['trial_id']}: workflow events exceed the evaluation budget.")
+    expected = expected_events(ids, trial)
+    require_equal(trial, "workflow events", expected[:len(events)], events)
 
 
 def _verify_persisted_events(frame, events, trial):

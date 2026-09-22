@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v3.3.2 - Multi-Objective And Multi-Fidelity Benchmark Evidence
+
+- Add source-only schema-v3 deterministic Branin-Currin/qLogEHVI and continuous
+  Augmented Branin/qMFKG routes, with matched Sobol initialization and random/Sobol baselines.
+- Record ordered coupled objective vectors, Pareto membership, and user-space
+  hypervolume; keep target-observed regret separate from target-projected oracle diagnostics.
+- Record normalized affine modeled cost and oracle computation time separately;
+  fixed-count endpoints do not imply equal-cost comparison or recommendation quality.
+- Extend schedule binding, partial-evidence validation, failure denominators,
+  objective-free report regeneration, numerical CI smokes, and package boundaries.
+- Preserve schema-v1/v2 evidence, seed derivations, timing semantics, and all five
+  historical constrained-BO failures. No production optimizer, campaign schema,
+  public API, application workflow, or dependency change.
+- Add opt-in notebook instructions without changing its default workload.
+  Local acceptance completed 30/30 standard trials (600 evaluations) and 6/6
+  new smoke trials. qMFKG made no target observations after initialization and
+  had worse observed-target quality at lower modeled cost; this outcome and
+  its separate oracle diagnostics are retained in `docs/BENCHMARKS.md`.
+
 ## v3.3.1 - Benchmark Integrity And Workflow Routes
 
 Status: prepared; local route acceptance recorded with five disclosed constrained-BO failures.

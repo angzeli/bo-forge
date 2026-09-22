@@ -1,0 +1,24 @@
+schema_version: 3
+route: multi_fidelity
+name: multi-fidelity-standard
+problems:
+  - {name: augmented_branin, noise_std: 0.0, optimum_tolerance: 0.000001}
+seeds: [0, 1, 2, 3, 4]
+modes: [deterministic]
+strategies: [bo, random, sobol]
+evaluations: 16
+initial_observations: 8
+timeout_seconds: 600
+baseline_policy: target_only
+initialization_policy: first_two_target_then_sobol
+fidelity:
+  target: 1.0
+  fixed_cost: 0.25
+  fidelity_cost_weight: 0.75
+  num_fantasies: 8
+  optimizer_maxiter: 100
+bo:
+  raw_samples: 32
+  num_restarts: 2
+  mc_samples: 64
+  min_normalized_distance: 0.0

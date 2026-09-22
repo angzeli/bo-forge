@@ -23,6 +23,11 @@ COLORS = {"bo": MODEL_COLOR, "random": NEUTRAL_COLOR, "sobol": OBSERVED_COLOR}
 def render_figures(traces, trajectories, metadata, directory):
     directory = Path(directory)
     directory.mkdir()
+    if metadata["schema_version"] == 3:
+        from benchmarks.multi_report import multi_figures
+
+        multi_figures(traces, trajectories, metadata, directory)
+        return
     for problem in metadata["spec"]["problems"]:
         for mode in metadata["spec"]["modes"]:
             trace = traces.loc[traces.problem.eq(problem["name"]) & traces["mode"].eq(mode)]

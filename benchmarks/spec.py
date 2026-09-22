@@ -12,7 +12,9 @@ import yaml
 from benchmarks import SPEC_VERSION
 
 DIMENSIONS = {"branin": 2, "hartmann3": 3, "hartmann6": 6, "mixed_quadratic": 4}
+DIMENSIONS.update(branin_currin=2, augmented_branin=3)
 ROUTES = ("mixed", "constrained_mixed", "pending_noisy")
+V3_ROUTES = ("multi_objective", "multi_fidelity")
 MODES = ("deterministic", "noisy")
 STRATEGIES = ("bo", "random", "sobol")
 STREAMS = ("initialization", "baseline", "observation_noise", "fitting")
@@ -68,10 +70,15 @@ def _choices(value, allowed, label):
 def validate_spec(spec):
     if not isinstance(spec, dict):
         raise SpecError("spec must be a mapping.")
-    _integer(spec.get("schema_version"), 1, 2, "schema_version")
+    _integer(spec.get("schema_version"), 1, 3, "schema_version")
     keys = ("schema_version", "name", "problems", "seeds", "modes", "strategies",
             "evaluations", "initial_observations", "timeout_seconds", "bo")
-    _keys(spec, keys + (("route",) if spec["schema_version"] == 2 else ()), "spec")
+    extra = ("route",) if spec["schema_version"] >= 2 else ()
+    if spec["schema_version"] == 3:
+        extra += ("baseline_policy", "initialization_policy")
+        extra += (("fidelity",) if spec.get("route") == "multi_fidelity"
+                  else ("reference_point",))
+    _keys(spec, keys + extra, "spec")
     if not isinstance(spec["name"], str) or not spec["name"].strip():
         raise SpecError("name must be a nonempty string.")
     _choices(spec["modes"], MODES, "modes")
@@ -100,9 +107,12 @@ def validate_spec(spec):
 
 def _validate_route(spec):
     names = [problem["name"] for problem in spec["problems"]]
+    if spec["schema_version"] == 3:
+        _validate_v3(spec, names)
+        return
     if spec["schema_version"] == 1:
-        if "mixed_quadratic" in names:
-            raise SpecError("mixed_quadratic requires a version-2 route.")
+        if any(name not in ("branin", "hartmann3", "hartmann6") for name in names):
+            raise SpecError("This problem requires an explicit versioned route.")
         return
     route = spec["route"]
     if route not in ROUTES:
@@ -118,11 +128,43 @@ def _validate_route(spec):
         raise SpecError("pending_noisy requires complete two-suggestion cycles.")
 
 
+def _validate_v3(spec, names):
+    route = spec["route"]
+    if route not in V3_ROUTES:
+        raise SpecError(f"Version 3 route must be one of {V3_ROUTES}.")
+    mf = route == "multi_fidelity"
+    expected = "augmented_branin" if mf else "branin_currin"
+    if names != [expected] or spec["modes"] != ["deterministic"]:
+        raise SpecError("Unsupported version-3 route/problem/mode combination.")
+    if spec["problems"][0]["noise_std"] != 0.0:
+        raise SpecError("Version-3 routes require noise_std=0.")
+    policies = {"baseline_policy": "target_only" if mf else "full_design",
+                "initialization_policy": "first_two_target_then_sobol" if mf else "shared_sobol"}
+    for key, value in policies.items():
+        if spec[key] != value:
+            raise SpecError(f"{key} must be {value!r}.")
+    if not mf:
+        if spec["reference_point"] != [18.0, 6.0]:
+            raise SpecError("reference_point must be [18, 6] in objective order branin, currin.")
+        return
+    fidelity = spec["fidelity"]
+    _keys(fidelity, ("target", "fixed_cost", "fidelity_cost_weight", "num_fantasies",
+                     "optimizer_maxiter"), "fidelity")
+    for key, value in (("target", 1.0), ("fixed_cost", .25), ("fidelity_cost_weight", .75)):
+        _number(fidelity[key], value, value, key)
+    for key in ("num_fantasies", "optimizer_maxiter"):
+        _integer(fidelity[key], 1, 4096, key)
+    if spec["problems"][0]["optimum_tolerance"] != 1e-6:
+        raise SpecError("Augmented Branin target optimum_tolerance must be 1e-6.")
+
+
 def _validate_problems(spec):
     problems = spec["problems"]
     supported = ("branin", "hartmann3", "hartmann6")
     if spec["schema_version"] == 2:
         supported = ("branin",) if spec["route"] == "pending_noisy" else ("mixed_quadratic",)
+    elif spec["schema_version"] == 3:
+        supported = ("branin_currin", "augmented_branin")
     if not isinstance(problems, list) or not 1 <= len(problems) <= len(DIMENSIONS):
         raise SpecError(f"problems must list supported problems: {', '.join(supported)}.")
     names = []
@@ -163,7 +205,8 @@ def seed_mapping(problem, seed, mode, *, route=None):
     return {
         stream: int.from_bytes(hashlib.sha256(json.dumps(
             ([SPEC_VERSION, problem, seed, mode, stream] if route is None
-             else [2, route, problem, seed, mode, stream]), separators=(",", ":"),
+             else [3 if route in V3_ROUTES else 2, route, problem, seed, mode, stream]),
+            separators=(",", ":"),
         ).encode()).digest()[:4], "big") for stream in STREAMS
     }
 
@@ -179,10 +222,15 @@ def schedule(spec):
         for problem in spec["problems"] for mode in spec["modes"]
         for seed in spec["seeds"] for strategy in spec["strategies"]
     ]
-    if spec["schema_version"] == 2:
+    if spec["schema_version"] >= 2:
         for trial in trials:
-            trial.update(schema_version=2, route=spec["route"],
+            trial.update(schema_version=spec["schema_version"], route=spec["route"],
                          trial_id=f"{spec['route']}-{trial['trial_id']}",
                          seeds=seed_mapping(trial["problem"]["name"], trial["seed"],
                                             trial["mode"], route=spec["route"]))
+            if spec["schema_version"] == 3:
+                for key in ("baseline_policy", "initialization_policy",
+                            "reference_point", "fidelity"):
+                    if key in spec:
+                        trial[key] = spec[key]
     return trials

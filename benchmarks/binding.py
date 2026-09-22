@@ -46,28 +46,42 @@ def verify_binding(directory, trial, inputs=None):
         for key, value in (("seed_mapping", expected_seeds), ("bounds", problem["bounds"]),
                            ("optimum", problem["optimum"]), ("direction", "minimize")):
             require_equal(trial, f"inputs.{key}", value, inputs.get(key))
+        if trial.get("schema_version") == 3:
+            from benchmarks.multi import input_metadata
+
+            for key, value in input_metadata(trial).items():
+                require_equal(trial, f"inputs.{key}", value, inputs.get(key))
         initial = _verify_representation(trial, inputs)
         if initial is not None and log.exists():
             _verify_initial_rows(trial, frame, initial)
+    elif log.exists() and trial.get("schema_version", 1) >= 2:
+        _verify_initial_rows(trial, frame, _scheduled_initial(trial))
 
 
 def _verify_representation(trial, inputs):
-    expected_dtype = "typed_json" if trial.get("schema_version") == 2 else "float64"
+    expected_dtype = "typed_json" if trial.get("schema_version", 1) >= 2 else "float64"
     require_equal(trial, "inputs.dtype", expected_dtype, inputs.get("dtype"))
     digest = inputs.get("initial_design_sha256")
     if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef"
                                                             for c in digest):
         raise ValueError(f"{trial['trial_id']}: inputs.initial_design_sha256 is not a SHA-256.")
-    if trial.get("schema_version") != 2:
+    if trial.get("schema_version", 1) < 2:
         return
-    from benchmarks.designs import Proposals, typed_digest
+    from benchmarks.designs import typed_digest
 
     require_equal(trial, "inputs.variables", definition(trial)["variables"],
                   inputs.get("variables"))
+    initial = _scheduled_initial(trial)
+    require_equal(trial, "inputs.initial_design_sha256", typed_digest(initial), digest)
+    return initial
+
+
+def _scheduled_initial(trial):
+    from benchmarks.designs import Proposals
+
     proposals, initial = Proposals(trial), []
     for _ in range(trial["initial_observations"]):
         initial.append(proposals.draw("sobol", initial))
-    require_equal(trial, "inputs.initial_design_sha256", typed_digest(initial), digest)
     return initial
 
 

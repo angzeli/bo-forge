@@ -131,7 +131,10 @@ def test_partial_contradictory_provenance_rejects_report(run, tmp_path, status_n
 
 
 @pytest.mark.parametrize("state", ["previous", "resulting", "unknown"])
-def test_partial_pending_provenance_is_disclosed_only_for_known_states(run, tmp_path, state):
+@pytest.mark.parametrize("missing_config", [False, True])
+def test_partial_pending_provenance_is_disclosed_only_for_known_states(
+    run, tmp_path, state, missing_config,
+):
     from bo_forge._campaign.provenance import _manifest_with_pending_transaction
 
     directory = next((run / "trials").iterdir())
@@ -145,6 +148,8 @@ def test_partial_pending_provenance_is_disclosed_only_for_known_states(run, tmp_
         resulting_hash=sha256(resulting), resulting_row_count=payload["log"]["row_count"],
     )
     write_json(manifest, pending)
+    if missing_config:
+        (directory / "campaign.yaml").unlink()
     if state != "previous":
         log.write_bytes(resulting if state == "resulting" else resulting + b"\n")
     status = json.loads((directory / "status.json").read_text())

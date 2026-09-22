@@ -139,6 +139,7 @@ def test_benchmark_notebook_is_source_only_bounded_and_output_free() -> None:
     for forbidden in (
         "standard.yaml", "suggest_next(", "append_suggestions(", "mark_observed(",
         "examples/", "shell=True", "mixed_smoke.yaml", "pending_noisy_smoke.yaml",
+        "multi_objective_smoke.yaml", "multi_fidelity_smoke.yaml",
     ):
         assert forbidden not in code
     for fragment in (
@@ -154,6 +155,10 @@ def test_benchmark_notebook_is_source_only_bounded_and_output_free() -> None:
     assert instructions.cell_type == "markdown"
     for fragment in (
         "v3.3.1", "outside Run All", "original six-trial smoke",
+        "v3.3.2", "multi_objective_smoke.yaml", "multi_fidelity_smoke.yaml",
+        "multi_objective_standard.yaml", "multi_fidelity_standard.yaml",
+        "6 trials / 36 evaluations", "30 trials / 600 evaluations", "target-only",
+        "not equal-cost", "oracle", "reference [18, 6]",
         "mixed_smoke.yaml", "constrained_mixed_smoke.yaml", "pending_noisy_smoke.yaml",
         "mixed_standard.yaml", "constrained_mixed_standard.yaml",
         "pending_noisy_standard.yaml", "9 trials / 54 evaluations",

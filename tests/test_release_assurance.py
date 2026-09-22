@@ -152,14 +152,14 @@ def test_benchmark_smoke_is_explicit_and_bounded_in_numerical_ci() -> None:
     workflow = _workflow(".github/workflows/ci.yml")
     steps = workflow["jobs"]["numerical"]["steps"]
     benchmark_steps = [step for step in steps if "-m benchmarks" in step.get("run", "")]
-    assert len(benchmark_steps) == 4
+    assert len(benchmark_steps) == 6
     assert benchmark_steps[0]["run"] == (
         "python -m benchmarks run --spec benchmarks/specs/smoke.yaml "
         "--output /tmp/bo-forge-benchmark-smoke"
     )
     assert "standard.yaml" not in _read(".github/workflows/ci.yml")
     uploads = [step for step in steps if step.get("uses") == "actions/upload-artifact@v4"]
-    assert len(uploads) == 4
+    assert len(uploads) == 6
     assert uploads[0]["if"] == "always()"
     assert uploads[0]["with"] == {
         "name": "closed-loop-benchmark-smoke", "path": "/tmp/bo-forge-benchmark-smoke/",
@@ -167,7 +167,8 @@ def test_benchmark_smoke_is_explicit_and_bounded_in_numerical_ci() -> None:
     }
     for step, upload, route in zip(
         benchmark_steps[1:], uploads[1:],
-        ("mixed", "constrained_mixed", "pending_noisy"), strict=True,
+        ("mixed", "constrained_mixed", "pending_noisy", "multi_objective", "multi_fidelity"),
+        strict=True,
     ):
         slug = route.replace("_", "-")
         assert step["run"] == (
@@ -219,6 +220,21 @@ def test_benchmark_release_docs_preserve_source_and_acceptance_boundaries() -> N
         "docs/CAPABILITY_MATRIX.md", "docs/STREAMLIT_APP.md",
     ):
         assert PROJECT_VERSION in _read(path)
+
+
+def test_v332_protocol_docs_keep_evidence_levels_separate() -> None:
+    guide = _read("docs/BENCHMARKS.md")
+    for text in (
+        "schema_version: 3", "30 trials / 600 evaluations", "6 trials / 36 evaluations",
+        "first_two_target_then_sobol", "target_only", "0.25 + 0.75*s", "0.397887",
+        "oracle_seconds", "not equal-cost", "hypervolume", "five constrained-BO failures",
+        "multi_objective_standard.yaml", "multi_fidelity_standard.yaml",
+    ):
+        assert text in guide
+    notebook = _read("notebooks/24_closed_loop_benchmarks.ipynb")
+    assert "v3.3.2 routes (outside Run All)" in notebook
+    assert len(list((PROJECT_ROOT / "benchmarks/specs").glob("*.yaml"))) == 12
+    assert "all twelve YAML specs" in _read("docs/RELEASE_CHECKLIST.md")
 
 
 def test_v331_release_docs_separate_route_budgets_from_acceptance() -> None:
@@ -392,12 +408,13 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.2.3` | implementation complete |" in roadmap
     assert "| `v3.2.x` | completed |" in roadmap
     assert "class v33 majorActive" in roadmap
-    assert "class v330 patchDone" in roadmap
-    assert "class v331 patchActive" in roadmap
+    assert "class v330,v331 patchDone" in roadmap
+    assert "class v332 patchActive" in roadmap
     assert "| `v3.3.0` | prepared |" in roadmap
     assert "| `v3.3.1` | prepared |" in roadmap
     assert "| `v3.3.x` | active |" in roadmap
-    for version in ("3.3.2", "3.3.3", "3.3.4"):
+    assert "| `v3.3.2` | prepared |" in roadmap
+    for version in ("3.3.3", "3.3.4"):
         assert f"| `v{version}` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap

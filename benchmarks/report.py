@@ -38,7 +38,8 @@ def _owned(root, path):
 def load_evidence(run):
     run = Path(run)
     metadata = read_object(run / "run.json")
-    if type(metadata.get("schema_version")) is not int or metadata["schema_version"] not in (1, 2):
+    if (type(metadata.get("schema_version")) is not int
+            or metadata["schema_version"] not in (1, 2, 3)):
         raise ValueError("Unsupported benchmark evidence schema.")
     spec = validate_spec(metadata["spec"])
     if metadata["schema_version"] != spec["schema_version"]:
@@ -76,7 +77,12 @@ def load_evidence(run):
                          "Historical trial duration not available.",
                          "evidence_warning": evidence_warning,
                          **workflow})
-    return metadata, pd.DataFrame(traces, columns=TRACE_COLUMNS), pd.DataFrame(statuses)
+    columns = TRACE_COLUMNS
+    if spec["schema_version"] == 3:
+        from benchmarks.multi_evidence import trace_columns
+
+        columns = trace_columns(spec["route"])
+    return metadata, pd.DataFrame(traces, columns=columns), pd.DataFrame(statuses)
 
 
 def _verify_trace(directory, trial, status, rows, warning):
@@ -96,7 +102,7 @@ def _verify_trace(directory, trial, status, rows, warning):
             raise ValueError(f"{trial['trial_id']}: Campaign configuration changed "
                              "after execution.")
     observed, evidence_warning = campaign_evidence(
-        directory, config, log, rows, status["status"] == "complete",
+        directory, config, log, rows, status["status"] == "complete", trial,
     )
     if inputs is None:
         evidence_warning = "; ".join(filter(None, [evidence_warning,
@@ -107,11 +113,20 @@ def _verify_trace(directory, trial, status, rows, warning):
 
     if inputs is None:
         raise ValueError(f"{trial['trial_id']}: Scored trace requires inputs.json.")
-    verify_rows(rows, observed, inputs, trial)
+    if trial.get("schema_version") == 3:
+        from benchmarks.multi_evidence import verify_multi_rows
+
+        verify_multi_rows(rows, observed, trial)
+    else:
+        verify_rows(rows, observed, inputs, trial)
     return evidence_warning
 
 
 def tables(metadata, traces, statuses):
+    if metadata["schema_version"] == 3:
+        from benchmarks.multi_report import multi_tables
+
+        return multi_tables(metadata, traces, statuses)
     summary, trajectories = [], []
     group_keys = ["route", "problem", "mode", "strategy"]
     for key, group in statuses.groupby(group_keys, sort=False):
@@ -156,6 +171,10 @@ def tables(metadata, traces, statuses):
 
 
 def _markdown(metadata, summary, statuses):
+    if metadata["schema_version"] == 3:
+        from benchmarks.multi_report import multi_markdown
+
+        return multi_markdown(metadata, summary, statuses)
     lines = [f"# {metadata['spec']['name']} closed-loop benchmark", "",
              "Summaries are conditioned on successfully completed trials. Counts retain all "
              "scheduled trials. Partial traces are shown only through their last evaluation; "
@@ -198,6 +217,10 @@ def _markdown(metadata, summary, statuses):
     if not unknown.empty:
         lines.extend(["", "## Timing warnings", ""])
         lines.extend(f"- `{row.trial_id}`: {row.timing_warning}" for row in unknown.itertuples())
+    truncated = statuses.loc[statuses.trace_warning.fillna("").ne("")]
+    if not truncated.empty:
+        lines.extend(["", "## Trace warnings", ""])
+        lines.extend(f"- `{row.trial_id}`: {row.trace_warning}" for row in truncated.itertuples())
     lines.extend(["", "Full seed mapping, resolved settings, environment, and Git identity: "
                   "run.json. Per-seed outcomes: traces.csv; denominators: trials.csv.", ""])
     return "\n".join(lines)
@@ -211,6 +234,11 @@ def generate_report(run, output):
     if output.resolve().is_relative_to((Path(run) / "trials").resolve()):
         raise ValueError("Report destinations must be separate from trial campaign directories.")
     metadata, traces, statuses = load_evidence(run)
+    for trial in metadata["trials"]:
+        directory = (Path(run) / "trials" / trial["trial_id"]).resolve()
+        if output.resolve().is_relative_to(directory):
+            raise ValueError(
+                "Report destinations must be separate from trial campaign directories.")
     summary, trajectories = tables(metadata, traces, statuses)
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(mkdtemp(prefix=".benchmark-report-", dir=output.parent))

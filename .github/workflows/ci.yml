@@ -226,6 +226,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Run multi-objective benchmark smoke
+        if: ${{ !cancelled() }}
+        run: python -m benchmarks run --spec benchmarks/specs/multi_objective_smoke.yaml --output /tmp/bo-forge-benchmark-multi-objective-smoke
+      - name: Preserve multi-objective benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-objective-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-multi-objective-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Run multi-fidelity benchmark smoke
+        if: ${{ !cancelled() }}
+        run: python -m benchmarks run --spec benchmarks/specs/multi_fidelity_smoke.yaml --output /tmp/bo-forge-benchmark-multi-fidelity-smoke
+      - name: Preserve multi-fidelity benchmark smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-fidelity-benchmark-smoke
+          path: /tmp/bo-forge-benchmark-multi-fidelity-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
   package:
     name: Build and external artifact probes
     runs-on: ubuntu-latest

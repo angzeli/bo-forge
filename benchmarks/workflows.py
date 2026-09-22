@@ -105,7 +105,11 @@ def _validate(campaign, candidate, trial, index):
     if not isinstance(candidate, pd.DataFrame) or len(candidate) != 1:
         raise ValueError("A benchmark submission requires exactly one candidate.")
     row = candidate.iloc[0]
-    if row["status"] != "suggested" or pd.notna(pd.to_numeric(row["outcome"], errors="coerce")):
+    outcomes = (campaign.config.objective_names if campaign.config.is_multi_objective
+                else [campaign.config.objective.name])
+    if row["status"] != "suggested" or any(
+        pd.notna(pd.to_numeric(row[name], errors="coerce")) for name in outcomes
+    ):
         raise ValueError("Candidates must be unobserved suggestions.")
     if row["source"] != expected_source(trial, index):
         raise ValueError("Candidate source differs from the scheduled strategy.")

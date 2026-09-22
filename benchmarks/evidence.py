@@ -6,7 +6,8 @@ import math
 import pandas as pd
 
 from benchmarks.storage import TERMINAL
-from bo_forge._campaign.provenance_resume import inspect_provenance
+from bo_forge._campaign.provenance import validate_manifest_references
+from bo_forge._campaign.provenance_resume import _managed_file_state, inspect_provenance
 from bo_forge.errors import BOForgeError
 
 IDENTITY_FIELDS = {"trial_id", "problem", "mode", "strategy", "seed", "status", "route"}
@@ -63,7 +64,11 @@ def validate_rows(rows, trial=None):
             if not isinstance(row.get(key), str) or not row[key]:
                 raise ValueError(f"Trace {key} must be nonempty text.")
         _validate_point(row.get("x"), variables)
-        for key in NUMBER_FIELDS:
+        fields = NUMBER_FIELDS
+        if trial and trial.get("schema_version") == 3:
+            fields = ("suggestion_seconds", "objective_seconds", "mutation_seconds",
+                      "oracle_seconds")
+        for key in fields:
             finite_number(row.get(key), f"Trace {key}")
             if key.endswith("_seconds") and row[key] < 0:
                 raise ValueError(f"Trace {key} must be nonnegative.")
@@ -94,7 +99,11 @@ def validate_inputs(inputs, trial):
     for axis in bounds:
         for value in axis:
             finite_number(value, "Recorded bound")
-    finite_number(inputs.get("optimum"), "Recorded optimum")
+    if trial.get("route") == "multi_objective":
+        if inputs.get("optimum") is not None:
+            raise ValueError("Multi-objective evidence has no exact reference optimum.")
+    else:
+        finite_number(inputs.get("optimum"), "Recorded optimum")
     finite_number(inputs.get("optimum_tolerance"), "Recorded optimum tolerance")
     if inputs["optimum_tolerance"] != trial["problem"]["optimum_tolerance"]:
         raise ValueError("Recorded optimum tolerance differs from the trial specification.")
@@ -102,7 +111,7 @@ def validate_inputs(inputs, trial):
         raise ValueError("Recorded config_sha256 must be text.")
 
 
-def campaign_evidence(directory, config, log, rows, complete):
+def campaign_evidence(directory, config, log, rows, complete, trial=None):
     """Complete trials fail closed; incomplete trials disclose missing campaign evidence."""
     problems = _provenance_problems(directory, config, log)
     if not log.exists():
@@ -112,7 +121,9 @@ def campaign_evidence(directory, config, log, rows, complete):
         observed = None
     else:
         frame = pd.read_csv(log, keep_default_na=False)
-        if not {"row_id", "status", "outcome"}.issubset(frame.columns):
+        objectives = ({"branin", "currin"} if trial and trial.get("route") == "multi_objective"
+                      else {"outcome"})
+        if not {"row_id", "status", *objectives}.issubset(frame.columns):
             raise ValueError(f"Campaign CSV lacks required benchmark columns: {directory}")
         if frame.row_id.duplicated().any():
             raise ValueError(f"Campaign CSV has duplicate row IDs: {directory}")
@@ -138,13 +149,32 @@ def _provenance_problems(directory, config, log):
         missing_manifest = getattr(exc, "reason_code", None) == "manifest_required"
         missing_config = (isinstance(exc.__cause__, FileNotFoundError)
                           and exc.__cause__.filename == str(config.resolve()))
-        if missing_manifest or missing_config:
+        if missing_config:
+            return [f"Provenance: {exc}", *_retained_log_problems(directory, config, log)]
+        if missing_manifest:
             return [f"Provenance: {exc}"]
         raise ValueError(f"Incomplete campaign evidence for {directory.name}: "
                          f"contradictory provenance: {exc}") from exc
-    if inspection.resume_status == "ready":
+    return _provenance_reason(directory, inspection.reason_code)
+
+
+def _retained_log_problems(directory, config, log):
+    try:
+        manifest = validate_manifest_references(config, log)
+        if manifest is None:
+            return ["Provenance: manifest absent; CSV identity cannot be verified."]
+        # Inspect only the retained log; the absent config remains an explicit warning.
+        state = _managed_file_state(log, manifest, byte_match=True, semantic_match=True,
+                                    log_row_count=None)
+    except (BOForgeError, OSError, ValueError) as exc:
+        raise ValueError(f"Incomplete campaign evidence for {directory.name}: "
+                         f"contradictory provenance: {exc}") from exc
+    return _provenance_reason(directory, state[2])
+
+
+def _provenance_reason(directory, reason):
+    if reason is None:
         return []
-    reason = inspection.reason_code
     if reason not in {"log_missing", "pending_previous_state", "pending_resulting_state"}:
         raise ValueError(f"Incomplete campaign evidence for {directory.name}: "
                          f"contradictory provenance: {reason}")

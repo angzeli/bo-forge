@@ -4,8 +4,8 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.3.1 preparation adds source-only mixed, constrained, and pending-aware
-benchmark routes plus evidence-integrity and cancellation-timing fixes.
+The v3.3.2 preparation adds source-only coupled multi-objective and continuous
+multi-fidelity routes, preserving evidence-integrity and cancellation-timing fixes.
 Measured v3.3.1 acceptance is documented in the benchmark guide, including five
 constrained-BO failures. Prepared docs, tests, and CI steps alone do not establish acceptance
 or BO superiority. The v3.2.3 diagnostic acceptance remains historical evidence,
@@ -91,7 +91,7 @@ bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
 
-For v3.3.1, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
+For v3.3.2, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
 source archive. Numerical CI retains the full six-trial smoke sequentially, with
 600 seconds per trial and only four BO suggestion calls:
 
@@ -101,6 +101,8 @@ python -m benchmarks report --run /tmp/bo-forge-benchmark-smoke --output /tmp/bo
 python -m benchmarks run --spec benchmarks/specs/mixed_smoke.yaml --output /tmp/bo-forge-benchmark-mixed-smoke
 python -m benchmarks run --spec benchmarks/specs/constrained_mixed_smoke.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-smoke
 python -m benchmarks run --spec benchmarks/specs/pending_noisy_smoke.yaml --output /tmp/bo-forge-benchmark-pending-noisy-smoke
+python -m benchmarks run --spec benchmarks/specs/multi_objective_smoke.yaml --output /tmp/bo-forge-benchmark-multi-objective-smoke
+python -m benchmarks run --spec benchmarks/specs/multi_fidelity_smoke.yaml --output /tmp/bo-forge-benchmark-multi-fidelity-smoke
 ```
 
 Use new output directories. Inspect planned trial IDs, the spec snapshot, all
@@ -122,8 +124,18 @@ source binding, feasibility, delayed observations and `X_pending`, cancellation
 timing, unknown-duration counts, and read-only report regeneration. Preserve all
 failed/partial attempts and distinguish local results from exact-commit CI.
 
+The two schema-v3 smokes add 6 trials/36 evaluations. Run their separate standards
+(30 trials/600 evaluations) outside CI, retaining every terminal outcome. Verify
+MO objective ordering, coupled observations, reference points, and hypervolume;
+MF matched initialization, target-only baselines, observed-target regret, affine
+modeled cost, and oracle-only projected scores/timing. Run the focused
+`tests/test_benchmark_multi_scores.py` and `tests/test_benchmark_multi_evidence.py`
+checks. Regenerate v1/v2 reports into new destinations without rerunning objectives.
+Verify all new modules and four specs in the extracted sdist, absent from the
+runtime wheel. Keep the five historical constrained-BO failures disclosed.
+
 Check that `benchmarks/` is absent from the runtime wheel, while Python sources,
-all eight YAML specs (the original two plus six schema-v2 route specs), this
+all twelve YAML specs (two original, six schema-v2, and four schema-v3 specs), this
 guide, and the notebook are in the
 sdist. From a freshly extracted sdist, run `python -m benchmarks --help`,
 `python -m benchmarks run --help`, and `python -m benchmarks report --help`.
@@ -393,4 +405,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.3.1 does none of those actions.
+separate explicit authorization. Preparing v3.3.2 does none of those actions.

@@ -1,11 +1,21 @@
-# 🧪 BO Forge v3.3.1
+# 🧪 BO Forge v3.3.2
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.3.1 prepares benchmark evidence-integrity and cancellation-timing fixes plus
+v3.3.2 adds source-only deterministic two-objective Branin-Currin (`qlog_ehvi`)
+and continuous-fidelity Augmented Branin (`qmf_kg`) benchmark routes. Hypervolume,
+actually observed target-fidelity regret, modeled cost, and scoring-only oracle
+diagnostics remain distinct. Fixed-count endpoints are not equal-cost comparisons.
+Local standard acceptance completed 30/30 trials / 600 evaluations. qMFKG made
+no new target observations after initialization in these five seeds; its worse
+observed-target quality is retained, not replaced by oracle scores. Full outcomes
+and limitations are recorded in the benchmark guide; exact-commit CI and
+publication approval remain separate gates.
+
+v3.3.1 delivered benchmark evidence-integrity and cancellation-timing fixes plus
 source-only `mixed`, `constrained_mixed`, and `pending_noisy` routes, comparing
 BO with random and Sobol baselines. Schema-v1 continuous Branin, Hartmann3,
 and Hartmann6 specs remain supported. Reports retain failures and distinguish

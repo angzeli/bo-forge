@@ -1,0 +1,24 @@
+schema_version: 3
+route: multi_fidelity
+name: multi-fidelity-smoke
+problems:
+  - {name: augmented_branin, noise_std: 0.0, optimum_tolerance: 0.000001}
+seeds: [0]
+modes: [deterministic]
+strategies: [bo, random, sobol]
+evaluations: 6
+initial_observations: 4
+timeout_seconds: 600
+baseline_policy: target_only
+initialization_policy: first_two_target_then_sobol
+fidelity:
+  target: 1.0
+  fixed_cost: 0.25
+  fidelity_cost_weight: 0.75
+  num_fantasies: 4
+  optimizer_maxiter: 50
+bo:
+  raw_samples: 8
+  num_restarts: 1
+  mc_samples: 16
+  min_normalized_distance: 0.0

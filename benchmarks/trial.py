@@ -96,6 +96,10 @@ def run_trial(directory, *, suggest=None, objective=None):
     """Write durable evidence after each observed step; exceptions end the trial visibly."""
     directory = Path(directory)
     trial = json.loads((directory / "trial.json").read_text())
+    if trial.get("schema_version") == 3:
+        from benchmarks.multi import run_multi
+
+        return run_multi(directory, trial, suggest=suggest, objective=objective)
     if trial.get("schema_version") == 2:
         from benchmarks.workflows import run_extended
 

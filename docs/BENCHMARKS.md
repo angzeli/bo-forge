@@ -1,6 +1,7 @@
 # Closed-Loop Benchmarks
 
-BO Forge v3.3.1 prepares evidence-integrity and cancellation-timing fixes plus
+BO Forge v3.3.2 adds schema-v3 multi-objective and multi-fidelity evidence.
+The v3.3.1 evidence-integrity and cancellation-timing fixes remain in place with
 bounded `mixed`, `constrained_mixed`, and `pending_noisy` routes. The source-only
 harness retains continuous Branin, Hartmann3, and Hartmann6 comparisons between
 `bo`, `random`, and `sobol` in `deterministic` and `noisy` modes. It changes no BO
@@ -10,6 +11,141 @@ results remain recorded separately.
 Neither preparation nor those results establish general baseline superiority.
 
 ## Run From Source
+
+### v3.3.2 Vector And Fidelity Protocols
+
+These separate specs use benchmark `schema_version: 3`; versions 1 and 2 retain
+their original layouts, trial identities, seed derivations, and reporting semantics.
+No production campaign schema or capability changes. Runs remain sequential CPU
+double-precision workers with one computational thread, a 600-second per-trial
+timeout, and no harness retry or substitution.
+
+| Route | Problem / BO strategy | Baselines after initialization | Smoke initial / total | Standard initial / total |
+| --- | --- | --- | --- | --- |
+| `multi_objective` | BoTorch Branin-Currin / qLogEHVI | Uniform random and continued scrambled Sobol | 4 / 6 | 6 / 24 |
+| `multi_fidelity` | BoTorch Augmented Branin / qMFKG | Target-only random and continued scrambled Sobol | 4 / 6 | 8 / 16 |
+
+Smoke uses seed 0: **6 trials / 36 evaluations** across the two routes. Standard
+uses seeds 0 through 4: **30 trials / 600 evaluations**. Budgets include initialization.
+
+```bash
+python -m benchmarks run --spec benchmarks/specs/multi_objective_smoke.yaml --output /tmp/bo-forge-mo-smoke
+python -m benchmarks run --spec benchmarks/specs/multi_fidelity_smoke.yaml --output /tmp/bo-forge-mf-smoke
+# Explicit standard acceptance, not notebook Run All or routine CI:
+python -m benchmarks run --spec benchmarks/specs/multi_objective_standard.yaml --output /tmp/bo-forge-mo-standard
+python -m benchmarks run --spec benchmarks/specs/multi_fidelity_standard.yaml --output /tmp/bo-forge-mf-standard
+```
+
+**Coupled MO:** two continuous variables in [0, 1], ordered objectives `branin`,
+`currin`, both minimized. The fixed user-space reference point is [18, 6]. Every
+observation is coupled through `mark_observed(objective_values=...)`; deterministic
+observed and latent vectors agree. Traces store both ordered vectors, reference
+point, Pareto row membership (ties retained), Pareto count, and hypervolume after
+each observation. Reference-excluded points contribute no volume. Hypervolume
+is reported directly, never as an exact gap to BoTorch's approximate maximum.
+Independent rectangle examples check sign conversion and the two-dimensional
+hypervolume calculation.
+
+**Continuous MF:** Augmented Branin uses native bounds [-5, 10] x [0, 15] x [0, 1],
+with the last coordinate as fidelity `s` and target `s=1`. All strategies share
+Sobol initialization: first two designs at target fidelity, remaining initial
+fidelities from the seeded sequence. After initialization, qMFKG chooses all
+three coordinates; baselines project their proposals to the target. Specs and
+inputs record `first_two_target_then_sobol` and `target_only` policies.
+
+Primary quality is best **actually observed target-fidelity regret**, using
+reference minimum 0.397887 and tolerance 1e-6. Target matching uses numeric
+tolerance (relative and absolute 1e-9). Lower-fidelity outcomes cannot update it.
+Absent target observations yield blank metrics, not zeros. Substantial negative
+regret is rejected; only rounding within the declared optimum tolerance is zeroed.
+
+Modeled evaluation cost is `0.25 + 0.75*s` because fidelity already spans the
+unit interval: a target evaluation costs one modeled unit. This is not wall
+time and not production `cost:` budget support. Figures show observed target
+quality against evaluation count and cumulative modeled cost. **Fixed-count
+endpoints are not equal-cost comparisons.** Cost curves retain each seed's
+actual evaluation points; they do not extrapolate or silently align unequal budgets.
+
+The separately labeled **oracle diagnostic** evaluates the target projection of
+each sampled design only for scoring. Oracle values are never written into
+campaign observations or passed to the optimizer. They do not establish
+recommendation quality or verified experimental outcomes. `oracle_seconds` is
+separate from observation objective time, and both are distinct from wall time.
+Actual observations are persisted before oracle scoring. If that diagnostic fails
+or is interrupted, the trial remains failed/interrupted, its actual observation
+stays in the campaign, and reports disclose the observation without a scoring trace.
+
+MO reuses the original smoke/standard optimizer settings. MF smoke uses
+`raw_samples=8`, `num_restarts=1`, `mc_samples=16`, `num_fantasies=4`,
+`optimizer_maxiter=50`; standard uses 32, 2, 64, 8, 100 respectively. These are
+benchmark-only settings; production defaults and numerical paths are untouched.
+
+Reports use route-specific columns: no scalar-regret placeholders in MO and no
+hypervolume placeholders in MF. Complete-trial quantiles carry contributing
+counts; partial trajectories and all terminal records remain visible. Scheduled
+binding checks objectives/order/directions, reference points, fidelity/cost settings,
+initialization, baseline policy, sources, and seeds, including unscored partial
+campaigns. Report regeneration validates stored evidence without model fits or
+objective calls. Oracle truth itself is retained execution evidence, not recomputed
+by report generation. Missing timing remains unknown rather than zero.
+Missing artifacts are disclosed, but do not disable checks of retained CSV hashes,
+scheduled initialization, or existing workflow events. Truncated scoring records
+are disclosed in both the trial table and Markdown report. Report destinations
+inside resolved trial directories are rejected, including symlink aliases.
+
+The native functions come from the installed supported
+[BoTorch test functions](https://botorch.readthedocs.io/en/v0.17.2/test_functions.html),
+not reimplemented formulas. No noisy MO, discrete-fidelity, combined MO/MF route,
+production optimizer repair, or additional dependency is included.
+
+### v3.3.2 Measured Acceptance
+
+Local acceptance completed **30/30 standard trials and 600 evaluations**, with
+no timeout, interruption, unknown duration, or evidence-validation warning. The
+two new smokes completed **6/6 trials and 36 evaluations**. Trials used seeds
+0 through 4 for standards and seed 0 for smokes; no failed trial was replaced.
+
+MO, 24 evaluations per trial (6 initial), n=5 complete trials per strategy:
+
+| Strategy | Final hypervolume median [Q25, Q75] | Final Pareto count median |
+| --- | --- | --- |
+| qLogEHVI | 53.0163 [51.5876, 54.4172] | 11 |
+| Random | 4.32061 [0, 7.87111] | 6 |
+| Sobol | 16.9545 [3.59104, 17.6260] | 3 |
+
+MF, 16 evaluations per trial (8 initial), n=5 complete trials per strategy:
+
+| Strategy | Observed-target regret median [Q25, Q75] | Oracle projected regret median | Cumulative modeled cost median | Target observations median |
+| --- | --- | --- | --- | --- |
+| qMFKG | 53.6478 [38.4258, 60.4258] | 2.16585 | 7.71575 | 2 |
+| Target-only random | 5.32276 [1.99202, 12.2570] | 1.99202 | 13.7157 | 10 |
+| Target-only Sobol | 5.19790 [4.08801, 8.73516] | 4.08801 | 13.7157 | 10 |
+
+All five qMFKG trials selected only lower-fidelity evaluations after initialization.
+Consequently their primary observed-target metric did not improve after the first
+two observations. The better oracle-projected scores do not repair this lack of
+target observations. At this fixed count and these settings qMFKG used less modeled
+cost but had worse observed-target quality than the baselines. This is retained
+scientific evidence, not a reason to tune seeds or alter optimizer defaults. MO
+results also remain descriptive fixed-protocol evidence, not a general superiority
+claim. Five seeds do not establish broad scientific performance.
+
+Full evidence is retained in `reports/benchmarks/v3.3.2-multi-objective-standard/`
+and `reports/benchmarks/v3.3.2-multi-fidelity-standard/`, with corresponding
+`*-smoke/` runs. The environment recorded BO Forge 3.3.2, Python 3.12.0,
+BoTorch 0.17.2, Torch 2.11.0, GPyTorch 1.15.2, NumPy 2.5.2, pandas 3.0.5,
+macOS 26.3 ARM64, one CPU thread per worker, and revision
+`35f66202a6b71dd4a195b662a6bf1fb1f93adfaf` with uncommitted changes. These are not
+fixed-runner performance measurements; runtime components are retained in reports.
+
+All nine retained v3.3.0/v3.3.1 runs were revalidated and regenerated into separate
+`report-v332-verified/` destinations without optimization or objective evaluation.
+Their traces, summaries, trajectories, and trial tables match the prior reviewed
+reports. The five constrained-BO failures and the earlier failed pending smoke
+remain intact and are **not resolved** by v3.3.2. No production BO changes were made.
+The new benchmark checks do not replace exact-commit CI or publication approval.
+
+### Source Commands
 
 Use an installed BO Forge environment from the root of a checkout or extracted
 source archive. See [Installation](INSTALLATION.md). The sdist includes
@@ -403,6 +539,6 @@ Local smoke results, standard-run measurements, exact-commit CI, and publication
 authorization are separate gates. Append measured acceptance results only after
 the corresponding runs have been inspected. Mixed/constrained and pending-aware
 routes are prepared in v3.3.1 with the failures disclosed above;
-multi-objective/multi-fidelity evidence is v3.3.2,
+multi-objective/multi-fidelity evidence is recorded separately for v3.3.2,
 full notebook execution v3.3.3, and performance closeout v3.3.4. See the
 [roadmap](../ROADMAP_V3_X.md) and [release checklist](RELEASE_CHECKLIST.md).

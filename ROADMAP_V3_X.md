@@ -4,7 +4,9 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.3.1`. The source-only benchmark harness extends
+Current prepared baseline: `v3.3.2`. The source-only benchmark harness adds
+coupled qLogEHVI hypervolume and continuous qMFKG observed-target quality/cost
+evidence, with separately labeled scoring-only oracle diagnostics. It retains
 continuous single-objective comparisons with mixed, constrained, and pending-aware
 routes plus evidence-integrity and cancellation-timing fixes. Local acceptance
 retained 40 complete and five failed standard trials. Historical v3.3.0 acceptance completed
@@ -69,9 +71,9 @@ flowchart LR
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
-    class v330 patchDone
-    class v331 patchActive
-    class v332,v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v330,v331 patchDone
+    class v332 patchActive
+    class v333,v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -100,7 +102,7 @@ flowchart LR
 | `v3.2.x` | completed | Predictive diagnostics, hardening, interpretation, and acceptance; not universal calibration |
 | `v3.3.0` | prepared | Source-only continuous benchmark harness; 90/90 local standard trials complete |
 | `v3.3.1` | prepared | Evidence integrity, cancellation timing, mixed/constrained/pending routes; 40 complete and 5 failed standard trials retained |
-| `v3.3.2` | planned | Multi-objective and multi-fidelity routes |
+| `v3.3.2` | prepared | 30/30 local MO/MF standard trials complete; worse qMFKG observed-target quality retained separately from oracle diagnostics |
 | `v3.3.3` | planned | Full notebook execution |
 | `v3.3.4` | planned | Performance evidence and series closeout |
 | `v3.3.x` | active | Closed-loop scientific and executable-workflow validation |
@@ -378,9 +380,18 @@ authorization and exact-commit CI.
 
 ### v3.3.2 - Multi-Objective And Multi-Fidelity Routes
 
-- Add hypervolume or hypervolume-regret evidence for multi-objective workflows.
-- Add bounded multi-fidelity quality/cost evidence with failure disclosure.
-- Keep unsupported combinations unchanged unless separately reviewed.
+- Add schema-v3 deterministic Branin-Currin/qLogEHVI hypervolume with reference
+  point [18, 6], not an exact hypervolume-regret claim.
+- Add continuous Augmented Branin/qMFKG observed-target regret and affine
+  modeled-cost evidence; target-only baselines after shared initialization.
+- Keep oracle target projection scoring-only, with separate time accounting.
+  Fixed-count endpoints are not equal-cost comparisons or recommendation quality.
+- Smoke: 6 trials / 36 evaluations. Standard: 30 trials / 600 evaluations;
+  retain failures, partial evidence, and timing completeness without retries.
+- Preserve v1/v2 evidence and all five historical constrained-BO failures.
+  Local acceptance completed 30/30 standard trials and 6/6 new smokes, retaining
+  qMFKG's lack of new target observations and worse observed-target quality.
+  See [measured acceptance](docs/BENCHMARKS.md); capability statuses are unchanged.
 
 ### v3.3.3 - Full Notebook Execution
 
