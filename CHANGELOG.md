@@ -1,5 +1,35 @@
 # 📝 BO Forge Changelog
 
+## v3.3.3 - Source-Archive Notebook Execution Assurance
+
+- Add source-only `notebook_assurance` execution and aggregation commands, kept
+  in the sdist and excluded from the runtime wheel.
+- Schedule one unchanged notebook per CI job, with `fail-fast: false`, at most
+  two concurrent jobs, and a 90-minute job timeout. The PR subset is
+  01, 04, 08, 12, 14, 18, 20, 22, 23, and 24; manual and exact-tag gates cover
+  all 20 notebooks.
+- Reuse the one built sdist across each matrix and its aggregate, binding
+  evidence to its SHA-256 and rejecting missing jobs rather than treating
+  available successes as complete-profile acceptance.
+- Preserve committed output-free notebooks and historical benchmark evidence.
+  Documentation and workflow preparation do not establish execution acceptance;
+  results must be inspected before execution approval. Publication still needs
+  exact-commit CI and separate authorization.
+- Correct notebook 04's initialization example so seed copying does not
+  invalidate a newly created provenance manifest. Remove notebook 14's unused
+  15-row constant and verify its actual six observations across two stages.
+- Correct notebook 20's review calls to use the public `accept` decision rather
+  than the stored `accepted` status, with tests executing both tutorial calls.
+- Correct notebook 17's synthetic working baseline to evaluate the original seed
+  designs with its unchanged simulator before fitting. Preserve the committed
+  seed CSV, config, 15-observation target, and optimizer safeguards.
+- Checkpoint completed cells, capture notebook 23/24 exports before cleanup,
+  and enforce cell and whole-notebook deadlines with owned-process cleanup.
+- Continue verified descendant cleanup after process-inspection failures and
+  retain aggregation failures with actionable CLI evidence and retry messages.
+- Reject truncated figure artifacts and incorrect contextual tutorial sequences
+  rather than accepting image headers or observation counts alone.
+
 ## v3.3.2 - Multi-Objective And Multi-Fidelity Benchmark Evidence
 
 - Add source-only schema-v3 deterministic Branin-Currin/qLogEHVI and continuous

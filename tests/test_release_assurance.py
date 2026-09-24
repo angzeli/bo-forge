@@ -109,8 +109,10 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
         "macos-filesystem",
         "numerical",
         "package",
+        "notebooks",
     }
-    assert all(int(job["timeout-minutes"]) > 0 for job in jobs.values())
+    assert all(int(job["timeout-minutes"]) > 0 for job in jobs.values() if "uses" not in job)
+    assert jobs["notebooks"]["uses"] == "./.github/workflows/notebook-execution.yml"
 
 
 def test_provenance_filesystem_acceptance_is_in_macos_ci_and_checklist() -> None:
@@ -324,7 +326,7 @@ def test_future_tag_gate_validates_without_publishing() -> None:
     assert "from bo_forge_api import create_app" not in workflow
     assert '"${wheel}[app,api]"' not in workflow
     assert "-print -quit" not in workflow
-    assert set(workflow_data["jobs"]) == {"validate-tag"}
+    assert set(workflow_data["jobs"]) == {"validate-tag", "notebooks"}
     assert int(workflow_data["jobs"]["validate-tag"]["timeout-minutes"]) > 0
 
 
@@ -408,14 +410,15 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.2.3` | implementation complete |" in roadmap
     assert "| `v3.2.x` | completed |" in roadmap
     assert "class v33 majorActive" in roadmap
-    assert "class v330,v331 patchDone" in roadmap
-    assert "class v332 patchActive" in roadmap
+    assert "class v330,v331,v332 patchDone" in roadmap
+    assert "class v333 patchActive" in roadmap
     assert "| `v3.3.0` | prepared |" in roadmap
     assert "| `v3.3.1` | prepared |" in roadmap
     assert "| `v3.3.x` | active |" in roadmap
     assert "| `v3.3.2` | prepared |" in roadmap
-    for version in ("3.3.3", "3.3.4"):
-        assert f"| `v{version}` | planned |" in roadmap
+    assert "| `v3.3.3` | prepared |" in roadmap
+    assert "local execution acceptance and exact-commit CI are separate gates" in roadmap
+    assert "| `v3.3.4` | planned |" in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
     assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap

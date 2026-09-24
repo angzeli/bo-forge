@@ -1,6 +1,6 @@
 # 🖥️ Streamlit App
 
-BO Forge v3.3.2 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
+BO Forge v3.3.3 provides a local Streamlit workbench around the existing `CampaignSession` workflow.
 
 The v3.3.2 [benchmark harness](BENCHMARKS.md) is a separate source-only command
 workflow. It adds no Streamlit controls or changes to BO behavior; benchmark

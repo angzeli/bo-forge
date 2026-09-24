@@ -24,6 +24,7 @@ PRODUCTION_ROOTS = (
     PROJECT_ROOT / "bo_forge_app",
     PROJECT_ROOT / "bo_forge_api",
 )
+GOVERNED_ROOTS = (*PRODUCTION_ROOTS, PROJECT_ROOT / "notebook_assurance")
 EXPECTED_PUBLIC_EXPORTS = {
     "FitMetadata",
     "PredictiveEvaluationResult",
@@ -118,7 +119,7 @@ def test_production_modules_stay_below_physical_line_limit() -> None:
         path.relative_to(PROJECT_ROOT).as_posix(): len(
             path.read_text(encoding="utf-8").splitlines()
         )
-        for root in PRODUCTION_ROOTS
+        for root in GOVERNED_ROOTS
         for path in _python_files(root)
         if len(path.read_text(encoding="utf-8").splitlines()) > 800
     }
@@ -128,7 +129,7 @@ def test_production_modules_stay_below_physical_line_limit() -> None:
 
 def test_production_functions_stay_below_line_limit() -> None:
     oversized: dict[str, int] = {}
-    for root in PRODUCTION_ROOTS:
+    for root in GOVERNED_ROOTS:
         for path in _python_files(root):
             for node in ast.walk(_parsed(path)):
                 if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
@@ -180,6 +181,8 @@ def test_core_and_optional_packages_respect_layer_boundaries() -> None:
         "bo_forge_app": {"bo_forge_api", "fastapi", "uvicorn"},
         "bo_forge_api": {"bo_forge_app", "streamlit"},
     }
+    for forbidden in forbidden_by_root.values():
+        forbidden.add("notebook_assurance")
     for root in PRODUCTION_ROOTS:
         for path in _python_files(root):
             for node in ast.walk(_parsed(path)):
@@ -207,7 +210,7 @@ def test_core_and_optional_packages_respect_layer_boundaries() -> None:
 
 def test_broad_exception_catches_explain_their_boundary() -> None:
     unexplained: list[str] = []
-    for root in PRODUCTION_ROOTS:
+    for root in GOVERNED_ROOTS:
         for path in _python_files(root):
             lines = path.read_text(encoding="utf-8").splitlines()
             for node in ast.walk(_parsed(path)):

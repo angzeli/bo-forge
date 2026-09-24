@@ -1,3 +1,4 @@
+import ast
 import hashlib
 import json
 import math
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import nbformat
+import pandas as pd
 import pytest
 from nbformat.validator import validate
 
@@ -63,12 +65,16 @@ def notebook_source(notebook_path: Path) -> str:
 
 
 @pytest.mark.parametrize("notebook_path", CAMPAIGN_NOTEBOOKS)
-def test_notebook_defines_15_step_target(notebook_path: Path) -> None:
+def test_notebook_defines_actual_completion_target(notebook_path: Path) -> None:
     source = notebook_source(notebook_path)
     if notebook_path == REPLICATE_NOTEBOOK:
         assert "TARGET_REPLICATE_GROUPS = 15" in source
     elif notebook_path == FOUR_OBJECTIVE_NOTEBOOK:
         assert "TARGET_OBSERVED_ROWS = 50" in source
+    elif notebook_path.name == "14_structured_campaign_tutorial.ipynb":
+        assert "TARGET_OBSERVED_ROWS" not in source
+        assert 'suggest_next(batch_size=1, stage="screening")' in source
+        assert 'suggest_next(batch_size=1, stage="refinement")' in source
     else:
         assert "TARGET_OBSERVED_ROWS = 15" in source
 
@@ -85,6 +91,60 @@ def test_cli_notebook_uses_package_module_invocation() -> None:
 
     assert '"-m",' in source
     assert '"bo_forge"' in source
+
+
+def test_cli_notebook_initialization_keeps_managed_log_separate_from_seed() -> None:
+    notebook = nbformat.read(CLI_NOTEBOOK, as_version=4)
+    cell = next(cell.source for cell in notebook.cells
+                if cell.cell_type == "code" and '"init-log"' in cell.source)
+    assert "with TemporaryDirectory(" in cell
+    assert 'str(Path(initialization_dir) / "empty.csv")' in cell
+    assert "seed_log.to_csv(PROJECT_ROOT / WORKING_LOG_PATH, index=False)" in cell
+    assert "str(WORKING_LOG_PATH)" not in cell
+
+
+def test_cli_notebook_setup_reloads_seed_without_stale_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tempfile
+
+    root = Path(__file__).resolve().parents[1]
+    notebook = nbformat.read(root / CLI_NOTEBOOK, as_version=4)
+    for relative in (
+        "pyproject.toml",
+        "configs/04_simple_4d_maximise_logei.yaml",
+        "examples/04_simple_4d_maximise_logei_campaign_log.csv",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(root / relative, destination)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(runtime))
+    monkeypatch.setenv("TMPDIR", str(runtime))
+    monkeypatch.chdir(tmp_path)
+
+    namespace = {"__name__": "__main__"}
+    for cell in notebook.cells:
+        if cell.cell_type != "code":
+            continue
+        exec(compile(cell.source, f"{CLI_NOTEBOOK}:{cell.id}", "exec"), namespace)
+        if "seed_log.to_csv(" in cell.source:
+            break
+    else:
+        pytest.fail("CLI notebook seed initialization cell was not found")
+
+    config_path = tmp_path / namespace["CONFIG_PATH"]
+    working_path = tmp_path / namespace["WORKING_LOG_PATH"]
+    campaign = CampaignSession.from_files(config_path, working_path)
+    campaign.reload()
+    campaign.validate()
+    seed = CampaignSession.from_files(config_path, tmp_path / namespace["SEED_LOG_PATH"])
+    assert len(campaign.observed_data()) > 0
+    namespace["pd"].testing.assert_frame_equal(campaign.df, seed.df)
+    assert Path(namespace["initialization_dir"]).is_relative_to(runtime)
+    assert not Path(namespace["initialization_dir"]).exists()
+    assert not list(tmp_path.rglob("*.manifest.json"))
 
 
 @pytest.mark.parametrize("notebook_path", CAMPAIGN_NOTEBOOKS)
@@ -449,45 +509,85 @@ def test_contextual_cost_review_tutorial_workflow_smoke(tmp_path: Path) -> None:
     plt.close("all")
 
 
-def test_model_profile_tutorial_workflow_smoke(tmp_path: Path) -> None:
-    log_path = tmp_path / "17_model_profile_logei_working_log.csv"
-    latest_path = tmp_path / "17_model_profile_logei_latest_suggestions.csv"
-    report_dir = tmp_path / "reports"
-    report_dir.mkdir()
-    shutil.copyfile("examples/17_model_profile_campaign_log.csv", log_path)
-    campaign = CampaignSession.from_files(
+@pytest.fixture
+def model_profile_notebook(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root = Path(__file__).resolve().parents[1]
+    notebook = nbformat.read(root / MODEL_PROFILE_NOTEBOOK, as_version=4)
+    originals = {}
+    for relative in (
         "configs/17_model_profile_logei.yaml",
-        log_path,
-    )
-
-    def simulate_activity(row: object) -> float:
-        loading = float(row["catalyst_loading"])
-        temperature = float(row["reaction_temperature"])
-        loading_term = 0.62 + 0.85 * loading - 0.92 * (loading - 0.68) ** 2
-        temperature_term = -0.00008 * (temperature - 108.0) ** 2
-        smooth_variation = 0.035 * math.sin(9.0 * loading + 0.035 * temperature)
-        return round(loading_term + temperature_term + smooth_variation, 6)
-
-    campaign.validate()
-    model_summary = campaign.model_summary()
-    model_values = dict(
-        zip(model_summary["field"], model_summary["value"], strict=True)
-    )
-    assert model_values["model_profile"] == "smooth"
-    before = log_path.read_bytes()
-    suggestions = campaign.suggest_next(batch_size=1)
-    assert log_path.read_bytes() == before
-    suggestions.to_csv(latest_path, index=False)
-    campaign.append_suggestions(suggestions)
-    for row_id in suggestions["row_id"]:
-        row = campaign.df.loc[campaign.df["row_id"] == row_id].iloc[0]
-        campaign.mark_observed(row_id=row_id, objective_value=simulate_activity(row))
-
-    campaign = CampaignSession.from_files("configs/17_model_profile_logei.yaml", log_path)
-    campaign.plot_model_diagnostics(save_path=report_dir / "17_model_profile_diagnostics.png")
-    campaign.export_report(report_dir / "17_model_profile_report.md")
-
-    assert latest_path.exists()
-    assert (report_dir / "17_model_profile_diagnostics.png").exists()
-    assert (report_dir / "17_model_profile_report.md").exists()
+        "examples/17_model_profile_campaign_log.csv",
+    ):
+        source, destination = root / relative, tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        originals[source] = source.read_bytes()
+        originals[destination] = destination.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    namespace = {"__name__": "__main__"}
+    setup = next(cell for cell in notebook.cells if cell.id == "model-profile-setup")
+    exec(compile(setup.source, f"{MODEL_PROFILE_NOTEBOOK}:{setup.id}", "exec"), namespace)
+    yield notebook, namespace
+    for path, expected in originals.items():
+        assert path.read_bytes() == expected
     plt.close("all")
+
+
+def test_model_profile_tutorial_initializes_consistent_synthetic_baseline(
+    model_profile_notebook,
+) -> None:
+    _, namespace = model_profile_notebook
+    seed = pd.read_csv(namespace["SEED_LOG_PATH"])
+    working = pd.read_csv(namespace["WORKING_LOG_PATH"])
+    assert working.activity.tolist() == [0.213534, 0.743145, 1.191096, 1.319409]
+    pd.testing.assert_frame_equal(working.drop(columns="activity"), seed.drop(columns="activity"))
+    assert working.columns.tolist() == seed.columns.tolist()
+    assert namespace["TARGET_OBSERVED_ROWS"] == 15
+
+
+def test_model_profile_tutorial_workflow_smoke(model_profile_notebook) -> None:
+    notebook, namespace = model_profile_notebook
+    for cell in notebook.cells:
+        if cell.cell_type != "code" or cell.id == "model-profile-setup":
+            continue
+        before = namespace["WORKING_LOG_PATH"].read_bytes()
+        exec(compile(cell.source, f"{MODEL_PROFILE_NOTEBOOK}:{cell.id}", "exec"), namespace)
+        if cell.id == "dry-run-suggestion":
+            assert namespace["WORKING_LOG_PATH"].read_bytes() == before
+
+    campaign = namespace["campaign"]
+    campaign.reload()
+    campaign.validate()
+    assert len(campaign.observed_data()) == len(campaign.df) == 15
+    assert campaign.pending_suggestions().empty
+    assert not campaign.df.duplicated(subset=campaign.config.variable_names).any()
+    assert campaign.config.model.profile == "smooth"
+    assert campaign.config.bo.random_seed == 17
+    assert campaign.df.loc[campaign.df.iteration.gt(0), "source"].eq("log_ei").all()
+    latest = pd.read_csv(namespace["LATEST_SUGGESTIONS_PATH"])
+    assert len(latest) == 1
+    assert latest.row_id.iloc[0] == campaign.df.row_id.iloc[-1]
+    for filename in ("17_model_profile_diagnostics.png", "17_model_profile_report.md"):
+        assert (namespace["REPORT_DIR"] / filename).stat().st_size > 0
+
+
+@pytest.mark.parametrize("cell_id", ["dba69fc7", "234a0e7b"])
+def test_contextual_notebook_review_calls_use_public_decisions(tmp_path, cell_id):
+    notebook = nbformat.read(CONTEXTUAL_COST_REVIEW_NOTEBOOK, as_version=4)
+    cell = next(cell for cell in notebook.cells if cell.id == cell_id)
+    calls = [node for node in ast.walk(ast.parse(cell.source))
+             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+             and node.func.attr == "review_suggestion"]
+    assert len(calls) == 1
+    log_path = tmp_path / "campaign.csv"
+    shutil.copyfile("examples/20_contextual_cost_review_campaign_log.csv", log_path)
+    campaign = CampaignSession.from_files(
+        "configs/20_contextual_cost_review_logei.yaml", log_path)
+    suggestions = campaign.suggest_next(context_values={"feedstock_acidity": 0.5})
+    campaign.append_suggestions(suggestions)
+    row_id = suggestions.iloc[0]["row_id"]
+    expression = ast.Expression(body=calls[0])
+    eval(compile(expression, str(CONTEXTUAL_COST_REVIEW_NOTEBOOK), "eval"),
+         {"campaign": campaign, "row_id": row_id})
+    row = campaign.df.loc[campaign.df["row_id"] == row_id].iloc[0]
+    assert row["review_status"] == "accepted"

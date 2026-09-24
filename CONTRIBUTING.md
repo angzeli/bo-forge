@@ -41,6 +41,16 @@ Run quickstart from a temporary copy when release hygiene matters so no working
 log is created in the checkout. The release checklist describes external
 wheel/sdist installation probes and packaged command smokes.
 
+Notebook execution uses the source-only `notebook_assurance` tool described in
+[Notebook Execution](docs/NOTEBOOK_EXECUTION.md), not in-place notebook runs.
+Keep committed notebooks output-free. PR CI runs ten representative notebooks;
+the manual full workflow and exact-tag gate each run all 20 from one built
+sdist, with one notebook per job and at most two concurrent jobs. Preserve
+failure evidence and require the aggregate to reject missing jobs. Do not claim
+execution approval until actual results have been inspected, or interpret a
+prepared workflow as completed execution. Existing generated constraints supply
+the notebook and optional interface dependencies; do not upgrade them for a run.
+
 ## Dependency changes
 
 Keep end-user lower bounds and compatibility ranges in `pyproject.toml`. When a

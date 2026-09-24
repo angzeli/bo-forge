@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "3.3.2"
+version = "3.3.3"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -102,6 +102,7 @@ target-version = "py311"
 include = [
     "bo_forge/**/*.py",
     "benchmarks/**/*.py",
+    "notebook_assurance/**/*.py",
     "bo_forge_app/**/*.py",
     "bo_forge_api/**/*.py",
     "examples/**/*.py",

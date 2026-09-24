@@ -4,8 +4,11 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.3.2 preparation adds source-only coupled multi-objective and continuous
-multi-fidelity routes, preserving evidence-integrity and cancellation-timing fixes.
+The v3.3.3 patch adds source-archive notebook execution and complete-profile
+aggregation. Execution approval requires inspected successful full-profile results;
+prepared infrastructure alone is not execution evidence. See
+[Notebook Execution](NOTEBOOK_EXECUTION.md). The v3.3.2 source-only coupled
+multi-objective and continuous multi-fidelity routes retain their historical evidence.
 Measured v3.3.1 acceptance is documented in the benchmark guide, including five
 constrained-BO failures. Prepared docs, tests, and CI steps alone do not establish acceptance
 or BO superiority. The v3.2.3 diagnostic acceptance remains historical evidence,
@@ -237,6 +240,16 @@ Representative read-only CLI checks:
 | `macOS filesystem and CLI` | Path, symlink, locking, fingerprint, rollback, mode, process, and CLI checks |
 | `Bounded real numerical paths` | CPU-only real qMFKG and five-row/two-fold predictive-GP integration with a bounded job timeout |
 | `Build and external artifact probes` | PEP 517 build, Twine, package boundaries, external wheel/sdist installs, `pip check`, packaged entrypoints |
+| `PR notebook assurance` | Ten one-notebook jobs from the built sdist, retained failure evidence, and complete-profile aggregation against that same archive |
+
+The PR subset is 01, 04, 08, 12, 14, 18, 20, 22, 23, and 24. The manual
+`.github/workflows/notebook-full.yml` workflow and exact-tag release gate must
+each use the full 20-notebook profile. The shared workflow uses
+`fail-fast: false`, `max-parallel: 2`, and `timeout-minutes: 90` per notebook.
+Inspect the aggregate `result.json` and individual failures, confirm
+`archive_sha256` against the original built sdist, and require all scheduled
+notebooks to have successful evidence. Missing jobs fail the aggregate even if
+every available result passed. A passing PR subset is not full-profile acceptance.
 
 Workflow files use read-only repository permissions and bounded timeouts. They
 do not use `pull_request_target`, publishing credentials, or non-loopback test
@@ -301,7 +314,9 @@ Inspect the wheel and sdist with the repository contracts:
 
 The wheel contains only runtime packages and distribution metadata. The sdist
 contains release docs, generated constraints, configs, seed logs, notebooks,
-and tests required by the release contract.
+the source-only `notebook_assurance` package, and tests required by the release
+contract. Every assurance Python module must be present in the sdist and absent
+from the wheel; [Notebook Execution](NOTEBOOK_EXECUTION.md) describes its CLI.
 
 Specifically, verify that the wheel contains the `bo_forge`, `bo_forge_app`,
 and `bo_forge_api` packages, while release documentation, examples, notebooks,
@@ -392,7 +407,9 @@ For a pushed `v*` tag or a manual run naming an existing tag, it:
 3. runs required tests and Ruff;
 4. builds and verifies wheel/sdist in runner-temporary storage;
 5. smoke-installs the exact wheel, source distribution, app extra, and API extra;
-6. retains verified files as private GitHub Actions artifacts for 14 days.
+6. retains verified files as private GitHub Actions artifacts for 14 days;
+7. runs all 20 notebooks and aggregates their evidence against that exact built
+   sdist, using the resolved tagged commit for the assurance tooling.
 
 It does not create a GitHub Release, publish to PyPI, use trusted publishing,
 attach public files, or generate release prose.
@@ -405,4 +422,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.3.2 does none of those actions.
+separate explicit authorization. Preparing v3.3.3 does none of those actions.

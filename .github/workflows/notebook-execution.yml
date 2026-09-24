@@ -1,0 +1,179 @@
+name: Source archive notebook assurance
+
+on:
+  workflow_call:
+    inputs:
+      profile:
+        required: true
+        type: string
+      artifact-name:
+        required: true
+        type: string
+      source-ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+  UV_HTTP_TIMEOUT: "300"
+
+jobs:
+  schedule:
+    name: Schedule archive notebooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      notebooks: ${{ steps.schedule.outputs.notebooks }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/dist
+      - name: Select the complete profile from the built archive
+        id: schedule
+        env:
+          PROFILE: ${{ inputs.profile }}
+          DIST_DIR: ${{ runner.temp }}/dist
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          archive, = Path(os.environ["DIST_DIR"]).glob("*.tar.gz")
+          with tarfile.open(archive) as source:
+              notebooks = sorted(
+                  PurePosixPath(member.name).name for member in source.getmembers()
+                  if member.isfile() and len(PurePosixPath(member.name).parts) == 3
+                  and PurePosixPath(member.name).parts[1] == "notebooks"
+                  and member.name.endswith(".ipynb")
+              )
+          if len(notebooks) != 20 or len(set(notebooks)) != 20:
+              raise SystemExit("Expected exactly 20 unique archive notebooks")
+          profile = os.environ["PROFILE"]
+          if profile == "pr":
+              prefixes = {"01", "04", "08", "12", "14", "18", "20", "22", "23", "24"}
+              notebooks = [name for name in notebooks if name[:2] in prefixes]
+              if len(notebooks) != 10 or {name[:2] for name in notebooks} != prefixes:
+                  raise SystemExit("Incomplete PR notebook subset")
+          elif profile != "full":
+              raise SystemExit(f"Unknown notebook profile: {profile}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"notebooks={json.dumps(notebooks)}\n")
+          PY
+
+  execute:
+    name: ${{ matrix.notebook }}
+    needs: schedule
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        notebook: ${{ fromJSON(needs.schedule.outputs.notebooks) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: notebook-uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/dist
+      - name: Install constrained environment with optional notebook dependencies
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r requirements/constraints-py312-linux-x86_64.txt
+          sdists=("$RUNNER_TEMP/dist"/*.tar.gz)
+          [[ ${#sdists[@]} -eq 1 && -f ${sdists[0]} ]]
+          uv pip install --system --no-deps --no-build-isolation "${sdists[0]}"
+          python -m pip check
+      - name: Execute one unchanged notebook from the source archive
+        env:
+          PROFILE: ${{ inputs.profile }}
+          NOTEBOOK: ${{ matrix.notebook }}
+        run: |
+          sdists=("$RUNNER_TEMP/dist"/*.tar.gz)
+          [[ ${#sdists[@]} -eq 1 && -f ${sdists[0]} ]]
+          python -m notebook_assurance run --sdist "${sdists[0]}" \
+            --profile "$PROFILE" --notebook "$NOTEBOOK" \
+            --output "$RUNNER_TEMP/notebook-result"
+      - name: Preserve per-notebook evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-${{ inputs.profile }}-${{ matrix.notebook }}
+          path: ${{ runner.temp }}/notebook-result/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    name: Verify complete notebook evidence
+    needs: [schedule, execute]
+    if: ${{ always() && needs.schedule.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/dist
+      - name: Install constrained assurance dependencies
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r requirements/constraints-py312-linux-x86_64.txt
+          python -m pip check
+      - name: Prepare evidence directory even when every job failed
+        run: mkdir -p "$RUNNER_TEMP/notebook-evidence"
+      - name: Collect all available notebook evidence
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: notebook-${{ inputs.profile }}-*.ipynb
+          path: ${{ runner.temp }}/notebook-evidence
+          merge-multiple: false
+      - name: Require complete profile evidence for the same source archive
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          sdists=("$RUNNER_TEMP/dist"/*.tar.gz)
+          [[ ${#sdists[@]} -eq 1 && -f ${sdists[0]} ]]
+          python -m notebook_assurance aggregate --sdist "${sdists[0]}" \
+            --profile "$PROFILE" --evidence "$RUNNER_TEMP/notebook-evidence" \
+            --output "$RUNNER_TEMP/notebook-aggregate"
+      - name: Preserve aggregate including missing-job failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-${{ inputs.profile }}-aggregate
+          path: ${{ runner.temp }}/notebook-aggregate/
+          if-no-files-found: warn
+          retention-days: 14

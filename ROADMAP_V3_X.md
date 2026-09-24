@@ -4,7 +4,11 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.3.2`. The source-only benchmark harness adds
+Current prepared baseline: `v3.3.3`. Source-only notebook assurance adds PR,
+manual full, and exact-tag archive-bound execution gates. Execution acceptance
+requires inspected results for the exact source archive; prepared CI/docs are not
+execution approval. See [Notebook Execution](docs/NOTEBOOK_EXECUTION.md).
+The source-only benchmark harness adds
 coupled qLogEHVI hypervolume and continuous qMFKG observed-target quality/cost
 evidence, with separately labeled scoring-only oracle diagnostics. It retains
 continuous single-objective comparisons with mixed, constrained, and pending-aware
@@ -71,9 +75,9 @@ flowchart LR
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
-    class v330,v331 patchDone
-    class v332 patchActive
-    class v333,v334,v340,v341,v342,v343,v344 patchFuture
+    class v330,v331,v332 patchDone
+    class v333 patchActive
+    class v334,v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -103,7 +107,7 @@ flowchart LR
 | `v3.3.0` | prepared | Source-only continuous benchmark harness; 90/90 local standard trials complete |
 | `v3.3.1` | prepared | Evidence integrity, cancellation timing, mixed/constrained/pending routes; 40 complete and 5 failed standard trials retained |
 | `v3.3.2` | prepared | 30/30 local MO/MF standard trials complete; worse qMFKG observed-target quality retained separately from oracle diagnostics |
-| `v3.3.3` | planned | Full notebook execution |
+| `v3.3.3` | prepared | Source-archive notebook execution gates; acceptance requires inspected archive-bound results |
 | `v3.3.4` | planned | Performance evidence and series closeout |
 | `v3.3.x` | active | Closed-loop scientific and executable-workflow validation |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
@@ -395,10 +399,18 @@ authorization and exact-commit CI.
 
 ### v3.3.3 - Full Notebook Execution
 
+Status: prepared; local execution acceptance and exact-commit CI are separate gates.
+
 - Execute every notebook from a clean source archive in temporary workspaces.
 - Enforce bounded timeouts and no tracked-file writes.
-- Keep committed notebooks output-free; use a representative PR subset and a
-  complete release job if total runtime requires separation.
+- Keep committed notebooks output-free. PR CI covers 01, 04, 08, 12, 14, 18,
+  20, 22, 23, and 24; manual and exact-tag workflows cover all 20 notebooks.
+- Use one notebook per job, a 90-minute job timeout, no fail-fast, and at most
+  two concurrent jobs. Reuse the one built sdist for execution and aggregation.
+- Bind each `result.json` to `archive_sha256`, record its schedule and notebook
+  statuses, and fail aggregation on missing jobs or unsuccessful evidence.
+  See [Notebook Execution](docs/NOTEBOOK_EXECUTION.md). Prepared infrastructure
+  does not establish a completed run or publication approval.
 
 ### v3.3.4 - Stable Performance Evidence
 

@@ -37,7 +37,7 @@ jobs:
       - name: Ruff
         run: ruff check . --no-cache
       - name: Syntax
-        run: python -m compileall -q bo_forge bo_forge_app bo_forge_api benchmarks examples tests
+        run: python -m compileall -q bo_forge bo_forge_app bo_forge_api benchmarks notebook_assurance examples tests
       - name: Whitespace
         run: git diff --check HEAD^ HEAD
       - name: Verify generated constraints
@@ -271,7 +271,14 @@ jobs:
           uv pip install --system --no-deps --no-build-isolation -e .
           python -m pip check
       - name: Build wheel and sdist outside the checkout
-        run: python -m build --outdir "$RUNNER_TEMP/dist"
+        run: python -m build --outdir "$RUNNER_TEMP/dist" --no-isolation
+      - name: Retain the built notebook source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-source
+          path: ${{ runner.temp }}/dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify metadata and package boundaries
         env:
           DIST_DIR: ${{ runner.temp }}/dist
@@ -358,3 +365,12 @@ jobs:
           (cd "$RUNNER_TEMP/api-interface-probe" && PYTHONPATH= \
             "$RUNNER_TEMP/api-interface/bin/python" -c \
               'from pathlib import Path; import bo_forge_api; from bo_forge_api.api import create_app; assert not hasattr(bo_forge_api, "create_app"); app = create_app(root=Path(".")); assert app.title')
+
+  notebooks:
+    name: PR notebook assurance
+    needs: package
+    uses: ./.github/workflows/notebook-execution.yml
+    with:
+      profile: pr
+      artifact-name: notebook-source
+      source-ref: ${{ github.sha }}

@@ -148,6 +148,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
     excluded_prefixes = (
         "benchmarks/",
+        "notebook_assurance/",
         "docs/",
         "configs/",
         "examples/",
@@ -172,6 +173,9 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         names = set(sdist.getnames())
 
     required_paths = {
+        "notebook_assurance/__init__.py",
+        "notebook_assurance/__main__.py",
+        "docs/NOTEBOOK_EXECUTION.md",
         "benchmarks/__init__.py",
         "benchmarks/__main__.py",
         "benchmarks/specs/smoke.yaml",
@@ -274,6 +278,11 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         for path in (PROJECT_ROOT / "benchmarks").rglob("*.py")
     }
     assert benchmark_sources.issubset(names)
+    assurance_sources = {
+        f"{SDIST_ROOT}/{path.relative_to(PROJECT_ROOT).as_posix()}"
+        for path in (PROJECT_ROOT / "notebook_assurance").rglob("*.py")
+    }
+    assert assurance_sources.issubset(names)
     benchmark_specs = {
         f"{SDIST_ROOT}/{path.relative_to(PROJECT_ROOT).as_posix()}"
         for path in (PROJECT_ROOT / "benchmarks" / "specs").glob("*.yaml")
@@ -295,6 +304,17 @@ def _assert_sdist_test_fixture_works(
     for arguments in (["--help"], ["run", "--help"], ["report", "--help"]):
         completed = subprocess.run(
             [sys.executable, "-m", "benchmarks", *arguments],
+            cwd=source_root,
+            env=benchmark_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert "usage:" in completed.stdout.lower()
+    for arguments in (["--help"], ["run", "--help"], ["aggregate", "--help"]):
+        completed = subprocess.run(
+            [sys.executable, "-m", "notebook_assurance", *arguments],
             cwd=source_root,
             env=benchmark_env,
             check=True,
