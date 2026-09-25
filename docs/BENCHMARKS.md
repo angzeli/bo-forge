@@ -540,5 +540,6 @@ authorization are separate gates. Append measured acceptance results only after
 the corresponding runs have been inspected. Mixed/constrained and pending-aware
 routes are prepared in v3.3.1 with the failures disclosed above;
 multi-objective/multi-fidelity evidence is recorded separately for v3.3.2,
-full notebook execution v3.3.3, and performance closeout v3.3.4. See the
+the verified full notebook baseline for v3.3.3, and passed local performance acceptance
+for v3.3.4 in [Performance Benchmarks](PERFORMANCE_BENCHMARKS.md). See the
 [roadmap](../ROADMAP_V3_X.md) and [release checklist](RELEASE_CHECKLIST.md).

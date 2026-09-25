@@ -1,5 +1,36 @@
 # 📝 BO Forge Changelog
 
+## v3.3.4 - Stable Performance Evidence
+
+Status: implementation complete for v3.3.4 and the v3.3.x series. Local performance
+acceptance passed, with 156/156 processes complete and 13/13 valid case pairs;
+the full notebook baseline is verified at 20/20. The local release gate must pass
+before commit; exact-commit CI remains pending.
+
+- Defines a same-host comparison of baseline commit `6c0d57db` and candidate
+  sdists: 13 cases x 2 versions x 6 fresh-process samples = 156 processes,
+  with a 600-second per-process deadline and 90-minute overall harness budget.
+- Adds a manual-only Ubuntu 24.04 / Python 3.12 performance workflow, capped at
+  120 minutes, using the existing hashed development constraints. Build the
+  baseline in an isolated detached worktree and compare both archives on one host.
+- Requires isolated non-editable environments; preparation is excluded from
+  sample timings. Runtime ratios are advisory, not machine-independent CI gates
+  or scientific-quality claims. Available evidence is always uploaded for 14 days.
+- Records the verified 20/20 full-notebook v3.3.3 baseline separately from the
+  current candidate: archive
+  `466a48c15347e5d8c4d2635afddbeb85acf53c693bd26dc856e47aa6b0fc9f40`,
+  retained under `reports/notebooks/v3.3.3/seed-baseline-fix/`.
+- Preserves historical timings as noncomparable evidence. No dependency upgrades,
+  support-status changes, optimizer changes, or full-performance PR runs are added.
+
+Measured medians, IQRs, environment/archive identities, and advisory ratios are
+recorded in `docs/PERFORMANCE_BENCHMARKS.md`. The evaluated candidate archive
+predates report-validation and interruption-checkpoint fixes plus closeout docs.
+The measurement worker, workloads, and production code are unchanged; the original
+samples are preserved and the regenerated report validates the same evidence.
+The result is archive-bound, not exact-commit CI. Push, tagging, and publication
+remain separate gates.
+
 ## v3.3.3 - Source-Archive Notebook Execution Assurance
 
 - Add source-only `notebook_assurance` execution and aggregation commands, kept

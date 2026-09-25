@@ -301,9 +301,11 @@ def _assert_sdist_test_fixture_works(
     source_root = extract_root / SDIST_ROOT
     benchmark_env = env.copy()
     benchmark_env.pop("PYTHONPATH", None)
-    for arguments in (["--help"], ["run", "--help"], ["report", "--help"]):
+    commands = [(module, arguments) for module in ("benchmarks", "benchmarks.performance")
+                for arguments in (["--help"], ["run", "--help"], ["report", "--help"])]
+    for module, arguments in commands:
         completed = subprocess.run(
-            [sys.executable, "-m", "benchmarks", *arguments],
+            [sys.executable, "-m", module, *arguments],
             cwd=source_root,
             env=benchmark_env,
             check=True,

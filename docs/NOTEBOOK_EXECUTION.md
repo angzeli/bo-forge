@@ -1,11 +1,21 @@
 # Notebook Execution Assurance
 
-BO Forge v3.3.3 provides source-only notebook execution assurance. The
+BO Forge v3.3.4 retains the source-only notebook assurance introduced in v3.3.3. The
 `notebook_assurance` package ships in the source distribution (sdist), not the
 runtime wheel. It executes unchanged notebook cells from a clean source archive
 in isolated workspaces and keeps committed notebooks output-free.
 
 ## Acceptance Status
+
+The verified v3.3.3 baseline passed all 20 notebooks in the `full` profile.
+Its archive SHA-256 is
+`466a48c15347e5d8c4d2635afddbeb85acf53c693bd26dc856e47aa6b0fc9f40`.
+Retained evidence lives in `reports/notebooks/v3.3.3/seed-baseline-fix/`, with
+the checked summary at
+`bo-forge-v333-seedfix-verified-aggregate/aggregate.json` under that directory.
+This acceptance belongs to those exact archive bytes; it does not certify a
+rebuilt v3.3.4 candidate. The passed paired performance acceptance is recorded
+separately in [Performance Benchmarks](PERFORMANCE_BENCHMARKS.md).
 
 Execution acceptance requires successful full-profile results to be inspected. Prepared
 code, static tests, package checks, and CI definitions do not grant execution
@@ -64,7 +74,7 @@ bytes throughout execution and aggregation:
 ```bash
 python -m build --sdist --no-isolation --outdir /tmp/bo-forge-notebook-dist
 python -m notebook_assurance run \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.3.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
   --profile pr --output /tmp/bo-forge-notebook-pr
 ```
 
@@ -74,7 +84,7 @@ path). The CI matrix uses exactly one such option per run:
 
 ```bash
 python -m notebook_assurance run \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.3.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
   --profile pr --notebook 01_maximisation_logei_campaign.ipynb \
   --output /tmp/bo-forge-notebook-evidence/01
 ```
@@ -84,7 +94,7 @@ overwriting its `result.json`. Once every scheduled job has finished, aggregate:
 
 ```bash
 python -m notebook_assurance aggregate \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.3.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
   --profile pr --evidence /tmp/bo-forge-notebook-evidence \
   --output /tmp/bo-forge-notebook-aggregate
 ```

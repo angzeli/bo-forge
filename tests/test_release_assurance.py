@@ -44,6 +44,12 @@ def test_release_identity_and_maturity_are_aligned() -> None:
         line for line in _read("CHANGELOG.md").splitlines() if line.startswith("## v")
     )
     assert current_changelog_heading.startswith(f"## v{PROJECT_VERSION} - ")
+    for path in (
+        "docs/INSTALLATION.md", "docs/PUBLIC_API.md", "docs/STREAMLIT_APP.md",
+        "docs/CAPABILITY_MATRIX.md", "docs/NOTEBOOK_EXECUTION.md",
+    ):
+        assert f"v{PROJECT_VERSION}" in _read(path).splitlines()[2]
+    assert f"bo_forge-{PROJECT_VERSION}.tar.gz" in _read("docs/NOTEBOOK_EXECUTION.md")
 
 
 def test_generated_constraints_are_hashed_and_resolver_pinned() -> None:
@@ -409,16 +415,21 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.2.2` | prepared | Practical interpretation" in roadmap
     assert "| `v3.2.3` | implementation complete |" in roadmap
     assert "| `v3.2.x` | completed |" in roadmap
-    assert "class v33 majorActive" in roadmap
-    assert "class v330,v331,v332 patchDone" in roadmap
-    assert "class v333 patchActive" in roadmap
+    assert "class v33 majorDone" in roadmap
+    assert "class v330,v331,v332,v333 patchDone" in roadmap
+    assert "class v334 patchDone" in roadmap
     assert "| `v3.3.0` | prepared |" in roadmap
     assert "| `v3.3.1` | prepared |" in roadmap
-    assert "| `v3.3.x` | active |" in roadmap
+    assert "| `v3.3.x` | completed |" in roadmap
     assert "| `v3.3.2` | prepared |" in roadmap
     assert "| `v3.3.3` | prepared |" in roadmap
     assert "local execution acceptance and exact-commit CI are separate gates" in roadmap
-    assert "| `v3.3.4` | planned |" in roadmap
+    assert f"| `v{PROJECT_VERSION}` | implementation complete |" in roadmap
+    assert "Performance acceptance passed: 156/156" in roadmap
+    assert "The local release gate must pass before commit" in roadmap
+    assert "exact-commit CI remains pending" in roadmap
+    assert "class v33 majorActive" not in roadmap
+    assert "class v334 patchActive" not in roadmap
     assert "### v3.2.1 - Diagnostics Hardening" in roadmap
     assert "### v3.2.2 - Interpretation And Calibration Guidance" in roadmap
     assert "### v3.2.3 - Synthetic Acceptance And Interpretation Contract" in roadmap

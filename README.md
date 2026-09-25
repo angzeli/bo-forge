@@ -1,14 +1,24 @@
-# 🧪 BO Forge v3.3.3
+# 🧪 BO Forge v3.3.4
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.3.3 adds [source-archive notebook assurance](docs/NOTEBOOK_EXECUTION.md):
+v3.3.4 records [same-host performance evidence](docs/PERFORMANCE_BENCHMARKS.md)
+against baseline commit `6c0d57db`: all 156 processes completed and all 13 case
+pairs validated. The comparison is manual-only, with advisory runtime ratios.
+Performance acceptance has passed for the recorded archives, and v3.3.x
+implementation is complete. The local release gate must pass before commit;
+exact-commit CI remains pending. The measured candidate predates report-validation
+and interruption-checkpoint fixes plus closeout docs. The measurement worker,
+workloads, and production code are unchanged; this is not exact-commit CI evidence.
+
+v3.3.3 added [source-archive notebook assurance](docs/NOTEBOOK_EXECUTION.md):
 a ten-notebook PR subset, all 20 notebooks in manual and exact-tag workflows,
 and archive-bound per-notebook evidence with missing-job detection. Execution
-acceptance requires inspected successful full-profile results; CI/docs preparation is
+acceptance includes a verified 20/20 full-profile baseline, bound to the archive
+recorded in the notebook guide, not to a rebuilt v3.3.4 candidate. CI/docs preparation is
 not execution or publication approval. The assurance tool is source-only and
 excluded from runtime wheels.
 

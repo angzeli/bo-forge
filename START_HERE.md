@@ -129,7 +129,7 @@ Streamlit, which displays the local interface. Installation can take several
 minutes and downloads scientific libraries; wait for the terminal prompt to
 return. Do not use a package-index BO Forge release in place of this command.
 
-Expected: `No broken requirements found.`, `bo-forge 3.3.3` for this source
+Expected: `No broken requirements found.`, `bo-forge 3.3.4` for this source
 version, and `Status: OK` from the doctor. Stop and address errors before
 starting experimental work. A different downloaded revision may have a
 different version; check its README heading.

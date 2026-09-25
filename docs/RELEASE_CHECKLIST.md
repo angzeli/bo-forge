@@ -4,9 +4,18 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.3.3 patch adds source-archive notebook execution and complete-profile
-aggregation. Execution approval requires inspected successful full-profile results;
-prepared infrastructure alone is not execution evidence. See
+The v3.3.4 paired local performance comparison against baseline `6c0d57db` passed:
+156/156 processes completed and all 13 case pairs validated. v3.3.x implementation
+is complete. The local release gate must pass before commit; exact-commit CI
+remains pending. The measured candidate archive predates report-validation and
+interruption-checkpoint fixes plus closeout docs. The measurement worker,
+workloads, and production code are unchanged; the result does not establish
+exact-commit CI. See
+[Performance Benchmarks](PERFORMANCE_BENCHMARKS.md).
+The verified v3.3.3 full notebook baseline passed 20/20, bound to archive
+`466a48c15347e5d8c4d2635afddbeb85acf53c693bd26dc856e47aa6b0fc9f40`
+under `reports/notebooks/v3.3.3/seed-baseline-fix/`. This does not certify a rebuilt
+candidate. Prepared infrastructure alone is not execution evidence. See
 [Notebook Execution](NOTEBOOK_EXECUTION.md). The v3.3.2 source-only coupled
 multi-objective and continuous multi-fidelity routes retain their historical evidence.
 Measured v3.3.1 acceptance is documented in the benchmark guide, including five
@@ -51,7 +60,8 @@ build directories.
 /tmp/bo-forge-release/bin/python -m pytest -p no:cacheprovider \
   tests/test_release_assurance.py \
   tests/test_release_artifacts.py \
-  tests/test_release_dependency_resolution.py
+  tests/test_release_dependency_resolution.py \
+  tests/test_release_performance_workflow.py
 git diff --check
 ```
 
@@ -93,6 +103,39 @@ lifecycle-hardening/acceptance tests. Existing artifact probes also exercise
 bounded adopt, mutate, accept-config, and fork sequences without a model fit.
 
 ## 3. Full Local Preflight
+
+### v3.3.4 Performance Acceptance
+
+The retained paired run passed local performance acceptance, and v3.3.x
+implementation is complete. The local release gate must pass before commit.
+For a new measurement, build baseline
+commit `6c0d57db` in an isolated detached worktree and build the candidate sdist
+separately. Compare both on the same host with the existing constrained development
+environment. The harness must prepare isolated non-editable installations and
+exclude environment preparation from sample timings.
+
+```bash
+python -m benchmarks.performance run --baseline PATH --candidate PATH --output PATH
+python -m benchmarks.performance report --input PATH --output NEWPATH
+```
+
+The protocol schedules 13 cases x 2 versions x 6 samples = 156 fresh processes,
+with a 600-second per-process deadline and 90-minute overall harness budget.
+The manual-only `.github/workflows/performance.yml` uses one Ubuntu 24.04 /
+Python 3.12 job, capped at 120 minutes, and always uploads available evidence
+for 14 days. Do not add the full performance workload to PR CI or the tag gate.
+
+- [x] Inspect both exact archive identities, installed import locations, and
+  constrained environment manifests; no editable installs or dependency upgrades.
+- [x] Reconcile all 156 scheduled process outcomes, including failures and missing
+  samples; preserve original attempts and never substitute missing times with zero.
+- [x] Regenerate the report into a fresh destination without running workloads.
+- [x] Record measured medians, spread, and advisory candidate/baseline ratios in
+  `docs/PERFORMANCE_BENCHMARKS.md`; historical workstation timings are noncomparable.
+- [ ] Pass the full local release gate before commit.
+  Support statuses, scientific claims, and publication gates are unchanged.
+
+### Existing Scientific Acceptance
 
 For v3.3.2, use the [benchmark guide](BENCHMARKS.md) from a checkout or extracted
 source archive. Numerical CI retains the full six-trial smoke sequentially, with
@@ -422,4 +465,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.3.3 does none of those actions.
+separate explicit authorization. Preparing v3.3.4 does none of those actions.

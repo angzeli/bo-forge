@@ -4,10 +4,18 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.3.3`. Source-only notebook assurance adds PR,
-manual full, and exact-tag archive-bound execution gates. Execution acceptance
-requires inspected results for the exact source archive; prepared CI/docs are not
-execution approval. See [Notebook Execution](docs/NOTEBOOK_EXECUTION.md).
+Current prepared baseline: `v3.3.4`. Implementation is complete for v3.3.4 and
+the v3.3.x series. Performance acceptance passed: 156/156 processes completed
+and all 13 case pairs validated. The local release gate must pass before commit;
+exact-commit CI remains pending. The archive-bound same-host comparison against
+`6c0d57db` is recorded in
+[Performance Benchmarks](docs/PERFORMANCE_BENCHMARKS.md).
+The verified v3.3.3 notebook baseline passed all 20 notebooks, with archive
+`466a48c15347e5d8c4d2635afddbeb85acf53c693bd26dc856e47aa6b0fc9f40`
+and evidence under `reports/notebooks/v3.3.3/seed-baseline-fix/`.
+That result does not certify a rebuilt candidate. Source-only notebook assurance
+retains PR, manual full, and exact-tag archive-bound execution gates. See
+[Notebook Execution](docs/NOTEBOOK_EXECUTION.md).
 The source-only benchmark harness adds
 coupled qLogEHVI hypervolume and continuous qMFKG observed-target quality/cost
 evidence, with separately labeled scoring-only oracle diagnostics. It retains
@@ -70,14 +78,14 @@ flowchart LR
     v34 -.-> v344
 
     class v30,v31,v32 majorDone
-    class v33 majorActive
+    class v33 majorDone
     class v34 majorFuture
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
-    class v330,v331,v332 patchDone
-    class v333 patchActive
-    class v334,v340,v341,v342,v343,v344 patchFuture
+    class v330,v331,v332,v333 patchDone
+    class v334 patchDone
+    class v340,v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -107,9 +115,9 @@ flowchart LR
 | `v3.3.0` | prepared | Source-only continuous benchmark harness; 90/90 local standard trials complete |
 | `v3.3.1` | prepared | Evidence integrity, cancellation timing, mixed/constrained/pending routes; 40 complete and 5 failed standard trials retained |
 | `v3.3.2` | prepared | 30/30 local MO/MF standard trials complete; worse qMFKG observed-target quality retained separately from oracle diagnostics |
-| `v3.3.3` | prepared | Source-archive notebook execution gates; acceptance requires inspected archive-bound results |
-| `v3.3.4` | planned | Performance evidence and series closeout |
-| `v3.3.x` | active | Closed-loop scientific and executable-workflow validation |
+| `v3.3.3` | prepared | Verified 20/20 full-profile notebook baseline; archive-bound acceptance, separate from candidate CI |
+| `v3.3.4` | implementation complete | Performance acceptance passed: 156/156 processes, 13/13 valid pairs; exact-commit CI remains separate |
+| `v3.3.x` | completed | Implementation complete; notebook 20/20 and performance acceptance verified, not publication approval |
 | `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
@@ -338,7 +346,11 @@ Audit mapping: diagnostics portion of `SCI-001`.
 
 ## v3.3.x - Closed-Loop Scientific And Workflow Validation
 
-Status: active
+Status: completed
+
+Implementation is complete; notebook and paired performance acceptance are verified.
+The local release gate must pass before commit. Exact-commit CI remains pending,
+and publication requires separate authorization.
 
 Audit mapping: closed-loop portion of `SCI-001`, plus `TST-001` and `PERF-001`.
 
@@ -400,6 +412,8 @@ authorization and exact-commit CI.
 ### v3.3.3 - Full Notebook Execution
 
 Status: prepared; local execution acceptance and exact-commit CI are separate gates.
+The verified baseline completed all 20 notebooks; the archive identity and retained
+evidence path are recorded above. Earlier failed attempts remain separate evidence.
 
 - Execute every notebook from a clean source archive in temporary workspaces.
 - Enforce bounded timeouts and no tracked-file writes.
@@ -414,10 +428,29 @@ Status: prepared; local execution acceptance and exact-commit CI are separate ga
 
 ### v3.3.4 - Stable Performance Evidence
 
-- Add fixed-runner import/startup checks and representative q=1/2/4 workflows.
-- Record environment manifests, runtime variance, and memory evidence where
-  practical.
-- Keep performance regressions distinct from scientific quality claims.
+Status: implementation complete; performance acceptance passed (156/156 processes,
+13/13 valid case pairs). The local release gate must pass before commit.
+Exact-commit CI remains pending; publication is a separate gate.
+
+- Compare baseline `6c0d57db` and candidate sdists on one host, using isolated
+  non-editable environments and excluding environment preparation from timings.
+- Schedule 13 import/startup and representative q=1/2/4 cases, two versions, and
+  six fresh-process samples per case/version: 156 processes. Limit each process
+  to 600 seconds and the overall harness to 90 minutes.
+- Use one manual-only Ubuntu 24.04 / Python 3.12 job with a 120-minute timeout,
+  existing hashed constraints, and always-uploaded evidence retained for 14 days.
+  Full performance runs are not PR CI.
+- Record archive and environment identities, failure counts, timing variation,
+  and available memory evidence. Keep ratios advisory and historical timings
+  noncomparable; neither timing nor notebook success establishes BO superiority.
+- Retain measured results in [Performance Benchmarks](docs/PERFORMANCE_BENCHMARKS.md):
+  process ratios 0.9660-1.0822, public-call ratios 0.9012-1.0794, and peak-RSS
+  ratios 0.9939-1.0086. These do not establish speedup or scientific superiority.
+  The evaluated candidate archive predates report-validation and
+  interruption-checkpoint fixes plus closeout docs. The measurement worker,
+  workloads, and production code are unchanged; the regenerated report validates
+  the preserved original samples. Acceptance is bound to those archive bytes,
+  not a final commit or rebuilt sdist.
 
 ## v3.4.x - Interface And Maintenance Hardening
 

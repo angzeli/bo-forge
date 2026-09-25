@@ -1,0 +1,82 @@
+name: Manual same-host performance evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+  CUDA_VISIBLE_DEVICES: ""
+  PYTHONDONTWRITEBYTECODE: "1"
+  UV_HTTP_TIMEOUT: "300"
+
+jobs:
+  compare:
+    name: Baseline and candidate on one host
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install constrained development environment
+        run: |
+          python -m pip install "uv==0.11.3"
+          uv pip install --system --require-hashes --torch-backend cpu \
+            -r requirements/constraints-py312-linux-x86_64.txt
+          python -m pip check
+      - name: Build baseline and candidate source archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/performance-inputs"
+          git worktree add --detach "$RUNNER_TEMP/performance-baseline" 6c0d57db
+          git -C "$RUNNER_TEMP/performance-baseline" rev-parse HEAD \
+            > "$RUNNER_TEMP/performance-inputs/baseline-commit.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/performance-inputs/candidate-commit.txt"
+          python -m build --sdist --no-isolation \
+            --outdir "$RUNNER_TEMP/performance-inputs/baseline" "$RUNNER_TEMP/performance-baseline"
+          python -m build --sdist --no-isolation \
+            --outdir "$RUNNER_TEMP/performance-inputs/candidate"
+      - name: Run bounded same-host comparison
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          baselines=("$RUNNER_TEMP/performance-inputs/baseline"/*.tar.gz)
+          candidates=("$RUNNER_TEMP/performance-inputs/candidate"/*.tar.gz)
+          [[ ${#baselines[@]} -eq 1 && -f ${baselines[0]} ]] || { echo "Expected one baseline sdist" >&2; exit 1; }
+          [[ ${#candidates[@]} -eq 1 && -f ${candidates[0]} ]] || { echo "Expected one candidate sdist" >&2; exit 1; }
+          sha256sum "${baselines[0]}" "${candidates[0]}" \
+            > "$RUNNER_TEMP/performance-inputs/archive-sha256.txt"
+          python -m benchmarks.performance run \
+            --baseline "${baselines[0]}" --candidate "${candidates[0]}" \
+            --output "$RUNNER_TEMP/performance-run"
+      - name: Regenerate report from retained evidence
+        if: ${{ always() && steps.compare.outcome != 'skipped' }}
+        run: |
+          python -m benchmarks.performance report \
+            --input "$RUNNER_TEMP/performance-run" --output "$RUNNER_TEMP/performance-report"
+      - name: Preserve available performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/performance-inputs/
+            ${{ runner.temp }}/performance-run/
+            ${{ runner.temp }}/performance-report/
+            !${{ runner.temp }}/performance-run/*/venv/**
+            !${{ runner.temp }}/performance-run/*/extracted/**
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
