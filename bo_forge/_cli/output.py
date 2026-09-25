@@ -76,15 +76,15 @@ def requested_json_command(parser, argv):
 
 
 def _format_value(parser, token, following):
-    # Resolve abbreviations with the real parser, including ambiguity rules.
-    try:
-        option = parser._parse_optional(token)
-    except ArgumentFailure:
+    # Inspect declared options, not _parse_optional's patch-version-dependent tuples.
+    option, separator, explicit = token.partition("=")
+    registered = parser._option_string_actions
+    if option not in registered and parser.allow_abbrev and option.startswith("--"):
+        matches = [name for name in registered if name.startswith(option)]
+        option = matches[0] if len(matches) == 1 else None
+    if option != "--format":
         return None
-    if option is None or option[0] is None or option[0].dest != "format":
-        return None
-    explicit = option[2]
-    return explicit if explicit is not None else next(iter(following), None)
+    return explicit if separator else next(iter(following), None)
 
 
 def json_value(value):

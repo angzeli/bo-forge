@@ -9,10 +9,47 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from bo_forge._cli.output import SerializationError, json_value, render, table_payload
-from bo_forge.cli import run
+from bo_forge._cli.output import (
+    SerializationError,
+    json_value,
+    render,
+    requested_json_command,
+    table_payload,
+)
+from bo_forge.cli import build_parser, run
 from bo_forge.session import CampaignSession
 from tests.test_cli_json import SCHEMA, example_args, response, validate_contract
+
+
+@pytest.mark.parametrize("shape", ["tuple3", "tuple4", "list4"])
+def test_format_intent_does_not_depend_on_private_parser_return_shape(shape, monkeypatch):
+    parser = build_parser()
+    command = parser._subparsers._group_actions[0].choices["validate"]
+    action = command._option_string_actions["--format"]
+    returned = {
+        "tuple3": (action, "--format", "json"),
+        "tuple4": (action, "--format", "=", "json"),
+        "list4": [(action, "--format", "=", "json")],
+    }[shape]
+    monkeypatch.setattr(command, "_parse_optional", lambda token: returned)
+    assert requested_json_command(parser, ["validate", "--format=json"]) == "validate"
+
+
+@pytest.mark.parametrize("extra_option,abbreviations,flag,expected", [
+    (None, True, "--for=json", "validate"),
+    (None, False, "--for=json", None),
+    (None, False, "--format=json", "validate"),
+    ("--formal", True, "--for=json", None),
+    ("--formal", True, "--format=json", "validate"),
+    ("--for", True, "--for=json", None),
+])
+def test_format_intent_respects_registered_options(extra_option, abbreviations, flag, expected):
+    parser = build_parser()
+    command = parser._subparsers._group_actions[0].choices["validate"]
+    command.allow_abbrev = abbreviations
+    if extra_option:
+        command.add_argument(extra_option)
+    assert requested_json_command(parser, ["validate", flag]) == expected
 
 
 @pytest.mark.parametrize("flags", [
