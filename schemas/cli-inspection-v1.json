@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/angzeli/bo-forge/schemas/cli-inspection-v1.json",
+  "title": "BO Forge CLI inspection envelope v1",
+  "type": "object",
+  "required": ["schema_version", "bo_forge_version", "command", "ok", "data", "error"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bo_forge_version": {"type": "string"},
+    "command": {"enum": ["validate", "summary", "status", "next-action", "cost-summary", "replicate-summary", "stage-summary", "context-summary", "fidelity-summary", "fidelity-coverage", "qlog-nei-summary", "model-summary", "model-compare", "pareto-front", "pareto-summary", "provenance"]},
+    "ok": {"type": "boolean"},
+    "data": {"type": ["null", "object"]},
+    "error": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/error"}]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"ok": {"const": true}}},
+      "then": {"properties": {"error": {"type": "null"}, "data": {"type": "object"}}},
+      "else": {
+        "properties": {"error": {"$ref": "#/$defs/error"}},
+        "if": {"properties": {"command": {"const": "provenance"}}},
+        "then": {"properties": {"data": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/table"}]}}},
+        "else": {"properties": {"data": {"type": "null"}}}
+      }
+    },
+    {
+      "if": {"properties": {"ok": {"const": true}, "command": {"const": "validate"}}},
+      "then": {"properties": {"data": {"$ref": "#/$defs/valid"}}}
+    },
+    {
+      "if": {"properties": {"ok": {"const": true}, "command": {"const": "status"}}},
+      "then": {"properties": {"data": {"$ref": "#/$defs/status"}}}
+    },
+    {
+      "if": {"properties": {"ok": {"const": true}, "command": {"not": {"enum": ["status", "validate"]}}}},
+      "then": {"properties": {"data": {"$ref": "#/$defs/table"}}}
+    }
+  ],
+  "$defs": {
+    "table": {
+      "$comment": "Each record must have exactly the keys listed in columns. This dynamic correspondence is checked separately from JSON Schema.",
+      "type": "object",
+      "required": ["columns", "records"],
+      "properties": {
+        "columns": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "records": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "valid": {"type": "object", "required": ["valid"], "properties": {"valid": {"const": true}}},
+    "status": {"type": "object", "required": ["status"], "properties": {"status": {"type": "string"}}},
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "hint", "details"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "message": {"type": "string"},
+        "hint": {"type": ["string", "null"]},
+        "details": {"type": "object"}
+      }
+    }
+  }
+}

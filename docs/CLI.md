@@ -5,6 +5,87 @@ It exposes the same BO behaviour as the package API; it makes validation, sugges
 
 For a runnable notebook version of this workflow, open `notebooks/04_cli_four_variable_campaign.ipynb`.
 
+## Versioned JSON Inspection
+
+Starting in v3.4.0, put `--format json` (or `--format=json`) **after the subcommand**.
+Text remains the default; `--format text` is equivalent to omitting the option.
+The supported commands are `validate`, `summary`, `status`, `next-action`,
+`cost-summary`, `replicate-summary`, `stage-summary`, `context-summary`,
+`fidelity-summary`, `fidelity-coverage`, `qlog-nei-summary`, `model-summary`,
+`model-compare`, `pareto-front`, `pareto-summary`, and `provenance`.
+
+```bash
+bo-forge validate --config configs/01_simple_2d_maximise_logei.yaml \
+  --log examples/01_simple_2d_maximise_logei_campaign_log.csv --format json
+```
+
+```json
+{"schema_version":1,"bo_forge_version":"3.4.0","command":"validate","ok":true,"data":{"valid":true},"error":null}
+```
+
+Every handled JSON request emits one newline-terminated object on stdout.
+Diagnostics, warnings, and backend progress go to stderr. Help and version remain
+textual. Exit codes remain `0` for success, `1` for handled operational failure,
+and `2` for argument errors. Recognized JSON inspection requests also use the
+envelope for missing arguments, invalid profiles, and unknown options:
+
+```json
+{"schema_version":1,"bo_forge_version":"3.4.0","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
+```
+
+The last valid `--format` value selects the error format; an invalid or missing
+value on a repeated flag does not erase an earlier JSON request. Unambiguous
+option abbreviations follow the same parser rules, though full flags are
+recommended for scripts. Options after `--` are not interpreted as format flags.
+
+Tables have `columns` and `records`, including column names for empty results.
+Row/profile order and native values are preserved. Missing and non-finite numbers
+become `null`; strings such as `"001"` remain strings. Unsupported objects produce
+`serialization_error`, not silently stringified data. `status` returns a `status`
+string; `validate` returns `valid: true`. The
+[machine-readable schema](../schemas/cli-inspection-v1.json) allows additive v1
+fields. Removing fields or changing meanings/types requires an explicitly selected
+new schema version, never a silent change to v1.
+Each record has exactly the keys listed in `columns`; consumers should check
+this dynamic correspondence separately from JSON Schema validation. Numeric
+scalars support Python integers/floats and NumPy integers and floats up to
+64-bit precision. Fractions, decimals, and extended-precision floating values
+are rejected rather than silently rounded.
+
+Operational error codes are `config_error`, `log_validation_error`,
+`log_write_error`, `log_conflict_error`, `log_busy_error`, `suggestion_error`,
+`provenance_error`, `provenance_recovery_required`, and the base `bo_forge_error`.
+Each error contains `code`, `message`, nullable `hint`, and `details`; provenance
+reason and recovery fields remain in `details` when available. Failed provenance
+inspection retains its table when available. Inspection never repairs files.
+Unexpected programming exceptions are not converted to success or generic JSON.
+
+```python
+import json
+import subprocess
+
+result = subprocess.run(
+    ["bo-forge", "summary", "--config", "campaign.yaml", "--log", "campaign.csv",
+     "--format", "json"], capture_output=True, text=True, check=False,
+)
+payload = json.loads(result.stdout)
+if payload["schema_version"] != 1:
+    raise RuntimeError("Unsupported inspection schema")
+if result.returncode != 0 or not payload["ok"]:
+    error = payload["error"]
+    if error and error["code"] == "provenance_recovery_required":
+        print(error["details"].get("recovery_action"))  # Explicit recovery is separate.
+    raise RuntimeError(error)
+rows = payload["data"]["records"]
+```
+
+Branch on codes/structured fields rather than prose. `ok` means the command
+executed successfully, not that models are scientifically validated: `model-compare`
+remains **in-sample** diagnostics and can successfully return failed-profile rows.
+`next-action` is advice, not execution. Suggestions, mutations, reports/exports,
+predictive evaluation, doctor, and launchers reject the format flag before execution.
+JSON inspection adds no fitting to commands that did not already fit models.
+
 ## 🧰 Install
 
 ```bash

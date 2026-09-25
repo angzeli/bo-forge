@@ -1,9 +1,14 @@
-# 🧪 BO Forge v3.3.4
+# 🧪 BO Forge v3.4.0
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
+
+v3.4.0 adds opt-in [versioned CLI JSON inspection](docs/CLI.md#versioned-json-inspection)
+for 16 read-only commands. Default text output, exit codes, campaign formats, and
+BO behavior are unchanged. JSON does not repair provenance or execute next-action
+advice. Local readiness and exact-commit CI remain separate publication gates.
 
 v3.3.4 records [same-host performance evidence](docs/PERFORMANCE_BENCHMARKS.md)
 against baseline commit `6c0d57db`: all 156 processes completed and all 13 case

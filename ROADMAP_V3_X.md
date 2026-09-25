@@ -4,7 +4,9 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.3.4`. Implementation is complete for v3.3.4 and
+Current prepared baseline: `v3.4.0`. The v3.4.x interface line is active, with
+versioned JSON inspection prepared for local and exact-commit validation.
+Implementation is complete for v3.3.4 and
 the v3.3.x series. Performance acceptance passed: 156/156 processes completed
 and all 13 case pairs validated. The local release gate must pass before commit;
 exact-commit CI remains pending. The archive-bound same-host comparison against
@@ -79,13 +81,14 @@ flowchart LR
 
     class v30,v31,v32 majorDone
     class v33 majorDone
-    class v34 majorFuture
+    class v34 majorActive
     class v300,v301,v302 patchDone
     class v310,v311,v312,v313 patchDone
     class v320,v321,v322,v323 patchDone
     class v330,v331,v332,v333 patchDone
     class v334 patchDone
-    class v340,v341,v342,v343,v344 patchFuture
+    class v340 patchActive
+    class v341,v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -118,7 +121,8 @@ flowchart LR
 | `v3.3.3` | prepared | Verified 20/20 full-profile notebook baseline; archive-bound acceptance, separate from candidate CI |
 | `v3.3.4` | implementation complete | Performance acceptance passed: 156/156 processes, 13/13 valid pairs; exact-commit CI remains separate |
 | `v3.3.x` | completed | Implementation complete; notebook 20/20 and performance acceptance verified, not publication approval |
-| `v3.4.x` | planned | Structured automation interfaces and maintenance decisions |
+| `v3.4.0` | prepared | Schema-v1 JSON for 16 read-only CLI commands; text and BO contracts unchanged |
+| `v3.4.x` | active | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
 
@@ -454,23 +458,26 @@ Exact-commit CI remains pending; publication is a separate gate.
 
 ## v3.4.x - Interface And Maintenance Hardening
 
-Status: planned
+Status: active
 
 ### v3.4.0 - Versioned CLI JSON For Read-Only Commands
 
 Audit mapping: first half of `UX-001`.
 
-- Add versioned structured output for validate, summary, model
-  summary/comparison, and context/fidelity/replicate/stage summaries.
-- Separate stdout data from stderr diagnostics.
-- Add schema and compatibility contract tests.
+- Prepared schema-v1 JSON for validate, summary, status, next-action, cost,
+  replicate, stage, context, fidelity summary/coverage, qLogNEI summary, model
+  summary/comparison, Pareto front/summary, and provenance.
+- Preserve text defaults, exit codes, capability checks, and read-only behavior;
+  separate stdout data from stderr diagnostics, including parser failures.
+- Publish schema/golden fixtures and compatibility, provenance, and installed
+  entrypoint checks. No BO support status changes or HTTP additions.
 
 ### v3.4.1 - Structured Dry-Run And Automation Contracts
 
 Audit mapping: second half of `UX-001`.
 
-- Add structured suggestion dry-run output and stable automation errors where
-  appropriate.
+- Reuse the v3.4.0 envelope and error format for structured suggestion dry-run
+  output and subsequent automation contracts; do not introduce a competing format.
 - Add golden/schema tests without changing explicit append semantics.
 
 ### v3.4.2 - Opportunistic Module Decomposition

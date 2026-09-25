@@ -19,3 +19,5 @@ recursive-include notebooks *.ipynb
 recursive-include requirements *.md *.txt
 recursive-include tests *.py
 include tests/fixtures/provenance_v1.json
+recursive-include schemas *.json
+recursive-include tests/fixtures/cli_json *.json

@@ -6,6 +6,8 @@ import argparse
 from collections.abc import Callable
 from typing import Any
 
+from bo_forge._cli.output import emit
+
 
 def register_provenance_commands(
     subparsers: argparse._SubParsersAction,
@@ -48,7 +50,11 @@ def _cmd_provenance(args: argparse.Namespace) -> int:
         summary = provenance_summary(args.config, args.log)
     else:
         summary = inspection.to_frame()
-    _print_table(summary)
+    emit(args, summary)
+    if getattr(args, "format", "text") == "json":
+        from bo_forge._campaign.provenance_resume import enforce_resumable
+
+        enforce_resumable(inspection)
     values = dict(summary.itertuples(index=False, name=None))
     if values.get("provenance_status") == "managed" and values.get(
         "integrity_status"

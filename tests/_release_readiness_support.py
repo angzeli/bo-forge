@@ -147,6 +147,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert f"{DIST_INFO_ROOT}/entry_points.txt" in names
     assert f"{DIST_INFO_ROOT}/licenses/LICENSE" in names
     excluded_prefixes = (
+        "schemas/",
         "benchmarks/",
         "notebook_assurance/",
         "docs/",
@@ -173,6 +174,10 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         names = set(sdist.getnames())
 
     required_paths = {
+        "schemas/cli-inspection-v1.json",
+        "tests/fixtures/cli_json/validate.json",
+        "tests/fixtures/cli_json/argument_error.json",
+        "tests/fixtures/cli_json/table.json",
         "notebook_assurance/__init__.py",
         "notebook_assurance/__main__.py",
         "docs/NOTEBOOK_EXECUTION.md",
@@ -486,6 +491,18 @@ assert len(child.df) == 1
 print("Installed provenance lifecycle acceptance passed")
 import json
 import math
+import subprocess
+
+for entry in ([sys.executable, "-m", "bo_forge"],
+              [str(Path(sys.executable).parent / "bo-forge")]):
+    result = subprocess.run(entry + ["summary", "--config", str(child.config_path),
+        "--log", str(child.log_path), "--format=json"],
+        text=True, capture_output=True, check=True)
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == 1 and payload["ok"]
+    assert payload["data"]["columns"] == list(child.summary().columns)
+    assert payload["error"] is None
+    assert len(result.stdout.splitlines()) == 1
 
 rows = []
 for index, x in enumerate((0.4, 0.55, 0.7, 0.85), start=2):

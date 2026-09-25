@@ -1,6 +1,6 @@
 # Notebook Execution Assurance
 
-BO Forge v3.3.4 retains the source-only notebook assurance introduced in v3.3.3. The
+BO Forge v3.4.0 retains the source-only notebook assurance introduced in v3.3.3. The
 `notebook_assurance` package ships in the source distribution (sdist), not the
 runtime wheel. It executes unchanged notebook cells from a clean source archive
 in isolated workspaces and keeps committed notebooks output-free.
@@ -74,7 +74,7 @@ bytes throughout execution and aggregation:
 ```bash
 python -m build --sdist --no-isolation --outdir /tmp/bo-forge-notebook-dist
 python -m notebook_assurance run \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.4.0.tar.gz \
   --profile pr --output /tmp/bo-forge-notebook-pr
 ```
 
@@ -84,7 +84,7 @@ path). The CI matrix uses exactly one such option per run:
 
 ```bash
 python -m notebook_assurance run \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.4.0.tar.gz \
   --profile pr --notebook 01_maximisation_logei_campaign.ipynb \
   --output /tmp/bo-forge-notebook-evidence/01
 ```
@@ -94,7 +94,7 @@ overwriting its `result.json`. Once every scheduled job has finished, aggregate:
 
 ```bash
 python -m notebook_assurance aggregate \
-  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.3.4.tar.gz \
+  --sdist /tmp/bo-forge-notebook-dist/bo_forge-3.4.0.tar.gz \
   --profile pr --evidence /tmp/bo-forge-notebook-evidence \
   --output /tmp/bo-forge-notebook-aggregate
 ```

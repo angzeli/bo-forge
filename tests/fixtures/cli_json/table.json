@@ -1,0 +1,1 @@
+{"schema_version": 1, "bo_forge_version": "<version>", "command": "summary", "ok": true, "data": {"columns": ["name", "value", "flag"], "records": [{"name": "001", "value": null, "flag": true}, {"name": "温度", "value": 0.12345678901234566, "flag": false}]}, "error": null}

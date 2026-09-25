@@ -1,5 +1,22 @@
 # 📝 BO Forge Changelog
 
+## v3.4.0 - Versioned CLI JSON And Inspection Contracts
+
+- Add opt-in `--format {text,json}` to 16 existing read-only inspection commands,
+  with a schema-v1 envelope, typed table records, and structured operational and
+  argument errors. Text remains the default; exit codes and BO behavior are unchanged.
+- Keep stdout to one complete JSON object; route backend chatter and diagnostics
+  to stderr. Preserve provenance inspection tables on managed-state conflicts
+  without repairing campaign files. Model comparisons remain in-sample diagnostics.
+- Publish the schema and golden fixtures in the sdist, with installed-entrypoint,
+  optional-import, capability, parser, serialization, and no-mutation checks.
+  Declare already-locked `jsonschema` as a development-only dependency.
+- Suggestions, mutations, predictive evaluation, reports, doctor, and launchers
+  do not accept JSON format flags. v3.4.1 will reuse this envelope for dry runs.
+  No YAML/CSV, model, acquisition, public Python API, or HTTP contract changes.
+- Local readiness must pass before commit; exact-commit CI, push, tagging, and
+  publication remain separate gates. The performance campaign is not repeated.
+
 ## v3.3.4 - Stable Performance Evidence
 
 Status: implementation complete for v3.3.4 and the v3.3.x series. Local performance

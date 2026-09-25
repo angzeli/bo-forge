@@ -4,6 +4,12 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
+The v3.4.0 candidate adds schema-v1 JSON to 16 read-only CLI commands. Run
+`tests/test_cli_json.py` and `tests/test_cli_json_errors.py`, including the bounded
+real comparison, schema/golden fixtures, provenance non-mutation, text compatibility,
+and installed JSON entrypoint probes. Verify schemas and fixtures in the sdist
+and their exclusion from the wheel. No full performance rerun is required.
+
 The v3.3.4 paired local performance comparison against baseline `6c0d57db` passed:
 156/156 processes completed and all 13 case pairs validated. v3.3.x implementation
 is complete. The local release gate must pass before commit; exact-commit CI
@@ -465,4 +471,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.3.4 does none of those actions.
+separate explicit authorization. Preparing v3.4.0 does none of those actions.

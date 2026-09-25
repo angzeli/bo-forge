@@ -1,9 +1,14 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.3.4 retains explicit bounded predictive diagnostics while keeping
+BO Forge v3.4.0 retains explicit bounded predictive diagnostics while keeping
 YAML/CSV schemas, suggestion algorithms, campaign combinations, and provenance
 contracts unchanged. Predictive evaluation has its own narrower scope below;
 support for a BO campaign combination does not imply evaluator support.
+
+v3.4.0 adds [schema-v1 CLI JSON inspection](CLI.md#versioned-json-inspection)
+for 16 read-only commands. This changes representation only: capability guards,
+in-sample model-comparison meaning, next-action advice, and explicit provenance
+recovery remain unchanged. Mutation and suggestion JSON are deferred to v3.4.1.
 
 Legend:
 

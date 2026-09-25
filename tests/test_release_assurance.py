@@ -424,7 +424,10 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "| `v3.3.2` | prepared |" in roadmap
     assert "| `v3.3.3` | prepared |" in roadmap
     assert "local execution acceptance and exact-commit CI are separate gates" in roadmap
-    assert f"| `v{PROJECT_VERSION}` | implementation complete |" in roadmap
+    assert f"| `v{PROJECT_VERSION}` | prepared |" in roadmap
+    assert "class v34 majorActive" in roadmap
+    assert "class v340 patchActive" in roadmap
+    assert "Reuse the v3.4.0 envelope and error format" in roadmap
     assert "Performance acceptance passed: 156/156" in roadmap
     assert "The local release gate must pass before commit" in roadmap
     assert "exact-commit CI remains pending" in roadmap

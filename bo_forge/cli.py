@@ -19,6 +19,8 @@ import pandas as pd
 
 from bo_forge import __version__
 from bo_forge._campaign.exports import _validate_export_destination
+from bo_forge._cli.dispatch import run_cli
+from bo_forge._cli.output import InspectionParser, emit, register_formats
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import (
     BOForgeError,
@@ -47,7 +49,7 @@ class _CLIDoctorError(BOForgeError):
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the BO Forge CLI argument parser."""
-    parser = argparse.ArgumentParser(
+    parser = InspectionParser(
         prog="bo-forge",
         description="Run BO Forge campaign workflows from the terminal.",
     )
@@ -63,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     register_provenance_commands(subparsers, _add_config_log_arguments)
     _register_mutation_commands(subparsers)
     _register_plot_command(subparsers)
+    register_formats(subparsers)
     return parser
 
 
@@ -287,22 +290,7 @@ def _register_plot_command(subparsers: argparse._SubParsersAction) -> None:
 
 def run(argv: Sequence[str] | None = None) -> int:
     """Parse CLI arguments, dispatch a command, and return an exit code."""
-    parser = build_parser()
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit as exc:
-        if isinstance(exc.code, int):
-            return exc.code
-        return 1
-
-    try:
-        return int(args.handler(args))
-    except BOForgeError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        hint = _hint_for_error(exc)
-        if hint is not None:
-            print(hint, file=sys.stderr)
-        return 1
+    return run_cli(build_parser(), argv, _hint_for_error)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -376,37 +364,38 @@ def _cmd_init_log(args: argparse.Namespace) -> int:
 def _cmd_validate(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     campaign.validate()
-    print("Campaign log is valid.")
+    emit(args, {"valid": True}, text="Campaign log is valid.")
     return 0
 
 
 def _cmd_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.summary())
+    emit(args, campaign.summary())
     return 0
 
 
 def _cmd_status(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    print(campaign.campaign_status())
+    status = campaign.campaign_status()
+    emit(args, {"status": status}, text=status)
     return 0
 
 
 def _cmd_next_action(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.next_action())
+    emit(args, campaign.next_action())
     return 0
 
 
 def _cmd_cost_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.cost_summary())
+    emit(args, campaign.cost_summary())
     return 0
 
 
 def _cmd_replicate_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.replicate_summary())
+    emit(args, campaign.replicate_summary())
     return 0
 
 
@@ -414,7 +403,7 @@ def _cmd_stage_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if not campaign.config.is_structured_campaign:
         raise ConfigError("stage-summary requires a structured campaign config.")
-    _print_table(campaign.stage_summary())
+    emit(args, campaign.stage_summary())
     return 0
 
 
@@ -422,7 +411,7 @@ def _cmd_fidelity_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if campaign.config.fidelity is None:
         raise ConfigError("fidelity-summary requires a multi-fidelity config.")
-    _print_table(campaign.fidelity_summary())
+    emit(args, campaign.fidelity_summary())
     return 0
 
 
@@ -431,7 +420,7 @@ def _cmd_fidelity_coverage(args: argparse.Namespace) -> int:
     if campaign.config.fidelity is None:
         raise ConfigError("fidelity-coverage requires a multi-fidelity config.")
     coverage = campaign.fidelity_coverage()
-    _print_table(coverage.where(pd.notna(coverage), ""))
+    emit(args, coverage, text=coverage.where(pd.notna(coverage), "").to_string(index=False))
     return 0
 
 
@@ -439,7 +428,7 @@ def _cmd_context_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if campaign.config.context is None:
         raise ConfigError("context-summary requires a contextual config.")
-    _print_table(campaign.context_summary())
+    emit(args, campaign.context_summary())
     return 0
 
 
@@ -447,19 +436,19 @@ def _cmd_qlog_nei_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if campaign.config.bo.acquisition != "qlog_nei":
         raise ConfigError("qlog-nei-summary requires bo.acquisition: qlog_nei.")
-    _print_table(campaign.qlog_nei_summary())
+    emit(args, campaign.qlog_nei_summary())
     return 0
 
 
 def _cmd_model_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.model_summary())
+    emit(args, campaign.model_summary())
     return 0
 
 
 def _cmd_model_compare(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
-    _print_table(campaign.model_profile_comparison(profiles=args.profile))
+    emit(args, campaign.model_profile_comparison(profiles=args.profile))
     return 0
 
 
@@ -467,7 +456,7 @@ def _cmd_pareto_front(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if not campaign.config.is_multi_objective:
         raise ConfigError("pareto-front requires a multi-objective config.")
-    _print_table(campaign.pareto_front())
+    emit(args, campaign.pareto_front())
     return 0
 
 
@@ -475,7 +464,7 @@ def _cmd_pareto_summary(args: argparse.Namespace) -> int:
     campaign = _load_session(args)
     if not campaign.config.is_multi_objective:
         raise ConfigError("pareto-summary requires a multi-objective config.")
-    _print_table(campaign.pareto_summary())
+    emit(args, campaign.pareto_summary())
     return 0
 
 

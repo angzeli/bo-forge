@@ -1,0 +1,1 @@
+{"schema_version": 1, "bo_forge_version": "<version>", "command": "summary", "ok": false, "data": null, "error": {"code": "argument_error", "message": "the following arguments are required: --config, --log", "hint": null, "details": {}}}
