@@ -17,6 +17,50 @@ from tests.test_cli_json import example_args, response
 from tests.test_provenance_resume import _pending_previous, _pending_resulting
 
 
+@pytest.mark.parametrize("command", ["validate", "suggest"])
+@pytest.mark.parametrize("output_format", ["text", "json"])
+@pytest.mark.parametrize("managed", [False, True])
+@pytest.mark.parametrize("filename,contents,code", [
+    ("log.csv", b"", "log_write_error"),
+    ("log.csv", b" \n\t\n", "log_write_error"),
+    ("log.csv", b"row_id,status\n\xff,observed\n", "log_write_error"),
+    ("config.yaml", b"name: \xff\n", "config_error"),
+])
+def test_malformed_input_is_handled_without_writes(
+    tmp_path, capsys, command, output_format, managed, filename, contents, code,
+):
+    config = write_config(tmp_path / "config.yaml")
+    log = tmp_path / "log.csv"
+    CampaignSession.initialize(config, log)
+    archive = tmp_path / "prior.manifest.json"
+    archive.write_bytes(manifest_path_for_log(log).read_bytes())
+    if not managed:
+        manifest_path_for_log(log).unlink()
+    (tmp_path / filename).write_bytes(contents)
+    before = {path: path.read_bytes() for path in tmp_path.iterdir()}
+    config_conflict = managed and filename == "config.yaml"
+
+    assert run([command, "--config", str(config), "--log", str(log),
+                f"--format={output_format}"]) == 1
+    if output_format == "json":
+        payload, stderr = response(capsys)
+        assert payload["ok"] is False and payload["data"] is None
+        assert payload["error"]["code"] == ("log_conflict_error" if config_conflict else code)
+        assert payload["error"]["hint"]
+        if config_conflict:
+            assert payload["error"]["details"]["reason_code"] == "config_semantics_changed"
+        else:
+            assert filename in payload["error"]["message"]
+    else:
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        stderr = captured.err
+    assert "Traceback" not in stderr
+    if not config_conflict:
+        assert "Could not parse" in stderr
+    assert {path: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
 @pytest.mark.parametrize("cls,code", [
     (errors.BOForgeError, "bo_forge_error"),
     (errors.ConfigError, "config_error"),
@@ -52,7 +96,8 @@ def test_error_class_mapping(cls, code, monkeypatch, capsys):
     ("pending_previous", "provenance_recovery_required", "pending_previous_state"),
     ("pending_resulting", "provenance_recovery_required", "pending_resulting_state"),
 ])
-def test_provenance_retains_evidence_without_writes(tmp_path, capsys, state, code, reason):
+@pytest.mark.parametrize("command", ["provenance", "suggest"])
+def test_provenance_retains_evidence_without_writes(tmp_path, capsys, state, code, reason, command):
     config = write_config(tmp_path / "config.yaml")
     log = tmp_path / "log.csv"
     CampaignSession.initialize(config, log)
@@ -77,12 +122,14 @@ def test_provenance_retains_evidence_without_writes(tmp_path, capsys, state, cod
     args = ["--config", str(config), "--log", str(log), "--format=json"]
     if state == "required":
         args.append("--require-provenance")
-    assert run(["provenance", *args]) == (1 if code else 0)
+    assert run([command, *args]) == (1 if code else 0)
     payload, _ = response(capsys)
     if code:
         assert payload["error"]["code"] == code
         assert payload["error"]["details"]["reason_code"] == reason
-    if state not in {"required", "malformed"}:
+    if command == "suggest" and code:
+        assert payload["data"] is None
+    if command == "provenance" and state not in {"required", "malformed"}:
         fields = {row["field"]: row["value"] for row in payload["data"]["records"]}
         assert fields["reason_code"] == reason
     assert {path: path.read_bytes() for path in tmp_path.iterdir()} == before
@@ -121,20 +168,21 @@ def test_explicit_text_and_help_remain_text(capsys):
     assert capsys.readouterr().out.startswith("usage:")
 
 
-def test_warnings_on_stderr_in_real_process():
+@pytest.mark.parametrize("command,method", [("summary", "summary"), ("suggest", "suggest_next")])
+def test_warnings_on_stderr_in_real_process(command, method):
     script = """
 import sys, warnings
 import pandas as pd
 from bo_forge.session import CampaignSession
 from bo_forge.cli import run
-def summary(self):
+def summary(self, **kwargs):
     warnings.warn('fit warning', UserWarning)
     return pd.DataFrame({'value': [1]})
-CampaignSession.summary = summary
+setattr(CampaignSession, sys.argv.pop(1), summary)
 raise SystemExit(run(sys.argv[1:]))
 """
-    completed = subprocess.run([sys.executable, "-c", script, "summary",
-        *example_args("summary"), "--format=json"], text=True, capture_output=True)
+    completed = subprocess.run([sys.executable, "-c", script, method, command,
+        *example_args(command), "--format=json"], text=True, capture_output=True)
     assert completed.returncode == 0
     assert json.loads(completed.stdout)["ok"]
     assert "fit warning" in completed.stderr

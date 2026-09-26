@@ -160,7 +160,7 @@ class CampaignConfig:
                 raw = yaml.safe_load(handle)
         except OSError as exc:
             raise ConfigError(f"Could not read config file '{config_path}': {exc}") from exc
-        except yaml.YAMLError as exc:
+        except (yaml.YAMLError, UnicodeError) as exc:
             raise ConfigError(f"Could not parse config file '{config_path}': {exc}") from exc
         return parse_campaign_config(raw)
 

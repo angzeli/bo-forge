@@ -20,6 +20,7 @@ def run_cli(parser, argv, hint_for_error):
     command = requested_json_command(parser, arguments)
     try:
         args = parser.parse_args(arguments)
+        _validate_json_options(parser, args)
     except ArgumentFailure as exc:
         exc.parser.print_usage(sys.stderr)
         print(f"{exc.parser.prog}: error: {exc.message}", file=sys.stderr)
@@ -37,6 +38,15 @@ def run_cli(parser, argv, hint_for_error):
     except BOForgeError as exc:
         _diagnose(exc, hint_for_error(exc))
         return 1
+
+
+def _validate_json_options(parser, args):
+    if args.command != "suggest" or getattr(args, "format", "text") != "json":
+        return
+    if args.append or args.output is not None:
+        raise ArgumentFailure(
+            parser, "suggest --format json cannot be combined with --append or --output.",
+        )
 
 
 def _diagnose(exc, hint):

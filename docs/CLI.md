@@ -20,7 +20,7 @@ bo-forge validate --config configs/01_simple_2d_maximise_logei.yaml \
 ```
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.0","command":"validate","ok":true,"data":{"valid":true},"error":null}
+{"schema_version":1,"bo_forge_version":"3.4.1","command":"validate","ok":true,"data":{"valid":true},"error":null}
 ```
 
 Every handled JSON request emits one newline-terminated object on stdout.
@@ -30,7 +30,7 @@ and `2` for argument errors. Recognized JSON inspection requests also use the
 envelope for missing arguments, invalid profiles, and unknown options:
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.0","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
+{"schema_version":1,"bo_forge_version":"3.4.1","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
 ```
 
 The last valid `--format` value selects the error format; an invalid or missing
@@ -40,7 +40,7 @@ recommended for scripts. Options after `--` are not interpreted as format flags.
 
 Tables have `columns` and `records`, including column names for empty results.
 Row/profile order and native values are preserved. Missing and non-finite numbers
-become `null`; strings such as `"001"` remain strings. Unsupported objects produce
+become `null`; strings such as `"001"` and empty strings `""` remain strings. Unsupported objects produce
 `serialization_error`, not silently stringified data. `status` returns a `status`
 string; `validate` returns `valid: true`. The
 [machine-readable schema](../schemas/cli-inspection-v1.json) allows additive v1
@@ -59,6 +59,9 @@ Each error contains `code`, `message`, nullable `hint`, and `details`; provenanc
 reason and recovery fields remain in `details` when available. Failed provenance
 inspection retains its table when available. Inspection never repairs files.
 Unexpected programming exceptions are not converted to success or generic JSON.
+Empty or whitespace-only CSV files and invalid UTF-8 inputs are handled input
+errors. An empty campaign CSV still needs its canonical header; use `init-log`
+to create it. Managed config conflicts retain their provenance error details.
 
 ```python
 import json
@@ -82,9 +85,72 @@ rows = payload["data"]["records"]
 Branch on codes/structured fields rather than prose. `ok` means the command
 executed successfully, not that models are scientifically validated: `model-compare`
 remains **in-sample** diagnostics and can successfully return failed-profile rows.
-`next-action` is advice, not execution. Suggestions, mutations, reports/exports,
+`next-action` is advice, not execution. Mutations, reports/exports,
 predictive evaluation, doctor, and launchers reject the format flag before execution.
 JSON inspection adds no fitting to commands that did not already fit models.
+
+## Structured Suggestion Previews
+
+Starting in v3.4.1, `suggest` also accepts `--format json` through the same
+schema-v1 envelope. Text remains the default; no separate `--dry-run` flag is needed.
+
+```bash
+bo-forge suggest --config campaign.yaml --log campaign.csv \
+  --batch-size 2 --format json
+```
+
+JSON is a **preview**: it does not write YAML, CSV, manifests, or provenance
+archives, reserve candidates, or produce an appendable staged bundle. It contains
+no staging token or replay mechanism. A later `suggest --append` invocation
+generates another batch; it does not commit the earlier preview.
+
+`--append` and `--output` are rejected with `argument_error` and exit `2` when
+JSON is selected, before campaign loading, fitting, or file creation. Text-mode
+generation, CSV export, and explicit append are unchanged, including using
+`--output` and `--append` together.
+
+Existing `--batch-size`, `--stage`, repeated `--context NAME=VALUE`, and
+`--require-provenance` work with JSON. All existing supported campaign routes and
+their capability, budget, pending-review, and provenance checks remain in force;
+JSON enables no new combinations. Generation runs once. The `data` table retains
+the returned canonical columns, row order, source labels, predictions, and
+applicable review, replicate, context, stage, fidelity, cost, and acquisition fields.
+Internal DataFrame attributes are not exported. Initial-design batches can contain
+fewer rows than requested; consumers must use the actual `records` length.
+
+```python
+import json
+import subprocess
+import sys
+
+result = subprocess.run(
+    [sys.executable, "-m", "bo_forge", "suggest", "--config", "campaign.yaml",
+     "--log", "campaign.csv", "--batch-size", "2", "--format", "json"],
+    capture_output=True, text=True, check=False,
+)
+if not result.stdout.strip():
+    raise RuntimeError(result.stderr)  # Unexpected failures need not use the envelope.
+payload = json.loads(result.stdout)
+if payload["schema_version"] != 1 or payload["command"] != "suggest":
+    raise RuntimeError("Unsupported suggestion response")
+if result.returncode != 0 or not payload["ok"]:
+    error = payload["error"]
+    raise RuntimeError(f"{error['code']}: {error['message']} ({error['hint']})")
+columns = payload["data"]["columns"]
+rows = payload["data"]["records"]
+if any(set(row) != set(columns) for row in rows):
+    raise RuntimeError("Invalid suggestion table")
+```
+
+Handled suggestion/configuration/provenance/serialization failures use the
+existing error codes, exit `1`, `ok: false`, and `data: null`. Argument failures
+use exit `2`; help remains textual. Progress, optimizer warnings, and contextual
+replicate fallback notes go to stderr, without a textual `Generated...` banner.
+Missing and non-finite numerical values normalize to `null`, as for inspection
+tables. Initial-design rows use empty strings `""` for unfilled objectives,
+predictions, and acquisition values; these remain strings, not `null`.
+This interface makes no new concurrency guarantee or promise of bitwise
+reproducibility across environments.
 
 ## 🧰 Install
 
@@ -641,7 +707,7 @@ bo-forge plot \
 | `bo-forge provenance-accept-config --config PATH --log PATH` | Preview formatting-only config acceptance after explicit v2 migration. |
 | `bo-forge provenance-fork --config PATH --log PATH --destination DIR [--config-changes JSON]` | Preview a child with inherited CSV bytes and restricted config changes. |
 | `bo-forge provenance-recover --config PATH --log PATH [--expected-log-fingerprint SHA256]` | Explicitly finalize or cancel a recoverable pending manifest transaction without changing YAML or CSV bytes. |
-| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append]` | Generate suggestions; append only when `--append` is passed. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
+| `bo-forge suggest --config PATH --log PATH [--batch-size N] [--stage STAGE_NAME] [--context NAME=VALUE ...] [--output PATH] [--append] [--format {text,json}]` | Generate suggestions; text mode appends only with `--append`. JSON is non-writing and rejects `--append` and `--output`. Structured campaigns use `--stage`; contextual campaigns use repeatable `--context`. |
 | `bo-forge review --config PATH --log PATH --row-id ROW_ID --decision accept\|reject\|defer [--note TEXT]` | Record one human review decision. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective-value VALUE [--actual-cost VALUE]` | Mark one pending suggestion as observed. |
 | `bo-forge mark-observed --config PATH --log PATH --row-id ROW_ID --objective NAME=VALUE --objective NAME=VALUE [...] [--actual-cost VALUE]` | Mark a multi-objective pending suggestion observed, optionally with realised cost when cost is configured. |

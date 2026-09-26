@@ -31,6 +31,23 @@ def _workflow(relative_path: str) -> dict[str, object]:
     return yaml.load(_read(relative_path), Loader=yaml.BaseLoader)
 
 
+def test_clean_artifact_jobs_execute_json_suggestion_previews() -> None:
+    for workflow, loop in (("ci.yml", "for kind in wheel sdist; do"),
+                           ("release-gate.yml", "for kind in core sdist; do")):
+        data = _workflow(f".github/workflows/{workflow}")
+        steps = [step for job in data["jobs"].values() for step in job.get("steps", [])]
+        probe_steps = [step["run"] for step in steps
+                       if "_cli_json_install_probe.py" in step.get("run", "")]
+        assert len(probe_steps) == 1
+        probe = probe_steps[0]
+        assert loop in probe
+        assert 'cp tests/_cli_json_install_probe.py "$RUNNER_TEMP/' in probe
+        assert '&& PYTHONPATH= ' in probe
+        assert 'SOURCE_ROOT="$GITHUB_WORKSPACE"' in probe
+        assert 'bin/python" json-preview.py)' in probe
+        assert "--system-site-packages" not in probe
+
+
 def test_release_identity_and_maturity_are_aligned() -> None:
     assert re.fullmatch(r"\d+\.\d+\.\d+", PROJECT_VERSION)
     assert bo_forge.__version__ == PROJECT_VERSION
@@ -426,7 +443,8 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "local execution acceptance and exact-commit CI are separate gates" in roadmap
     assert f"| `v{PROJECT_VERSION}` | prepared |" in roadmap
     assert "class v34 majorActive" in roadmap
-    assert "class v340 patchActive" in roadmap
+    assert "class v340 patchDone" in roadmap
+    assert "class v341 patchActive" in roadmap
     assert "Reuse the v3.4.0 envelope and error format" in roadmap
     assert "Performance acceptance passed: 156/156" in roadmap
     assert "The local release gate must pass before commit" in roadmap

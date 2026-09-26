@@ -102,7 +102,7 @@ def test_missing_arguments_are_json(command, flag, capsys):
     assert "required" in stderr
 
 
-@pytest.mark.parametrize("command", ["suggest", "report", "init-log", "review",
+@pytest.mark.parametrize("command", ["report", "init-log", "review",
                                       "mark-observed", "doctor", "model-evaluate", "plot",
                                       "provenance-recover"])
 def test_deferred_commands_reject_format_before_handler(command, monkeypatch, capsys):

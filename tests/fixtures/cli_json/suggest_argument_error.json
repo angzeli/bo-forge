@@ -1,0 +1,1 @@
+{"schema_version":1,"bo_forge_version":"<version>","command":"suggest","ok":false,"data":null,"error":{"code":"argument_error","message":"suggest --format json cannot be combined with --append or --output.","hint":null,"details":{}}}

@@ -4,8 +4,8 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.4.0`. The v3.4.x interface line is active, with
-versioned JSON inspection prepared for local and exact-commit validation.
+Current prepared baseline: `v3.4.1`. The v3.4.x interface line is active, with
+structured suggestion previews prepared for local and exact-commit validation.
 Implementation is complete for v3.3.4 and
 the v3.3.x series. Performance acceptance passed: 156/156 processes completed
 and all 13 case pairs validated. The local release gate must pass before commit;
@@ -52,7 +52,7 @@ flowchart LR
     v333["v3.3.3<br/>Notebook execution"]
     v334["v3.3.4<br/>Performance evidence"]
     v340["v3.4.0<br/>Read-only CLI JSON"]
-    v341["v3.4.1<br/>Dry-run automation contracts"]
+    v341["v3.4.1<br/>Structured suggestion previews"]
     v342["v3.4.2<br/>Opportunistic decomposition"]
     v343["v3.4.3<br/>Typed-package decision"]
     v344["v3.4.4<br/>API boundary disposition"]
@@ -87,8 +87,9 @@ flowchart LR
     class v320,v321,v322,v323 patchDone
     class v330,v331,v332,v333 patchDone
     class v334 patchDone
-    class v340 patchActive
-    class v341,v342,v343,v344 patchFuture
+    class v340 patchDone
+    class v341 patchActive
+    class v342,v343,v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -122,6 +123,7 @@ flowchart LR
 | `v3.3.4` | implementation complete | Performance acceptance passed: 156/156 processes, 13/13 valid pairs; exact-commit CI remains separate |
 | `v3.3.x` | completed | Implementation complete; notebook 20/20 and performance acceptance verified, not publication approval |
 | `v3.4.0` | prepared | Schema-v1 JSON for 16 read-only CLI commands; text and BO contracts unchanged |
+| `v3.4.1` | prepared | Non-writing suggestion previews using the existing JSON envelope; append/export flags rejected before loading |
 | `v3.4.x` | active | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
@@ -472,13 +474,16 @@ Audit mapping: first half of `UX-001`.
 - Publish schema/golden fixtures and compatibility, provenance, and installed
   entrypoint checks. No BO support status changes or HTTP additions.
 
-### v3.4.1 - Structured Dry-Run And Automation Contracts
+### v3.4.1 - Structured Suggestion Dry-Runs
 
 Audit mapping: second half of `UX-001`.
 
-- Reuse the v3.4.0 envelope and error format for structured suggestion dry-run
-  output and subsequent automation contracts; do not introduce a competing format.
-- Add golden/schema tests without changing explicit append semantics.
+- Reuse the v3.4.0 envelope and error format for `suggest --format json`.
+  Prepared previews generate once and retain backend batch semantics and metadata.
+- Reject append/export flags before loading or fitting; previews neither reserve
+  candidates nor create appendable staged bundles. Text-mode writes are unchanged.
+- Add golden/schema, route, no-write, parser, and installed entrypoint checks.
+  Mutation JSON and further automation contracts remain separately scoped.
 
 ### v3.4.2 - Opportunistic Module Decomposition
 

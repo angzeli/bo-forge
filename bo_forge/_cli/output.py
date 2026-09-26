@@ -28,6 +28,7 @@ INSPECTION_COMMANDS = (
     "fidelity-coverage", "qlog-nei-summary", "model-summary", "model-compare",
     "pareto-front", "pareto-summary", "provenance",
 )
+JSON_COMMANDS = (*INSPECTION_COMMANDS, "suggest")
 
 
 class SerializationError(BOForgeError):
@@ -50,16 +51,16 @@ class InspectionParser(argparse.ArgumentParser):
 
 
 def register_formats(subparsers):
-    for name in INSPECTION_COMMANDS:
+    for name in JSON_COMMANDS:
         subparsers.choices[name].add_argument(
             "--format", choices=("text", "json"), default="text",
-            help="Inspection output format (default: text).",
+            help="Output format (default: text; JSON suggestions are non-writing previews).",
         )
 
 
 def requested_json_command(parser, argv):
     """Recognize explicit JSON intent even when parsing the request fails."""
-    if not argv or argv[0] not in INSPECTION_COMMANDS:
+    if not argv or argv[0] not in JSON_COMMANDS:
         return None
     subparsers = next(action for action in parser._actions
                       if isinstance(action, argparse._SubParsersAction))

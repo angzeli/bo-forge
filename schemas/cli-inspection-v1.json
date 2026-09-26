@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "bo_forge_version": {"type": "string"},
-    "command": {"enum": ["validate", "summary", "status", "next-action", "cost-summary", "replicate-summary", "stage-summary", "context-summary", "fidelity-summary", "fidelity-coverage", "qlog-nei-summary", "model-summary", "model-compare", "pareto-front", "pareto-summary", "provenance"]},
+    "command": {"enum": ["validate", "summary", "status", "next-action", "cost-summary", "replicate-summary", "stage-summary", "context-summary", "fidelity-summary", "fidelity-coverage", "qlog-nei-summary", "model-summary", "model-compare", "pareto-front", "pareto-summary", "provenance", "suggest"]},
     "ok": {"type": "boolean"},
     "data": {"type": ["null", "object"]},
     "error": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/error"}]}

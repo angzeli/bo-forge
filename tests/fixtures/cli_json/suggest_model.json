@@ -1,0 +1,1 @@
+{"schema_version":1,"bo_forge_version":"<version>","command":"suggest","ok":true,"data":{"columns":["row_id","iteration","status","source","x","score","predicted_mean","predicted_std","acquisition"],"records":[{"row_id":"preview_0","iteration":1,"status":"suggested","source":"log_ei","x":0.25,"score":"","predicted_mean":1.7,"predicted_std":0.2,"acquisition":-0.5}]},"error":null}

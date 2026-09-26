@@ -320,6 +320,9 @@ jobs:
             (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= \
               SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" -c \
               'import os; from pathlib import Path; import bo_forge; module = Path(bo_forge.__file__).resolve(); source = Path(os.environ["SOURCE_ROOT"]).resolve(); assert source not in module.parents, module; print(bo_forge.__version__)')
+            cp tests/_cli_json_install_probe.py "$RUNNER_TEMP/${kind}-probe/json-preview.py"
+            (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= \
+              SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" json-preview.py)
           done
       - name: Packaged core and optional entry-point smokes
         shell: bash

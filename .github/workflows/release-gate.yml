@@ -129,6 +129,13 @@ jobs:
           (cd "$RUNNER_TEMP" && PYTHONPATH= \
             "$RUNNER_TEMP/sdist-probe/bin/bo-forge" --version)
 
+          for kind in core sdist; do
+            mkdir -p "$RUNNER_TEMP/${kind}-json-preview"
+            cp tests/_cli_json_install_probe.py "$RUNNER_TEMP/${kind}-json-preview/json-preview.py"
+            (cd "$RUNNER_TEMP/${kind}-json-preview" && PYTHONPATH= \
+              SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind-probe/bin/python" json-preview.py)
+          done
+
           python -m venv "$RUNNER_TEMP/app-probe"
           uv pip install --python "$RUNNER_TEMP/app-probe/bin/python" \
             --torch-backend cpu \

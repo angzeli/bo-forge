@@ -503,6 +503,10 @@ def _cmd_suggest(args: argparse.Namespace) -> int:
 
     _print_contextual_replicate_fallback_note(campaign, suggestions)
 
+    if getattr(args, "format", "text") == "json":
+        emit(args, suggestions)
+        return 0
+
     print(f"Generated {len(suggestions)} suggestion(s).")
     if args.output is None:
         _print_table(suggestions)

@@ -174,10 +174,15 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         names = set(sdist.getnames())
 
     required_paths = {
+        "tests/_cli_json_install_probe.py",
         "schemas/cli-inspection-v1.json",
         "tests/fixtures/cli_json/validate.json",
         "tests/fixtures/cli_json/argument_error.json",
         "tests/fixtures/cli_json/table.json",
+        "tests/fixtures/cli_json/suggest_initial.json",
+        "tests/fixtures/cli_json/suggest_model.json",
+        "tests/fixtures/cli_json/suggest_argument_error.json",
+        "tests/fixtures/cli_json/suggest_error.json",
         "notebook_assurance/__init__.py",
         "notebook_assurance/__main__.py",
         "docs/NOTEBOOK_EXECUTION.md",
@@ -464,7 +469,7 @@ config_path, log_path = Path("campaign.yaml"), Path("campaign.csv")
 config_path.write_text("""campaign_name: artifact
 objective: {name: score, direction: maximize}
 variables: [{name: x, type: continuous, lower: 0, upper: 1}]
-bo: {initial_design_size: 4}
+bo: {initial_design_size: 4, random_seed: 0, raw_samples: 16, num_restarts: 1, mc_samples: 16}
 """, encoding="utf-8")
 from bo_forge import CampaignConfig
 config = CampaignConfig.from_yaml(config_path)
@@ -493,6 +498,24 @@ import json
 import math
 import subprocess
 
+def preview(entry, source):
+    protected = {p: p.read_bytes() for p in Path(".").rglob("*") if p.is_file()}
+    result = subprocess.run(entry + ["suggest", "--config", str(child.config_path),
+        "--log", str(child.log_path), "--batch-size", "1", "--require-provenance",
+        "--format=json"], text=True, capture_output=True, check=True)
+    payload = json.loads(result.stdout)
+    assert len(result.stdout.splitlines()) == 1
+    assert payload["schema_version"] == 1 and payload["ok"] and payload["error"] is None
+    assert payload["command"] == "suggest"
+    assert payload["data"]["columns"] == list(child.df.columns)
+    assert len(payload["data"]["records"]) == 1
+    row = payload["data"]["records"][0]
+    assert row["source"] == source and row["status"] == "suggested"
+    if source == "log_ei":
+        assert all(math.isfinite(row[key]) for key in
+                   ("predicted_mean", "predicted_std", "acquisition"))
+    assert protected == {p: p.read_bytes() for p in Path(".").rglob("*") if p.is_file()}
+
 for entry in ([sys.executable, "-m", "bo_forge"],
               [str(Path(sys.executable).parent / "bo-forge")]):
     result = subprocess.run(entry + ["summary", "--config", str(child.config_path),
@@ -503,6 +526,7 @@ for entry in ([sys.executable, "-m", "bo_forge"],
     assert payload["data"]["columns"] == list(child.summary().columns)
     assert payload["error"] is None
     assert len(result.stdout.splitlines()) == 1
+    preview(entry, "sobol")
 
 rows = []
 for index, x in enumerate((0.4, 0.55, 0.7, 0.85), start=2):
@@ -515,6 +539,9 @@ for row in rows:
 sources = (config_path, log_path, Path("campaign.csv.manifest.json"),
            child.config_path, child.log_path, Path("child/campaign.csv.manifest.json"))
 before = {path: path.read_bytes() for path in sources}
+for entry in ([sys.executable, "-m", "bo_forge"],
+              [str(Path(sys.executable).parent / "bo-forge")]):
+    preview(entry, "log_ei")
 diagnostics = child.model_predictive_evaluation(profiles=["default"], folds=2, seed=0)
 assert diagnostics.summary.fit_status.tolist() == ["complete"]
 assert diagnostics.fold_outcomes.fit_status.tolist() == ["complete", "complete"]

@@ -1,0 +1,1 @@
+{"schema_version":1,"bo_forge_version":"<version>","command":"suggest","ok":false,"data":null,"error":{"code":"suggestion_error","message":"controlled suggestion failure","hint":"Hint: Resolve pending suggestions or review the campaign state before requesting new suggestions.","details":{}}}

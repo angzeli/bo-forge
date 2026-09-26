@@ -272,7 +272,8 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "## v3.3.2 - Multi-Objective And Multi-Fidelity Benchmark Evidence" in changelog
     assert "## v3.3.3 - Source-Archive Notebook Execution Assurance" in changelog
     assert "## v3.3.4 - Stable Performance Evidence" in changelog
-    assert f"## v{PROJECT_VERSION} - Versioned CLI JSON And Inspection Contracts" in changelog
+    assert f"## v{PROJECT_VERSION} - Structured Suggestion Dry-Runs" in changelog
+    assert "## v3.4.0 - Versioned CLI JSON And Inspection Contracts" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
     assert "## v3.0.1 - CI-Backed Release Foundation" in changelog
     assert "## v3.0.0 - Architecture And Scientific UX Reset" in changelog

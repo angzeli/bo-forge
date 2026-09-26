@@ -796,9 +796,12 @@ def test_multi_fidelity_cli_rejects_batch_size_above_four_without_mutation(
     assert "Hint: Use --batch-size 1, 2, 3, or 4" in captured.err
     assert log_path.read_bytes() == before
 
+@pytest.mark.parametrize("format_flags", [[], ["--format=text"],
+                                           ["--format=json", "--format=text"]])
 def test_suggest_output_and_append_writes_output_and_log(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    format_flags,
 ) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
     log_path = write_log(tmp_path / "campaign.csv", config())
@@ -812,6 +815,7 @@ def test_suggest_output_and_append_writes_output_and_log(
                 "--output",
                 str(output_path),
                 "--append",
+                *format_flags,
             ]
         )
         == 0

@@ -1,5 +1,24 @@
 # 📝 BO Forge Changelog
 
+## v3.4.1 - Structured Suggestion Dry-Runs
+
+- Adds `suggest --format {text,json}` using the existing schema-v1 envelope,
+  table serializer, error codes, and exit conventions. The separate 16-command
+  inspection interface remains unchanged.
+- JSON previews generate once, preserve returned columns and short initial-design
+  batches, and keep progress/warnings on stderr. They do not reserve candidates
+  or constitute appendable staged bundles.
+- Rejects JSON with `--append` or `--output` before loading, fitting, or writing.
+  Text-mode export and explicit append, including their combination, are unchanged.
+- Adds schema/golden, campaign-route, provenance/no-write, parser, text-compatibility,
+  and installed module/console initial-design and model-based preview checks.
+- Handles empty CSV and invalid UTF-8 input as existing config/log errors rather
+  than uncaught parser exceptions. Managed config conflicts remain fail-closed.
+- Locks the initial-preview golden to real generated rows, including empty-string
+  fields, and runs JSON previews in clean wheel/sdist CI and release-gate installs.
+- No BO algorithms, campaign schemas, dependencies, notebooks, public Python APIs,
+  Streamlit workflows, or HTTP endpoints change.
+
 ## v3.4.0 - Versioned CLI JSON And Inspection Contracts
 
 - Add opt-in `--format {text,json}` to 16 existing read-only inspection commands,

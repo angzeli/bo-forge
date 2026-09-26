@@ -1,6 +1,6 @@
 # 🧰 BO Forge Installation Tutorial
 
-This page shows the recommended `pip install` paths for BO Forge v3.4.0.
+This page shows the recommended `pip install` paths for BO Forge v3.4.1.
 
 The optional [benchmark workflow](BENCHMARKS.md) is source-only: use a checkout
 or extracted sdist and run `python -m benchmarks --help` from its root with BO

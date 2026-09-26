@@ -477,7 +477,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
         return pd.read_csv(path, keep_default_na=False)
     except OSError as exc:
         raise LogWriteError(f"Could not read campaign log '{path}': {exc}") from exc
-    except pd.errors.ParserError as exc:
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeError) as exc:
         raise LogWriteError(f"Could not parse campaign log '{path}': {exc}") from exc
 
 
