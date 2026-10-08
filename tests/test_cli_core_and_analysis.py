@@ -3,6 +3,7 @@
 import json
 
 import bo_forge._campaign.provenance as provenance_module
+import bo_forge._cli.environment as environment_commands
 from bo_forge import __version__
 from bo_forge._campaign.provenance import manifest_path_for_log
 from tests._cli_support import (
@@ -10,7 +11,6 @@ from tests._cli_support import (
     Path,
     base_args,
     canonical_columns,
-    cli,
     config,
     cost_review_config,
     load_campaign_log,
@@ -88,14 +88,14 @@ def test_doctor_import_failure_returns_error(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    original_import_module = cli.importlib.import_module
+    original_import_module = environment_commands.importlib.import_module
 
     def fail_torch_import(module_name: str) -> object:
         if module_name == "torch":
             raise ImportError("missing torch")
         return original_import_module(module_name)
 
-    monkeypatch.setattr(cli.importlib, "import_module", fail_torch_import)
+    monkeypatch.setattr(environment_commands.importlib, "import_module", fail_torch_import)
 
     assert run(["doctor"]) == 1
 

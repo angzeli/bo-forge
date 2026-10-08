@@ -65,13 +65,13 @@ def test_preview_forwards_once_and_preserves_route_table(prefix, monkeypatch, ca
 @pytest.mark.parametrize("format_first", [True, False])
 def test_write_flags_fail_before_loading(tmp_path, monkeypatch, capsys,
                                         format_flags, write_flag, format_first):
-    import bo_forge.cli as cli
+    from bo_forge._cli import campaign
 
     def forbidden(*args, **kwargs):
         pytest.fail("JSON write flags reached campaign or filesystem work")
 
-    monkeypatch.setattr(cli, "_load_session", forbidden)
-    monkeypatch.setattr(cli, "_write_csv", forbidden)
+    monkeypatch.setattr(campaign, "_load_session", forbidden)
+    monkeypatch.setattr(campaign, "_write_csv", forbidden)
     monkeypatch.setattr(CampaignSession, "suggest_next", forbidden)
     monkeypatch.setattr(CampaignSession, "append_suggestions", forbidden)
     output = tmp_path / "not-created" / "suggestions.csv"

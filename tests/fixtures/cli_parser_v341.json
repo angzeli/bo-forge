@@ -1,0 +1,2564 @@
+{
+  "root": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--version"
+        ],
+        "dest": "version",
+        "action": "_VersionAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show program's version number and exit"
+      },
+      {
+        "options": [],
+        "dest": "command",
+        "action": "_SubParsersAction",
+        "default": null,
+        "required": true,
+        "nargs": "A...",
+        "choices": [
+          "doctor",
+          "init-log",
+          "validate",
+          "summary",
+          "status",
+          "next-action",
+          "cost-summary",
+          "replicate-summary",
+          "stage-summary",
+          "fidelity-summary",
+          "fidelity-coverage",
+          "context-summary",
+          "qlog-nei-summary",
+          "model-summary",
+          "model-compare",
+          "pareto-front",
+          "pareto-summary",
+          "report",
+          "model-evaluate",
+          "provenance",
+          "provenance-recover",
+          "provenance-adopt",
+          "provenance-migrate",
+          "provenance-accept-config",
+          "provenance-fork",
+          "suggest",
+          "review",
+          "mark-observed",
+          "plot"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": null
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge [-h] [--version]\n                {doctor,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n                ...\n\nRun BO Forge campaign workflows from the terminal.\n\npositional arguments:\n  {doctor,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n    doctor              Check the active BO Forge environment.\n    init-log            Create an empty canonical campaign CSV log and\n                        provenance manifest.\n    validate            Validate a campaign CSV log.\n    summary             Print campaign summary.\n    status              Print campaign status.\n    next-action         Print the recommended next campaign action.\n    cost-summary        Print campaign cost and budget summary.\n    replicate-summary   Print observed replicate-group summary statistics.\n    stage-summary       Print structured-campaign stage summary fields.\n    fidelity-summary    Print multi-fidelity campaign summary fields.\n    fidelity-coverage   Print observed and active-suggestion coverage by\n                        fidelity value.\n    context-summary     Print contextual-campaign summary rows by context\n                        combination.\n    qlog-nei-summary    Print qLogNEI pending-state summary fields.\n    model-summary       Print model profile and fitting-input summary fields.\n    model-compare       Compare model profiles on current observed fitting\n                        rows.\n    pareto-front        Print nondominated observed rows for a multi-objective\n                        campaign.\n    pareto-summary      Print Pareto-front and hypervolume summary fields.\n    report              Print or export a campaign report.\n    model-evaluate      Evaluate model profiles using held-out predictions.\n    provenance          Print campaign provenance and integrity fields.\n    provenance-recover  Explicitly resolve an interrupted managed-campaign\n                        transaction.\n    provenance-adopt    Preview or explicitly apply provenance adopt.\n    provenance-migrate  Preview or explicitly apply provenance migrate.\n    provenance-accept-config\n                        Preview or explicitly apply provenance accept-config.\n    provenance-fork     Preview or explicitly apply provenance fork.\n    suggest             Generate campaign suggestions.\n    review              Accept, reject, or defer one suggested row.\n    mark-observed       Mark one pending suggestion as observed.\n    plot                Export one campaign plot.\n\noptions:\n  -h, --help            show this help message and exit\n  --version             show program's version number and exit\n"
+  },
+  "doctor": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge doctor [-h]\n\noptions:\n  -h, --help  show this help message and exit\n"
+  },
+  "init-log": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge init-log [-h] --config CONFIG --log LOG\n\noptions:\n  -h, --help       show this help message and exit\n  --config CONFIG  Campaign YAML config path.\n  --log LOG        Campaign CSV log path.\n"
+  },
+  "validate": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "status": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "next-action": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "cost-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "replicate-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "stage-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "fidelity-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "fidelity-coverage": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "context-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "qlog-nei-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "model-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "model-compare": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--profile"
+        ],
+        "dest": "profile",
+        "action": "_AppendAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "default",
+          "smooth",
+          "rough",
+          "robust"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Model profile to compare; repeat to compare a subset."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "pareto-front": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "pareto-summary": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "report": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--output"
+        ],
+        "dest": "output",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Optional report output path."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "model-evaluate": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--profile"
+        ],
+        "dest": "profile",
+        "action": "_AppendAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "default",
+          "smooth",
+          "rough",
+          "robust"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Model profile; repeat in the desired evaluation order."
+      },
+      {
+        "options": [
+          "--folds"
+        ],
+        "dest": "folds",
+        "action": "_StoreAction",
+        "default": 5,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "int",
+        "metavar": null,
+        "help": "Cross-validation folds (default: 5)."
+      },
+      {
+        "options": [
+          "--seed"
+        ],
+        "dest": "seed",
+        "action": "_StoreAction",
+        "default": 0,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "int",
+        "metavar": null,
+        "help": "Split seed (default: 0)."
+      },
+      {
+        "options": [
+          "--output-dir"
+        ],
+        "dest": "output_dir",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Optional evaluation artifact directory."
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge model-evaluate [-h] --config CONFIG --log LOG\n                               [--require-provenance]\n                               [--profile {default,smooth,rough,robust}]\n                               [--folds FOLDS] [--seed SEED]\n                               [--output-dir OUTPUT_DIR]\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       Campaign YAML config path.\n  --log LOG             Campaign CSV log path.\n  --require-provenance  Reject legacy campaigns that do not have a provenance\n                        manifest.\n  --profile {default,smooth,rough,robust}\n                        Model profile; repeat in the desired evaluation order.\n  --folds FOLDS         Cross-validation folds (default: 5).\n  --seed SEED           Split seed (default: 0).\n  --output-dir OUTPUT_DIR\n                        Optional evaluation artifact directory.\n"
+  },
+  "provenance": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "provenance-recover": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--expected-log-fingerprint"
+        ],
+        "dest": "expected_log_fingerprint",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Optional current log fingerprint required before recovery."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "provenance-adopt": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--apply"
+        ],
+        "dest": "apply",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Apply a previously reviewed preview."
+      },
+      {
+        "options": [
+          "--reason"
+        ],
+        "dest": "reason",
+        "action": "_StoreAction",
+        "default": "",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Nonempty reason required when applying."
+      },
+      {
+        "options": [
+          "--preview"
+        ],
+        "dest": "preview",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "JSON preview file required with --apply."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "provenance-migrate": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--apply"
+        ],
+        "dest": "apply",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Apply a previously reviewed preview."
+      },
+      {
+        "options": [
+          "--reason"
+        ],
+        "dest": "reason",
+        "action": "_StoreAction",
+        "default": "",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Nonempty reason required when applying."
+      },
+      {
+        "options": [
+          "--preview"
+        ],
+        "dest": "preview",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "JSON preview file required with --apply."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "provenance-accept-config": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--apply"
+        ],
+        "dest": "apply",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Apply a previously reviewed preview."
+      },
+      {
+        "options": [
+          "--reason"
+        ],
+        "dest": "reason",
+        "action": "_StoreAction",
+        "default": "",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Nonempty reason required when applying."
+      },
+      {
+        "options": [
+          "--preview"
+        ],
+        "dest": "preview",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "JSON preview file required with --apply."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "provenance-fork": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--apply"
+        ],
+        "dest": "apply",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Apply a previously reviewed preview."
+      },
+      {
+        "options": [
+          "--reason"
+        ],
+        "dest": "reason",
+        "action": "_StoreAction",
+        "default": "",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Nonempty reason required when applying."
+      },
+      {
+        "options": [
+          "--preview"
+        ],
+        "dest": "preview",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "JSON preview file required with --apply."
+      },
+      {
+        "options": [
+          "--destination"
+        ],
+        "dest": "destination",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": null
+      },
+      {
+        "options": [
+          "--config-changes"
+        ],
+        "dest": "config_changes",
+        "action": "_StoreAction",
+        "default": "{}",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "JSON mapping of campaign_name, bo, model changes."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "suggest": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--batch-size"
+        ],
+        "dest": "batch_size",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "int",
+        "metavar": null,
+        "help": "Override configured batch size."
+      },
+      {
+        "options": [
+          "--stage"
+        ],
+        "dest": "stage",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Structured campaign stage name for stage-aware suggestions."
+      },
+      {
+        "options": [
+          "--context"
+        ],
+        "dest": "context",
+        "action": "_AppendAction",
+        "default": [],
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": "NAME=VALUE",
+        "help": "Context variable value for contextual campaigns; repeat as needed."
+      },
+      {
+        "options": [
+          "--output"
+        ],
+        "dest": "output",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Optional suggestions CSV output path."
+      },
+      {
+        "options": [
+          "--append"
+        ],
+        "dest": "append",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Append generated suggestions to the canonical campaign log."
+      },
+      {
+        "options": [
+          "--format"
+        ],
+        "dest": "format",
+        "action": "_StoreAction",
+        "default": "text",
+        "required": false,
+        "nargs": null,
+        "choices": [
+          "text",
+          "json"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Output format (default: text; JSON suggestions are non-writing previews)."
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge suggest [-h] --config CONFIG --log LOG [--require-provenance]\n                        [--batch-size BATCH_SIZE] [--stage STAGE]\n                        [--context NAME=VALUE] [--output OUTPUT] [--append]\n                        [--format {text,json}]\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       Campaign YAML config path.\n  --log LOG             Campaign CSV log path.\n  --require-provenance  Reject legacy campaigns that do not have a provenance\n                        manifest.\n  --batch-size BATCH_SIZE\n                        Override configured batch size.\n  --stage STAGE         Structured campaign stage name for stage-aware\n                        suggestions.\n  --context NAME=VALUE  Context variable value for contextual campaigns;\n                        repeat as needed.\n  --output OUTPUT       Optional suggestions CSV output path.\n  --append              Append generated suggestions to the canonical campaign\n                        log.\n  --format {text,json}  Output format (default: text; JSON suggestions are\n                        non-writing previews).\n"
+  },
+  "review": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--row-id"
+        ],
+        "dest": "row_id",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Suggested row_id to review."
+      },
+      {
+        "options": [
+          "--decision"
+        ],
+        "dest": "decision",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": [
+          "accept",
+          "reject",
+          "defer"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Review decision."
+      },
+      {
+        "options": [
+          "--note"
+        ],
+        "dest": "note",
+        "action": "_StoreAction",
+        "default": "",
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Optional one-line review note."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "mark-observed": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--row-id"
+        ],
+        "dest": "row_id",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Suggested row_id to mark observed."
+      },
+      {
+        "options": [
+          "--objective-value"
+        ],
+        "dest": "objective_value",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "float",
+        "metavar": null,
+        "help": "Observed objective value in user-facing units."
+      },
+      {
+        "options": [
+          "--objective"
+        ],
+        "dest": "objective",
+        "action": "_AppendAction",
+        "default": [],
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": null,
+        "metavar": "NAME=VALUE",
+        "help": "Observed multi-objective value; repeat once per objective."
+      },
+      {
+        "options": [
+          "--actual-cost"
+        ],
+        "dest": "actual_cost",
+        "action": "_StoreAction",
+        "default": null,
+        "required": false,
+        "nargs": null,
+        "choices": null,
+        "type": "float",
+        "metavar": null,
+        "help": "Optional observed experiment cost for cost-aware campaigns."
+      }
+    ],
+    "allow_abbrev": true
+  },
+  "plot": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign YAML config path."
+      },
+      {
+        "options": [
+          "--log"
+        ],
+        "dest": "log",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Campaign CSV log path."
+      },
+      {
+        "options": [
+          "--require-provenance"
+        ],
+        "dest": "require_provenance",
+        "action": "_StoreTrueAction",
+        "default": false,
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "Reject legacy campaigns that do not have a provenance manifest."
+      },
+      {
+        "options": [
+          "--kind"
+        ],
+        "dest": "kind",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": [
+          "progress",
+          "diagnostics",
+          "cost-progress",
+          "replicates",
+          "pareto",
+          "pareto-parallel",
+          "hypervolume",
+          "stage-diagnostics",
+          "fidelity-diagnostics",
+          "fidelity-progress",
+          "context-diagnostics",
+          "qlog-nei-diagnostics",
+          "model-diagnostics",
+          "model-comparison"
+        ],
+        "type": null,
+        "metavar": null,
+        "help": "Plot type to export."
+      },
+      {
+        "options": [
+          "--output"
+        ],
+        "dest": "output",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "Figure output path."
+      }
+    ],
+    "allow_abbrev": true,
+    "help": "usage: bo-forge plot [-h] --config CONFIG --log LOG [--require-provenance]\n                     --kind\n                     {progress,diagnostics,cost-progress,replicates,pareto,pareto-parallel,hypervolume,stage-diagnostics,fidelity-diagnostics,fidelity-progress,context-diagnostics,qlog-nei-diagnostics,model-diagnostics,model-comparison}\n                     --output OUTPUT\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       Campaign YAML config path.\n  --log LOG             Campaign CSV log path.\n  --require-provenance  Reject legacy campaigns that do not have a provenance\n                        manifest.\n  --kind {progress,diagnostics,cost-progress,replicates,pareto,pareto-parallel,hypervolume,stage-diagnostics,fidelity-diagnostics,fidelity-progress,context-diagnostics,qlog-nei-diagnostics,model-diagnostics,model-comparison}\n                        Plot type to export.\n  --output OUTPUT       Figure output path.\n"
+  }
+}

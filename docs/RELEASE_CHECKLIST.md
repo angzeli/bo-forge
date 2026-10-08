@@ -4,8 +4,16 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.4.1 candidate extends schema-v1 JSON to non-writing suggestion previews;
-the 16-command inspection set is unchanged. Run `tests/test_cli_json*.py`, including
+The v3.4.2 candidate is behavior-preserving CLI maintenance. Run
+`tests/test_cli_compatibility.py` against the captured v3.4.1 parser contract,
+including options, defaults, command/help ordering, text output, first-error
+selection, command dispatch/lifecycle selectors, and export-before-append sequencing.
+Run `tests/test_cli_export_atomicity.py` for partial-write/publication failures and
+`tests/test_cli_error_boundaries.py` for unsupported plot formats without suppressing
+programming errors. Run the import-boundary check
+preventing internal CLI modules from depending on the public entrypoint.
+Schema-v1 JSON suggestions and the 16-command inspection set are unchanged.
+Run `tests/test_cli_json*.py`, including
 `test_cli_json_suggest.py`, `test_cli_json_suggest_workflows.py`, and the parser
 compatibility checks in `test_cli_json_contract_edges.py`. Verify rejection of
 JSON append/export before loading, generation exactly once, short batches,
@@ -13,12 +21,15 @@ stderr warnings, provenance non-mutation, and text export/append compatibility.
 Check malformed CSV/UTF-8 input envelopes and the real initial-design golden,
 including preserved empty-string fields.
 Installed module and console probes must exercise real initial-design and bounded
-model-based JSON suggestions, alongside the existing inspection probes. Both CI
-and the release gate run `tests/_cli_json_install_probe.py` from outside the
+model-based JSON suggestions, alongside the existing inspection probes. Exercise
+`python -m bo_forge`, `python -m bo_forge.cli`, and the installed console script,
+plus temporary init, export/append, review, observation, and validation workflows.
+Both CI and the release gate run `tests/_cli_json_install_probe.py` from outside the
 checkout with `PYTHONPATH` cleared in fresh core wheel and sdist environments,
 without inherited system packages or optional app/API dependencies. Verify
-the schema and all golden fixtures in the sdist and their exclusion from the
-wheel. No full performance or notebook campaign rerun is required for this patch.
+the schema, v3.4.1 parser baseline, and all golden fixtures in the sdist and their
+exclusion from the wheel. No full performance or notebook campaign rerun is required
+for this patch.
 
 The v3.3.4 paired local performance comparison against baseline `6c0d57db` passed:
 156/156 processes completed and all 13 case pairs validated. v3.3.x implementation
@@ -481,4 +492,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.4.1 does none of those actions.
+separate explicit authorization. Preparing v3.4.2 does none of those actions.

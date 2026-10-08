@@ -1,3 +1,5 @@
+import ast
+import importlib.util
 import json
 import subprocess
 import sys
@@ -5,6 +7,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BLOCKED_MODULES = {"torch", "botorch", "gpytorch", "matplotlib", "streamlit", "fastapi"}
+
+
+def test_internal_cli_modules_do_not_import_public_entrypoint() -> None:
+    modules = sorted((ROOT / "bo_forge" / "_cli").glob("*.py"))
+    for path in modules:
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if node.level:
+                    module = importlib.util.resolve_name("." * node.level + module, "bo_forge._cli")
+                names = [module, *(f"{module}.{alias.name}" for alias in node.names)]
+            assert "bo_forge.cli" not in names, (path.name, node.lineno)
+    imports = "\n".join(f"import bo_forge._cli.{path.stem}" for path in modules)
+    result = _blocked_probe(imports + '\nassert "bo_forge.cli" not in sys.modules')
+    assert result["blocked"] == []
 
 
 def _probe(source: str) -> dict[str, object]:

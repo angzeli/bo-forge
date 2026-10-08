@@ -1,5 +1,23 @@
 # 📝 BO Forge Changelog
 
+## v3.4.2 - CLI Decomposition And Compatibility Hardening
+
+- Separate internal CLI ownership into inspection/report, campaign creation and
+  mutation, and environment/plot commands. Keep public parser and entrypoint
+  signatures unchanged, with shared lazy session loading and CLI error helpers.
+- Remove predictive evaluation's import back into the public CLI entrypoint.
+  Preserve provenance command ownership, JSON serialization, dispatch, registration
+  order, text output, error precedence, and explicit export/append sequencing.
+- Freeze v3.4.1 parser/help contracts and extend installed entrypoint and temporary
+  mutation probes, including command dispatch and provenance lifecycle selectors.
+  Internal helpers are not a public compatibility promise.
+- Publish suggestion CSV exports atomically so failed writes preserve existing
+  artifacts and prevent append. Handle unsupported plot formats without masking
+  unrelated programming errors; preserve successful export/append ordering.
+- No BO behavior, supported combination, YAML/CSV schema, HTTP contract, dependency,
+  or UI workflow changes. API stage storage, session internals, and validation
+  decomposition remain outside this CLI maintenance patch.
+
 ## v3.4.1 - Structured Suggestion Dry-Runs
 
 - Adds `suggest --format {text,json}` using the existing schema-v1 envelope,

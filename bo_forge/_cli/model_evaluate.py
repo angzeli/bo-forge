@@ -8,6 +8,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 from bo_forge._campaign.exports import _validate_export_destination
+from bo_forge._cli.common import _load_session
+from bo_forge._cli.errors import _CLIOutputError
+from bo_forge._cli.output import _print_table
 from bo_forge.errors import ConfigError
 
 
@@ -31,8 +34,6 @@ def register_model_evaluate_command(
 
 
 def _cmd_model_evaluate(args: argparse.Namespace) -> int:
-    from bo_forge.cli import _CLIOutputError, _load_session, _print_table
-
     campaign = _load_session(args)
     try:
         if args.output_dir is not None:

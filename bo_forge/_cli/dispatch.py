@@ -5,9 +5,8 @@ from __future__ import annotations
 import contextlib
 import sys
 
+from bo_forge._cli.errors import ArgumentFailure, SerializationError
 from bo_forge._cli.output import (
-    ArgumentFailure,
-    SerializationError,
     error_payload,
     render,
     requested_json_command,

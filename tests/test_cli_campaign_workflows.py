@@ -1,5 +1,6 @@
 """CLI campaign mutation, report, plot, and structured workflow tests."""
 
+from bo_forge._cli.errors import _hint_for_error
 from tests._cli_support import (
     CampaignConfig,
     LogBusyError,
@@ -7,7 +8,6 @@ from tests._cli_support import (
     Path,
     base_args,
     canonical_columns,
-    cli,
     config,
     cost_review_config,
     cost_review_log,
@@ -282,10 +282,10 @@ def test_mark_observed_missing_row_returns_hint(
     )
 
 def test_log_coordination_errors_have_specific_cli_hints() -> None:
-    assert cli._hint_for_error(LogConflictError("stale")) == (
+    assert _hint_for_error(LogConflictError("stale")) == (
         "Hint: Reload the campaign, inspect the latest log, and retry the mutation."
     )
-    assert cli._hint_for_error(LogBusyError("busy")) == (
+    assert _hint_for_error(LogBusyError("busy")) == (
         "Hint: Another local writer is active; wait briefly and retry."
     )
 

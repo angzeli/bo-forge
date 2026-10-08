@@ -1,5 +1,8 @@
 """CLI error-translation and argument-boundary tests."""
 
+from types import SimpleNamespace
+
+from bo_forge._cli import environment
 from tests._cli_support import (
     Path,
     base_args,
@@ -86,10 +89,42 @@ def test_missing_required_arguments_return_argparse_error(
     assert "required" in captured.err
 
 def test_unexpected_errors_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    from bo_forge._cli import inspection
+
     def raise_unexpected_error(args: object) -> int:
         raise RuntimeError("unexpected boom")
 
-    monkeypatch.setattr(cli, "_cmd_validate", raise_unexpected_error)
+    monkeypatch.setattr(inspection, "_cmd_validate", raise_unexpected_error)
 
     with pytest.raises(RuntimeError, match="unexpected boom"):
         cli.run(["validate", "--config", "campaign.yaml", "--log", "campaign.csv"])
+
+
+def test_unsupported_plot_format_is_handled_before_rendering(tmp_path, monkeypatch, capsys):
+    campaign = SimpleNamespace(config=cost_review_config(), config_path=tmp_path / "config.yaml",
+                               log_path=tmp_path / "campaign.csv", plot_progress=lambda **kw:
+                               pytest.fail("unsupported format must not render"))
+    monkeypatch.setattr(environment, "_load_session", lambda args: campaign)
+    output = tmp_path / "progress.unsupported"
+    assert run(["plot", "--config", "unused.yaml", "--log", "unused.csv", "--kind", "progress",
+                "--output", str(output)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "unsupported" in captured.err and "supported formats" in captured.err
+    assert "Traceback" not in captured.err
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("suffix", [".png", ".PNG", ".pdf", ""])
+def test_supported_plot_format_does_not_swallow_programming_errors(
+    tmp_path, monkeypatch, suffix,
+):
+    def broken_plot(**kwargs):
+        raise ValueError("controlled programming defect")
+
+    campaign = SimpleNamespace(config=cost_review_config(), plot_progress=broken_plot,
+                               config_path=tmp_path / "config.yaml", log_path=tmp_path / "log.csv")
+    monkeypatch.setattr(environment, "_load_session", lambda args: campaign)
+    with pytest.raises(ValueError, match="controlled programming defect"):
+        run(["plot", "--config", "unused.yaml", "--log", "unused.csv", "--kind", "progress",
+             "--output", str(tmp_path / ("progress" + suffix))])

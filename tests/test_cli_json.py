@@ -13,9 +13,9 @@ import pandas as pd
 import pytest
 
 from bo_forge import __version__
+from bo_forge._cli.errors import SerializationError
 from bo_forge._cli.output import (
     INSPECTION_COMMANDS,
-    SerializationError,
     json_value,
     render,
     table_payload,

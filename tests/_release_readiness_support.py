@@ -127,6 +127,8 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert "bo_forge/predictive.py" in names
     assert "bo_forge/_filesystem.py" in names
     assert "bo_forge/_config/parser.py" in names
+    for module in ("campaign", "common", "environment", "errors", "inspection"):
+        assert f"bo_forge/_cli/{module}.py" in names
     assert "bo_forge/_campaign/validation.py" in names
     assert "bo_forge/_optimization/router.py" in names
     assert "bo_forge/_diagnostics/standard.py" in names
@@ -220,6 +222,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "tests/test_provenance_acceptance.py",
         "tests/test_provenance_closeout.py",
         "tests/fixtures/provenance_v1.json",
+        "tests/fixtures/cli_parser_v341.json",
         "tests/test_provenance_lifecycle_hardening.py",
         "tests/__init__.py",
         "tests/_session_support.py",

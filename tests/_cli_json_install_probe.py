@@ -1,4 +1,4 @@
-"""Bounded JSON previews against a clean installed artifact, outside the checkout."""
+"""CLI previews and explicit writes against an isolated installed artifact."""
 
 import importlib.util
 import json
@@ -45,6 +45,43 @@ def _preview(entry, campaign, source, environment):
     print(f"Installed JSON {source} preview passed: {' '.join(entry)}")
 
 
+def _write_workflow(entry, config, log, environment):
+    from bo_forge import CampaignSession
+
+    config.write_text(
+        "campaign_name: installed_write_workflow\n"
+        "objective: {name: score, direction: maximize}\n"
+        "variables: [{name: x, type: continuous, lower: 0, upper: 1}]\n"
+        "review: {enabled: true}\n"
+        "bo: {initial_design_size: 2, random_seed: 0}\n",
+        encoding="utf-8",
+    )
+    common = ["--config", str(config), "--log", str(log)]
+
+    def execute(command, *flags):
+        result = subprocess.run(
+            [*entry, command, *common, *flags], env=environment,
+            text=True, capture_output=True, timeout=120,
+        )
+        assert result.returncode == 0, result.stderr
+        return result.stdout
+
+    execute("init-log")
+    preview = log.with_suffix(".preview.csv")
+    execute("suggest", "--batch-size", "1", "--output", str(preview), "--append")
+    campaign = CampaignSession.from_files(config, log, provenance_policy="required")
+    assert len(campaign.df) == 1 and preview.is_file()
+    row_id = str(campaign.df.iloc[0].row_id)
+    execute("review", "--row-id", row_id, "--decision", "accept")
+    execute("mark-observed", "--row-id", row_id, "--objective-value", "1.5")
+    payload = json.loads(execute("validate", "--format=json", "--require-provenance"))
+    assert payload["ok"] and payload["data"] == {"valid": True}
+    campaign.reload()
+    assert campaign.df.status.tolist() == ["observed"]
+    assert campaign.df.score.tolist() == [1.5]
+    print(f"Installed explicit write workflow passed: {' '.join(entry)}")
+
+
 def main():
     import bo_forge
     from bo_forge import CampaignSession
@@ -64,6 +101,7 @@ def main():
         "CUDA_VISIBLE_DEVICES": "",
     }
     entries = ([sys.executable, "-m", "bo_forge"],
+               [sys.executable, "-m", "bo_forge.cli"],
                [str(Path(sys.executable).parent / "bo-forge")])
     with TemporaryDirectory(prefix="json-preview-", dir=Path.cwd()) as directory:
         config, log = Path(directory) / "campaign.yaml", Path(directory) / "campaign.csv"
@@ -84,6 +122,11 @@ def main():
             campaign.mark_observed(row.row_id, 2 * row.x + 1)
         for entry in entries:
             _preview(entry, campaign, "log_ei", environment)
+        for index, entry in enumerate(entries):
+            _write_workflow(
+                entry, Path(directory) / f"write-{index}.yaml",
+                Path(directory) / f"write-{index}.csv", environment,
+            )
 
 
 if __name__ == "__main__":

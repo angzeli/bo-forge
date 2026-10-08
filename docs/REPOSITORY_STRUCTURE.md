@@ -94,7 +94,7 @@ The compatibility facades and remaining focused modules include:
 - `constraints.py`: safe constraint expression validation and row feasibility checks.
 - `contextual.py`: context-value resolution, fixed-feature translation, and read-only summaries for contextual suggestions.
 - `costs.py`: safe deterministic cost expressions, effective-cost accounting, and budget summaries.
-- `cli.py`: terminal command wrappers around `CampaignSession`.
+- `cli.py`: parser composition and the public `build_parser()`, `run()`, and `main()` entrypoints.
 - `errors.py`: custom exception types used across the package.
 - `logs.py`: CSV compatibility facade plus locked, fingerprint-aware mutations.
 - `multi_objective.py`: Pareto-front, reference-point, and hypervolume helpers for coupled multi-objective campaigns.
@@ -117,6 +117,22 @@ The compatibility facades and remaining focused modules include:
 - `_cli/provenance_lifecycle.py`: preview-first lifecycle command adapters.
 - `bo_forge_api/provenance.py` and `bo_forge_app/ui/provenance.py`:
   root-bounded API lifecycle routes and Streamlit preview/confirm/reload controls.
+
+Internal CLI ownership lives under `_cli/`:
+
+- `inspection.py`: inspection registration, capability checks, and report exports.
+- `campaign.py`: initialization, suggestion previews/exports/appends, review, and observation.
+- `environment.py`: doctor checks and plot registration/export.
+- `common.py`: shared config/log arguments and lazy session loading.
+- `errors.py`: CLI-specific failures and error hints.
+- `output.py` and `dispatch.py`: existing text/JSON presentation and execution boundaries.
+- `provenance.py`, `provenance_lifecycle.py`, and `model_evaluate.py`: retained focused commands.
+
+Command owners depend on shared internal helpers, never back on `bo_forge.cli`.
+Composition preserves registration order, including doctor followed by init-log.
+Internal helpers and private patch locations are not a public compatibility promise.
+This CLI-focused extraction leaves API stage storage, session internals, and
+validation ownership unchanged.
 
 Most users should start with the `bo-forge` CLI, `CampaignSession`, or the public functions exported from `bo_forge/__init__.py` rather than importing implementation helpers directly.
 

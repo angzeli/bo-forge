@@ -20,7 +20,7 @@ bo-forge validate --config configs/01_simple_2d_maximise_logei.yaml \
 ```
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.1","command":"validate","ok":true,"data":{"valid":true},"error":null}
+{"schema_version":1,"bo_forge_version":"3.4.2","command":"validate","ok":true,"data":{"valid":true},"error":null}
 ```
 
 Every handled JSON request emits one newline-terminated object on stdout.
@@ -30,7 +30,7 @@ and `2` for argument errors. Recognized JSON inspection requests also use the
 envelope for missing arguments, invalid profiles, and unknown options:
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.1","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
+{"schema_version":1,"bo_forge_version":"3.4.2","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
 ```
 
 The last valid `--format` value selects the error format; an invalid or missing
@@ -71,6 +71,8 @@ result = subprocess.run(
     ["bo-forge", "summary", "--config", "campaign.yaml", "--log", "campaign.csv",
      "--format", "json"], capture_output=True, text=True, check=False,
 )
+if not result.stdout.strip():
+    raise RuntimeError(result.stderr)  # Unexpected failures need not use the envelope.
 payload = json.loads(result.stdout)
 if payload["schema_version"] != 1:
     raise RuntimeError("Unsupported inspection schema")
@@ -758,6 +760,14 @@ The manifest filename is reserved case-insensitively, including for legacy logs.
 Choose a separate artifact path; existing ordinary artifact files can still be
 replaced. A rejected destination leaves campaign files unchanged, including when
 `suggest --output` is combined with `--append`.
+
+Suggestion CSV exports are prepared separately and atomically replace the artifact
+only after serialization succeeds. A failed write leaves an existing artifact
+unchanged, or a new destination absent. With `--output --append`, export still
+precedes append: export failure prevents append, but a later append failure does
+not undo a successful export. These are separate operations, not a joint transaction.
+Unsupported plot filename extensions produce a handled output error listing the
+available formats. Extensionless paths retain Matplotlib's default format.
 
 `bo-forge suggest --append` never marks suggestions observed. The explicit campaign rhythm remains:
 

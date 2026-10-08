@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from bo_forge._cli.errors import SerializationError
 from bo_forge._cli.output import (
-    SerializationError,
     json_value,
     render,
     requested_json_command,

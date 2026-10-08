@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from bo_forge import __version__
+from bo_forge._cli.errors import ArgumentFailure, SerializationError
 from bo_forge.errors import (
     BOForgeError,
     ConfigError,
@@ -31,23 +32,15 @@ INSPECTION_COMMANDS = (
 JSON_COMMANDS = (*INSPECTION_COMMANDS, "suggest")
 
 
-class SerializationError(BOForgeError):
-    """An inspection result contains values outside the JSON contract."""
-
-
-class ArgumentFailure(Exception):
-    """Retain the failing parser's usage and message without writing stdout."""
-
-    def __init__(self, parser, message):
-        self.parser = parser
-        self.message = message
-
-
 class InspectionParser(argparse.ArgumentParser):
     """Let the entrypoint render parser errors in the requested format."""
 
     def error(self, message):
         raise ArgumentFailure(self, message)
+
+
+def _print_table(df: pd.DataFrame) -> None:
+    print(df.to_string(index=False))
 
 
 def register_formats(subparsers):
