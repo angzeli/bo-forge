@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 from importlib.metadata import version
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -22,6 +23,10 @@ from bo_forge._fit_metadata import config_identity
 from bo_forge.config import CampaignConfig, ModelConfig
 from bo_forge.errors import ConfigError, LogConflictError
 from bo_forge.validation import design_tuples, get_observed_data, validate_campaign_data
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+    from numpy.typing import NDArray
 
 _PROFILES = ("default", "smooth", "rough", "robust")
 _Z95 = 1.959963984540054
@@ -50,7 +55,7 @@ class PredictiveEvaluationResult:
     summary: pd.DataFrame
     predictions: pd.DataFrame
     fold_outcomes: pd.DataFrame
-    metadata: dict
+    metadata: dict[str, Any]
     _campaign_sources: tuple[Path, Path] | None = field(default=None, init=False, repr=False,
                                                      compare=False)
 
@@ -84,7 +89,9 @@ class PredictiveEvaluationResult:
             raise
         return destination
 
-    def plot_predictions(self, *, save_path: str | Path | None = None):
+    def plot_predictions(
+        self, *, save_path: str | Path | None = None,
+    ) -> tuple[Figure, NDArray[np.object_]]:
         """Plot observed versus held-out predicted outcomes without refitting."""
         from bo_forge._diagnostics.predictive import plot_predictions
 
@@ -92,7 +99,9 @@ class PredictiveEvaluationResult:
             plot_predictions, self._campaign_sources, self, save_path=save_path,
         )
 
-    def plot_residuals(self, *, save_path: str | Path | None = None):
+    def plot_residuals(
+        self, *, save_path: str | Path | None = None,
+    ) -> tuple[Figure, NDArray[np.object_]]:
         """Plot observation-standardized held-out residuals without refitting."""
         from bo_forge._diagnostics.predictive import plot_residuals
 

@@ -103,9 +103,3 @@ SESSION_METHOD_NAMES = {
     "summary",
     "validate",
 }
-
-# Hashes cover the complete name-to-signature maps. Failed assertions print the maps.
-PUBLIC_SIGNATURE_DIGEST = "257035aadf6c1a8fa189be38efeb1f5e65757154c88d26ef0eea7716767cb1d0"
-SESSION_METHOD_SIGNATURE_DIGEST = (
-    "06c8306ef66f28a0d852934dbbead19ad7256effba46f3293a5f81b3537bdf9d"
-)

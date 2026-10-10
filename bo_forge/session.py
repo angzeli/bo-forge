@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -53,6 +53,15 @@ from bo_forge.validation import (
     validate_campaign_data,
 )
 
+if TYPE_CHECKING:
+    import numpy as np
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from numpy.typing import NDArray
+
+    from bo_forge._fit_metadata import FitMetadata
+    from bo_forge.predictive import PredictiveEvaluationResult
+
 
 @dataclass
 class CampaignSession:
@@ -68,7 +77,7 @@ class CampaignSession:
     _provenance_policy: str = field(default="compatible", init=False, repr=False)
     _manifest_fingerprint: str | None = field(default=None, init=False, repr=False)
     _lifecycle_identity: str | None = field(default=None, init=False, repr=False)
-    _fit_metadata: Any = field(default=None, init=False, repr=False)
+    _fit_metadata: FitMetadata | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def initialize(cls, config_path: str | Path, log_path: str | Path) -> CampaignSession:
@@ -576,7 +585,13 @@ class CampaignSession:
         self._assert_provenance_resumable()
         return model_profile_comparison(self.config, self.df, profiles=profiles)
 
-    def model_predictive_evaluation(self, profiles=None, *, folds=5, seed=0):
+    def model_predictive_evaluation(
+        self,
+        profiles: list[str] | tuple[str, ...] | None = None,
+        *,
+        folds: int = 5,
+        seed: int = 0,
+    ) -> PredictiveEvaluationResult:
         """Run explicit retrospective held-out checks without campaign mutation."""
         from bo_forge.predictive import _session_predictive_evaluation
 
@@ -691,80 +706,80 @@ class CampaignSession:
 
         enforce_session_provenance(self)
 
-    def plot_progress(self, **kwargs: Any) -> Any:
+    def plot_progress(self, **kwargs: Any) -> tuple[Figure, Axes]:
         """Plot campaign progress and return figure/axes objects."""
         from bo_forge.diagnostics import plot_progress as _plot_progress
         return _session_plot(self, _plot_progress, kwargs)
 
-    def plot_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_diagnostics(self, **kwargs: Any) -> tuple[Figure, Axes | NDArray[np.object_]]:
         """Plot campaign diagnostics and return figure/axes objects."""
         from bo_forge.diagnostics import plot_diagnostics as _plot_diagnostics
         return _session_plot(self, _plot_diagnostics, kwargs)
 
-    def plot_cost_progress(self, **kwargs: Any) -> Any:
+    def plot_cost_progress(self, **kwargs: Any) -> tuple[Figure, Axes]:
         """Plot best observed objective against cumulative effective cost."""
         from bo_forge.diagnostics import plot_cost_progress as _plot_cost_progress
         return _session_plot(self, _plot_cost_progress, kwargs)
 
-    def plot_replicates(self, **kwargs: Any) -> Any:
+    def plot_replicates(self, **kwargs: Any) -> tuple[Figure, Axes | NDArray[np.object_]]:
         """Plot replicate-group objective summaries and return figure/axes objects."""
         from bo_forge.diagnostics import plot_replicates as _plot_replicates
         return _session_plot(self, _plot_replicates, kwargs)
 
-    def plot_pareto(self, **kwargs: Any) -> Any:
+    def plot_pareto(self, **kwargs: Any) -> tuple[Figure, Axes | NDArray[np.object_]]:
         """Plot observed Pareto diagnostics for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_pareto as _plot_pareto
         return _session_plot(self, _plot_pareto, kwargs)
 
-    def plot_pareto_parallel(self, **kwargs: Any) -> Any:
+    def plot_pareto_parallel(self, **kwargs: Any) -> tuple[Figure, Axes]:
         """Plot Pareto-front rows with normalized parallel coordinates."""
         from bo_forge.diagnostics import plot_pareto_parallel as _plot_pareto_parallel
         return _session_plot(self, _plot_pareto_parallel, kwargs)
 
-    def plot_hypervolume(self, **kwargs: Any) -> Any:
+    def plot_hypervolume(self, **kwargs: Any) -> tuple[Figure, Axes]:
         """Plot hypervolume progress for a multi-objective campaign."""
         from bo_forge.diagnostics import plot_hypervolume as _plot_hypervolume
         return _session_plot(self, _plot_hypervolume, kwargs)
 
-    def plot_stage_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_stage_diagnostics(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot structured-campaign stage diagnostics."""
         from bo_forge.diagnostics import plot_stage_diagnostics as _plot_stage_diagnostics
         return _session_plot(self, _plot_stage_diagnostics, kwargs)
 
-    def plot_fidelity_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_fidelity_diagnostics(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot observed multi-fidelity diagnostics."""
         from bo_forge.diagnostics import (
             plot_fidelity_diagnostics as _plot_fidelity_diagnostics,
         )
         return _session_plot(self, _plot_fidelity_diagnostics, kwargs)
 
-    def plot_fidelity_progress(self, **kwargs: Any) -> Any:
+    def plot_fidelity_progress(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot fidelity use and target-fidelity objective progress."""
         from bo_forge.diagnostics import plot_fidelity_progress as _plot_fidelity_progress
         return _session_plot(self, _plot_fidelity_progress, kwargs)
 
-    def plot_context_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_context_diagnostics(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot observed contextual diagnostics."""
         from bo_forge.diagnostics import (
             plot_context_diagnostics as _plot_context_diagnostics,
         )
         return _session_plot(self, _plot_context_diagnostics, kwargs)
 
-    def plot_model_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_model_diagnostics(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot model posterior-vs-observed diagnostics."""
         from bo_forge.diagnostics import (
             plot_model_diagnostics as _plot_model_diagnostics,
         )
         return _session_plot(self, _plot_model_diagnostics, kwargs)
 
-    def plot_model_comparison(self, **kwargs: Any) -> Any:
+    def plot_model_comparison(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot model-profile comparison diagnostics."""
         from bo_forge.diagnostics import (
             plot_model_comparison as _plot_model_comparison,
         )
         return _session_plot(self, _plot_model_comparison, kwargs)
 
-    def plot_qlog_nei_diagnostics(self, **kwargs: Any) -> Any:
+    def plot_qlog_nei_diagnostics(self, **kwargs: Any) -> tuple[Figure, NDArray[np.object_]]:
         """Plot qLogNEI pending-state diagnostics."""
         from bo_forge.diagnostics import (
             plot_qlog_nei_diagnostics as _plot_qlog_nei_diagnostics,

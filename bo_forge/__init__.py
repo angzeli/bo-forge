@@ -1,8 +1,9 @@
-"""BO Forge v3.4.2."""
+"""BO Forge v3.4.3."""
 
 from importlib import import_module
+from typing import TYPE_CHECKING
 
-__version__ = "3.4.2"
+__version__ = "3.4.3"
 
 from bo_forge.config import (
     BOConfig,
@@ -32,6 +33,44 @@ from bo_forge.errors import (
     ProvenanceRecoveryRequired,
     SuggestionError,
 )
+
+if TYPE_CHECKING:
+    from bo_forge._fit_metadata import FitMetadata
+    from bo_forge.contextual import context_summary
+    from bo_forge.costs import evaluate_cost
+    from bo_forge.logs import (
+        append_suggestions,
+        load_campaign_log,
+        mark_observed,
+        review_suggestion,
+    )
+    from bo_forge.models import model_profile_comparison, model_summary
+    from bo_forge.multi_objective import (
+        hypervolume,
+        hypervolume_progress,
+        pareto_front,
+        pareto_summary,
+    )
+    from bo_forge.multifidelity import fidelity_coverage, fidelity_summary
+    from bo_forge.noisy import qlog_nei_summary
+    from bo_forge.predictive import PredictiveEvaluationResult, model_predictive_evaluation
+    from bo_forge.provenance import (
+        accept_provenance_config,
+        adopt_provenance,
+        fork_campaign,
+        migrate_provenance,
+        provenance_summary,
+        recover_provenance,
+    )
+    from bo_forge.replicates import (
+        aggregate_observed_replicates,
+        best_replicate_group,
+        replicate_summary,
+    )
+    from bo_forge.session import CampaignSession
+    from bo_forge.structured import stage_summary
+    from bo_forge.suggestions import suggest_next, suggestion_quality_summary
+    from bo_forge.validation import get_observed_data, validate_campaign_data
 
 __all__ = [
     "BOConfig",
@@ -137,15 +176,16 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
 }
 
 
-def __getattr__(name: str) -> object:
-    """Resolve heavy public exports only when callers request them."""
-    try:
-        module_name, attribute_name = _LAZY_EXPORTS[name]
-    except KeyError as exc:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
-    value = getattr(import_module(module_name), attribute_name)
-    globals()[name] = value
-    return value
+if not TYPE_CHECKING:
+    def __getattr__(name: str) -> object:
+        """Resolve runtime exports without accepting unknown names during type checking."""
+        try:
+            module_name, attribute_name = _LAZY_EXPORTS[name]
+        except KeyError as exc:
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+        value = getattr(import_module(module_name), attribute_name)
+        globals()[name] = value
+        return value
 
 
 def __dir__() -> list[str]:

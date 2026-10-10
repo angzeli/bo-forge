@@ -1,9 +1,14 @@
 # BO Forge Capability Matrix
 
-BO Forge v3.4.2 retains explicit bounded predictive diagnostics while keeping
+BO Forge v3.4.3 retains explicit bounded predictive diagnostics while keeping
 YAML/CSV schemas, suggestion algorithms, campaign combinations, and provenance
 contracts unchanged. Predictive evaluation has its own narrower scope below;
 support for a BO campaign combination does not imply evaluator support.
+
+The prepared [public Python typing contract](PUBLIC_API.md#supported-public-python-typing)
+does not expand runtime capabilities or statically validate DataFrame columns.
+Local installed typing acceptance passed on macOS/Python 3.12; exact-commit
+Python 3.11/3.12 CI remains pending.
 
 v3.4.0 added [schema-v1 CLI JSON inspection](CLI.md#versioned-json-inspection)
 for 16 read-only commands. This changes representation only: capability guards,

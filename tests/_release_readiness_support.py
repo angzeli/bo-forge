@@ -1,4 +1,5 @@
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -119,6 +120,9 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
         metadata = wheel.read(f"{DIST_INFO_ROOT}/METADATA").decode("utf-8")
 
     assert "bo_forge/__init__.py" in names
+    assert {name for name in names if Path(name).name == "py.typed"} == {
+        "bo_forge/py.typed",
+    }
     assert "bo_forge/contextual.py" in names
     assert "bo_forge/multifidelity.py" in names
     assert "bo_forge/plot_registry.py" in names
@@ -175,8 +179,19 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
 
+    assert {name for name in names if Path(name).name == "py.typed"} == {
+        f"{SDIST_ROOT}/bo_forge/py.typed",
+    }
     required_paths = {
         "tests/_cli_json_install_probe.py",
+        "tests/_typing_install_probe.py",
+        "tests/_public_typing_contract.py",
+        "tests/test_public_typing.py",
+        "tests/typing_contract/positive.py",
+        "tests/typing_contract/negative.py",
+        "tests/typing_contract/mypy.ini",
+        "tests/fixtures/public_calls_v342.json",
+        "bo_forge/py.typed",
         "schemas/cli-inspection-v1.json",
         "tests/fixtures/cli_json/validate.json",
         "tests/fixtures/cli_json/argument_error.json",
@@ -405,6 +420,28 @@ def _install_distribution_and_probe(
         text=True,
     )
     if resolve_dependencies:
+        platform_name = {"darwin": "macos", "linux": "linux"}[sys.platform]
+        python_version = f"{sys.version_info.major}{sys.version_info.minor}"
+        constraints = PROJECT_ROOT / "requirements" / (
+            f"constraints-py{python_version}-{platform_name}-{platform.machine()}.txt"
+        )
+        uv = Path(sys.executable).with_name("uv")
+        if not uv.is_file():
+            uv_on_path = shutil.which("uv", path=install_env.get("PATH"))
+            if uv_on_path is None:
+                raise RuntimeError(
+                    "Installed typing probes require uv. Install uv in the release "
+                    "environment or make it available on PATH."
+                )
+            uv = Path(uv_on_path)
+        subprocess.run(
+            [str(uv), "pip", "install", "--python", str(python), "-c", str(constraints),
+             "mypy>=1.19,<2", "pandas-stubs>=3.0,<3.1"],
+            cwd=probe_dir,
+            env=install_env,
+            check=True,
+            text=True,
+        )
         _run_pip_check(pip, probe_dir, env)
     completed = subprocess.run(
         [str(venv_dir / "bin" / "bo-forge"), "--version"],
@@ -427,6 +464,24 @@ def _install_distribution_and_probe(
         assert option in api_help.stdout
 
     source_root = str(PROJECT_ROOT.resolve())
+    if not resolve_dependencies:
+        probe_site = Path(sysconfig.get_path(
+            "purelib", vars={"base": str(venv_dir), "platbase": str(venv_dir)},
+        ))
+        # Reuse cached dependencies without giving them precedence over the installed artifact.
+        (probe_site / "_bo_forge_probe_dependencies.pth").write_text(
+            sysconfig.get_paths()["purelib"] + "\n", encoding="utf-8",
+        )
+    shutil.copy2(PROJECT_ROOT / "tests" / "_typing_install_probe.py",
+                 probe_dir / "typing-probe.py")
+    shutil.copytree(PROJECT_ROOT / "tests" / "typing_contract", probe_dir / "typing_contract")
+    subprocess.run(
+        [str(python), "typing-probe.py"],
+        cwd=probe_dir,
+        env={**install_env, "SOURCE_ROOT": source_root, "PYTHONPATH": "", "MYPYPATH": ""},
+        check=True,
+        text=True,
+    )
     script = f"""
 import builtins
 import sys

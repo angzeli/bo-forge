@@ -1,5 +1,34 @@
 # 📝 BO Forge Changelog
 
+## v3.4.3 - Supported Public Python Typing
+
+Status: prepared; local installed typing and runtime acceptance passed on
+macOS/Python 3.12. Exact-commit Python 3.11/3.12 CI remains pending. Preparation
+is not publication approval.
+
+- Define the supported typing surface as top-level `bo_forge.__all__`, public
+  config dataclasses, `CampaignSession` methods, exception attributes,
+  `FitMetadata`, and `PredictiveEvaluationResult`, including equivalent public
+  names imported through compatibility modules.
+- Prepare type-only imports alongside lazy runtime exports and `py.typed`
+  discovery without promising strict checking of every internal module.
+  DataFrames remain DataFrames, not statically typed column schemas; deliberate
+  public `Any` boundaries cover heterogeneous metadata, pandas row values, and
+  plotting kwargs. Preserve `evaluate_cost()` support for pandas `Series` inputs
+  in the public typing contract, including mixed-value DataFrame rows.
+- Require mypy with `tests/typing_contract/mypy.ini`, positive and negative
+  consumer fixtures, and `tests/_typing_install_probe.py` against installed
+  wheel/sdist artifacts outside the checkout. Use versions pinned in
+  `requirements/constraints-*.txt`; acceptance results must be recorded separately.
+- Resolve the release probe's `uv` from its prepared Python environment before
+  PATH, retaining CI-provided tools and reporting a clear missing-tool error.
+- Require corresponding fixtures for public API changes and compatibility
+  review for narrowed argument types or changed return meaning.
+- No runtime behavior, BO algorithms, campaign combinations, YAML/CSV schemas,
+  CLI contracts, or HTTP/Streamlit workflows change. The v3.4.x line remains
+  active; v3.4.4 API product-boundary work is deferred. No full notebook or
+  performance campaign rerun is required for this typing-only patch.
+
 ## v3.4.2 - CLI Decomposition And Compatibility Hardening
 
 - Separate internal CLI ownership into inspection/report, campaign creation and

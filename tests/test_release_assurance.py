@@ -445,7 +445,8 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
     assert "class v34 majorActive" in roadmap
     assert "class v340 patchDone" in roadmap
     assert "class v341 patchDone" in roadmap
-    assert "class v342 patchActive" in roadmap
+    assert "class v342 patchDone" in roadmap
+    assert "class v343 patchActive" in roadmap
     assert "Reuse the v3.4.0 envelope and error format" in roadmap
     assert "Performance acceptance passed: 156/156" in roadmap
     assert "The local release gate must pass before commit" in roadmap

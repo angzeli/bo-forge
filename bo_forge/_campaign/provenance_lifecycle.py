@@ -20,7 +20,14 @@ from bo_forge.logs import _campaign_log_lock
 from bo_forge.validation import validate_campaign_data
 
 
-def adopt_provenance(config_path, log_path, *, apply=False, reason="", expected_identities=None):
+def adopt_provenance(
+    config_path: str | Path,
+    log_path: str | Path,
+    *,
+    apply: bool = False,
+    reason: str = "",
+    expected_identities: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Preview legacy adoption; apply only with a reason and unchanged preview identities."""
     return lifecycle(
         "adopt",
@@ -32,7 +39,14 @@ def adopt_provenance(config_path, log_path, *, apply=False, reason="", expected_
     )
 
 
-def migrate_provenance(config_path, log_path, *, apply=False, reason="", expected_identities=None):
+def migrate_provenance(
+    config_path: str | Path,
+    log_path: str | Path,
+    *,
+    apply: bool = False,
+    reason: str = "",
+    expected_identities: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Preview explicit v1-to-v2 migration, preserving campaign identity and old events."""
     return lifecycle(
         "migrate",
@@ -45,13 +59,13 @@ def migrate_provenance(config_path, log_path, *, apply=False, reason="", expecte
 
 
 def accept_provenance_config(
-    config_path,
-    log_path,
+    config_path: str | Path,
+    log_path: str | Path,
     *,
-    apply=False,
-    reason="",
-    expected_identities=None,
-):
+    apply: bool = False,
+    reason: str = "",
+    expected_identities: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Preview acknowledgment of byte-only YAML changes for a schema-v2 campaign."""
     return lifecycle(
         "accept-config",
@@ -64,15 +78,15 @@ def accept_provenance_config(
 
 
 def fork_campaign(
-    config_path,
-    log_path,
-    destination,
+    config_path: str | Path,
+    log_path: str | Path,
+    destination: str | Path,
     *,
-    config_changes=None,
-    apply=False,
-    reason="",
-    expected_identities=None,
-):
+    config_changes: dict[str, Any] | None = None,
+    apply: bool = False,
+    reason: str = "",
+    expected_identities: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Preview a child with inherited CSV bytes and restricted configuration changes."""
     return lifecycle(
         "fork",

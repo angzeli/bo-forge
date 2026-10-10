@@ -20,5 +20,8 @@ recursive-include requirements *.md *.txt
 recursive-include tests *.py
 include tests/fixtures/provenance_v1.json
 include tests/fixtures/cli_parser_v341.json
+include tests/fixtures/public_calls_v342.json
+include tests/typing_contract/mypy.ini
+include bo_forge/py.typed
 recursive-include schemas *.json
 recursive-include tests/fixtures/cli_json *.json

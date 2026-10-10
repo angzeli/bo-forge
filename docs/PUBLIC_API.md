@@ -1,6 +1,6 @@
 # 📦 BO Forge Public API
 
-This page lists the stable imports supported from the top-level `bo_forge` package in v3.4.2.
+This page lists the stable imports supported from the top-level `bo_forge` package in v3.4.3.
 
 The v3.3.2 [benchmark harness](BENCHMARKS.md) adds no public `bo_forge` imports,
 campaign CLI commands, or HTTP routes. Its `python -m benchmarks` commands run
@@ -54,7 +54,9 @@ These names are supported imports from `bo_forge`:
 - `SuggestionError`
 - `VariableConfig`
 - `__version__`
+- `accept_provenance_config`
 - `active_variables_for_stage`
+- `adopt_provenance`
 - `append_suggestions`
 - `aggregate_observed_replicates`
 - `best_replicate_group`
@@ -63,12 +65,14 @@ These names are supported imports from `bo_forge`:
 - `evaluate_cost`
 - `fidelity_coverage`
 - `fidelity_summary`
+- `fork_campaign`
 - `get_observed_data`
 - `hypervolume`
 - `hypervolume_progress`
 - `is_structured_campaign`
 - `load_campaign_log`
 - `mark_observed`
+- `migrate_provenance`
 - `model_summary`
 - `model_profile_comparison`
 - `model_predictive_evaluation`
@@ -83,6 +87,83 @@ These names are supported imports from `bo_forge`:
 - `suggest_next`
 - `suggestion_quality_summary`
 - `validate_campaign_data`
+
+### Supported Public Python Typing
+
+Status: prepared for v3.4.3; installed wheel/sdist consumer acceptance passed on
+macOS/Python 3.12.0 with Mypy 1.20.2 and pandas-stubs 3.0.5.260914. Exact-commit
+Python 3.11/3.12 CI remains pending. This contract adds no runtime, BO, YAML/CSV
+schema, or CLI behavior change.
+
+The supported static surface follows the top-level `bo_forge.__all__` list above:
+
+| Surface | Typing contract |
+| --- | --- |
+| Exported functions and constants | Public parameter and return types, including optional values and supported call forms |
+| Public config dataclasses | Constructors, fields, public properties, and methods such as `CampaignConfig.from_yaml()` |
+| `CampaignSession` | Public construction, fields, properties, and methods, including suggestions, mutations, reports, predictive evaluation, and plotting |
+| Public exceptions | Constructors and public attributes; `ProvenanceError.reason_code` is `str`, `recovery_action` is `str` or `None`; both attributes on `ProvenanceRecoveryRequired` are `str` |
+| `FitMetadata` | Immutable scalar `fields` and `as_dict()`; no fitted model is exposed |
+| `PredictiveEvaluationResult` | DataFrame fields `summary`, `predictions`, and `fold_outcomes`, heterogeneous `metadata`, and public export/plot methods |
+
+Equivalent public names imported from compatibility modules, such as
+`bo_forge.config.CampaignConfig`, `bo_forge.session.CampaignSession`,
+`bo_forge.errors.ProvenanceError`, or `bo_forge.predictive.PredictiveEvaluationResult`,
+have the same contract as their top-level equivalents. This does not make every
+name in those modules public or extend support to private implementation packages.
+Prefer top-level imports for consumers.
+
+Type-only imports under `TYPE_CHECKING` make lazy exports and annotation-only
+dependencies visible to the checker without eagerly loading optimizer or plotting
+dependencies at runtime. The runtime `__all__`, lazy attribute resolution, star
+imports, and `dir(bo_forge)` remain compatible. The `py.typed` marker allows
+installed-package type discovery; it is not proof that every internal module or
+third-party dependency passes strict checking.
+
+DataFrames are annotated as `pandas.DataFrame`, not statically checked column
+schemas. A type-checker pass cannot establish required columns, dtypes, campaign
+validity, or scientifically meaningful values. Existing runtime validation and
+the [CSV schema](CSV_SCHEMA.md) remain authoritative. Deliberate public `Any`
+boundaries cover heterogeneous metadata, pandas row values, and forwarded plotting
+kwargs; they do not excuse untyped public functions or unknown concrete return
+types. `evaluate_cost()` accepts mappings, sequences, and pandas `Series` rows,
+including mixed-value rows returned by `DataFrame.iterrows()`.
+
+For example, a consumer can check returned objects and narrow optional settings:
+
+```python
+from pathlib import Path
+from typing import assert_type
+
+import pandas as pd
+from bo_forge import CampaignSession, CostConfig
+
+session = CampaignSession.from_files(Path("campaign.yaml"), Path("campaign.csv"))
+assert_type(session.summary(), pd.DataFrame)
+assert_type(session.log_fingerprint, str | None)
+if session.config.cost is not None:
+    assert_type(session.config.cost, CostConfig)
+```
+
+The example reads an existing campaign. Static checking does not execute those
+operations or establish whether the files satisfy runtime validation.
+
+Mypy is the required consumer checker, using `tests/typing_contract/mypy.ini`
+and versions pinned in `requirements/constraints-*.txt`. Other checkers are not
+an acceptance substitute. `tests/typing_contract/positive.py` records supported
+calls and inferred types; `tests/typing_contract/negative.py` records misuse that
+must produce the expected diagnostics. Public API changes require corresponding
+fixtures. Narrowing accepted arguments or changing return meaning requires
+compatibility review, even if an annotation edit has no runtime effect.
+
+The acceptance runner is `tests/_typing_install_probe.py`. It must check both
+fixtures against installed wheel and sdist artifacts from outside the checkout,
+not an editable source import. Positive checks must pass and negative checks must
+fail for the intended reasons. See the [release checklist](RELEASE_CHECKLIST.md)
+for artifact isolation and Python 3.11/3.12 evidence requirements. Prepared docs,
+fixtures, or a discoverable `py.typed` marker alone do not establish acceptance.
+
+### Runtime Contracts
 
 `best_replicate_group` is only defined for single-objective replicate campaigns. For multi-objective replicate campaigns, use `replicate_summary` for group-level statistics and `pareto_front` for group-mean Pareto inspection.
 

@@ -79,6 +79,33 @@ Add behavior-freeze tests before changing numerical routing, candidate order,
 seeds, retries, fallbacks, persistence, or error contracts. Avoid broad module
 refactors during feature or release-hardening patches.
 
+## Public Python typing
+
+The v3.4.3 [public typing contract](docs/PUBLIC_API.md#supported-public-python-typing)
+covers `bo_forge.__all__`, public config dataclasses and session methods,
+exception attributes, `FitMetadata`, and `PredictiveEvaluationResult`. Equivalent
+public imports through compatibility modules share that contract; private helpers
+do not. Preserve runtime lazy loading with type-only imports where needed.
+
+Mypy is the required checker, using `tests/typing_contract/mypy.ini` and versions
+pinned in `requirements/constraints-*.txt`. Every public API change needs
+corresponding coverage in `tests/typing_contract/positive.py` and
+`tests/typing_contract/negative.py`. Keep supported calls accepted and deliberate
+misuse rejected. Narrowing accepted arguments or changing return meaning requires
+compatibility review, even when runtime behavior is unchanged.
+
+Annotate DataFrames as DataFrames, not static column schemas. Public `Any` is
+deliberate only for heterogeneous metadata, pandas row values, and plotting kwargs;
+do not use it to hide untyped public calls or concrete return types. `py.typed` enables discovery,
+not proof that every internal module passes strict checking.
+
+Before claiming acceptance, run strict consumer checks through
+`tests/_typing_install_probe.py` against fresh wheel and sdist installs outside
+the checkout, with Python 3.11/3.12 CI. See the
+[release checklist](docs/RELEASE_CHECKLIST.md) for evidence requirements.
+Local v3.4.3 acceptance passed on macOS/Python 3.12; exact-commit CI remains
+pending. This typing-only patch needs no full notebook or performance campaign rerun.
+
 ## Documentation and releases
 
 Update tests with every fixed behavior defect. Update docs only when existing

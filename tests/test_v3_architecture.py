@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import ast
-import hashlib
 import importlib
 import inspect
 import json
 from pathlib import Path
 
 import bo_forge
+from tests._public_typing_contract import call_shape
 from tests._v3_signature_contract import (
     PUBLIC_EXCEPTION_EXPORTS,
-    PUBLIC_SIGNATURE_DIGEST,
     PUBLIC_SIGNATURE_NAMES,
     SESSION_METHOD_NAMES,
-    SESSION_METHOD_SIGNATURE_DIGEST,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -109,9 +107,10 @@ def _parsed(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
-def _signature_digest(signatures: dict[str, str]) -> str:
-    payload = json.dumps(signatures, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(payload).hexdigest()
+def _baseline_calls() -> dict[str, list[dict[str, object]]]:
+    return json.loads(
+        (PROJECT_ROOT / "tests/fixtures/public_calls_v342.json").read_text(encoding="utf-8")
+    )
 
 
 def test_production_modules_stay_below_physical_line_limit() -> None:
@@ -255,10 +254,6 @@ def test_core_public_call_signatures_remain_keyword_compatible() -> None:
     callable_exports = {
         name for name in bo_forge.__all__ if callable(getattr(bo_forge, name))
     }
-    signatures = {
-        name: str(inspect.signature(getattr(bo_forge, name)))
-        for name in PUBLIC_SIGNATURE_NAMES
-    }
 
     lifecycle_exports = {"adopt_provenance", "migrate_provenance",
                          "accept_provenance_config", "fork_campaign"}
@@ -276,10 +271,9 @@ def test_core_public_call_signatures_remain_keyword_compatible() -> None:
     summary_signature = inspect.signature(bo_forge.model_summary)
     metadata = summary_signature.parameters["metadata"]
     assert metadata.kind == inspect.Parameter.KEYWORD_ONLY and metadata.default is None
-    signatures["model_summary"] = str(summary_signature.replace(parameters=[
-        parameter for name, parameter in summary_signature.parameters.items() if name != "metadata"
-    ]))
-    assert _signature_digest(signatures) == PUBLIC_SIGNATURE_DIGEST, signatures
+    baseline = _baseline_calls()
+    for name in PUBLIC_SIGNATURE_NAMES | lifecycle_exports | evaluation_exports:
+        assert call_shape(getattr(bo_forge, name)) == baseline[name], name
 
 
 def test_campaign_session_public_method_signatures_remain_compatible() -> None:
@@ -290,16 +284,13 @@ def test_campaign_session_public_method_signatures_remain_compatible() -> None:
         if not name.startswith("_") and callable(member)
     }
 
-    signatures = {
-        name: str(inspect.signature(member)) for name, member in public_methods.items()
-    }
-
     assert set(public_methods) == SESSION_METHOD_NAMES | {"model_predictive_evaluation"}
     evaluation_signature = inspect.signature(public_methods["model_predictive_evaluation"])
     assert evaluation_signature.parameters["folds"].default == 5
     assert evaluation_signature.parameters["seed"].default == 0
-    signatures.pop("model_predictive_evaluation")
-    assert _signature_digest(signatures) == SESSION_METHOD_SIGNATURE_DIGEST, signatures
+    baseline = _baseline_calls()
+    for name, member in public_methods.items():
+        assert call_shape(member) == baseline[f"CampaignSession.{name}"], name
 
 
 def test_compatibility_facades_limit_assignment_propagation(monkeypatch) -> None:

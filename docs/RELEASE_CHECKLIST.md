@@ -4,7 +4,49 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
-The v3.4.2 candidate is behavior-preserving CLI maintenance. Run
+## v3.4.3 Public Typing Acceptance
+
+The v3.4.3 candidate prepares supported public Python typing without runtime,
+BO, YAML/CSV schema, or CLI behavior changes. Local acceptance passed on
+macOS/Python 3.12.0 with Mypy 1.20.2 and pandas-stubs 3.0.5.260914, including
+fresh core/app/API installations and both installed typing artifacts. The
+hash-constrained typing-tool installation probe was corrected and revalidated.
+Exact-commit CI remains pending; local results do not authorize publication.
+
+- [x] Review coverage of top-level `bo_forge.__all__`, public config dataclasses,
+  session methods, exception attributes, `FitMetadata`, and
+  `PredictiveEvaluationResult`, including equivalent compatibility-module imports.
+- [x] Use mypy as the required checker with `tests/typing_contract/mypy.ini` and
+  versions pinned in `requirements/constraints-*.txt`. Strict consumer checking
+  must not be weakened to make a public API mismatch pass.
+- [x] Run `tests/_typing_install_probe.py` against fresh, non-editable wheel and
+  sdist installations from outside the checkout. Copy the runner, configuration,
+  and consumer fixtures to an external temporary workspace; clear `PYTHONPATH`
+  and `MYPYPATH`, exclude checkout sources from discovery, and verify that imports
+  and type discovery resolve to the installed package.
+- [x] Require `tests/typing_contract/positive.py` to pass with the expected types
+  and `tests/typing_contract/negative.py` to fail with the expected diagnostics.
+  Missing imports, missing stubs, or unrelated errors are not negative acceptance.
+  Retain interpreter, checker/dependency versions, artifact identity, installed
+  import location, and both fixture outcomes with the evidence.
+- [x] Verify `bo_forge/py.typed` in both artifacts and installed packages. Keep the
+  consumer fixtures, configuration, and runner in the sdist, not the runtime wheel.
+  The marker enables discovery; it does not prove strict typing of internals.
+- [x] Verify lightweight runtime imports and unchanged public call forms. Keep
+  DataFrames free of static column-schema claims and public `Any` limited to
+  deliberate heterogeneous metadata, pandas row values, and plotting kwargs.
+  Review narrowed arguments
+  or changed return meaning for compatibility, with corresponding consumer fixtures.
+- [ ] Pass the typing gates in required Python 3.11/3.12 CI for the exact release
+  commit, including both installed artifact formats. Local results do not replace CI.
+
+No full notebook or performance campaign rerun is required for this typing-only
+patch. Preserve historical evidence and the existing separately scoped notebook
+and tag-gate policies below; do not relabel old results as v3.4.3 acceptance.
+
+### Retained CLI Regression Checks
+
+The completed v3.4.2 CLI maintenance remains the regression baseline. Run
 `tests/test_cli_compatibility.py` against the captured v3.4.1 parser contract,
 including options, defaults, command/help ordering, text output, first-error
 selection, command dispatch/lifecycle selectors, and export-before-append sequencing.
@@ -75,6 +117,10 @@ python3.12 -m venv /tmp/bo-forge-release
 On macOS, omit `--torch-backend cpu` and use the x86_64 or arm64 file matching
 `uname -m`. See [`requirements/README.md`](../requirements/README.md) for exact
 regeneration and freshness-verification commands.
+
+The dependency-resolved typing probe uses `uv` beside the release environment's
+Python interpreter, falling back to PATH for CI-provided installations. Activating
+the environment or installing `uv` globally is not required for the setup above.
 
 Never use a stale repository `.venv` as the only release environment. Do not
 commit virtual environments, caches, generated reports, local working logs, or
@@ -305,12 +351,17 @@ Representative read-only CLI checks:
 | CI job | Required evidence |
 | --- | --- |
 | `Static validation` | Ruff, syntax, whitespace, generated-constraints freshness |
-| `Core tests (Python 3.11)` | Complete Linux pytest suite under Python 3.11 |
-| `Core tests (Python 3.12)` | Complete Linux pytest suite under Python 3.12 |
+| `Core tests (Python 3.11)` | Complete Linux pytest suite under Python 3.11; required v3.4.3 strict mypy consumer checks |
+| `Core tests (Python 3.12)` | Complete Linux pytest suite under Python 3.12; required v3.4.3 strict mypy consumer checks |
 | `macOS filesystem and CLI` | Path, symlink, locking, fingerprint, rollback, mode, process, and CLI checks |
 | `Bounded real numerical paths` | CPU-only real qMFKG and five-row/two-fold predictive-GP integration with a bounded job timeout |
-| `Build and external artifact probes` | PEP 517 build, Twine, package boundaries, external wheel/sdist installs, `pip check`, packaged entrypoints |
+| `Build and external artifact probes` | PEP 517 build, Twine, package boundaries, external wheel/sdist installs, `pip check`, packaged entrypoints; fresh installed typing acceptance on Python 3.12 |
 | `PR notebook assurance` | Ten one-notebook jobs from the built sdist, retained failure evidence, and complete-profile aggregation against that same archive |
+
+The full-suite matrix runs installed typing checks on Python 3.11 and 3.12;
+the separate fresh external-artifact job uses Python 3.12. These are required
+exact-commit gates, not a claim that CI has passed. Verify `tests/_typing_install_probe.py` uses
+`tests/typing_contract/mypy.ini` for both consumer fixtures and installed formats.
 
 The PR subset is 01, 04, 08, 12, 14, 18, 20, 22, 23, and 24. The manual
 `.github/workflows/notebook-full.yml` workflow and exact-tag release gate must
@@ -492,4 +543,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.4.2 does none of those actions.
+separate explicit authorization. Preparing v3.4.3 does none of those actions.

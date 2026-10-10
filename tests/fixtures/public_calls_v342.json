@@ -1,0 +1,1882 @@
+{
+  "BOConfig": [
+    {
+      "default": "1",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "batch_size",
+      "required": false
+    },
+    {
+      "default": "8",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "initial_design_size",
+      "required": false
+    },
+    {
+      "default": "'log_ei'",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "acquisition",
+      "required": false
+    },
+    {
+      "default": "'sobol'",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "initial_design_method",
+      "required": false
+    },
+    {
+      "default": "0",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "random_seed",
+      "required": false
+    },
+    {
+      "default": "128",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "raw_samples",
+      "required": false
+    },
+    {
+      "default": "5",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "num_restarts",
+      "required": false
+    },
+    {
+      "default": "128",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "mc_samples",
+      "required": false
+    },
+    {
+      "default": "0.0",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "min_normalized_distance",
+      "required": false
+    }
+  ],
+  "CampaignConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "campaign_name",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objective",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "variables",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "bo",
+      "required": true
+    },
+    {
+      "default": "()",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objectives",
+      "required": false
+    },
+    {
+      "default": "()",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "constraints",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "cost",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "fidelity",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "context",
+      "required": false
+    },
+    {
+      "default": "<factory>",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "model",
+      "required": false
+    },
+    {
+      "default": "<factory>",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "review",
+      "required": false
+    },
+    {
+      "default": "<factory>",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "replicates",
+      "required": false
+    },
+    {
+      "default": "()",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "stages",
+      "required": false
+    }
+  ],
+  "CampaignConfig.active_variable_names_for_stage": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "stage_name",
+      "required": true
+    }
+  ],
+  "CampaignConfig.context_variable_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.decision_variable_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.direction_sign": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.from_yaml": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "path",
+      "required": true
+    }
+  ],
+  "CampaignConfig.is_contextual_campaign": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.is_multi_objective": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.is_structured_campaign": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.objective_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.stage_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignConfig.variable_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_fingerprint",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_fingerprint",
+      "required": false
+    }
+  ],
+  "CampaignSession.append_suggestions": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "suggestions",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "CampaignSession.best_observation": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.best_replicate_group": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.campaign_status": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.context_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.cost_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.export_report": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "path",
+      "required": true
+    }
+  ],
+  "CampaignSession.fidelity_coverage": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.fidelity_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.from_files": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": "'compatible'",
+      "kind": "KEYWORD_ONLY",
+      "name": "provenance_policy",
+      "required": false
+    }
+  ],
+  "CampaignSession.initialize": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    }
+  ],
+  "CampaignSession.is_provenance_managed": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.mark_observed": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "row_id",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objective_value",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objective_values",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "actual_cost",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "CampaignSession.model_predictive_evaluation": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "profiles",
+      "required": false
+    },
+    {
+      "default": "5",
+      "kind": "KEYWORD_ONLY",
+      "name": "folds",
+      "required": false
+    },
+    {
+      "default": "0",
+      "kind": "KEYWORD_ONLY",
+      "name": "seed",
+      "required": false
+    }
+  ],
+  "CampaignSession.model_profile_comparison": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "profiles",
+      "required": false
+    }
+  ],
+  "CampaignSession.model_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.next_action": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.observed_data": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.pareto_front": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.pareto_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.pending_suggestions": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_context_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_cost_progress": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_fidelity_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_fidelity_progress": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_hypervolume": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_model_comparison": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_model_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_pareto": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_pareto_parallel": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_progress": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_qlog_nei_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_replicates": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.plot_stage_diagnostics": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "VAR_KEYWORD",
+      "name": "kwargs",
+      "required": true
+    }
+  ],
+  "CampaignSession.provenance_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.qlog_nei_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.reload": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.replicate_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.report": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.review_queue": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.review_suggestion": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "row_id",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "decision",
+      "required": true
+    },
+    {
+      "default": "''",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "note",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "CampaignSession.stage_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.suggest_next": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "batch_size",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "stage",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "context_values",
+      "required": false
+    }
+  ],
+  "CampaignSession.suggestion_quality": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "suggestions",
+      "required": true
+    }
+  ],
+  "CampaignSession.summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "CampaignSession.validate": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "ConstraintConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "name",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "expression",
+      "required": true
+    }
+  ],
+  "ContextConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "variables",
+      "required": true
+    },
+    {
+      "default": "<factory>",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "default_values",
+      "required": false
+    }
+  ],
+  "CostConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "expression",
+      "required": true
+    },
+    {
+      "default": "1.0",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "weight",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "budget",
+      "required": false
+    },
+    {
+      "default": "256",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "candidate_pool_size",
+      "required": false
+    },
+    {
+      "default": "24",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "top_k",
+      "required": false
+    }
+  ],
+  "FidelityConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "variable",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "target",
+      "required": true
+    },
+    {
+      "default": "0.01",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "fixed_cost",
+      "required": false
+    },
+    {
+      "default": "1.0",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "fidelity_cost_weight",
+      "required": false
+    },
+    {
+      "default": "64",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "num_fantasies",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "levels",
+      "required": false
+    },
+    {
+      "default": "200",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "optimizer_maxiter",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "optimizer_timeout_seconds",
+      "required": false
+    }
+  ],
+  "FitMetadata": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "fields",
+      "required": true
+    }
+  ],
+  "FitMetadata.as_dict": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    }
+  ],
+  "ModelConfig": [
+    {
+      "default": "'default'",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "profile",
+      "required": false
+    }
+  ],
+  "ObjectiveConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "name",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "direction",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "reference_point",
+      "required": false
+    }
+  ],
+  "PredictiveEvaluationResult": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "summary",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "predictions",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "fold_outcomes",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "metadata",
+      "required": true
+    }
+  ],
+  "PredictiveEvaluationResult.export": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "output_dir",
+      "required": true
+    }
+  ],
+  "PredictiveEvaluationResult.plot_predictions": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "save_path",
+      "required": false
+    }
+  ],
+  "PredictiveEvaluationResult.plot_residuals": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "self",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "save_path",
+      "required": false
+    }
+  ],
+  "ProvenanceError": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "message",
+      "required": true
+    },
+    {
+      "default": "'manifest_invalid'",
+      "kind": "KEYWORD_ONLY",
+      "name": "reason_code",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "recovery_action",
+      "required": false
+    }
+  ],
+  "ProvenanceRecoveryRequired": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "message",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "KEYWORD_ONLY",
+      "name": "reason_code",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "KEYWORD_ONLY",
+      "name": "recovery_action",
+      "required": true
+    }
+  ],
+  "ReplicateConfig": [
+    {
+      "default": "False",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "enabled",
+      "required": false
+    },
+    {
+      "default": "'uncertain_best'",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "suggestion_policy",
+      "required": false
+    },
+    {
+      "default": "0.1",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "replicate_threshold",
+      "required": false
+    },
+    {
+      "default": "3",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "min_repeats_at_best",
+      "required": false
+    },
+    {
+      "default": "5",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "max_repeats_per_group",
+      "required": false
+    },
+    {
+      "default": "1e-08",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "noise_floor",
+      "required": false
+    }
+  ],
+  "ReviewConfig": [
+    {
+      "default": "False",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "enabled",
+      "required": false
+    }
+  ],
+  "StageConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "name",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "variables",
+      "required": true
+    }
+  ],
+  "VariableConfig": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "name",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "type",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "lower",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "upper",
+      "required": false
+    },
+    {
+      "default": "()",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "values",
+      "required": false
+    }
+  ],
+  "accept_provenance_config": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": "False",
+      "kind": "KEYWORD_ONLY",
+      "name": "apply",
+      "required": false
+    },
+    {
+      "default": "''",
+      "kind": "KEYWORD_ONLY",
+      "name": "reason",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_identities",
+      "required": false
+    }
+  ],
+  "active_variables_for_stage": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "stage_name",
+      "required": true
+    }
+  ],
+  "adopt_provenance": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": "False",
+      "kind": "KEYWORD_ONLY",
+      "name": "apply",
+      "required": false
+    },
+    {
+      "default": "''",
+      "kind": "KEYWORD_ONLY",
+      "name": "reason",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_identities",
+      "required": false
+    }
+  ],
+  "aggregate_observed_replicates": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "observed_df",
+      "required": true
+    }
+  ],
+  "append_suggestions": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "suggestions",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "best_replicate_group": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "configured_stage_names": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    }
+  ],
+  "context_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "evaluate_cost": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "values",
+      "required": true
+    }
+  ],
+  "fidelity_coverage": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "fidelity_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "fork_campaign": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "destination",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "config_changes",
+      "required": false
+    },
+    {
+      "default": "False",
+      "kind": "KEYWORD_ONLY",
+      "name": "apply",
+      "required": false
+    },
+    {
+      "default": "''",
+      "kind": "KEYWORD_ONLY",
+      "name": "reason",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_identities",
+      "required": false
+    }
+  ],
+  "get_observed_data": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "hypervolume": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "hypervolume_progress": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "is_structured_campaign": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    }
+  ],
+  "load_campaign_log": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    }
+  ],
+  "mark_observed": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "row_id",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objective_value",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "objective_values",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "actual_cost",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "migrate_provenance": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": "False",
+      "kind": "KEYWORD_ONLY",
+      "name": "apply",
+      "required": false
+    },
+    {
+      "default": "''",
+      "kind": "KEYWORD_ONLY",
+      "name": "reason",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_identities",
+      "required": false
+    }
+  ],
+  "model_predictive_evaluation": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "profiles",
+      "required": false
+    },
+    {
+      "default": "5",
+      "kind": "KEYWORD_ONLY",
+      "name": "folds",
+      "required": false
+    },
+    {
+      "default": "0",
+      "kind": "KEYWORD_ONLY",
+      "name": "seed",
+      "required": false
+    }
+  ],
+  "model_profile_comparison": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "profiles",
+      "required": false
+    }
+  ],
+  "model_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "metadata",
+      "required": false
+    }
+  ],
+  "pareto_front": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "pareto_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "provenance_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    }
+  ],
+  "qlog_nei_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "recover_provenance": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "replicate_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "review_suggestion": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "log_path",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "row_id",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "decision",
+      "required": true
+    },
+    {
+      "default": "''",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "note",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "KEYWORD_ONLY",
+      "name": "expected_log_fingerprint",
+      "required": false
+    }
+  ],
+  "stage_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ],
+  "suggest_next": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "batch_size",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "stage",
+      "required": false
+    },
+    {
+      "default": "None",
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "context_values",
+      "required": false
+    }
+  ],
+  "suggestion_quality_summary": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "suggestions",
+      "required": true
+    }
+  ],
+  "validate_campaign_data": [
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "config",
+      "required": true
+    },
+    {
+      "default": null,
+      "kind": "POSITIONAL_OR_KEYWORD",
+      "name": "df",
+      "required": true
+    }
+  ]
+}

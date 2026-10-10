@@ -130,10 +130,19 @@ jobs:
             "$RUNNER_TEMP/sdist-probe/bin/bo-forge" --version)
 
           for kind in core sdist; do
+            uv pip install --python "$RUNNER_TEMP/$kind-probe/bin/python" \
+              --torch-backend cpu \
+              -c requirements/constraints-py312-linux-x86_64.txt \
+              "mypy>=1.19,<2" "pandas-stubs>=3.0,<3.1"
+            "$RUNNER_TEMP/$kind-probe/bin/python" -m pip check
             mkdir -p "$RUNNER_TEMP/${kind}-json-preview"
             cp tests/_cli_json_install_probe.py "$RUNNER_TEMP/${kind}-json-preview/json-preview.py"
             (cd "$RUNNER_TEMP/${kind}-json-preview" && PYTHONPATH= \
               SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind-probe/bin/python" json-preview.py)
+            cp tests/_typing_install_probe.py "$RUNNER_TEMP/${kind}-json-preview/typing-probe.py"
+            cp -R tests/typing_contract "$RUNNER_TEMP/${kind}-json-preview/typing_contract"
+            (cd "$RUNNER_TEMP/${kind}-json-preview" && PYTHONPATH= MYPYPATH= \
+              SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind-probe/bin/python" typing-probe.py)
           done
 
           python -m venv "$RUNNER_TEMP/app-probe"

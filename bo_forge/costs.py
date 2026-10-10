@@ -6,6 +6,7 @@ import ast
 import math
 import operator
 from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -45,7 +46,7 @@ def validate_cost_expression(
 
 def evaluate_cost(
     config: CampaignConfig,
-    values: Mapping[str, object] | Sequence[object],
+    values: Mapping[str, object] | Sequence[object] | pd.Series[Any],
 ) -> float:
     """Evaluate the configured cost expression for one user-space design."""
     if config.cost is None:

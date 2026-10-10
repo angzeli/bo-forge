@@ -3,6 +3,9 @@
 import ast
 import re
 
+import pytest
+import yaml
+
 from tests._release_readiness_support import (
     PROJECT_ROOT,
     PROJECT_VERSION,
@@ -93,6 +96,9 @@ def test_manifest_uses_expected_release_directives() -> None:
         "recursive-include tests *.py",
         "include tests/fixtures/provenance_v1.json",
         "include tests/fixtures/cli_parser_v341.json",
+        "include tests/fixtures/public_calls_v342.json",
+        "include tests/typing_contract/mypy.ini",
+        "include bo_forge/py.typed",
         "recursive-include schemas *.json",
         "recursive-include tests/fixtures/cli_json *.json",
     }
@@ -273,7 +279,8 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "## v3.3.2 - Multi-Objective And Multi-Fidelity Benchmark Evidence" in changelog
     assert "## v3.3.3 - Source-Archive Notebook Execution Assurance" in changelog
     assert "## v3.3.4 - Stable Performance Evidence" in changelog
-    assert f"## v{PROJECT_VERSION} - CLI Decomposition And Compatibility Hardening" in changelog
+    assert f"## v{PROJECT_VERSION} - Supported Public Python Typing" in changelog
+    assert "## v3.4.2 - CLI Decomposition And Compatibility Hardening" in changelog
     assert "## v3.4.1 - Structured Suggestion Dry-Runs" in changelog
     assert "## v3.4.0 - Versioned CLI JSON And Inspection Contracts" in changelog
     assert "## v3.1.0 - Durable Campaign Provenance Foundation" in changelog
@@ -1109,6 +1116,67 @@ def test_app_console_entrypoint_resolves_packaged_script() -> None:
     assert app_path.name == "streamlit_app.py"
     assert app_path.is_file()
     assert app_path.parent.name == "bo_forge_app"
+
+def test_full_suite_matrix_requires_both_installed_typing_artifacts() -> None:
+    workflow = yaml.load(
+        (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader,
+    )
+    core = workflow["jobs"]["core-tests"]
+    assert {entry["python"] for entry in core["strategy"]["matrix"]["include"]} == {
+        "3.11", "3.12",
+    }
+    assert any(step.get("run") == "python -m pytest -p no:cacheprovider"
+               for step in core["steps"])
+    assert "if" not in core and "continue-on-error" not in core
+    suite = next(step for step in core["steps"] if step.get("name") == "Full pytest suite")
+    assert "if" not in suite and "continue-on-error" not in suite
+
+    tree = ast.parse((PROJECT_ROOT / "tests/test_release_artifacts.py").read_text())
+    test = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                and node.name == "test_built_distributions_install_from_outside_source_tree")
+    assert not test.decorator_list
+    calls = [node.value for node in test.body if isinstance(node, ast.Expr)
+             and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
+             and node.value.func.id == "_install_distribution_and_probe"]
+    assert {ast.unparse(keyword.value) for call in calls for keyword in call.keywords
+            if keyword.arg == "artifact"} == {"wheels[0]", "sdists[0]"}
+
+    helper_tree = ast.parse((PROJECT_ROOT / "tests/_release_readiness_support.py").read_text())
+    helper = next(node for node in helper_tree.body if isinstance(node, ast.FunctionDef)
+                  and node.name == "_install_distribution_and_probe")
+    probes = [node.value for node in helper.body if isinstance(node, ast.Expr)
+              and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute)
+              and node.value.func.attr == "run" and node.value.args
+              and isinstance(node.value.args[0], ast.List)
+              and any(isinstance(item, ast.Constant) and item.value == "typing-probe.py"
+                      for item in node.value.args[0].elts)]
+    assert len(probes) == 1
+    assert any(keyword.arg == "check" and isinstance(keyword.value, ast.Constant)
+               and keyword.value.value is True for keyword in probes[0].keywords)
+
+@pytest.mark.parametrize("filename, job, loop", [
+    ("ci.yml", "package", "for kind in wheel sdist; do"),
+    ("release-gate.yml", "validate-tag", "for kind in core sdist; do"),
+])
+def test_clean_artifact_workflows_require_installed_typing(filename, job, loop) -> None:
+    workflow = yaml.load(
+        (PROJECT_ROOT / ".github/workflows" / filename).read_text(), Loader=yaml.BaseLoader,
+    )
+    steps = [step for step in workflow["jobs"][job]["steps"]
+             if "_typing_install_probe.py" in step.get("run", "")]
+    assert len(steps) == 1
+    assert "if" not in steps[0] and "continue-on-error" not in steps[0]
+    command = steps[0]["run"]
+    loop_body = command.split(loop, maxsplit=1)[1].split("done", maxsplit=1)[0]
+    for fragment in ("cp tests/_typing_install_probe.py", "cp -R tests/typing_contract",
+                     "PYTHONPATH= MYPYPATH=", 'SOURCE_ROOT="$GITHUB_WORKSPACE"',
+                     'bin/python" typing-probe.py)'):
+        assert fragment in loop_body
+    for fragment in ('"mypy>=1.19,<2" "pandas-stubs>=3.0,<3.1"',
+                     "-c requirements/constraints-py312-linux-x86_64.txt",
+                     'find_spec("streamlit") is None', 'find_spec("fastapi") is None'):
+        assert fragment in "\n".join(step.get("run", "")
+                                     for step in workflow["jobs"][job]["steps"])
 
 def test_built_distributions_install_from_outside_source_tree(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"

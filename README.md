@@ -1,11 +1,19 @@
-# 🧪 BO Forge v3.4.2
+# 🧪 BO Forge v3.4.3
 
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
 BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
 
-v3.4.2 separates internal CLI command ownership while preserving command order,
+v3.4.3 adds [supported public Python typing](docs/PUBLIC_API.md#supported-public-python-typing)
+for the top-level exports, public configuration records, session methods,
+exceptions, and result records. Mypy is the required consumer checker; local
+wheel/sdist acceptance passed on macOS/Python 3.12. Exact-commit Python 3.11/3.12
+CI remains pending. The `py.typed`
+marker enables type discovery, not a claim that package internals are fully
+strict-typed. No runtime, BO, YAML/CSV schema, or CLI behavior changes are intended.
+
+v3.4.2 separated internal CLI command ownership while preserving command order,
 text and JSON output contracts, error handling, lazy imports, and campaign writes.
 This is CLI maintenance, not a BO feature or a broader session/API decomposition.
 

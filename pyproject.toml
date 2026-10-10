@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bo-forge"
-version = "3.4.2"
+version = "3.4.3"
 description = "Practical Bayesian optimisation campaign tooling."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -66,9 +66,11 @@ dev = [
     "ipykernel>=6.29",
     "ipywidgets>=8.1",
     "jsonschema>=4.0",
+    "mypy>=1.19,<2",
     "nbclient>=0.10",
     "nbformat>=5.10",
     "notebook>=7.0",
+    "pandas-stubs>=3.0,<3.1",
     "pytest>=8.0",
     "ruff>=0.8",
     "streamlit>=1.57",
@@ -89,6 +91,9 @@ include = [
 
 [tool.setuptools]
 include-package-data = false
+
+[tool.setuptools.package-data]
+bo_forge = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

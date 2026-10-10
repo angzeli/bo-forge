@@ -315,6 +315,10 @@ jobs:
             uv pip install --python "$RUNNER_TEMP/$kind/bin/python" \
               --torch-backend cpu \
               -c requirements/constraints-py312-linux-x86_64.txt "$artifact"
+            uv pip install --python "$RUNNER_TEMP/$kind/bin/python" \
+              --torch-backend cpu \
+              -c requirements/constraints-py312-linux-x86_64.txt \
+              "mypy>=1.19,<2" "pandas-stubs>=3.0,<3.1"
             "$RUNNER_TEMP/$kind/bin/python" -m pip check
             mkdir -p "$RUNNER_TEMP/${kind}-probe"
             (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= \
@@ -323,6 +327,10 @@ jobs:
             cp tests/_cli_json_install_probe.py "$RUNNER_TEMP/${kind}-probe/json-preview.py"
             (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= \
               SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" json-preview.py)
+            cp tests/_typing_install_probe.py "$RUNNER_TEMP/${kind}-probe/typing-probe.py"
+            cp -R tests/typing_contract "$RUNNER_TEMP/${kind}-probe/typing_contract"
+            (cd "$RUNNER_TEMP/${kind}-probe" && PYTHONPATH= MYPYPATH= \
+              SOURCE_ROOT="$GITHUB_WORKSPACE" "$RUNNER_TEMP/$kind/bin/python" typing-probe.py)
           done
       - name: Packaged core and optional entry-point smokes
         shell: bash

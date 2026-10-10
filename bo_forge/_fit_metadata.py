@@ -27,7 +27,7 @@ class FitMetadata:
         ):
             raise TypeError("FitMetadata requires immutable scalar field pairs.")
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, str | int | bool | None]:
         return dict(self.fields)
 
 

@@ -20,7 +20,7 @@ bo-forge validate --config configs/01_simple_2d_maximise_logei.yaml \
 ```
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.2","command":"validate","ok":true,"data":{"valid":true},"error":null}
+{"schema_version":1,"bo_forge_version":"3.4.3","command":"validate","ok":true,"data":{"valid":true},"error":null}
 ```
 
 Every handled JSON request emits one newline-terminated object on stdout.
@@ -30,7 +30,7 @@ and `2` for argument errors. Recognized JSON inspection requests also use the
 envelope for missing arguments, invalid profiles, and unknown options:
 
 ```json
-{"schema_version":1,"bo_forge_version":"3.4.2","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
+{"schema_version":1,"bo_forge_version":"3.4.3","command":"summary","ok":false,"data":null,"error":{"code":"argument_error","message":"the following arguments are required: --config, --log","hint":null,"details":{}}}
 ```
 
 The last valid `--format` value selects the error format; an invalid or missing

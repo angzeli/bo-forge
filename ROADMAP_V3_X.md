@@ -4,8 +4,11 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.4.2`. The v3.4.x interface line is active, with
-behavior-preserving CLI command ownership prepared for local and exact-commit validation.
+Current prepared baseline: `v3.4.3`. The v3.4.x interface line is active.
+The v3.4.2 CLI decomposition is complete; v3.4.3 public Python typing is prepared,
+with local wheel/sdist acceptance passed on macOS/Python 3.12 and exact-commit
+Python 3.11/3.12 CI pending.
+The v3.4.4 API product-boundary disposition is deferred.
 Implementation is complete for v3.3.4 and
 the v3.3.x series. Performance acceptance passed: 156/156 processes completed
 and all 13 case pairs validated. The local release gate must pass before commit;
@@ -54,7 +57,7 @@ flowchart LR
     v340["v3.4.0<br/>Read-only CLI JSON"]
     v341["v3.4.1<br/>Structured suggestion previews"]
     v342["v3.4.2<br/>CLI decomposition"]
-    v343["v3.4.3<br/>Typed-package decision"]
+    v343["v3.4.3<br/>Supported public Python typing"]
     v344["v3.4.4<br/>API boundary disposition"]
 
     v30 -.-> v300
@@ -89,8 +92,9 @@ flowchart LR
     class v334 patchDone
     class v340 patchDone
     class v341 patchDone
-    class v342 patchActive
-    class v343,v344 patchFuture
+    class v342 patchDone
+    class v343 patchActive
+    class v344 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -125,7 +129,9 @@ flowchart LR
 | `v3.3.x` | completed | Implementation complete; notebook 20/20 and performance acceptance verified, not publication approval |
 | `v3.4.0` | prepared | Schema-v1 JSON for 16 read-only CLI commands; text and BO contracts unchanged |
 | `v3.4.1` | prepared | Non-writing suggestion previews using the existing JSON envelope; append/export flags rejected before loading |
-| `v3.4.2` | prepared | CLI command ownership and compatibility hardening; external contracts unchanged |
+| `v3.4.2` | implementation complete | CLI command ownership and compatibility hardening; external contracts unchanged |
+| `v3.4.3` | prepared | Supported public Python typing; local installed acceptance passed, exact-commit Python 3.11/3.12 CI pending |
+| `v3.4.4` | deferred | API product-boundary disposition; experimental adapter limits retained |
 | `v3.4.x` | active | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
@@ -489,6 +495,8 @@ Audit mapping: second half of `UX-001`.
 
 ### v3.4.2 - CLI Decomposition And Compatibility Hardening
 
+Status: implementation complete
+
 Audit mapping: `MNT-001`.
 
 - Separate inspection/report, campaign mutation, and environment/plot command owners.
@@ -499,15 +507,33 @@ Audit mapping: `MNT-001`.
 - Leave API stage storage, session internals, and validation domains untouched.
   This completes the CLI-focused patch, not every possible decomposition.
 
-### v3.4.3 - Typed-Package Product Decision
+### v3.4.3 - Supported Public Python Typing
+
+Status: prepared; local installed typing acceptance passed, exact-commit CI pending
+
+Typed-package decision: **yes, for the documented core API**.
 
 Audit mapping: `DX-002`.
 
-- Decide whether typing is a public compatibility promise.
-- If yes, add focused type checking and `py.typed` only after the supported
-  surface passes; if no, document the boundary honestly.
+- Make typing a bounded public compatibility promise for `bo_forge.__all__`,
+  public config dataclasses, session methods, exception attributes, `FitMetadata`,
+  and `PredictiveEvaluationResult`, including equivalent compatibility imports.
+- Preserve lazy runtime imports with type-only declarations. `py.typed` enables
+  discovery; it does not certify strict typing throughout internal modules.
+- Keep DataFrames free of static column-schema claims and public `Any` limited
+  to deliberate heterogeneous metadata and plotting kwargs.
+- Require mypy using `tests/typing_contract/mypy.ini`, the `positive.py` and
+  `negative.py` consumer fixtures in that directory, and installed wheel/sdist
+  acceptance through `tests/_typing_install_probe.py` outside the checkout.
+  Use versions pinned in `requirements/constraints-*.txt` and require Python
+  3.11/3.12 CI before claiming acceptance.
+- Require corresponding fixtures for public API changes and compatibility review
+  for narrower arguments or changed return meaning. No runtime, BO, schema, or
+  CLI changes, full notebook reruns, or performance reruns belong to this patch.
 
 ### v3.4.4 - API Product-Boundary Disposition
+
+Status: deferred
 
 Audit mapping: `OPS-001`.
 
