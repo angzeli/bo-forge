@@ -97,7 +97,7 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
         "permissions:\n  contents: read",
         'python: "3.11"',
         'python: "3.12"',
-        "runs-on: macos-14",
+        "runs-on: macos-15",
         "python -m pytest -p no:cacheprovider",
         "ruff check . --no-cache",
         "Verify generated constraints",
