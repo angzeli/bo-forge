@@ -491,22 +491,23 @@ def _atomic_write_and_validate(
     config: CampaignConfig | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        newline="",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as handle:
-        temp_path = Path(handle.name)
-        df.to_csv(handle, index=False, float_format=format_csv_float)
-        handle.flush()
-        os.fsync(handle.fileno())
-
+    temp_path: Path | None = None
     backup_path: Path | None = None
     try:
+        # Preparing the candidate (including fsync) shares the cleanup boundary below.
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            df.to_csv(handle, index=False, float_format=format_csv_float)
+            handle.flush()
+            os.fsync(handle.fileno())
         temp_df = _read_csv(temp_path)
         _validate_structural_log(temp_df)
         if config is not None:

@@ -652,6 +652,25 @@ def test_rewrites_keep_shortest_exact_float_text(tmp_path: Path) -> None:
     assert written.loc[1, "x"] == drifting
 
 
+def test_fsync_failure_reports_write_error_and_removes_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log_path = tmp_path / "campaign.csv"
+    append_suggestions(log_path, suggestion("row_1"))
+    before = log_path.read_bytes()
+
+    def failing_fsync(descriptor: int) -> None:
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(logs_module.os, "fsync", failing_fsync)
+    with pytest.raises(LogWriteError, match="Input/output error"):
+        mark_observed(log_path, "row_1", 1.0)
+
+    assert log_path.read_bytes() == before
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["campaign.csv"]
+
+
 def test_mark_observed_rejects_already_observed_row(tmp_path: Path) -> None:
     log_path = tmp_path / "campaign.csv"
     append_suggestions(log_path, suggestion("row_1"))
