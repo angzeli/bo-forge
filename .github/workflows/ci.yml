@@ -61,6 +61,9 @@ jobs:
           verify requirements/constraints-py312-linux-x86_64.txt \
             --all-extras --python-version 3.12 \
             --python-platform x86_64-manylinux_2_28 --torch-backend cpu
+          verify requirements/constraints-py314-linux-x86_64.txt \
+            --all-extras --python-version 3.14 \
+            --python-platform x86_64-manylinux_2_28 --torch-backend cpu
           verify requirements/constraints-py312-macos-x86_64.txt \
             --all-extras --python-version 3.12 \
             --python-platform x86_64-apple-darwin
@@ -80,6 +83,8 @@ jobs:
             constraints: requirements/constraints-py311-linux-x86_64.txt
           - python: "3.12"
             constraints: requirements/constraints-py312-linux-x86_64.txt
+          - python: "3.14"
+            constraints: requirements/constraints-py314-linux-x86_64.txt
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -103,7 +108,7 @@ jobs:
 
   macos-filesystem:
     name: macOS filesystem and CLI
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4

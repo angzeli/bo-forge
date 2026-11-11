@@ -20,6 +20,7 @@ CONSTRAINT_FILES = (
     "constraints-py312-linux-x86_64.txt",
     "constraints-py312-macos-arm64.txt",
     "constraints-py312-macos-x86_64.txt",
+    "constraints-py314-linux-x86_64.txt",
 )
 
 
@@ -83,7 +84,7 @@ def test_generated_constraints_are_hashed_and_resolver_pinned() -> None:
         assert content.count("==") > 50
         assert content.count("--hash=sha256:") > 50
 
-    for filename in CONSTRAINT_FILES[:2]:
+    for filename in (name for name in CONSTRAINT_FILES if "-linux-" in name):
         content = (requirements_dir / filename).read_text(encoding="utf-8")
         assert "--torch-backend cpu" in content.splitlines()[1]
         assert re.search(r"(?m)^torch==[^\s]+\+cpu \\\s*$", content)
@@ -97,7 +98,8 @@ def test_required_ci_covers_supported_platforms_and_artifacts() -> None:
         "permissions:\n  contents: read",
         'python: "3.11"',
         'python: "3.12"',
-        "runs-on: macos-14",
+        'python: "3.14"',
+        "runs-on: macos-15",
         "python -m pytest -p no:cacheprovider",
         "ruff check . --no-cache",
         "Verify generated constraints",

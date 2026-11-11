@@ -252,6 +252,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "requirements/constraints-py312-linux-x86_64.txt",
         "requirements/constraints-py312-macos-arm64.txt",
         "requirements/constraints-py312-macos-x86_64.txt",
+        "requirements/constraints-py314-linux-x86_64.txt",
         "examples/quickstart.py",
         "examples/01_simple_2d_maximise_logei_campaign_log.csv",
         "examples/10_multi_objective_mixed_constrained_campaign_log.csv",

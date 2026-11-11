@@ -1123,7 +1123,7 @@ def test_full_suite_matrix_requires_both_installed_typing_artifacts() -> None:
     )
     core = workflow["jobs"]["core-tests"]
     assert {entry["python"] for entry in core["strategy"]["matrix"]["include"]} == {
-        "3.11", "3.12",
+        "3.11", "3.12", "3.14",
     }
     assert any(step.get("run") == "python -m pytest -p no:cacheprovider"
                for step in core["steps"])

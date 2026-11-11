@@ -41,12 +41,21 @@ def parser_contract():
     return contract
 
 
+def _normalize_usage_wrapping(contract):
+    """Python 3.14 argparse wraps overlong usage choices differently; the stdlib owns that."""
+    for command in contract.values():
+        if "help" in command:
+            usage, separator, rest = command["help"].partition("\n\n")
+            command["help"] = " ".join(usage.split()) + separator + rest
+    return contract
+
+
 def test_parser_options_order_and_help_match_v341(monkeypatch):
     monkeypatch.setenv("COLUMNS", "80")
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     current = parser_contract()
     assert list(current) == list(baseline)
-    assert current == baseline
+    assert _normalize_usage_wrapping(current) == _normalize_usage_wrapping(baseline)
 
 
 def test_every_command_dispatches_to_its_owner_and_lifecycle_operation():
