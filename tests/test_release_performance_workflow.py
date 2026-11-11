@@ -25,9 +25,9 @@ def test_performance_is_manual_single_host_and_bounded() -> None:
     assert job["timeout-minutes"] == "120"
     assert "strategy" not in job and "continue-on-error" not in job
     assert all("continue-on-error" not in step for step in job["steps"])
-    setup, = [s for s in job["steps"] if s.get("uses") == "actions/setup-python@v5"]
+    setup, = [s for s in job["steps"] if s.get("uses") == "actions/setup-python@v6"]
     assert setup["with"]["python-version"] == "3.12"
-    checkout, = [s for s in job["steps"] if s.get("uses") == "actions/checkout@v4"]
+    checkout, = [s for s in job["steps"] if s.get("uses") == "actions/checkout@v5"]
     assert checkout["with"]["fetch-depth"] == "0"
     for name in (
         "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
@@ -77,7 +77,7 @@ def test_performance_run_report_and_failure_upload_contract() -> None:
     assert '--output "$RUNNER_TEMP/performance-report"' in report["run"]
     assert steps.index(run) < steps.index(report)
     upload = steps[-1]
-    assert upload["uses"] == "actions/upload-artifact@v4"
+    assert upload["uses"] == "actions/upload-artifact@v6"
     assert upload["if"] == "always()"
     assert upload["with"]["retention-days"] == "14"
     assert upload["with"]["if-no-files-found"] == "warn"

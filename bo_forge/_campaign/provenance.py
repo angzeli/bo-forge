@@ -21,8 +21,10 @@ from bo_forge._campaign.provenance_environment import capture_environment
 from bo_forge._campaign.provenance_schema import (
     validate_manifest_payload,
 )
+from bo_forge._filesystem import fsync_directory
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError, LogConflictError, LogWriteError, ProvenanceError
+from bo_forge.io import format_csv_float
 from bo_forge.validation import validate_campaign_data
 
 MANIFEST_SCHEMA_VERSION = 2
@@ -288,6 +290,7 @@ def write_managed_campaign_log(
         temp_path.chmod(stat.S_IMODE(path.stat().st_mode))
         temp_path.replace(path)
         log_replaced = True
+        fsync_directory(path.parent)
         _validate_written_log(path, managed_config)
         finalized = _finalize_pending_manifest(pending_manifest)
         _write_json_atomic(manifest_file, finalized)
@@ -575,7 +578,7 @@ def _prepare_csv_temp(path: Path, df: pd.DataFrame, config: CampaignConfig) -> P
             delete=False,
         ) as handle:
             temp_path = Path(handle.name)
-            df.to_csv(handle, index=False, float_format="%.17g")
+            df.to_csv(handle, index=False, float_format=format_csv_float)
             handle.flush()
             os.fsync(handle.fileno())
         _validate_written_log(temp_path, config)
@@ -590,11 +593,9 @@ def _prepare_csv_temp(path: Path, df: pd.DataFrame, config: CampaignConfig) -> P
 
 
 def _validate_written_log(path: Path, config: CampaignConfig) -> None:
-    try:
-        df = pd.read_csv(path, keep_default_na=False)
-    except (OSError, pd.errors.ParserError) as exc:
-        raise LogWriteError(f"Could not read candidate campaign log '{path}': {exc}") from exc
-    validate_campaign_data(config, df)
+    from bo_forge.logs import _read_csv
+
+    validate_campaign_data(config, _read_csv(path))
 
 
 def _prepare_json_temp(path: Path, payload: dict[str, Any]) -> Path:
@@ -640,6 +641,7 @@ def _write_bytes_atomic(path: Path, data: bytes, *, mode: int | None = None) -> 
         if mode is not None:
             temp_path.chmod(mode)
         temp_path.replace(path)
+        fsync_directory(path.parent)
     finally:
         _remove_file(temp_path)
 

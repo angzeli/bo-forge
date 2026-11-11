@@ -31,10 +31,10 @@ jobs:
     outputs:
       notebooks: ${{ steps.schedule.outputs.notebooks }}
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ runner.temp }}/dist
@@ -83,18 +83,18 @@ jobs:
       matrix:
         notebook: ${{ fromJSON(needs.schedule.outputs.notebooks) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.source-ref }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: notebook-uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ runner.temp }}/dist
@@ -119,7 +119,7 @@ jobs:
             --output "$RUNNER_TEMP/notebook-result"
       - name: Preserve per-notebook evidence including failures
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: notebook-${{ inputs.profile }}-${{ matrix.notebook }}
           path: ${{ runner.temp }}/notebook-result/
@@ -134,14 +134,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.source-ref }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ runner.temp }}/dist
@@ -155,7 +155,7 @@ jobs:
         run: mkdir -p "$RUNNER_TEMP/notebook-evidence"
       - name: Collect all available notebook evidence
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: notebook-${{ inputs.profile }}-*.ipynb
           path: ${{ runner.temp }}/notebook-evidence
@@ -171,7 +171,7 @@ jobs:
             --output "$RUNNER_TEMP/notebook-aggregate"
       - name: Preserve aggregate including missing-job failures
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: notebook-${{ inputs.profile }}-aggregate
           path: ${{ runner.temp }}/notebook-aggregate/
