@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
+import bo_forge._filesystem as filesystem
 import bo_forge.predictive as predictive
 from bo_forge._campaign import provenance_fork
 from bo_forge._filesystem import _DirectoryPublicationUnavailable
@@ -221,3 +222,16 @@ def test_shared_publication_preserves_underlying_filesystem_error(monkeypatch, t
     with pytest.raises(OSError) as raised:
         provenance_fork._rename_directory_exclusive(tmp_path / "from", tmp_path / "to")
     assert raised.value is error
+
+
+@pytest.mark.parametrize("platform,library", [
+    # Windows: the platform check must run before ctypes tries to load a C library.
+    ("win32", Mock(side_effect=AssertionError("libc must not be loaded"))),
+    # musl or glibc before 2.28: the library loads but lacks renameat2.
+    ("linux", Mock(return_value=object())),
+])
+def test_exclusive_rename_reports_unavailable_platforms(monkeypatch, tmp_path, platform, library):
+    monkeypatch.setattr(filesystem.sys, "platform", platform)
+    monkeypatch.setattr(filesystem.ctypes, "CDLL", library)
+    with pytest.raises(_DirectoryPublicationUnavailable):
+        filesystem.rename_directory_exclusive(tmp_path / "from", tmp_path / "to")

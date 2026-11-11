@@ -170,7 +170,7 @@ def _assert_wheel_package_boundaries(wheel_path: Path) -> None:
     assert 'Requires-Dist: streamlit>=1.57; extra == "app"' in metadata
     assert 'Requires-Dist: fastapi>=0.115; extra == "api"' in metadata
     assert 'Requires-Dist: uvicorn>=0.30; extra == "api"' in metadata
-    assert "Requires-Dist: filelock<4,>=3.16" in metadata
+    assert "Requires-Dist: filelock<4,>=3.20.1" in metadata
     assert 'Requires-Dist: streamlit>=1.57\n' not in metadata
     assert 'Requires-Dist: fastapi>=0.115\n' not in metadata
 

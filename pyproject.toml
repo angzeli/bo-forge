@@ -31,7 +31,7 @@ classifiers = [
 ]
 dependencies = [
     "botorch>=0.17,<0.18",
-    "filelock>=3.16,<4",
+    "filelock>=3.20.1,<4",
     "gpytorch>=1.14",
     "matplotlib>=3.8",
     "numpy>=1.26",

@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -81,12 +81,12 @@ jobs:
           - python: "3.12"
             constraints: requirements/constraints-py312-linux-x86_64.txt
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('requirements/constraints-*.txt') }}
@@ -103,15 +103,15 @@ jobs:
 
   macos-filesystem:
     name: macOS filesystem and CLI
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-macos-*.txt') }}
@@ -157,12 +157,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
@@ -185,7 +185,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/smoke.yaml --output /tmp/bo-forge-benchmark-smoke
       - name: Preserve benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: closed-loop-benchmark-smoke
           path: /tmp/bo-forge-benchmark-smoke/
@@ -197,7 +197,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/mixed_smoke.yaml --output /tmp/bo-forge-benchmark-mixed-smoke
       - name: Preserve mixed benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mixed-benchmark-smoke
           path: /tmp/bo-forge-benchmark-mixed-smoke/
@@ -208,7 +208,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/constrained_mixed_smoke.yaml --output /tmp/bo-forge-benchmark-constrained-mixed-smoke
       - name: Preserve constrained mixed benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: constrained-mixed-benchmark-smoke
           path: /tmp/bo-forge-benchmark-constrained-mixed-smoke/
@@ -219,7 +219,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/pending_noisy_smoke.yaml --output /tmp/bo-forge-benchmark-pending-noisy-smoke
       - name: Preserve pending noisy benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pending-noisy-benchmark-smoke
           path: /tmp/bo-forge-benchmark-pending-noisy-smoke/
@@ -231,7 +231,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/multi_objective_smoke.yaml --output /tmp/bo-forge-benchmark-multi-objective-smoke
       - name: Preserve multi-objective benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: multi-objective-benchmark-smoke
           path: /tmp/bo-forge-benchmark-multi-objective-smoke/
@@ -242,7 +242,7 @@ jobs:
         run: python -m benchmarks run --spec benchmarks/specs/multi_fidelity_smoke.yaml --output /tmp/bo-forge-benchmark-multi-fidelity-smoke
       - name: Preserve multi-fidelity benchmark smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: multi-fidelity-benchmark-smoke
           path: /tmp/bo-forge-benchmark-multi-fidelity-smoke/
@@ -254,12 +254,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-${{ runner.os }}-3.12-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
@@ -273,7 +273,7 @@ jobs:
       - name: Build wheel and sdist outside the checkout
         run: python -m build --outdir "$RUNNER_TEMP/dist" --no-isolation
       - name: Retain the built notebook source archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: notebook-source
           path: ${{ runner.temp }}/dist/*.tar.gz

@@ -57,7 +57,7 @@ def test_notebook_matrix_bounds_and_failure_evidence() -> None:
     assert "continue-on-error" not in execute
     assert all("continue-on-error" not in step for step in execute["steps"])
     upload, = [step for step in execute["steps"]
-               if step.get("uses") == "actions/upload-artifact@v4"]
+               if step.get("uses") == "actions/upload-artifact@v6"]
     assert upload["if"] == "always()"
     assert upload["with"] == {
         "name": "notebook-${{ inputs.profile }}-${{ matrix.notebook }}",
@@ -73,7 +73,7 @@ def test_aggregate_cannot_skip_failed_or_missing_jobs() -> None:
     assert aggregate["if"] == "${{ always() && needs.schedule.result == 'success' }}"
     assert "continue-on-error" not in aggregate
     tolerant, = [step for step in aggregate["steps"] if "continue-on-error" in step]
-    assert tolerant["uses"] == "actions/download-artifact@v4"
+    assert tolerant["uses"] == "actions/download-artifact@v7"
     assert tolerant["continue-on-error"] == "true"
     assert tolerant["with"]["merge-multiple"] == "false"
     assert tolerant["with"]["pattern"] == "notebook-${{ inputs.profile }}-*.ipynb"
@@ -88,16 +88,16 @@ def test_aggregate_cannot_skip_failed_or_missing_jobs() -> None:
     assert "--notebook" not in command
     assert "python -m build" not in command
     upload = aggregate["steps"][-1]
-    assert upload["uses"] == "actions/upload-artifact@v4"
+    assert upload["uses"] == "actions/upload-artifact@v6"
     assert upload["if"] == "always()"
     assert upload["with"]["retention-days"] == "14"
     for name in ("execute", "aggregate"):
         steps = jobs[name]["steps"]
-        checkout, = [step for step in steps if step.get("uses") == "actions/checkout@v4"]
+        checkout, = [step for step in steps if step.get("uses") == "actions/checkout@v5"]
         assert checkout["with"]["ref"] == "${{ inputs.source-ref }}"
     for job in jobs.values():
         download, = [step for step in job["steps"]
-                     if step.get("uses") == "actions/download-artifact@v4"
+                     if step.get("uses") == "actions/download-artifact@v7"
                      and "name" in step["with"]]
         assert download["with"]["name"] == "${{ inputs.artifact-name }}"
 
@@ -151,7 +151,7 @@ def test_pr_manual_and_exact_tag_share_built_artifacts() -> None:
         assert consumer["with"]["profile"] == profile
         assert _commands(jobs[producer]).count("python -m build ") == 1
         uploads = [step["with"] for step in jobs[producer]["steps"]
-                   if step.get("uses") == "actions/upload-artifact@v4"]
+                   if step.get("uses") == "actions/upload-artifact@v6"]
         if profile == "pr" or producer == "source":
             assert consumer["with"]["artifact-name"] == "notebook-source"
             assert any(upload["name"] == "notebook-source" for upload in uploads)
