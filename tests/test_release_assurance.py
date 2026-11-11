@@ -183,7 +183,7 @@ def test_benchmark_smoke_is_explicit_and_bounded_in_numerical_ci() -> None:
         "--output /tmp/bo-forge-benchmark-smoke"
     )
     assert "standard.yaml" not in _read(".github/workflows/ci.yml")
-    uploads = [step for step in steps if step.get("uses") == "actions/upload-artifact@v4"]
+    uploads = [step for step in steps if step.get("uses") == "actions/upload-artifact@v6"]
     assert len(uploads) == 6
     assert uploads[0]["if"] == "always()"
     assert uploads[0]["with"] == {
@@ -331,7 +331,7 @@ def test_future_tag_gate_validates_without_publishing() -> None:
         '"$sdist"',
         'assert importlib.util.find_spec("streamlit") is None',
         'assert importlib.util.find_spec("fastapi") is None',
-        "actions/upload-artifact@v4",
+        "actions/upload-artifact@v6",
         "retention-days: 14",
     ):
         assert fragment in workflow

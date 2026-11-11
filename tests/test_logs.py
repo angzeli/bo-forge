@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+import stat
 import subprocess
 import sys
 import threading
@@ -631,6 +632,26 @@ def test_mark_observed_rejects_missing_row_id(tmp_path: Path) -> None:
         mark_observed(log_path, "missing", 1.0)
 
 
+def test_rewrites_keep_shortest_exact_float_text(tmp_path: Path) -> None:
+    log_path = tmp_path / "campaign.csv"
+    # 0.04097352393619469 is misread by pandas' default C float parser.
+    drifting = 0.04097352393619469
+    append_suggestions(
+        log_path,
+        pd.concat([suggestion("row_1", x=0.7), suggestion("row_2", x=drifting)]),
+    )
+    # Each mutation re-reads and rewrites every row; untouched cells must not drift.
+    mark_observed(log_path, "row_1", 1.34)
+    append_suggestions(log_path, suggestion("row_3", x=0.5))
+    append_suggestions(log_path, suggestion("row_4", x=0.5))
+
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    assert lines[1].startswith("row_1,0,observed,sobol,0.7,1.34,")
+    assert lines[2].startswith(f"row_2,0,suggested,sobol,{drifting!r},")
+    written = logs_module._read_csv(log_path)
+    assert written.loc[1, "x"] == drifting
+
+
 def test_mark_observed_rejects_already_observed_row(tmp_path: Path) -> None:
     log_path = tmp_path / "campaign.csv"
     append_suggestions(log_path, suggestion("row_1"))
@@ -795,6 +816,28 @@ def test_log_lock_directory_is_stable_across_tmpdir_environments(tmp_path: Path)
         outputs.append(completed.stdout.strip())
 
     assert outputs[0] == outputs[1]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ownership and mode checks")
+def test_log_lock_directory_must_be_private_to_the_current_user(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o777)
+    logs_module._ensure_private_lock_directory(shared)
+    assert stat.S_IMODE(shared.stat().st_mode) == 0o700
+
+    linked = tmp_path / "linked"
+    linked.symlink_to(shared, target_is_directory=True)
+    with pytest.raises(LogWriteError, match="not a directory owned by the current user"):
+        logs_module._ensure_private_lock_directory(linked)
+
+    owner = shared.stat().st_uid
+    monkeypatch.setattr(logs_module.os, "getuid", lambda: owner + 1)
+    with pytest.raises(LogWriteError, match="not a directory owned by the current user"):
+        logs_module._ensure_private_lock_directory(shared)
 
 
 def test_log_lock_releases_after_validation_and_write_failures(

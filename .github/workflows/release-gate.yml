@@ -28,15 +28,15 @@ jobs:
     outputs:
       source-ref: ${{ steps.identity.outputs.commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.RELEASE_REF }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: release-uv-${{ runner.os }}-${{ hashFiles('requirements/constraints-py312-linux-x86_64.txt') }}
@@ -168,7 +168,7 @@ jobs:
             "$RUNNER_TEMP/api-probe/bin/python" -c \
               'from pathlib import Path; import bo_forge_api; from bo_forge_api.api import create_app; assert not hasattr(bo_forge_api, "create_app"); app = create_app(root=Path(".")); assert app.title')
       - name: Retain verified artifacts for manual release preparation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bo-forge-${{ env.RELEASE_REF }}-verified
           path: ${{ runner.temp }}/dist/*

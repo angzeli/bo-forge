@@ -28,6 +28,7 @@ from bo_forge._campaign.log_schema import (
     _validate_suggestions_for_append,
     _variable_and_objective_columns,
 )
+from bo_forge._filesystem import fsync_directory
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import (
     LogBusyError,
@@ -35,7 +36,7 @@ from bo_forge.errors import (
     LogValidationError,
     LogWriteError,
 )
-from bo_forge.io import empty_campaign_log
+from bo_forge.io import empty_campaign_log, format_csv_float
 from bo_forge.validation import (
     validate_campaign_data,
 )
@@ -214,7 +215,7 @@ def _parse_actual_cost(row_id: str, actual_cost: float | None) -> str | None:
             f"actual_cost for row '{row_id}' must be finite and >= 0: "
             f"value={actual_cost!r}."
         )
-    return f"{actual_cost_float:.17g}"
+    return format_csv_float(actual_cost_float)
 
 
 def _validate_log_for_mark_observed(
@@ -287,7 +288,7 @@ def _apply_observation(
     actual_cost_text: str | None,
 ) -> None:
     for objective, objective_float in objective_values.items():
-        df.at[index, objective] = f"{objective_float:.17g}"
+        df.at[index, objective] = format_csv_float(objective_float)
     df.at[index, "status"] = "observed"
     if actual_cost_text is not None:
         df.at[index, "cost_actual"] = actual_cost_text
@@ -474,7 +475,9 @@ def _write_campaign_log(
 
 def _read_csv(path: Path) -> pd.DataFrame:
     try:
-        return pd.read_csv(path, keep_default_na=False)
+        # The default C float parser can be off by an ulp, which would make each
+        # read-modify-write cycle silently perturb untouched numeric cells.
+        return pd.read_csv(path, keep_default_na=False, float_precision="round_trip")
     except OSError as exc:
         raise LogWriteError(f"Could not read campaign log '{path}': {exc}") from exc
     except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeError) as exc:
@@ -498,7 +501,9 @@ def _atomic_write_and_validate(
         delete=False,
     ) as handle:
         temp_path = Path(handle.name)
-        df.to_csv(handle, index=False, float_format="%.17g")
+        df.to_csv(handle, index=False, float_format=format_csv_float)
+        handle.flush()
+        os.fsync(handle.fileno())
 
     backup_path: Path | None = None
     try:
@@ -510,6 +515,7 @@ def _atomic_write_and_validate(
             temp_path.chmod(stat.S_IMODE(path.stat().st_mode))
             backup_path = _copy_log_backup(path)
         temp_path.replace(path)
+        fsync_directory(path.parent)
     except (OSError, LogValidationError, LogWriteError) as exc:
         _remove_temporary_file(temp_path)
         _remove_temporary_file(backup_path)
@@ -585,11 +591,38 @@ def _log_lock_path(path: str | Path) -> Path:
     return _LOG_LOCK_DIRECTORY / f"{digest}.lock"
 
 
+def _ensure_private_lock_directory(directory: Path) -> None:
+    """Create the per-user lock directory, refusing one another account could control."""
+    try:
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = directory.lstat()
+    except OSError as exc:
+        raise LogWriteError(
+            f"Could not prepare campaign log lock directory '{directory}': {exc}"
+        ) from exc
+    if os.name == "nt":
+        return
+    # The directory has a predictable name in shared /tmp, so another account could
+    # pre-create it or plant a symlink there to hold or redirect this user's locks.
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        raise LogWriteError(
+            f"Campaign log lock directory '{directory}' is not a directory owned by the "
+            "current user; remove it and retry."
+        )
+    if stat.S_IMODE(info.st_mode) & 0o077:
+        try:
+            directory.chmod(0o700)
+        except OSError as exc:
+            raise LogWriteError(
+                f"Could not restrict campaign log lock directory '{directory}': {exc}"
+            ) from exc
+
+
 @contextmanager
 def _campaign_log_lock(path: str | Path) -> Iterator[None]:
     canonical = _canonical_log_path(path)
     lock_path = _log_lock_path(canonical)
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_private_lock_directory(lock_path.parent)
     lock = FileLock(lock_path, timeout=LOG_LOCK_TIMEOUT_SECONDS)
     try:
         lock.acquire()
