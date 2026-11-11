@@ -12,8 +12,10 @@ and release preparation.
 | `constraints-py312-linux-x86_64.txt` | CPython 3.12, Linux x86_64, CPU-only PyTorch |
 | `constraints-py312-macos-x86_64.txt` | CPython 3.12, macOS x86_64 |
 | `constraints-py312-macos-arm64.txt` | CPython 3.12, macOS Apple Silicon |
+| `constraints-py314-linux-x86_64.txt` | CPython 3.14, Linux x86_64, CPU-only PyTorch |
 
-Linux is the required full-suite matrix for both supported Python versions.
+Linux is the required full-suite matrix for every supported Python version
+(3.11, 3.12, and 3.14).
 macOS 3.12 is the economical path/locking matrix; both macOS architectures are
 resolved so maintainers and hosted runners select wheels honestly.
 

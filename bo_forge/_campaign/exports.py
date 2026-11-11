@@ -16,8 +16,17 @@ def _validate_export_destination(
     """Reject source aliases and reserved parents; match the writer's home expansion."""
     try:
         destination = Path(path).resolve()
-    except RuntimeError as exc:
+    except RuntimeError as exc:  # Python < 3.13 reports symlink loops this way.
         raise OSError(f"Could not resolve export destination '{path}': {exc}") from exc
+    # Python 3.13+ stops at a loop without raising; any link left after resolution
+    # could not be followed, and writing there would replace the link itself.
+    unresolved = next(
+        (part for part in (destination, *destination.parents) if part.is_symlink()), None,
+    )
+    if unresolved is not None:
+        raise OSError(
+            f"Could not resolve export destination '{path}': symlink loop at '{unresolved}'"
+        )
     for source, reserved_name in _campaign_source_paths(config_path, log_path):
         if any(_source_alias(part, source, reserved_name)
                for part in (destination, *destination.parents)):

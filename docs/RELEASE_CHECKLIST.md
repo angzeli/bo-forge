@@ -98,7 +98,7 @@ authorization. Implementation completion does not grant publication approval.
 
 ## 1. Prepare An Isolated Environment
 
-Use Python 3.11 or 3.12 on Linux, or Python 3.12 on macOS, and choose the
+Use Python 3.11, 3.12, or 3.14 on Linux, or Python 3.12 on macOS, and choose the
 matching generated file from `requirements/`:
 
 ```bash
@@ -353,12 +353,13 @@ Representative read-only CLI checks:
 | `Static validation` | Ruff, syntax, whitespace, generated-constraints freshness |
 | `Core tests (Python 3.11)` | Complete Linux pytest suite under Python 3.11; required v3.4.3 strict mypy consumer checks |
 | `Core tests (Python 3.12)` | Complete Linux pytest suite under Python 3.12; required v3.4.3 strict mypy consumer checks |
+| `Core tests (Python 3.14)` | Complete Linux pytest suite under Python 3.14; required v3.4.3 strict mypy consumer checks |
 | `macOS filesystem and CLI` | Path, symlink, locking, fingerprint, rollback, mode, process, and CLI checks |
 | `Bounded real numerical paths` | CPU-only real qMFKG and five-row/two-fold predictive-GP integration with a bounded job timeout |
 | `Build and external artifact probes` | PEP 517 build, Twine, package boundaries, external wheel/sdist installs, `pip check`, packaged entrypoints; fresh installed typing acceptance on Python 3.12 |
 | `PR notebook assurance` | Ten one-notebook jobs from the built sdist, retained failure evidence, and complete-profile aggregation against that same archive |
 
-The full-suite matrix runs installed typing checks on Python 3.11 and 3.12;
+The full-suite matrix runs installed typing checks on Python 3.11, 3.12, and 3.14;
 the separate fresh external-artifact job uses Python 3.12. These are required
 exact-commit gates, not a claim that CI has passed. Verify `tests/_typing_install_probe.py` uses
 `tests/typing_contract/mypy.ini` for both consumer fixtures and installed formats.
