@@ -250,7 +250,7 @@ structured campaign creation.
 Install the app extra:
 
 ```bash
-pip install "bo-forge[app]"
+pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 ```
 
 For development from a clone:

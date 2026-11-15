@@ -2,6 +2,9 @@
 
 This page shows the recommended `pip install` paths for BO Forge v3.4.3.
 
+BO Forge is not published on PyPI. Install a tagged GitHub release as shown
+below; replace `v3.4.3` with another tag to pin a different release.
+
 The optional [benchmark workflow](BENCHMARKS.md) is source-only: use a checkout
 or extracted sdist and run `python -m benchmarks --help` from its root with BO
 Forge's dependencies installed. The runtime wheel deliberately excludes
@@ -25,7 +28,7 @@ source .venv/bin/activate
 Install BO Forge:
 
 ```bash
-pip install bo-forge
+pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 ```
 
 Check the install:
@@ -46,7 +49,7 @@ If you want the local app as well, install the app extra:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install "bo-forge[app]"
+pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 ```
 
 Check the install:
@@ -85,7 +88,7 @@ If you want the optional FastAPI probe, install the API extra:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install "bo-forge[api]"
+pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 ```
 
 Check the launcher:
@@ -214,4 +217,4 @@ python -m bo_forge doctor
 
 If `pip check` reports dependency conflicts, fix those before using the environment for release validation.
 
-If `bo-forge-app` reports that Streamlit is not installed, install the app extra with `pip install "bo-forge[app]"`.
+If `bo-forge-app` reports that Streamlit is not installed, install the app extra with `pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"`.

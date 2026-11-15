@@ -242,9 +242,10 @@ def test_qlog_nehvi_assets_and_scope_doc_are_release_files() -> None:
 def test_readme_contains_current_install_commands() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "pip install bo-forge" in readme
-    assert 'pip install "bo-forge[app]"' in readme
-    assert 'pip install "bo-forge[api]"' in readme
+    assert "not published on PyPI" in readme
+    assert 'pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v' in readme
+    assert 'pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v' in readme
+    assert 'pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v' in readme
     assert "bo-forge --version" in readme
     assert "bo-forge-app" in readme
     assert "bo-forge-api" in readme
@@ -524,7 +525,7 @@ def test_api_probe_guide_exists_and_covers_safety_model() -> None:
     required_phrases = [
         "experimental",
         "not a stable public API",
-        'pip install "bo-forge[api]"',
+        'pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v',
         "bo-forge-api --root . --host 127.0.0.1 --port 8765",
         "root-bound",
         "no built-in auth",
@@ -846,9 +847,10 @@ def test_generated_constraints_replace_direct_dependency_snapshot() -> None:
 def test_installation_tutorial_covers_pip_install_paths() -> None:
     tutorial = (PROJECT_ROOT / "docs" / "INSTALLATION.md").read_text(encoding="utf-8")
 
-    assert "pip install bo-forge" in tutorial
-    assert 'pip install "bo-forge[app]"' in tutorial
-    assert 'pip install "bo-forge[api]"' in tutorial
+    assert "not published on PyPI" in tutorial
+    assert 'pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v' in tutorial
+    assert 'pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v' in tutorial
+    assert 'pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v' in tutorial
     assert "uv pip install --python" in tutorial
     assert "--no-deps --no-build-isolation -e ." in tutorial
     assert 'glob("bo_forge-*.whl")' in tutorial

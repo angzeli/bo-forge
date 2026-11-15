@@ -171,9 +171,9 @@ installs also pass `--torch-backend cpu`.
 For installed use, the stable commands are:
 
 ```bash
-pip install bo-forge
-pip install "bo-forge[app]"
-pip install "bo-forge[api]"
+pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 bo-forge --version
 bo-forge-app
 bo-forge-api --help

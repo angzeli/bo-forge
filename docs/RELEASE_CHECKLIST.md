@@ -11,7 +11,7 @@ BO, YAML/CSV schema, or CLI behavior changes. Local acceptance passed on
 macOS/Python 3.12.0 with Mypy 1.20.2 and pandas-stubs 3.0.5.260914, including
 fresh core/app/API installations and both installed typing artifacts. The
 hash-constrained typing-tool installation probe was corrected and revalidated.
-Exact-commit CI remains pending; local results do not authorize publication.
+Required Python 3.11/3.12 CI passed on the tagged v3.4.3 commit `010908f3`.
 
 - [x] Review coverage of top-level `bo_forge.__all__`, public config dataclasses,
   session methods, exception attributes, `FitMetadata`, and
@@ -37,7 +37,7 @@ Exact-commit CI remains pending; local results do not authorize publication.
   deliberate heterogeneous metadata, pandas row values, and plotting kwargs.
   Review narrowed arguments
   or changed return meaning for compatibility, with corresponding consumer fixtures.
-- [ ] Pass the typing gates in required Python 3.11/3.12 CI for the exact release
+- [x] Pass the typing gates in required Python 3.11/3.12 CI for the exact release
   commit, including both installed artifact formats. Local results do not replace CI.
 
 No full notebook or performance campaign rerun is required for this typing-only

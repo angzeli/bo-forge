@@ -9,6 +9,7 @@ CI threshold or a scientific-quality comparison.
 v3.3.x implementation is complete. The local release gate must pass before commit;
 exact-commit CI remains pending. The measured result below is archive-bound local
 evidence, not exact-commit CI or publication approval.
+Update: required CI later passed on the tagged v3.3.4 commit `363d4b0d`.
 
 Compare an sdist built from baseline commit `6c0d57db` (v3.3.3) with the v3.3.4
 candidate sdist on the same host. Build the baseline in an isolated detached Git

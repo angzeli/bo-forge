@@ -6,7 +6,7 @@ is non-mutating, and writes remain explicit and failure-atomic.
 
 ## Supported development environments
 
-Required CI covers CPython 3.11 and 3.12 on Linux. macOS 3.12 provides focused
+Required CI covers CPython 3.11, 3.12, and 3.14 on Linux. macOS 3.12 provides focused
 coverage for path, symlink, locking, stale-fingerprint, rollback, file-mode,
 and process-mutation behavior. Broad package requirements live in
 `pyproject.toml`; generated development constraints live in `requirements/`.
@@ -101,10 +101,10 @@ not proof that every internal module passes strict checking.
 
 Before claiming acceptance, run strict consumer checks through
 `tests/_typing_install_probe.py` against fresh wheel and sdist installs outside
-the checkout, with Python 3.11/3.12 CI. See the
+the checkout, with required Python CI. See the
 [release checklist](docs/RELEASE_CHECKLIST.md) for evidence requirements.
-Local v3.4.3 acceptance passed on macOS/Python 3.12; exact-commit CI remains
-pending. This typing-only patch needs no full notebook or performance campaign rerun.
+Local v3.4.3 acceptance passed on macOS/Python 3.12, and required Python
+3.11/3.12 CI passed on the tagged v3.4.3 commit. This typing-only patch needs no full notebook or performance campaign rerun.
 
 ## Documentation and releases
 
