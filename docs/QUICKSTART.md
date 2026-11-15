@@ -619,6 +619,97 @@ Prefer `CampaignSession.append_suggestions()` or `append_suggestions(..., config
 - `configs/20_contextual_cost_review_logei.yaml`: demonstrates contextual LogEI with review metadata, deterministic cost, and campaign-global budget accounting.
 - `configs/21_contextual_replicate_logei.yaml`: demonstrates contextual LogEI with review, deterministic cost, replicate-derived variance, and context-matched active repeats.
 
+## 📦 Bundled Example Walkthroughs
+
+These examples each pair a config with a seed log and, where available, a
+notebook. The README lists them in one table.
+
+The bundled multi-fidelity example is `configs/15_multi_fidelity_qmfkg.yaml`
+with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`. Inspect it
+with `campaign.fidelity_summary()`, `campaign.fidelity_coverage()`,
+`bo-forge fidelity-summary`, `bo-forge fidelity-coverage`, or the
+`fidelity-diagnostics` and `fidelity-progress` plots; the notebook walkthrough is
+`notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
+
+The ordered-discrete and batch qMFKG example is
+`configs/22_discrete_multi_fidelity_qmfkg.yaml` with seed log
+`examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`. It constrains the
+continuous fidelity variable to four numeric levels and demonstrates qMFKG
+batches through `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
+Continuous batches use joint one-shot optimization; ordered-discrete batches
+use BoTorch's conditioned greedy mixed optimization and report one joint
+post-selection acquisition value.
+qMFKG runtime grows with batch size, fidelity levels, fantasies, restarts, and
+raw samples. Optional `fidelity.optimizer_maxiter` and
+`fidelity.optimizer_timeout_seconds` settings provide a user-selected safety limit;
+the timeout covers acquisition optimization after model fitting, and BO Forge
+rejects candidates returned after the shared deadline. BoTorch
+initial-condition generation and in-flight calls cannot be cancelled
+immediately, so the command can return later than the configured limit. The
+setting is not a candidate-quality guarantee.
+
+The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
+log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
+suggestions with `CampaignSession.suggest_next(context_values={...})` or
+`bo-forge suggest --context feedstock_acidity=0.25`, inspect context
+combinations with `campaign.context_summary()` or `bo-forge context-summary`,
+and export diagnostics with `bo-forge plot --kind context-diagnostics`. The
+notebook walkthrough is `notebooks/16_contextual_logei_campaign.ipynb`.
+Streamlit can also create `Campaign kind = Contextual LogEI` configs with
+selected context variables and optional defaults.
+
+The bundled model-profile example is `configs/17_model_profile_logei.yaml` with
+seed log `examples/17_model_profile_campaign_log.csv`. Inspect profile and
+fitting inputs with `campaign.model_summary()` or `bo-forge model-summary`, and
+compare candidate profiles with `campaign.model_profile_comparison()` or
+`bo-forge model-compare`. Existing comparison columns are retained, with
+`evaluation_scope=in_sample`: these training-row metrics are not held-out
+predictive evidence. Model comparison is diagnostic only. It does not automatically select a model or change the configured profile. Export
+posterior-vs-observed diagnostics with `bo-forge plot --kind model-diagnostics`
+and profile comparison diagnostics with `bo-forge plot --kind model-comparison`.
+The notebook walkthrough is `notebooks/17_model_profile_logei_campaign.ipynb`.
+
+For held-out checks, explicitly call `campaign.model_predictive_evaluation()` or
+`bo-forge model-evaluate --config campaign.yaml --log observed.csv --profile default --profile smooth --folds 3 --seed 0 --output-dir reports/evaluation`.
+The evaluator supports standard single-objective campaigns with 5..200 observed
+rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
+Context, replicates, stages, fidelity, and multi-objective campaigns are rejected.
+Predictive variance includes observation noise in original objective units squared;
+means and standard deviations use original objective units. Nothing runs
+automatically or selects a model. The compact, fixture-free
+[predictive diagnostics notebook](../notebooks/23_predictive_diagnostics.ipynb)
+uses 20 synthetic rows in a temporary directory, `default`/`smooth`, and three folds.
+See [Predictive Evaluation](PREDICTIVE_EVALUATION.md) for a worked scientific
+explanation, result/export contracts, and adaptive-data limitations, and
+[Public API](PUBLIC_API.md) for public imports.
+
+The bundled qLogNEI example is `configs/18_noisy_pending_qlognei.yaml` with
+seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates
+accepted pending review suggestions being passed to qLogNEI as `X_pending`.
+The tutorial walkthrough is `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
+
+The bundled qLogNEHVI example is `configs/19_multi_objective_qlognehvi.yaml`
+with seed log `examples/19_multi_objective_qlognehvi_campaign_log.csv`. It
+demonstrates `bo.acquisition: qlog_nehvi` for coupled noisy multi-objective
+suggestions with accepted pending review rows passed as `X_pending`. The
+implementation scope and deferred combinations are documented in
+`docs/QLOGNEHVI_FEASIBILITY.md`.
+
+The bundled contextual cost-review example is
+`configs/20_contextual_cost_review_logei.yaml` with seed log
+`examples/20_contextual_cost_review_campaign_log.csv`. It demonstrates
+single-objective contextual LogEI with optional review, deterministic cost,
+campaign-global budget accounting across contexts, and `source=cost_log_ei`
+model-based suggestions. The tutorial walkthrough is
+`notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
+
+The contextual replicate example is
+`configs/21_contextual_replicate_logei.yaml` with seed log
+`examples/21_contextual_replicate_campaign_log.csv`. It includes two contexts,
+an observed repeated group, review metadata, and deterministic cost. Active
+`uncertain_best` repeats only target groups matching the requested context;
+the GP still trains on group means from every context.
+
 ## 🎯 Multi-Objective qLogEHVI And qLogNEHVI Campaigns
 
 BO Forge supports coupled multi-objective campaigns with `m >= 2` objectives. The primary tested range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.

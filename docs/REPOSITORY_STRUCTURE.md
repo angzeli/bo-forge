@@ -38,12 +38,10 @@ bo-forge/
 │   ├── PREDICTIVE_EVALUATION.md
 │   ├── MIGRATION_V3.md
 │   ├── RELEASE_CHECKLIST.md
-│   └── REPOSITORY_STRUCTURE.md
+│   ├── REPOSITORY_STRUCTURE.md
+│   └── roadmap/                      # Completed v0-v2 roadmaps
 ├── tests/                            # Pytest coverage for package behavior
 ├── README.md                         # Project overview and documentation links
-├── ROADMAP_V0_TO_V1.md               # Milestones through v1.0.0
-├── ROADMAP_V1_X.md                   # Completed v1.x roadmap
-├── ROADMAP_V2_X.md                   # Completed v2.x history
 ├── ROADMAP_V3_X.md                   # Active v3 baseline
 ├── CHANGELOG.md                      # Release history
 ├── CONTRIBUTING.md                   # Constrained development and contribution guide
