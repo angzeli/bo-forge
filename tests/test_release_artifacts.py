@@ -79,9 +79,6 @@ def test_manifest_uses_expected_release_directives() -> None:
         "include LICENSE",
         "include README.md",
         "include START_HERE.md",
-        "include ROADMAP_V0_TO_V1.md",
-        "include ROADMAP_V1_X.md",
-        "include ROADMAP_V2_X.md",
         "include ROADMAP_V3_X.md",
         "include SECURITY.md",
         "recursive-include configs *.yaml",
@@ -259,6 +256,7 @@ def test_readme_contains_current_install_commands() -> None:
 
 def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     streamlit_app_docs = (PROJECT_ROOT / "docs" / "STREAMLIT_APP.md").read_text(
         encoding="utf-8"
@@ -302,16 +300,16 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "qLogNEI for supported single-objective campaigns" in readme
     assert "qLogEHVI/qLogNEHVI for coupled multi-objective campaigns" in readme
     assert "notebooks/18_noisy_pending_qlognei_campaign.ipynb" in readme
-    assert "docs/QLOGNEHVI_FEASIBILITY.md" in readme
-    assert "bo.acquisition: qlog_nehvi" in readme
+    assert "docs/QLOGNEHVI_FEASIBILITY.md" in quickstart
+    assert "bo.acquisition: qlog_nehvi" in quickstart
     assert "configs/19_multi_objective_qlognehvi.yaml" in readme
     assert "cost-aware qLogNEI" in readme
     assert "configs/17_model_profile_logei.yaml" in readme
-    assert "bo-forge model-summary" in readme
-    assert "bo-forge model-compare" in readme
-    assert "bo-forge plot --kind model-diagnostics" in readme
-    assert "bo-forge plot --kind model-comparison" in readme
-    assert "does not automatically select a model" in readme
+    assert "bo-forge model-summary" in quickstart
+    assert "bo-forge model-compare" in quickstart
+    assert "bo-forge plot --kind model-diagnostics" in quickstart
+    assert "bo-forge plot --kind model-comparison" in quickstart
+    assert "does not automatically select a model" in quickstart
     assert "single-objective contextual LogEI/qLogEI" in readme
     assert "--allow-network-access" in readme
     assert "backward compatible with prior v1.x baselines" not in readme
@@ -327,8 +325,8 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "configs/22_discrete_multi_fidelity_qmfkg.yaml" in readme
     assert "examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv" in readme
     assert "notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb" in readme
-    assert "campaign-global budget accounting across contexts" in readme
-    assert "CampaignSession.suggest_next(context_values={...})" in readme
+    assert "campaign-global budget accounting across contexts" in quickstart
+    assert "CampaignSession.suggest_next(context_values={...})" in quickstart
     assert "unchanged from the v1.2.3 baseline" not in readme
     assert (
         f"BO Forge v{PROJECT_VERSION} provides a local Streamlit workbench"
@@ -339,7 +337,7 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "Fidelity Progress" in streamlit_app_docs
     assert "ordered discrete fidelity levels" in streamlit_app_docs
     assert "batch sizes from one through four" in streamlit_app_docs
-    assert "conditioned greedy mixed optimization" in readme
+    assert "conditioned greedy mixed optimization" in quickstart
     assert "conditioned greedy mixed optimization" in streamlit_app_docs
     assert "Max optimizer iterations" in streamlit_app_docs
     assert "Limit acquisition" in streamlit_app_docs
@@ -391,7 +389,6 @@ def test_botorch_minor_version_is_bounded_for_optimizer_compatibility() -> None:
     assert '"botorch>=0.17,<0.18"' in pyproject
 
 def test_v2_4_1_docs_cover_qmfkg_runtime_controls_and_lazy_startup() -> None:
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     quickstart = (PROJECT_ROOT / "docs" / "QUICKSTART.md").read_text(encoding="utf-8")
     common_errors = (PROJECT_ROOT / "docs" / "COMMON_ERRORS.md").read_text(
         encoding="utf-8"
@@ -403,7 +400,7 @@ def test_v2_4_1_docs_cover_qmfkg_runtime_controls_and_lazy_startup() -> None:
         encoding="utf-8"
     )
 
-    for content in (readme, quickstart, common_errors):
+    for content in (quickstart, common_errors):
         assert "optimizer_timeout_seconds" in content
         assert "safety limit" in content
         assert "candidate-quality guarantee" in content
@@ -481,7 +478,7 @@ def test_core_docs_link_capability_matrix() -> None:
         PROJECT_ROOT / "docs" / "PUBLIC_API.md",
         PROJECT_ROOT / "docs" / "STREAMLIT_APP.md",
         PROJECT_ROOT / "docs" / "API_PROBE.md",
-        PROJECT_ROOT / "ROADMAP_V2_X.md",
+        PROJECT_ROOT / "docs" / "roadmap" / "ROADMAP_V2_X.md",
     ]
 
     for path in docs:
@@ -601,7 +598,9 @@ def test_release_checklist_requires_clean_tracked_security_docs() -> None:
     assert "all intended files must be committed" in checklist.lower()
 
 def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> None:
-    roadmap = (PROJECT_ROOT / "ROADMAP_V1_X.md").read_text(encoding="utf-8")
+    roadmap = (PROJECT_ROOT / "docs" / "roadmap" / "ROADMAP_V1_X.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "Current baseline: `v1.5.3`" in roadmap
     assert "Explicit stage-aware backend/session/CLI suggestions" in roadmap
@@ -643,7 +642,9 @@ def test_v1_roadmap_line_is_completed_history_after_contextual_closeout() -> Non
     )
 
 def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
-    roadmap = (PROJECT_ROOT / "ROADMAP_V2_X.md").read_text(encoding="utf-8")
+    roadmap = (PROJECT_ROOT / "docs" / "roadmap" / "ROADMAP_V2_X.md").read_text(
+        encoding="utf-8"
+    )
     v3_roadmap = (PROJECT_ROOT / "ROADMAP_V3_X.md").read_text(encoding="utf-8")
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
@@ -651,7 +652,7 @@ def test_v2_roadmap_is_completed_and_v3_baseline_is_active() -> None:
     assert "Final v2 baseline: `v2.5.3`" in roadmap
     assert "ROADMAP_V3_X.md" in roadmap
     assert "coherence and controlled expansion" in roadmap
-    assert "docs/CAPABILITY_MATRIX.md" in roadmap
+    assert "../CAPABILITY_MATRIX.md" in roadmap
     assert 'v210["v2.1.0<br/>Model profiles + diagnostics"]' in roadmap
     assert 'v211["v2.1.1<br/>Summary hardening + tutorial"]' in roadmap
     assert 'v212["v2.1.2<br/>Comparison diagnostics"]' in roadmap
@@ -924,7 +925,7 @@ def test_multi_fidelity_docs_reference_example_and_qmfkg_contract() -> None:
     public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
     api_probe = (PROJECT_ROOT / "docs" / "API_PROBE.md").read_text(encoding="utf-8")
 
-    for content in (readme, cli_docs, quickstart):
+    for content in (cli_docs, quickstart):
         assert "22_discrete_multi_fidelity_qmfkg" in content
     for content in (readme, quickstart):
         assert "15_multi_fidelity_qmfkg" in content
@@ -962,7 +963,7 @@ def test_contextual_docs_reference_example_and_context_contract() -> None:
     public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
     api_probe = (PROJECT_ROOT / "docs" / "API_PROBE.md").read_text(encoding="utf-8")
 
-    for content in (readme, cli_docs, quickstart):
+    for content in (cli_docs, quickstart):
         assert "16_contextual_logei" in content
         assert "--context feedstock_acidity=0.25" in content
         assert "context-summary" in content
@@ -988,7 +989,7 @@ def test_model_profile_docs_reference_example_and_contract() -> None:
     )
     public_api = (PROJECT_ROOT / "docs" / "PUBLIC_API.md").read_text(encoding="utf-8")
 
-    for content in (readme, cli_docs, quickstart):
+    for content in (cli_docs, quickstart):
         assert "17_model_profile_logei" in content
         assert "model-summary" in content
         assert "model-compare" in content

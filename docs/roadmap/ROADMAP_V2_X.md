@@ -9,7 +9,7 @@ behavior-freeze coverage, documentation alignment, and package verification
 while preserving BO behavior, schemas, mutation semantics, launcher/API
 contracts, and supported campaign combinations.
 
-Active planning moved to [ROADMAP_V3_X.md](ROADMAP_V3_X.md) with the v3.0.0
+Active planning moved to [ROADMAP_V3_X.md](../../ROADMAP_V3_X.md) with the v3.0.0
 architecture and scientific-UX baseline.
 
 ## Roadmap So Far
@@ -81,7 +81,7 @@ Status: completed
 
 - Preserve v1 YAML, CSV, session, CLI, notebook, Streamlit, service, and
   experimental API probe behavior.
-- Add [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) as the supported
+- Add [docs/CAPABILITY_MATRIX.md](../CAPABILITY_MATRIX.md) as the supported
   and deferred combination reference.
 - Harden package and release tests for wheel/sdist boundaries.
 - Keep the FastAPI probe experimental, optional, root-bound, and unauthenticated.
@@ -120,7 +120,7 @@ Status: completed
 - `v2.2.1` adds `qlog_nei_summary`, `bo-forge qlog-nei-summary`,
   `plot --kind qlog-nei-diagnostics`, a qLogNEI tutorial notebook, and
   Streamlit workflow polish.
-- `v2.2.2` adds [docs/QLOGNEHVI_FEASIBILITY.md](docs/QLOGNEHVI_FEASIBILITY.md)
+- `v2.2.2` adds [docs/QLOGNEHVI_FEASIBILITY.md](../QLOGNEHVI_FEASIBILITY.md)
   and locks down the safe qLogNEHVI scope before public exposure.
 - `v2.2.3` implements conservative coupled multi-objective qLogNEHVI with
   `X_baseline`, `X_pending`, and review-aware pending semantics.

@@ -1,91 +1,28 @@
 # 🧪 BO Forge v3.4.3
 
+BO Forge helps you run Bayesian optimisation campaigns for real experiments.
+You describe the variables, objectives, and constraints in a YAML config and keep
+every suggestion and result in a CSV log. BO Forge fits BoTorch Gaussian-process
+models to the observed rows and suggests what to try next. The same `bo_forge`
+package drives the notebook API (`CampaignSession`), the `bo-forge` CLI, and a
+local Streamlit workbench. An experimental FastAPI probe is also included.
+
 **New here? [Start here](START_HERE.md)** to download BO Forge and open the local
 Streamlit interface, with no Git experience required.
 
-BO Forge is a practical Bayesian optimisation campaign tool with notebook, CLI, and local Streamlit workflows. The reusable BO logic lives in the `bo_forge` Python package, while notebooks, the CLI, and the app wrap that package.
+## ✨ What's New
 
-v3.4.3 adds [supported public Python typing](docs/PUBLIC_API.md#supported-public-python-typing)
+**v3.4.3** adds [supported public Python typing](https://github.com/angzeli/bo-forge/blob/main/docs/PUBLIC_API.md#supported-public-python-typing)
 for the top-level exports, public configuration records, session methods,
-exceptions, and result records. Mypy is the required consumer checker; local
-wheel/sdist acceptance passed on macOS/Python 3.12, and required Python 3.11/3.12
-CI passed on the tagged v3.4.3 commit. The `py.typed`
-marker enables type discovery, not a claim that package internals are fully
-strict-typed. No runtime, BO, YAML/CSV schema, or CLI behavior changes are intended.
+exceptions, and result records, with a `py.typed` marker. No runtime, BO,
+YAML/CSV schema, or CLI behavior changes.
 
-v3.4.2 separated internal CLI command ownership while preserving command order,
-text and JSON output contracts, error handling, lazy imports, and campaign writes.
-This is CLI maintenance, not a BO feature or a broader session/API decomposition.
+**On `main`, not yet released:** Python 3.14 support and campaign-log write
+hardening. See the [CHANGELOG](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md) for these and every earlier release.
 
-v3.4.1 added [structured suggestion previews](docs/CLI.md#structured-suggestion-previews)
-through `suggest --format json`, reusing the versioned inspection envelope.
-JSON previews never append, export, or reserve candidates; write flags are rejected
-before campaign loading. Text-mode generation, export, and explicit append remain
-unchanged. A preview is not an appendable staged bundle.
+---
 
-v3.4.0 added opt-in [versioned CLI JSON inspection](docs/CLI.md#versioned-json-inspection)
-for 16 read-only commands. Default text output, exit codes, campaign formats, and
-BO behavior are unchanged. JSON does not repair provenance or execute next-action
-advice. Local readiness and exact-commit CI remain separate publication gates.
-
-v3.3.4 records [same-host performance evidence](docs/PERFORMANCE_BENCHMARKS.md)
-against baseline commit `6c0d57db`: all 156 processes completed and all 13 case
-pairs validated. The comparison is manual-only, with advisory runtime ratios.
-Performance acceptance has passed for the recorded archives, and v3.3.x
-implementation is complete; required CI passed on the tagged v3.3.4 commit. The measured candidate predates report-validation
-and interruption-checkpoint fixes plus closeout docs. The measurement worker,
-workloads, and production code are unchanged; this is not exact-commit CI evidence.
-
-v3.3.3 added [source-archive notebook assurance](docs/NOTEBOOK_EXECUTION.md):
-a ten-notebook PR subset, all 20 notebooks in manual and exact-tag workflows,
-and archive-bound per-notebook evidence with missing-job detection. Execution
-acceptance includes a verified 20/20 full-profile baseline, bound to the archive
-recorded in the notebook guide, not to a rebuilt v3.3.4 candidate. CI/docs preparation is
-not execution or publication approval. The assurance tool is source-only and
-excluded from runtime wheels.
-
-v3.3.2 added source-only deterministic two-objective Branin-Currin (`qlog_ehvi`)
-and continuous-fidelity Augmented Branin (`qmf_kg`) benchmark routes. Hypervolume,
-actually observed target-fidelity regret, modeled cost, and scoring-only oracle
-diagnostics remain distinct. Fixed-count endpoints are not equal-cost comparisons.
-Local standard acceptance completed 30/30 trials / 600 evaluations. qMFKG made
-no new target observations after initialization in these five seeds; its worse
-observed-target quality is retained, not replaced by oracle scores. Full outcomes
-and limitations are recorded in the benchmark guide; exact-commit CI and
-publication approval remain separate gates.
-
-v3.3.1 delivered benchmark evidence-integrity and cancellation-timing fixes plus
-source-only `mixed`, `constrained_mixed`, and `pending_noisy` routes, comparing
-BO with random and Sobol baselines. Schema-v1 continuous Branin, Hartmann3,
-and Hartmann6 specs remain supported. Reports retain failures and distinguish
-noisy observations from latent objective quality and unknown timing from zero.
-See [Benchmarks](docs/BENCHMARKS.md) and the output-free
-[smoke notebook](notebooks/24_closed_loop_benchmarks.ipynb), whose default remains
-the original six-trial smoke. Local v3.3.1 acceptance completed all nine smoke
-trials; the standard retained 40 complete and five failed constrained-BO trials,
-with 1,003 of 1,080 budgeted evaluations. Historical v3.3.0 acceptance completed 90/90 trials;
-the guide preserves that evidence and its limits separately.
-That is not a general superiority claim or publication approval. No BO,
-Streamlit, or public API behavior changes are introduced by this harness.
-
-The completed v3.2.3 line covers deterministic
-known-distribution acceptance, complete/incomplete workflow checks, and bounded
-real-GP package probes. The evaluator, atomic exports, and scientific scope are
-unchanged. See the [acceptance evidence](docs/PREDICTIVE_EVALUATION.md#acceptance-evidence)
-and [reading guide](docs/PREDICTIVE_EVALUATION.md#read-a-result): diagnostic
-correctness is not universal model calibration or future BO performance.
-Implementation completion is not publication approval; exact-commit CI remains required.
-Explicit legacy adoption, schema-v2 migration,
-formatting-only config acceptance, and captured parent/child lineage retain their
-preview-and-confirm contracts. Existing campaigns remain legacy-compatible;
-schema-v1 campaigns continue without silent upgrades. See
-[Campaign Provenance](docs/PROVENANCE.md) for archive portability and lifecycle examples.
-
-Existing campaign configs, CSV logs, BO behavior, campaign CLI commands,
-notebooks, service calls, API payloads, and launcher safeguards remain
-compatible. The Streamlit workbench now organizes work into `Campaign`, `Run`,
-and `Analyze`, with native Day/Night theme state and the same explicit mutation
-and staged-suggestion safeguards.
+## ✅ What BO Forge Supports
 
 BO Forge deliberately supports only:
 
@@ -114,7 +51,12 @@ BO Forge deliberately supports only:
 - coordinated append, review, and observation writes across local processes
 - optional provenance-managed campaigns with config/log hashes and mutation lineage
 
-It intentionally does not yet cover non-default model profiles for multi-objective, multi-fidelity, or structured campaigns, contextual combinations with multi-objective, structured, multi-fidelity, or qLogNEI/qLogNEHVI, multi-objective multi-fidelity, structured multi-fidelity, cost-aware multi-fidelity, replicate-aware multi-fidelity, named fidelity sources, per-level fidelity costs, qMFKG batches above four, automatic stage transitions, cost-aware structured campaigns, cost-aware qLogNEI, cost-aware qLogNEHVI, replicate-aware qLogNEHVI, structured qLogNEI/qLogNEHVI, learned noise models, decoupled or asynchronous multi-objective evaluation, learned cost models, cost-as-objective optimization, database-backed storage, or a production multi-user web backend. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
+Some feature combinations are intentionally unsupported, for example
+non-default model profiles outside standard single-objective campaigns,
+cost-aware qLogNEI, multi-objective multi-fidelity, learned noise or cost models,
+database-backed storage, and a production multi-user web backend. See the
+[capability matrix](https://github.com/angzeli/bo-forge/blob/main/docs/CAPABILITY_MATRIX.md) for every supported,
+read-only, rejected, and deferred combination. The primary tested multi-objective range is `2 <= m <= 4`; larger objective counts are advanced usage because qLogEHVI/qLogNEHVI, non-dominated partitioning, hypervolume, and visualization become more expensive.
 
 ---
 
@@ -233,22 +175,43 @@ before using it beyond localhost.
 
 ## 🔁 Workflow
 
-Initialize a new provenance-managed campaign with:
+A campaign is a loop: ask for suggestions, run the experiments, record the
+results, and ask again. Start from one of the bundled [`configs/`](https://github.com/angzeli/bo-forge/blob/main/configs)
+and adapt it to your variables and objectives.
 
 ```bash
+# 1. Create a provenance-managed campaign log for your config
 bo-forge init-log --config configs/my_campaign.yaml --log work/campaign.csv
-bo-forge provenance --config configs/my_campaign.yaml --log work/campaign.csv
-bo-forge validate --config configs/my_campaign.yaml --log work/campaign.csv \
-  --require-provenance
+
+# 2. Check the config and log
+bo-forge validate --config configs/my_campaign.yaml --log work/campaign.csv --require-provenance
+
+# 3. Generate suggestions and record them as pending rows
+bo-forge suggest --config configs/my_campaign.yaml --log work/campaign.csv --append
+
+# 4. Run the experiment, then record its result using the printed row_id
+bo-forge mark-observed --config configs/my_campaign.yaml --log work/campaign.csv \
+  --row-id ROW_ID --objective-value 0.82
+
+# 5. Check where the campaign stands, then repeat from step 3
+bo-forge status --config configs/my_campaign.yaml --log work/campaign.csv
 ```
 
-The first command creates both the canonical CSV and
+`suggest` changes nothing unless you pass `--append`. Inspect a managed
+campaign's identity and mutation history with
+`bo-forge provenance --config configs/my_campaign.yaml --log work/campaign.csv`.
+The [CLI guide](https://github.com/angzeli/bo-forge/blob/main/docs/CLI.md) covers review decisions, costs, reports, plots,
+and JSON output.
+
+`init-log` creates both the canonical CSV and
 `work/campaign.csv.manifest.json`. Existing CSV campaigns without a manifest
 continue unchanged. Move and back up a managed CSV together with its sidecar; schema v1
 cannot distinguish a deliberately removed sidecar from a genuine legacy CSV. See
 [docs/PROVENANCE.md](https://github.com/angzeli/bo-forge/blob/main/docs/PROVENANCE.md).
 If inspection reports a recoverable interrupted transaction, run
 `bo-forge provenance-recover` with the current log fingerprint before resuming.
+Legacy adoption and schema-v2 migration are explicit preview-and-confirm
+operations.
 
 ```mermaid
 flowchart LR
@@ -266,95 +229,34 @@ flowchart LR
     K --> B
 ```
 
-The Streamlit app is intentionally a thin wrapper.
+The CLI, the Streamlit app, and the API probe are thin wrappers. BO logic lives
+in the backend package, not in notebooks, CLI commands, or app code.
 
-Future interfaces should keep wrapping this backend package rather than moving BO logic into notebooks, CLI commands, or app code.
+---
 
-The bundled multi-fidelity example is `configs/15_multi_fidelity_qmfkg.yaml`
-with seed log `examples/15_multi_fidelity_qmfkg_campaign_log.csv`. Inspect it
-with `campaign.fidelity_summary()`, `campaign.fidelity_coverage()`,
-`bo-forge fidelity-summary`, `bo-forge fidelity-coverage`, or the
-`fidelity-diagnostics` and `fidelity-progress` plots; the notebook walkthrough is
-`notebooks/15_multi_fidelity_qmfkg_campaign.ipynb`.
+## 📦 Bundled Examples
 
-The ordered-discrete and batch qMFKG example is
-`configs/22_discrete_multi_fidelity_qmfkg.yaml` with seed log
-`examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv`. It constrains the
-continuous fidelity variable to four numeric levels and demonstrates qMFKG
-batches through `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb`.
-Continuous batches use joint one-shot optimization; ordered-discrete batches
-use BoTorch's conditioned greedy mixed optimization and report one joint
-post-selection acquisition value.
-qMFKG runtime grows with batch size, fidelity levels, fantasies, restarts, and
-raw samples. Optional `fidelity.optimizer_maxiter` and
-`fidelity.optimizer_timeout_seconds` settings provide a user-selected safety limit;
-the timeout covers acquisition optimization after model fitting, and BO Forge
-rejects candidates returned after the shared deadline. BoTorch
-initial-condition generation and in-flight calls cannot be cancelled
-immediately, so the command can return later than the configured limit. The
-setting is not a candidate-quality guarantee.
+Each example pairs a config with a seed log, and most have a notebook walkthrough.
+The [Quickstart](https://github.com/angzeli/bo-forge/blob/main/docs/QUICKSTART.md#-bundled-example-walkthroughs) explains
+what each one demonstrates and how to inspect it.
 
-The bundled contextual example is `configs/16_contextual_logei.yaml` with seed
-log `examples/16_contextual_logei_campaign_log.csv`. Generate contextual
-suggestions with `CampaignSession.suggest_next(context_values={...})` or
-`bo-forge suggest --context feedstock_acidity=0.25`, inspect context
-combinations with `campaign.context_summary()` or `bo-forge context-summary`,
-and export diagnostics with `bo-forge plot --kind context-diagnostics`. The
-notebook walkthrough is `notebooks/16_contextual_logei_campaign.ipynb`.
-Streamlit can also create `Campaign kind = Contextual LogEI` configs with
-selected context variables and optional defaults.
+| Feature | Config | Seed log | Notebook |
+| --- | --- | --- | --- |
+| Continuous-fidelity qMFKG | `configs/15_multi_fidelity_qmfkg.yaml` | `examples/15_multi_fidelity_qmfkg_campaign_log.csv` | `notebooks/15_multi_fidelity_qmfkg_campaign.ipynb` |
+| Ordered-discrete and batch qMFKG | `configs/22_discrete_multi_fidelity_qmfkg.yaml` | `examples/22_discrete_multi_fidelity_qmfkg_campaign_log.csv` | `notebooks/22_discrete_multi_fidelity_qmfkg_campaign.ipynb` |
+| Contextual LogEI | `configs/16_contextual_logei.yaml` | `examples/16_contextual_logei_campaign_log.csv` | `notebooks/16_contextual_logei_campaign.ipynb` |
+| Contextual LogEI with review and cost | `configs/20_contextual_cost_review_logei.yaml` | `examples/20_contextual_cost_review_campaign_log.csv` | `notebooks/20_contextual_cost_review_logei_campaign.ipynb` |
+| Contextual LogEI with replicates | `configs/21_contextual_replicate_logei.yaml` | `examples/21_contextual_replicate_campaign_log.csv` | — |
+| Model profiles and diagnostics | `configs/17_model_profile_logei.yaml` | `examples/17_model_profile_campaign_log.csv` | `notebooks/17_model_profile_logei_campaign.ipynb` |
+| Held-out predictive evaluation | — | synthetic, generated in the notebook | `notebooks/23_predictive_diagnostics.ipynb` |
+| qLogNEI with pending suggestions | `configs/18_noisy_pending_qlognei.yaml` | `examples/18_noisy_pending_qlognei_campaign_log.csv` | `notebooks/18_noisy_pending_qlognei_campaign.ipynb` |
+| Noisy multi-objective qLogNEHVI | `configs/19_multi_objective_qlognehvi.yaml` | `examples/19_multi_objective_qlognehvi_campaign_log.csv` | — |
+| Closed-loop benchmark smoke | — | — | `notebooks/24_closed_loop_benchmarks.ipynb` |
 
-The bundled model-profile example is `configs/17_model_profile_logei.yaml` with
-seed log `examples/17_model_profile_campaign_log.csv`. Inspect profile and
-fitting inputs with `campaign.model_summary()` or `bo-forge model-summary`, and
-compare candidate profiles with `campaign.model_profile_comparison()` or
-`bo-forge model-compare`. Existing comparison columns are retained, with
-`evaluation_scope=in_sample`: these training-row metrics are not held-out
-predictive evidence. Model comparison is diagnostic only. It does not automatically select a model or change the configured profile. Export
-posterior-vs-observed diagnostics with `bo-forge plot --kind model-diagnostics`
-and profile comparison diagnostics with `bo-forge plot --kind model-comparison`.
-The notebook walkthrough is `notebooks/17_model_profile_logei_campaign.ipynb`.
-
-For held-out checks, explicitly call `campaign.model_predictive_evaluation()` or
-`bo-forge model-evaluate --config campaign.yaml --log observed.csv --profile default --profile smooth --folds 3 --seed 0 --output-dir reports/evaluation`.
-The evaluator supports standard single-objective campaigns with 5..200 observed
-rows, 2..5 folds, at least two training rows per fold, and no duplicate designs.
-Context, replicates, stages, fidelity, and multi-objective campaigns are rejected.
-Predictive variance includes observation noise in original objective units squared;
-means and standard deviations use original objective units. Nothing runs
-automatically or selects a model. The compact, fixture-free
-[predictive diagnostics notebook](notebooks/23_predictive_diagnostics.ipynb)
-uses 20 synthetic rows in a temporary directory, `default`/`smooth`, and three folds.
-See [Predictive Evaluation](docs/PREDICTIVE_EVALUATION.md) for a worked scientific
-explanation, result/export contracts, and adaptive-data limitations, and
-[Public API](docs/PUBLIC_API.md) for public imports.
-
-The bundled qLogNEI example is `configs/18_noisy_pending_qlognei.yaml` with
-seed log `examples/18_noisy_pending_qlognei_campaign_log.csv`. It demonstrates
-accepted pending review suggestions being passed to qLogNEI as `X_pending`.
-The tutorial walkthrough is `notebooks/18_noisy_pending_qlognei_campaign.ipynb`.
-
-The bundled qLogNEHVI example is `configs/19_multi_objective_qlognehvi.yaml`
-with seed log `examples/19_multi_objective_qlognehvi_campaign_log.csv`. It
-demonstrates `bo.acquisition: qlog_nehvi` for coupled noisy multi-objective
-suggestions with accepted pending review rows passed as `X_pending`. The
-implementation scope and deferred combinations are documented in
-`docs/QLOGNEHVI_FEASIBILITY.md`.
-
-The bundled contextual cost-review example is
-`configs/20_contextual_cost_review_logei.yaml` with seed log
-`examples/20_contextual_cost_review_campaign_log.csv`. It demonstrates
-single-objective contextual LogEI with optional review, deterministic cost,
-campaign-global budget accounting across contexts, and `source=cost_log_ei`
-model-based suggestions. The tutorial walkthrough is
-`notebooks/20_contextual_cost_review_logei_campaign.ipynb`.
-
-The contextual replicate example is
-`configs/21_contextual_replicate_logei.yaml` with seed log
-`examples/21_contextual_replicate_campaign_log.csv`. It includes two contexts,
-an observed repeated group, review metadata, and deterministic cost. Active
-`uncertain_best` repeats only target groups matching the requested context;
-the GP still trains on group means from every context.
+Configs 01–14 cover the basics: maximise and minimise, mixed variables,
+constraints, cost-aware review, replicates, multi-objective qLogEHVI, and
+structured campaigns. They are listed under Example Configs in the
+[Quickstart](https://github.com/angzeli/bo-forge/blob/main/docs/QUICKSTART.md).
 
 ---
 
@@ -392,6 +294,10 @@ bo-forge/
 - [docs/CSV_SCHEMA.md](https://github.com/angzeli/bo-forge/blob/main/docs/CSV_SCHEMA.md): canonical CSV columns, allowed values, blanks, and status transitions.
 - [docs/COMMON_ERRORS.md](https://github.com/angzeli/bo-forge/blob/main/docs/COMMON_ERRORS.md): troubleshooting guide for common YAML and CSV errors.
 - [docs/PUBLIC_API.md](https://github.com/angzeli/bo-forge/blob/main/docs/PUBLIC_API.md): stable public imports supported by the `bo_forge` package.
+- [docs/PREDICTIVE_EVALUATION.md](https://github.com/angzeli/bo-forge/blob/main/docs/PREDICTIVE_EVALUATION.md): held-out model evaluation, uncertainty units, and [acceptance evidence](https://github.com/angzeli/bo-forge/blob/main/docs/PREDICTIVE_EVALUATION.md#acceptance-evidence).
+- [docs/BENCHMARKS.md](https://github.com/angzeli/bo-forge/blob/main/docs/BENCHMARKS.md): source-only closed-loop benchmark harness, specs, and recorded results.
+- [docs/NOTEBOOK_EXECUTION.md](https://github.com/angzeli/bo-forge/blob/main/docs/NOTEBOOK_EXECUTION.md): source-archive notebook execution assurance.
+- [docs/PERFORMANCE_BENCHMARKS.md](https://github.com/angzeli/bo-forge/blob/main/docs/PERFORMANCE_BENCHMARKS.md): same-host startup and suggestion timing evidence.
 - [docs/MIGRATION_V3.md](https://github.com/angzeli/bo-forge/blob/main/docs/MIGRATION_V3.md): v3 module facades, UI mapping, API isolation, and figure changes.
 - [docs/RELEASE_CHECKLIST.md](https://github.com/angzeli/bo-forge/blob/main/docs/RELEASE_CHECKLIST.md): GitHub and PyPI release checklist.
 - [docs/REPOSITORY_STRUCTURE.md](https://github.com/angzeli/bo-forge/blob/main/docs/REPOSITORY_STRUCTURE.md): detailed package layout and development workflow.
@@ -399,9 +305,9 @@ bo-forge/
 - [SECURITY.md](https://github.com/angzeli/bo-forge/blob/main/SECURITY.md): supported release and private vulnerability-reporting guidance.
 - [requirements/README.md](https://github.com/angzeli/bo-forge/blob/main/requirements/README.md): generated constraint sets and regeneration commands.
 - [CHANGELOG.md](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md): release history.
-- [ROADMAP_V0_TO_V1.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V0_TO_V1.md): completed milestones through v1.0.0.
-- [ROADMAP_V1_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V1_X.md): completed v1.x roadmap.
-- [ROADMAP_V2_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V2_X.md): completed v2.x history.
+- [ROADMAP_V0_TO_V1.md](https://github.com/angzeli/bo-forge/blob/main/docs/roadmap/ROADMAP_V0_TO_V1.md): completed milestones through v1.0.0.
+- [ROADMAP_V1_X.md](https://github.com/angzeli/bo-forge/blob/main/docs/roadmap/ROADMAP_V1_X.md): completed v1.x roadmap.
+- [ROADMAP_V2_X.md](https://github.com/angzeli/bo-forge/blob/main/docs/roadmap/ROADMAP_V2_X.md): completed v2.x history.
 - [ROADMAP_V3_X.md](https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md): active v3 baseline.
 
 ---

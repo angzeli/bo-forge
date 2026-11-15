@@ -282,7 +282,7 @@ def test_v331_release_docs_separate_route_budgets_from_acceptance() -> None:
     assert "production capability statuses below\nare unchanged" in _read(
         "docs/CAPABILITY_MATRIX.md"
     )
-    assert "40 complete and five failed" in _read("README.md")
+    assert "40 complete and five failed" in _read("CHANGELOG.md")
 
 
 def test_beginner_setup_contract_and_links() -> None:
@@ -474,7 +474,7 @@ def test_v3_roadmap_records_assurance_and_future_findings() -> None:
 
 def test_predictive_foundation_docs_preserve_scope_and_interpretation() -> None:
     for path in (
-        "README.md", "docs/PUBLIC_API.md", "docs/CLI.md",
+        "docs/QUICKSTART.md", "docs/PUBLIC_API.md", "docs/CLI.md",
         "docs/STREAMLIT_APP.md", "docs/CAPABILITY_MATRIX.md",
     ):
         content = _read(path)

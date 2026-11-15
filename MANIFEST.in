@@ -3,9 +3,6 @@ include CONTRIBUTING.md
 include LICENSE
 include README.md
 include START_HERE.md
-include ROADMAP_V0_TO_V1.md
-include ROADMAP_V1_X.md
-include ROADMAP_V2_X.md
 include ROADMAP_V3_X.md
 include SECURITY.md
 recursive-include configs *.yaml
