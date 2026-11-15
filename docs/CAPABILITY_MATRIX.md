@@ -7,8 +7,8 @@ support for a BO campaign combination does not imply evaluator support.
 
 The prepared [public Python typing contract](PUBLIC_API.md#supported-public-python-typing)
 does not expand runtime capabilities or statically validate DataFrame columns.
-Local installed typing acceptance passed on macOS/Python 3.12; exact-commit
-Python 3.11/3.12 CI remains pending.
+Local installed typing acceptance passed on macOS/Python 3.12, and required
+Python 3.11/3.12 CI passed on the tagged v3.4.3 commit.
 
 v3.4.0 added [schema-v1 CLI JSON inspection](CLI.md#versioned-json-inspection)
 for 16 read-only commands. This changes representation only: capability guards,

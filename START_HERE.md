@@ -11,7 +11,7 @@ terminal to enter commands, and a browser to display the app. A terminal is a
 window where you type a command and press Enter. Copy commands without the
 surrounding code fences; run one line at a time and wait for it to finish.
 
-Use **Python 3.12**. The repository CI targets Linux with Python 3.11/3.12 and
+Use **Python 3.12**. The repository CI targets Linux with Python 3.11/3.12/3.14 and
 macOS with Python 3.12. This beginner walkthrough is runtime-checked on macOS
 with Python 3.12; its Linux instructions are not separately runtime-verified
 here. Windows is not in the tested platform matrix; the Windows commands below

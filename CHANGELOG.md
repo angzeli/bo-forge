@@ -1,10 +1,42 @@
 # 📝 BO Forge Changelog
 
+## Unreleased
+
+### Python 3.14
+
+- Support and CI-test CPython 3.14 on Linux alongside 3.11 and 3.12, with a
+  hashed `requirements/constraints-py314-linux-x86_64.txt` (same pins as 3.12).
+  Python 3.13 is allowed by `requires-python` but not tested.
+- Reject export destinations that are symlink loops on Python 3.13+, where
+  `Path.resolve()` no longer raises; previously the export replaced the link.
+- Compare CLI help snapshots without the usage-line wrapping that changed in
+  Python 3.14 argparse.
+
+### Campaign log write hardening
+
+- Create the shared log-lock directory with mode `0o700` and refuse symlinks or
+  directories owned by another account; require `filelock>=3.20.1`.
+- Write the shortest round-trip float text and read logs with round-trip parsing,
+  so rewrites no longer churn or perturb untouched numeric cells. Existing
+  provenance hashes stay valid.
+- `fsync` the legacy writer's temporary file, and best effort the parent
+  directory after atomic renames in both write paths. A failure while preparing
+  the temporary file now removes it and raises `LogWriteError`.
+- Raise the typed unavailable error from `rename_directory_exclusive` on Windows
+  and on a libc without `renameat2`.
+
+### CI
+
+- Move GitHub Actions to their Node 24 majors and the macOS filesystem job to
+  `macos-15`.
+
+No public API, CLI, JSON, or YAML/CSV schema changes.
+
 ## v3.4.3 - Supported Public Python Typing
 
-Status: prepared; local installed typing and runtime acceptance passed on
-macOS/Python 3.12. Exact-commit Python 3.11/3.12 CI remains pending. Preparation
-is not publication approval.
+Status: released and tagged at `010908f3`; local installed typing and runtime
+acceptance passed on macOS/Python 3.12, and required Python 3.11/3.12 CI passed
+on that commit.
 
 - Define the supported typing surface as top-level `bo_forge.__all__`, public
   config dataclasses, `CampaignSession` methods, exception attributes,

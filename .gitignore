@@ -12,6 +12,7 @@ __pycache__/
 graphify-out/
 dist/
 build/
+bo_forge-*/
 examples/*_working_log.csv
 examples/*_latest_suggestions.csv
 examples/*_campaign_report.txt

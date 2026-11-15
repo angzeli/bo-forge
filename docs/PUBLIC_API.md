@@ -90,9 +90,9 @@ These names are supported imports from `bo_forge`:
 
 ### Supported Public Python Typing
 
-Status: prepared for v3.4.3; installed wheel/sdist consumer acceptance passed on
-macOS/Python 3.12.0 with Mypy 1.20.2 and pandas-stubs 3.0.5.260914. Exact-commit
-Python 3.11/3.12 CI remains pending. This contract adds no runtime, BO, YAML/CSV
+Status: released in v3.4.3; installed wheel/sdist consumer acceptance passed on
+macOS/Python 3.12.0 with Mypy 1.20.2 and pandas-stubs 3.0.5.260914, and required
+Python 3.11/3.12 CI passed on the tagged v3.4.3 commit. This contract adds no runtime, BO, YAML/CSV
 schema, or CLI behavior change.
 
 The supported static surface follows the top-level `bo_forge.__all__` list above:

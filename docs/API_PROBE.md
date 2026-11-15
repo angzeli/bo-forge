@@ -20,7 +20,7 @@ probe directly to the public internet.
 ## Install
 
 ```bash
-pip install "bo-forge[api]"
+pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
 ```
 
 From a development checkout:
