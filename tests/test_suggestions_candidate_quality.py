@@ -4,6 +4,7 @@ from tests._suggestions_support import (
     MAX_DECODE_RETRIES,
     BOConfig,
     CampaignConfig,
+    ConstraintConfig,
     ObjectiveConfig,
     SuggestionError,
     VariableConfig,
@@ -19,6 +20,9 @@ from tests._suggestions_support import (
     mixed_observed_log,
     pd,
     pytest,
+    qlog_nei_config,
+    qlog_nei_log,
+    replace,
     suggest_next,
     suggestion_quality_summary,
     suggestions_module,
@@ -147,12 +151,13 @@ def test_categorical_combination_threshold_is_enforced() -> None:
     with pytest.raises(SuggestionError, match="at most 64 categorical combinations"):
         suggest_next(cfg, df)
 
-def test_duplicate_decoded_candidates_retry_then_raise(
+def test_duplicate_decoded_candidates_retry_then_fall_back_to_valid_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cfg = mixed_config(batch_size=1, initial_design_size=3)
     df = mixed_observed_log(cfg)
-    duplicate_x = values_to_unit_cube(cfg, [(0.1, 1, 0.1, "MeCN")])
+    duplicate = (0.1, 1, 0.1, "MeCN")
+    duplicate_x = values_to_unit_cube(cfg, [duplicate])
     calls = 0
 
     def duplicate_optimizer(*args, **kwargs):
@@ -162,10 +167,92 @@ def test_duplicate_decoded_candidates_retry_then_raise(
 
     monkeypatch.setattr(suggestions_module, "optimize_log_ei", duplicate_optimizer)
 
-    with pytest.raises(SuggestionError, match=f"{MAX_DECODE_RETRIES} retries"):
-        suggest_next(cfg, df)
+    suggestions = suggest_next(cfg, df)
 
     assert calls == MAX_DECODE_RETRIES
+    assert suggestions["source"].tolist() == ["log_ei"]
+    candidate = tuple(suggestions.loc[0, name] for name in cfg.variable_names)
+    assert candidate != duplicate
+    assert not suggestion_quality_summary(cfg, df, suggestions).loc[0, "is_exact_duplicate"]
+
+
+def _budget_constrained_config(batch_size: int) -> CampaignConfig:
+    return CampaignConfig(
+        campaign_name="budget_constrained",
+        objective=ObjectiveConfig(name="score", direction="maximize"),
+        variables=(
+            VariableConfig("a", "continuous", 0.0, 1.0),
+            VariableConfig("b", "continuous", 0.0, 1.0),
+        ),
+        constraints=(ConstraintConfig(name="budget", expression="a + b <= 1.0"),),
+        bo=BOConfig(
+            batch_size=batch_size,
+            initial_design_size=4,
+            random_seed=0,
+            raw_samples=32,
+            num_restarts=2,
+            mc_samples=32,
+        ),
+    )
+
+
+def _budget_constrained_log(cfg: CampaignConfig) -> pd.DataFrame:
+    points = [(0.1, 0.1), (0.2, 0.5), (0.5, 0.2), (0.4, 0.4),
+              (0.1, 0.6), (0.6, 0.1), (0.3, 0.3), (0.45, 0.5)]
+    rows = [
+        {
+            "row_id": f"obs_{index}", "iteration": 0, "status": "observed",
+            "source": "manual", "a": a, "b": b, "score": a + b,
+            "predicted_mean": "", "predicted_std": "", "acquisition": "",
+        }
+        for index, (a, b) in enumerate(points)
+    ]
+    return pd.DataFrame(rows, columns=canonical_columns(cfg))
+
+
+@pytest.mark.parametrize(("batch_size", "source"), [(1, "log_ei"), (3, "qlog_ei")])
+def test_constraint_excluding_unconstrained_optimum_still_suggests(
+    batch_size: int, source: str,
+) -> None:
+    # The objective rises toward (1, 1), which the constraint excludes, so the
+    # unconstrained optimizer is rejected on every retry and the pool must answer.
+    cfg = _budget_constrained_config(batch_size)
+    df = _budget_constrained_log(cfg)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert len(suggestions) == batch_size
+    assert set(suggestions["source"]) == {source}
+    quality = suggestion_quality_summary(cfg, df, suggestions)
+    assert quality["is_feasible"].all()
+    assert not quality["is_exact_duplicate"].any()
+    totals = suggestions["a"].astype(float) + suggestions["b"].astype(float)
+    assert totals.max() > 0.8
+
+
+def test_qlog_nei_falls_back_to_feasible_pool_after_infeasible_optimizer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = replace(
+        qlog_nei_config(),
+        constraints=(ConstraintConfig(name="x_cap", expression="x <= 0.95"),),
+    )
+    df = qlog_nei_log(cfg)
+    infeasible_x = values_to_unit_cube(cfg, [(1.0, 500.0)])
+    calls = 0
+
+    def infeasible_optimizer(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return infeasible_x, torch.tensor(0.0, dtype=torch.double), "qlog_nei"
+
+    monkeypatch.setattr(suggestions_module, "optimize_qlog_nei", infeasible_optimizer)
+
+    suggestions = suggest_next(cfg, df)
+
+    assert calls == MAX_DECODE_RETRIES
+    assert suggestions["source"].tolist() == ["qlog_nei"]
+    assert float(suggestions.loc[0, "x"]) <= 0.95
 
 def test_near_duplicate_threshold_failure_has_clear_message() -> None:
     cfg = CampaignConfig(
