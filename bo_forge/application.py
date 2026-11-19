@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from bo_forge._campaign.exports import _validate_export_destination
+from bo_forge._campaign.exports import _publish_export_atomic, _validate_export_destination
 from bo_forge._campaign.provenance import manifest_fingerprint
 from bo_forge.config import CampaignConfig
 from bo_forge.errors import BOForgeError, LogConflictError, ProvenanceRecoveryRequired
@@ -222,11 +222,23 @@ def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[suggested].copy()
 
 
-def export_staged_suggestions_csv(suggestions: pd.DataFrame, path: str | Path) -> Path:
-    """Write staged suggestions to a standalone CSV without mutating app state."""
+def export_staged_suggestions_csv(
+    suggestions: pd.DataFrame,
+    path: str | Path,
+    *,
+    config_path: str | Path | None = None,
+    log_path: str | Path | None = None,
+) -> Path:
+    """Atomically write staged suggestions to a standalone CSV without mutating app state."""
     output_path = Path(path).expanduser()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    suggestions.copy(deep=True).to_csv(output_path, index=False)
+    staged = suggestions.copy(deep=True)
+    _publish_export_atomic(
+        output_path,
+        lambda prepared: staged.to_csv(prepared, index=False),
+        prefix=".suggestions-",
+        config_path=config_path,
+        log_path=log_path,
+    )
     return output_path
 
 
@@ -699,7 +711,12 @@ class CampaignAppService:
     def export_staged_suggestions(self, bundle: dict[str, object], path: str | Path) -> Path:
         """Export staged suggestions without mutating campaign state."""
         _validate_export_destination(Path(path).expanduser(), self.config_path, self.log_path)
-        return export_staged_suggestions_csv(staged_suggestions_from_bundle(bundle), path)
+        return export_staged_suggestions_csv(
+            staged_suggestions_from_bundle(bundle),
+            path,
+            config_path=self.config_path,
+            log_path=self.log_path,
+        )
 
     def review(
         self,

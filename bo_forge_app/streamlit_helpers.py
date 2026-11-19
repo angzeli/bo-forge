@@ -630,10 +630,16 @@ def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
 
 
 def export_staged_suggestions_csv(suggestions: pd.DataFrame, path: str | Path) -> Path:
-    """Write staged suggestions to a standalone CSV without mutating app state."""
+    """Atomically write staged suggestions to a standalone CSV without mutating app state."""
+    from bo_forge._campaign.exports import _publish_export_atomic
+
     output_path = Path(path).expanduser()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    suggestions.copy(deep=True).to_csv(output_path, index=False)
+    staged = suggestions.copy(deep=True)
+    _publish_export_atomic(
+        output_path,
+        lambda prepared: staged.to_csv(prepared, index=False),
+        prefix=".suggestions-",
+    )
     return output_path
 
 

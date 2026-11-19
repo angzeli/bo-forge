@@ -97,3 +97,69 @@ def test_successful_export_preserves_compression_modes_and_symlinks(
             assert archive.namelist() == [output.stem]
     assert all(p.read_bytes() == data for p, data in sources.items())
     assert not list(tmp_path.glob(".suggestions-*"))
+
+
+@pytest.mark.parametrize("module", ["service", "streamlit"])
+@pytest.mark.parametrize("failure", ["write", "publish"])
+def test_failed_staged_export_preserves_existing_artifact(
+    tmp_path, monkeypatch, campaign, module, failure,
+):
+    from bo_forge import application
+    from bo_forge_app import streamlit_helpers
+
+    owner = application if module == "service" else streamlit_helpers
+    export = owner.export_staged_suggestions_csv
+    _session, suggestions = campaign
+    output = tmp_path / "staged.csv"
+    output.write_bytes(b"previous complete artifact\n")
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+    def partial_write(self, path, **kwargs):
+        Path(path).write_bytes(b"row_id,status\npartial")
+        raise OSError("controlled incomplete export")
+
+    def failed_publish(self, target):
+        raise OSError("controlled publication failure")
+
+    if failure == "write":
+        monkeypatch.setattr(pd.DataFrame, "to_csv", partial_write)
+    else:
+        monkeypatch.setattr(Path, "replace", failed_publish)
+    with pytest.raises(OSError, match="controlled"):
+        export(suggestions, output)
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+
+
+@pytest.mark.parametrize("failure", ["write", "publish"])
+def test_failed_report_export_preserves_existing_report(tmp_path, monkeypatch, campaign, failure):
+    session, _suggestions = campaign
+    output = tmp_path / "report.txt"
+    output.write_text("previous complete report\n", encoding="utf-8")
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    original_write_text = Path.write_text
+
+    def partial_write(self, data, *args, **kwargs):
+        original_write_text(self, data[:5], *args, **kwargs)
+        raise OSError("controlled incomplete report")
+
+    def failed_publish(self, target):
+        raise OSError("controlled publication failure")
+
+    if failure == "write":
+        monkeypatch.setattr(Path, "write_text", partial_write)
+    else:
+        monkeypatch.setattr(Path, "replace", failed_publish)
+    with pytest.raises(OSError, match="controlled"):
+        session.export_report(output)
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+
+
+def test_report_export_replaces_atomically_and_keeps_mode(tmp_path, campaign):
+    session, _suggestions = campaign
+    output = tmp_path / "report.txt"
+    output.write_text("old\n", encoding="utf-8")
+    output.chmod(0o640)
+    assert session.export_report(output) == output
+    assert "old" not in output.read_text(encoding="utf-8")
+    assert stat.S_IMODE(output.stat().st_mode) == 0o640
+    assert not list(tmp_path.glob(".report-*"))

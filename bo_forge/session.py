@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-from bo_forge._campaign.exports import _session_plot, _validate_export_destination
+from bo_forge._campaign.exports import (
+    _publish_export_atomic,
+    _session_plot,
+    _validate_export_destination,
+)
 from bo_forge._campaign.reports import (
     _base_report_tables,
     _bo_suggestion_reason,
@@ -499,9 +503,14 @@ class CampaignSession:
         """Write a deterministic plain-text campaign report and return its path."""
         _validate_export_destination(path, self.config_path, self.log_path)
         report_path = Path(path)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
         text = _format_campaign_report(self.report())
-        report_path.write_text(text + "\n", encoding="utf-8")
+        _publish_export_atomic(
+            report_path,
+            lambda prepared: prepared.write_text(text + "\n", encoding="utf-8"),
+            prefix=".report-",
+            config_path=self.config_path,
+            log_path=self.log_path,
+        )
         return report_path
 
     def best_observation(self) -> pd.DataFrame:
