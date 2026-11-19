@@ -52,6 +52,13 @@
 - Move GitHub Actions to their Node 24 majors and the macOS filesystem job to
   `macos-15`.
 
+### Maintenance
+
+- Share one restricted expression parser, validator, and evaluator between
+  constraints and cost models (`bo_forge/_expressions.py`), replacing two copies.
+  Accepted syntax and every error message are unchanged. Parsed expressions are
+  cached, so constraints are no longer re-parsed for each row and candidate.
+
 No public API, CLI, JSON, or YAML/CSV schema changes.
 
 ## v3.4.3 - Supported Public Python Typing

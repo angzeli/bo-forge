@@ -4,33 +4,19 @@ from __future__ import annotations
 
 import ast
 import math
-import operator
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 import pandas as pd
 
-from bo_forge.config import CampaignConfig, VariableConfig
+from bo_forge._expressions import (
+    evaluate_expression,
+    normalise_variable_value,
+    parse_expression,
+    validate_expression,
+)
+from bo_forge.config import CampaignConfig
 from bo_forge.errors import ConfigError, LogValidationError
-
-_BINARY_OPERATORS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-}
-_UNARY_OPERATORS = {
-    ast.UAdd: operator.pos,
-    ast.USub: operator.neg,
-}
-_COMPARISON_OPERATORS = {
-    ast.Lt: operator.lt,
-    ast.LtE: operator.le,
-    ast.Gt: operator.gt,
-    ast.GtE: operator.ge,
-    ast.Eq: operator.eq,
-    ast.NotEq: operator.ne,
-}
 
 
 def validate_cost_expression(
@@ -39,9 +25,14 @@ def validate_cost_expression(
     variable_names: Iterable[str],
 ) -> None:
     """Validate a cost expression at config-load time."""
-    tree = _parse_expression(expression)
-    validator = _CostAstValidator(set(variable_names))
-    validator.visit(tree)
+    validate_expression(
+        _parse_expression(expression),
+        variable_names,
+        unknown_name=lambda variable: (
+            f"Cost expression references unknown variable '{variable}'."
+        ),
+        unsupported=lambda node_type: f"Cost expression uses unsupported syntax: {node_type}.",
+    )
 
 
 def evaluate_cost(
@@ -53,12 +44,12 @@ def evaluate_cost(
         raise LogValidationError("Cannot evaluate cost because config has no cost section.")
     if isinstance(values, Mapping) or _contains_variable_names(config, values):
         context = {
-            variable.name: _normalise_variable_value(variable, values[variable.name])
+            variable.name: normalise_variable_value(variable, values[variable.name])
             for variable in config.variables
         }
     else:
         context = {
-            variable.name: _normalise_variable_value(variable, value)
+            variable.name: normalise_variable_value(variable, value)
             for variable, value in zip(config.variables, values, strict=True)
         }
     result = _evaluate_cost_expression(config.cost.expression, context)
@@ -134,7 +125,7 @@ def estimated_row_cost(config: CampaignConfig, row: Mapping[str, object]) -> flo
 
 def _parse_expression(expression: str) -> ast.Expression:
     try:
-        return ast.parse(expression, mode="eval")
+        return parse_expression(expression)
     except SyntaxError as exc:
         raise ConfigError(f"Cost expression has invalid syntax: {expression!r}.") from exc
 
@@ -145,188 +136,15 @@ def _evaluate_cost_expression(
 ) -> object:
     tree = _parse_expression(expression)
     try:
-        return _evaluate_node(tree.body, context)
+        return evaluate_expression(
+            tree.body,
+            context,
+            unsupported=lambda node_type: (
+                f"Cost expression contains unsupported syntax: {node_type}."
+            ),
+        )
     except (KeyError, TypeError, ZeroDivisionError) as exc:
         raise LogValidationError(f"Cost expression could not be evaluated: {exc}.") from exc
-
-
-def _evaluate_node(node: ast.AST, context: Mapping[str, object]) -> object:
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, ast.Name):
-        return context[node.id]
-    if isinstance(node, ast.BoolOp):
-        return _evaluate_bool_operation(node, context)
-    if isinstance(node, ast.UnaryOp):
-        return _evaluate_unary_operation(node, context)
-    if isinstance(node, ast.BinOp):
-        return _evaluate_binary_operation(node, context)
-    if isinstance(node, ast.Compare):
-        return _evaluate_comparison(node, context)
-    _raise_unsupported_evaluation(node)
-
-
-def _evaluate_bool_operation(
-    node: ast.BoolOp,
-    context: Mapping[str, object],
-) -> bool:
-    if isinstance(node.op, ast.And):
-        for value in node.values:
-            if not bool(_evaluate_node(value, context)):
-                return False
-        return True
-    if isinstance(node.op, ast.Or):
-        for value in node.values:
-            if bool(_evaluate_node(value, context)):
-                return True
-        return False
-    _raise_unsupported_evaluation(node)
-
-
-def _evaluate_unary_operation(
-    node: ast.UnaryOp,
-    context: Mapping[str, object],
-) -> object:
-    operand = _evaluate_node(node.operand, context)
-    if isinstance(node.op, ast.Not):
-        return not bool(operand)
-    for operator_type, operation in _UNARY_OPERATORS.items():
-        if isinstance(node.op, operator_type):
-            return operation(operand)
-    _raise_unsupported_evaluation(node)
-
-
-def _evaluate_binary_operation(
-    node: ast.BinOp,
-    context: Mapping[str, object],
-) -> object:
-    left = _evaluate_node(node.left, context)
-    right = _evaluate_node(node.right, context)
-    for operator_type, operation in _BINARY_OPERATORS.items():
-        if isinstance(node.op, operator_type):
-            return operation(left, right)
-    _raise_unsupported_evaluation(node)
-
-
-def _evaluate_comparison(
-    node: ast.Compare,
-    context: Mapping[str, object],
-) -> bool:
-    left = _evaluate_node(node.left, context)
-    for comparison, comparator in zip(node.ops, node.comparators, strict=True):
-        right = _evaluate_node(comparator, context)
-        operation = _comparison_operation(comparison, node)
-        if not operation(left, right):
-            return False
-        left = right
-    return True
-
-
-def _comparison_operation(comparison: ast.cmpop, node: ast.AST):
-    for operator_type, operation in _COMPARISON_OPERATORS.items():
-        if isinstance(comparison, operator_type):
-            return operation
-    _raise_unsupported_evaluation(node)
-
-
-def _raise_unsupported_evaluation(node: ast.AST) -> None:
-    raise LogValidationError(
-        f"Cost expression contains unsupported syntax: {type(node).__name__}."
-    )
-
-
-class _CostAstValidator(ast.NodeVisitor):
-    def __init__(self, variable_names: set[str]) -> None:
-        self.variable_names = variable_names
-
-    def visit_Expression(self, node: ast.Expression) -> None:
-        self.visit(node.body)
-
-    def visit_Constant(self, node: ast.Constant) -> None:
-        if not isinstance(node.value, str | int | float | bool):
-            self._raise_unsupported(node)
-
-    def visit_Name(self, node: ast.Name) -> None:
-        if node.id not in self.variable_names:
-            raise ConfigError(f"Cost expression references unknown variable '{node.id}'.")
-
-    def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        if not isinstance(node.op, ast.And | ast.Or):
-            self._raise_unsupported(node)
-        for value in node.values:
-            self.visit(value)
-
-    def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
-        if not isinstance(node.op, ast.Not | ast.UAdd | ast.USub):
-            self._raise_unsupported(node)
-        self.visit(node.operand)
-
-    def visit_BinOp(self, node: ast.BinOp) -> None:
-        if not isinstance(node.op, ast.Add | ast.Sub | ast.Mult | ast.Div):
-            self._raise_unsupported(node)
-        self.visit(node.left)
-        self.visit(node.right)
-
-    def visit_Compare(self, node: ast.Compare) -> None:
-        for op in node.ops:
-            if not isinstance(op, ast.Lt | ast.LtE | ast.Gt | ast.GtE | ast.Eq | ast.NotEq):
-                self._raise_unsupported(node)
-        self.visit(node.left)
-        for comparator in node.comparators:
-            self.visit(comparator)
-
-    def generic_visit(self, node: ast.AST) -> None:
-        self._raise_unsupported(node)
-
-    def _raise_unsupported(self, node: ast.AST) -> None:
-        raise ConfigError(
-            f"Cost expression uses unsupported syntax: {type(node).__name__}."
-        )
-
-
-def _normalise_variable_value(variable: VariableConfig, value: object) -> object:
-    if variable.type == "continuous":
-        return _finite_float(variable, value)
-    if variable.type == "integer":
-        parsed = _finite_float(variable, value)
-        if parsed % 1 != 0:
-            raise LogValidationError(
-                f"Variable '{variable.name}' has non-integer value: value={value!r}."
-            )
-        return int(parsed)
-    if variable.type == "discrete":
-        parsed = _finite_float(variable, value)
-        for allowed in [float(item) for item in variable.values]:
-            if math.isclose(parsed, allowed, rel_tol=1e-12, abs_tol=1e-12):
-                return float(allowed)
-        raise LogValidationError(
-            f"Variable '{variable.name}' has value outside configured choices: "
-            f"value={value!r}."
-        )
-    if variable.type == "categorical":
-        if not isinstance(value, str) or value == "" or value.strip() != value:
-            raise LogValidationError(
-                f"Variable '{variable.name}' has blank or whitespace-padded "
-                f"categorical value: value={value!r}."
-            )
-        return value
-    raise LogValidationError(
-        f"Variable '{variable.name}' has unsupported type '{variable.type}'."
-    )
-
-
-def _finite_float(variable: VariableConfig, value: object) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError) as exc:
-        raise LogValidationError(
-            f"Variable '{variable.name}' has non-numeric value: value={value!r}."
-        ) from exc
-    if not math.isfinite(parsed):
-        raise LogValidationError(
-            f"Variable '{variable.name}' has non-finite value: value={value!r}."
-        )
-    return parsed
 
 
 def _non_negative_float(value: object, column: str) -> float:
