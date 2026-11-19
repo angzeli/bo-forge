@@ -92,6 +92,8 @@ Interactive docs can also be disabled with `--no-docs`. This removes `/docs`,
 - Multiple Uvicorn workers do not share server-managed stages.
 - Stage state and lifecycle counters are process-local and disappear on restart.
 - Same-machine locks do not coordinate separate hosts writing one shared file.
+- Locks are per operating-system account, so processes running as different
+  accounts on one machine do not coordinate writes to one shared log.
 - Capacity limits bound retained stages but are not full request rate limits.
 - Disabling docs reduces discovery surfaces but does not secure endpoints.
 

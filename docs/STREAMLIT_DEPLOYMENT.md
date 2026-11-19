@@ -84,7 +84,9 @@ another command bypasses the launcher check and does not make the listener safe.
 Use a dedicated campaign working directory and copied CSV logs. BO Forge
 serializes same-machine append, review, and observation calls, but it does not
 coordinate multi-user UI state or multi-host shared-filesystem writers. Avoid
-simultaneous writes from different hosts and external tools.
+simultaneous writes from different hosts and external tools. Locks are per
+operating-system account, so on a shared machine run every writer of a campaign
+log as the same account.
 
 See [API_SECURITY.md](API_SECURITY.md) for the equivalent experimental API
 trust boundary and the requirements that remain deferred for production use.
