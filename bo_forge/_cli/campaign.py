@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import argparse
 import math
-import stat
 import sys
 from collections.abc import Sequence
 from os.path import expanduser
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from bo_forge._campaign.exports import _validate_export_destination
+from bo_forge._campaign.exports import _publish_export_atomic, _validate_export_destination
 from bo_forge._cli.common import _add_config_log_arguments, _load_session
 from bo_forge._cli.errors import _CLIOutputError
 from bo_forge._cli.output import _print_table, emit
@@ -233,18 +231,13 @@ def _write_csv(df: pd.DataFrame, path: Path, campaign: CampaignSession) -> Path:
     try:
         output_path = Path(expanduser(path))
         _validate_export_destination(output_path, campaign.config_path, campaign.log_path)
-        destination = output_path.resolve()
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(
-            dir=destination.parent, prefix=".suggestions-", ignore_cleanup_errors=True,
-        ) as temporary:
-            # Retain the requested basename for compression inference and ZIP members.
-            prepared = Path(temporary) / output_path.name
-            df.to_csv(prepared, index=False)
-            _validate_export_destination(destination, campaign.config_path, campaign.log_path)
-            if destination.exists():
-                prepared.chmod(stat.S_IMODE(destination.stat().st_mode))
-            prepared.replace(destination)
+        _publish_export_atomic(
+            output_path,
+            lambda prepared: df.to_csv(prepared, index=False),
+            prefix=".suggestions-",
+            config_path=campaign.config_path,
+            log_path=campaign.log_path,
+        )
     except OSError as exc:
         raise _CLIOutputError(f"Could not write suggestions CSV '{path}': {exc}") from exc
     return path

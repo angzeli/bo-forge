@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Atomic artifact exports
+
+- Publish staged-suggestion CSVs from the app service and Streamlit, and campaign
+  reports from `CampaignSession.export_report()`, through a sibling temporary file
+  and an atomic replace, matching the CLI's `suggest --output`. A failed write no
+  longer truncates an earlier complete artifact; existing permission bits and
+  symlinked destinations are kept. Overwrite semantics are unchanged.
+
 ### Python 3.14
 
 - Support and CI-test CPython 3.14 on Linux alongside 3.11 and 3.12, with a

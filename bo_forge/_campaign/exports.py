@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import stat
 from collections.abc import Callable, Iterator
 from contextvars import ContextVar
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 _PLOT_SOURCES: ContextVar[tuple[Path, Path] | None] = ContextVar("plot_sources", default=None)
@@ -34,6 +36,35 @@ def _validate_export_destination(
                 f"Export destination '{path}' conflicts with campaign source '{source}'. "
                 "Choose a separate artifact output path; campaign files were not changed."
             )
+
+
+def _publish_export_atomic(
+    path: Path,
+    write: Callable[[Path], None],
+    *,
+    prefix: str,
+    config_path: str | Path | None = None,
+    log_path: str | Path | None = None,
+) -> None:
+    """Write an artifact beside its destination, then atomically replace the destination.
+
+    A failed write leaves any earlier artifact untouched. A symlinked destination keeps
+    the link and updates its target, and an existing artifact keeps its permission bits.
+    With campaign sources given, the destination is re-checked just before publication.
+    """
+    destination = path.resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(
+        dir=destination.parent, prefix=prefix, ignore_cleanup_errors=True,
+    ) as temporary:
+        # Retain the requested basename for compression inference and ZIP members.
+        prepared = Path(temporary) / path.name
+        write(prepared)
+        if config_path is not None and log_path is not None:
+            _validate_export_destination(destination, config_path, log_path)
+        if destination.exists():
+            prepared.chmod(stat.S_IMODE(destination.stat().st_mode))
+        prepared.replace(destination)
 
 
 def _source_alias(destination: Path, source: Path, reserved_name: bool) -> bool:
