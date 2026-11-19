@@ -557,7 +557,9 @@ longer than the 10-second wait limit.
 
 Fix: wait for the other write to finish and retry. Do not remove lock files or
 edit the CSV during an active write. BO Forge does not coordinate writers on
-different hosts sharing a network filesystem.
+different hosts sharing a network filesystem, or processes running as different
+operating-system accounts on one machine, because each account has its own lock
+directory.
 
 ### `Staged batch is stale`
 

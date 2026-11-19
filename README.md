@@ -48,7 +48,8 @@ BO Forge deliberately supports only:
 - an internal app service layer that delegates BO behavior to `CampaignSession`
 - an optional experimental FastAPI probe with preferred server-managed staging
   for local/trusted-network exploration
-- coordinated append, review, and observation writes across local processes
+- coordinated append, review, and observation writes across local processes run by
+  the same user account
 - optional provenance-managed campaigns with config/log hashes and mutation lineage
 
 Some feature combinations are intentionally unsupported, for example

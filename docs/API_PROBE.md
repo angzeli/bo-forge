@@ -352,7 +352,8 @@ Fingerprint checks run inside the same cross-process lock as CSV validation,
 mutation, atomic replacement, and post-write validation. Append, review, and
 observation therefore reject stale callers rather than overwriting a newer
 same-machine write. A busy lock returns `log_busy`. Locks do not coordinate
-different hosts writing the same network filesystem. If post-write validation
+different hosts writing the same network filesystem, or processes running as
+different operating-system accounts on one machine. If post-write validation
 fails, BO Forge restores the prior CSV bytes before reporting failure; if that
 rollback cannot be confirmed, the error states that campaign file state is
 uncertain.

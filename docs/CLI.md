@@ -781,7 +781,8 @@ BO Forge serializes append, review, and observation mutations with the same
 canonical-log lock used by sessions, Streamlit, and the API on one machine.
 Each CLI mutation loads a current fingerprint before writing. A conflicting or
 busy log fails clearly without overwriting newer rows; multi-host shared-file
-coordination remains unsupported.
+coordination remains unsupported. Locks are per operating-system account, so run
+every writer of a shared log as the same account.
 
 For provenance-managed campaigns, successful append, review, and observation
 mutations also update the sidecar ledger under the same lock. Read-only commands

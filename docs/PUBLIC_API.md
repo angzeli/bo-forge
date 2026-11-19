@@ -183,6 +183,12 @@ their staged payload to the exact config/log fingerprints used before
 optimization and fail if either file changes during generation. Multi-host
 shared-filesystem coordination is not supported.
 
+Locks are also per operating-system account. On macOS and Linux they live in
+`/tmp/bo-forge-<uid>-log-locks`, keyed by user ID, so processes running as
+different accounts on one machine do not exclude each other when writing the same
+log. Fingerprint checks still catch many stale writes, but they cannot close that
+race. Run every writer of a shared campaign log as the same account.
+
 Structured campaigns expose stage metadata through `StageConfig`,
 `is_structured_campaign`, `configured_stage_names`, and
 `active_variables_for_stage`. v1.3.1 supports explicit stage-aware suggestions
