@@ -525,6 +525,9 @@ Fix: change the row values or update the constraint if the campaign definition i
 ### `Could not generate enough feasible, non-duplicate suggestions`
 
 BO Forge exhausted its bounded retry loop while filtering infeasible, exact-duplicate, or near-duplicate candidates.
+The acquisition optimizer does not see constraints, so after repeated rejections
+BO Forge scores a bounded Sobol pool of feasible candidates instead. This error
+means that pool also had no candidate passing every check.
 
 Fix: check whether constraints are too restrictive, whether the feasible design space is exhausted, or whether `bo.min_normalized_distance` is too large.
 

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Constrained suggestions
+
+- Fix model-based LogEI/qLogEI and qLogNEI suggestions failing when a constraint
+  excludes the unconstrained acquisition optimum. The optimizer does not see
+  constraints, so every reseeded retry could be rejected. After the retries,
+  BO Forge now greedily selects from a bounded Sobol pool of candidates that pass
+  the constraint, duplicate, and distance checks, scoring each batch slot jointly
+  with the slots already chosen. Multi-objective qLogEHVI/qLogNEHVI use the same
+  shared fallback in place of their random-batch versions.
+- Give candidate-exhaustion errors a CLI hint about constraints and
+  `bo.min_normalized_distance` instead of the generic pending-suggestions hint.
+- Replicate campaigns whose exploration fill was previously exhausted can now
+  return a full batch instead of only the repeat rows.
+
 ### Atomic artifact exports
 
 - Publish staged-suggestion CSVs from the app service and Streamlit, and campaign

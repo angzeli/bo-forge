@@ -54,6 +54,11 @@ def _hint_for_error(exc: BOForgeError) -> str | None:
 
 
 def _suggestion_error_hint(message: str) -> str:
+    if message.startswith("Could not generate enough feasible"):
+        return (
+            "Hint: Relax restrictive constraints or bo.min_normalized_distance, or "
+            "check whether existing rows already cover the feasible design space."
+        )
     if "review_status='pending'" in message and "qLogNEI" in message:
         return (
             "Hint: qLogNEI can use accepted suggestions as X_pending, but rows "

@@ -48,22 +48,7 @@ def optimize_log_ei(
         [[0.0] * dimension, [1.0] * dimension],
         dtype=torch.double,
     )
-    best_f = train_y_model.max()
-
-    if batch_size == 1:
-        acquisition = LogExpectedImprovement(model=model, best_f=best_f)
-        source = "log_ei"
-    else:
-        sampler = SobolQMCNormalSampler(
-            sample_shape=torch.Size([config.bo.mc_samples]),
-            seed=config.bo.random_seed,
-        )
-        acquisition = qLogExpectedImprovement(
-            model=model,
-            best_f=best_f,
-            sampler=sampler,
-        )
-        source = "qlog_ei"
+    acquisition, source = build_log_ei_acquisition(config, model, train_y_model, batch_size)
 
     optimize_kwargs = {
         "acq_function": acquisition,
@@ -99,16 +84,7 @@ def optimize_qlog_nei(
         [[0.0] * dimension, [1.0] * dimension],
         dtype=torch.double,
     )
-    sampler = SobolQMCNormalSampler(
-        sample_shape=torch.Size([config.bo.mc_samples]),
-        seed=config.bo.random_seed,
-    )
-    acquisition = qLogNoisyExpectedImprovement(
-        model=model,
-        X_baseline=x_baseline,
-        X_pending=x_pending,
-        sampler=sampler,
-    )
+    acquisition = build_qlog_nei_acquisition(config, model, x_baseline, x_pending)
     optimize_kwargs = {
         "acq_function": acquisition,
         "bounds": bounds,
@@ -339,6 +315,42 @@ def _extract_qmf_kg_candidates(
     raise RuntimeError(
         "qMFKG optimizer returned an unexpected candidate count: "
         f"expected {q} or {q + num_fantasies}, actual={candidate_count}."
+    )
+
+
+def build_log_ei_acquisition(
+    config: CampaignConfig,
+    model: Model,
+    train_y_model: torch.Tensor,
+    batch_size: int,
+) -> tuple[LogExpectedImprovement | qLogExpectedImprovement, str]:
+    """Construct LogEI (q=1) or qLogEI and its source label for optimizer and fallback."""
+    best_f = train_y_model.max()
+    if batch_size == 1:
+        return LogExpectedImprovement(model=model, best_f=best_f), "log_ei"
+    sampler = SobolQMCNormalSampler(
+        sample_shape=torch.Size([config.bo.mc_samples]),
+        seed=config.bo.random_seed,
+    )
+    return qLogExpectedImprovement(model=model, best_f=best_f, sampler=sampler), "qlog_ei"
+
+
+def build_qlog_nei_acquisition(
+    config: CampaignConfig,
+    model: Model,
+    x_baseline: torch.Tensor,
+    x_pending: torch.Tensor | None = None,
+) -> qLogNoisyExpectedImprovement:
+    """Construct qLogNEI over observed baseline and optional pending inputs."""
+    sampler = SobolQMCNormalSampler(
+        sample_shape=torch.Size([config.bo.mc_samples]),
+        seed=config.bo.random_seed,
+    )
+    return qLogNoisyExpectedImprovement(
+        model=model,
+        X_baseline=x_baseline,
+        X_pending=x_pending,
+        sampler=sampler,
     )
 
 

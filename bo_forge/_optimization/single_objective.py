@@ -16,10 +16,13 @@ from bo_forge._optimization.common import (
     _candidate_rejection_message,
     _CandidateGenerationExhausted,
     _empty_row,
+    _fallback_pool_candidate_batch,
     _populate_replicate_fields,
     _populate_review_fields,
 )
 from bo_forge.acquisition import (
+    build_log_ei_acquisition,
+    build_qlog_nei_acquisition,
     optimize_log_ei,
     optimize_qlog_nei,
 )
@@ -120,10 +123,19 @@ def _suggest_model_based(
             break
 
     if user_candidates is None or acquisition_value is None or source is None:
-        raise _CandidateGenerationExhausted(
-            "Could not generate enough feasible, non-duplicate suggestions after "
-            f"{MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
-            f"Last rejection: {rejection_message}"
+        acquisition, source = build_log_ei_acquisition(
+            config, model, train_y_model, batch_size,
+        )
+        user_candidates, acquisition_value = _fallback_pool_candidate_batch(
+            config=config,
+            df=df,
+            acquisition=acquisition,
+            batch_size=batch_size,
+            fixed_features_list=fixed_features_list,
+            rejection_message=rejection_message,
+            seed_offset=155921,
+            failure_message="Could not generate enough feasible, non-duplicate suggestions",
+            error_type=_CandidateGenerationExhausted,
         )
 
     x_unit_repaired = values_to_unit_cube(config, user_candidates)
@@ -200,10 +212,20 @@ def _suggest_qlog_nei_model_based(
             break
 
     if user_candidates is None or acquisition_value is None:
-        raise _CandidateGenerationExhausted(
-            "Could not generate enough feasible, non-duplicate qLogNEI suggestions "
-            f"after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
-            f"Last rejection: {rejection_message}"
+        user_candidates, acquisition_value = _fallback_pool_candidate_batch(
+            config=config,
+            df=df,
+            acquisition=build_qlog_nei_acquisition(
+                config, model, training.train_x, x_pending,
+            ),
+            batch_size=batch_size,
+            fixed_features_list=fixed_features_list,
+            rejection_message=rejection_message,
+            seed_offset=169957,
+            failure_message=(
+                "Could not generate enough feasible, non-duplicate qLogNEI suggestions"
+            ),
+            error_type=_CandidateGenerationExhausted,
         )
 
     x_unit_repaired = values_to_unit_cube(config, user_candidates)
