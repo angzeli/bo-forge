@@ -94,8 +94,6 @@ def _render_reports(
     )
 
 
-
-
 def _render_model_comparison_action(st: Any, campaign: Any) -> None:
     if _supports_model_profile_comparison(campaign.config):
         st.markdown("Training error is not predictive quality.")

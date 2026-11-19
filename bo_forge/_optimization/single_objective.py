@@ -12,6 +12,8 @@ from torch.quasirandom import SobolEngine
 
 from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
+    MAX_CATEGORICAL_COMBINATIONS,
+    MAX_DECODE_RETRIES,
     _candidate_batch_rejection_message,
     _candidate_rejection_message,
     _CandidateGenerationExhausted,
@@ -53,26 +55,6 @@ from bo_forge.validation import (
     design_key_for_values,
     next_iteration,
 )
-
-MAX_CATEGORICAL_COMBINATIONS = 64
-MAX_DECODE_RETRIES = 8
-MAX_INITIAL_DESIGN_BATCHES = 1000
-_GENERATION_FAILURE_HINT = (
-    "The feasible design space may be exhausted, constraints may be too restrictive, "
-    "or bo.min_normalized_distance may be too large."
-)
-SUGGESTION_QUALITY_COLUMNS = [
-    "row_id",
-    "is_feasible",
-    "violated_constraints",
-    "is_exact_duplicate",
-    "duplicate_allowed_by_replicates",
-    "nearest_existing_distance",
-    "nearest_batch_distance",
-    "passes_distance_threshold",
-]
-
-
 
 
 def _suggest_model_based(

@@ -2509,6 +2509,7 @@ starlette==1.6.0 \
     --hash=sha256:a86dd39d14bb45f85a3d18525215a9ef0cfd1f192ac793220e72598c90335f0c \
     --hash=sha256:d4e3ac5e546444960c710297a3c9fc3f7ebae1b7e963f3d36173b49da535be9b
     # via
+    #   bo-forge (pyproject.toml)
     #   fastapi
     #   streamlit
 streamlit==1.62.0 \

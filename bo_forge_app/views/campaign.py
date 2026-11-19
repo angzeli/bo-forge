@@ -127,7 +127,6 @@ def _render_overview(st: Any, campaign: Any, view_data: ViewDataLike) -> None:
     )
 
 
-
 def _render_overview_feature_summaries(
     st: Any,
     campaign: Any,
@@ -269,7 +268,6 @@ def _render_data(
         st.dataframe(format_dataframe_for_display(campaign.df), width="stretch")
 
 
-
 def _render_data_feature_tables(
     st: Any,
     campaign: Any,
@@ -357,6 +355,7 @@ def _render_data_feature_tables(
             empty_kind="report_preview",
             expanded_raw=False,
         )
+
 
 def _render_campaign_state_blocks(
     st: Any,

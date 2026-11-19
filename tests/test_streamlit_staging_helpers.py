@@ -2,6 +2,7 @@
 
 from tests._streamlit_support import (
     CampaignConfig,
+    CampaignSession,
     Path,
     SimpleNamespace,
     append_disabled_reason,
@@ -754,6 +755,22 @@ def test_staged_bundle_is_appendable_for_matching_context(tmp_path: Path) -> Non
 
     assert staged_bundle_is_appendable(bundle, config_path, log_path)
     assert staged_bundle_invalidation_reason(bundle, config_path, log_path) is None
+
+def test_staged_bundle_is_appendable_for_provenance_managed_campaign(tmp_path: Path) -> None:
+    # The helper once omitted the manifest fingerprint, so every bundle staged for a
+    # managed campaign was reported stale before it could be appended.
+    config_path = tmp_path / "campaign.yaml"
+    config_path.write_bytes(
+        (Path(__file__).resolve().parents[1] / "configs/01_simple_2d_maximise_logei.yaml")
+        .read_bytes()
+    )
+    session = CampaignSession.initialize(config_path, tmp_path / "campaign.csv")
+    bundle = make_staged_suggestion_bundle(
+        session.suggest_next(), config_path, session.log_path,
+    )
+
+    assert "manifest_fingerprint" in bundle
+    assert staged_bundle_invalidation_reason(bundle, config_path, session.log_path) is None
 
 def test_staged_bundle_invalidates_for_changed_config_path(tmp_path: Path) -> None:
     config_path = tmp_path / "campaign.yaml"

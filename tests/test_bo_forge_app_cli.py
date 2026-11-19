@@ -296,7 +296,7 @@ def test_write_macos_launcher_writes_executable_command(
         ]
     )
     monkeypatch.setattr(app_cli.sys, "platform", "darwin")
-    monkeypatch.setattr(app_cli.shutil, "which", lambda name: "/opt/bin/bo-forge-app")
+    monkeypatch.setattr(app_cli.sys, "executable", "/opt/venv/bin/python")
 
     written_path = app_cli.write_macos_launcher(launcher_path, args, passthrough)
 
@@ -305,7 +305,7 @@ def test_write_macos_launcher_writes_executable_command(
     assert mode & stat.S_IXUSR
     text = launcher_path.read_text(encoding="utf-8")
     assert "cd " in text
-    assert "/opt/bin/bo-forge-app" in text
+    assert "exec /opt/venv/bin/python -m bo_forge_app --host 0.0.0.0" in text
     assert "--host 0.0.0.0" in text
     assert "--allow-network-access" in text
     assert "--port 8502" in text
@@ -350,13 +350,13 @@ def test_write_macos_launcher_rejects_non_macos(
         app_cli.write_macos_launcher(tmp_path / "BO-Forge.command", args, passthrough)
 
 
-def test_write_macos_launcher_requires_installed_command(
+def test_write_macos_launcher_requires_running_interpreter(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     args, passthrough = app_cli.parse_launcher_args([])
     monkeypatch.setattr(app_cli.sys, "platform", "darwin")
-    monkeypatch.setattr(app_cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(app_cli.sys, "executable", "")
 
     with pytest.raises(app_cli.LauncherError, match="Could not resolve"):
         app_cli.write_macos_launcher(tmp_path / "BO-Forge.command", args, passthrough)
@@ -369,7 +369,7 @@ def test_make_launcher_write_text_failure_returns_clean_error(
 ) -> None:
     launcher_path = tmp_path / "BO-Forge.command"
     monkeypatch.setattr(app_cli.sys, "platform", "darwin")
-    monkeypatch.setattr(app_cli.shutil, "which", lambda name: "/opt/bin/bo-forge-app")
+    monkeypatch.setattr(app_cli.sys, "executable", "/opt/venv/bin/python")
 
     def fail_write_text(self: Path, *args: object, **kwargs: object) -> int:
         raise OSError("disk is full")
@@ -389,7 +389,7 @@ def test_make_launcher_chmod_failure_returns_clean_error(
 ) -> None:
     launcher_path = tmp_path / "BO-Forge.command"
     monkeypatch.setattr(app_cli.sys, "platform", "darwin")
-    monkeypatch.setattr(app_cli.shutil, "which", lambda name: "/opt/bin/bo-forge-app")
+    monkeypatch.setattr(app_cli.sys, "executable", "/opt/venv/bin/python")
 
     def fail_chmod(self: Path, *args: object, **kwargs: object) -> None:
         raise OSError("permission denied")

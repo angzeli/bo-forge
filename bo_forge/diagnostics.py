@@ -32,6 +32,7 @@ __all__ = [
 _COMPATIBILITY_MODULES = (contextual, fidelity, model, multi_objective, standard, structured)
 _PATCH_TARGETS = {"model_profile_comparison": (model,)}
 
+
 class _DiagnosticsFacade(ModuleType):
     """Expose legacy implementation helpers while plots live in focused modules."""
 
@@ -45,5 +46,6 @@ class _DiagnosticsFacade(ModuleType):
         super().__setattr__(name, value)
         for module in _PATCH_TARGETS.get(name, ()):
             setattr(module, name, value)
+
 
 sys.modules[__name__].__class__ = _DiagnosticsFacade

@@ -38,6 +38,7 @@ VALID_MULTI_OBJECTIVE_SOURCES = {
 }
 VALID_REVIEW_STATUSES = {"pending", "accepted", "rejected", "deferred"}
 
+
 def canonical_columns(config: CampaignConfig) -> list[str]:
     """Return canonical CSV columns for a campaign."""
     if config.is_multi_objective:

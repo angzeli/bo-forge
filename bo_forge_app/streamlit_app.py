@@ -28,6 +28,7 @@ _PATCH_TARGETS = {
     "_current_invalidation_reason": (run, state),
 }
 
+
 class _StreamlitFacade(ModuleType):
     """Expose v2 implementation helpers while v3 uses focused UI modules."""
 
@@ -44,6 +45,7 @@ class _StreamlitFacade(ModuleType):
         )
         for module in targets:
             setattr(module, name, value)
+
 
 sys.modules[__name__].__class__ = _StreamlitFacade
 

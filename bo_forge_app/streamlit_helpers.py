@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import re
 from math import isfinite
@@ -14,12 +12,24 @@ from typing import TYPE_CHECKING
 import pandas as pd
 import yaml
 
+# Shared with the app service layer and re-exported for app views and tests.
+from bo_forge.application import (
+    available_plot_kinds,  # noqa: F401
+    context_values_fingerprint,  # noqa: F401
+    dataframe_fingerprint,  # noqa: F401
+    export_staged_suggestions_csv,  # noqa: F401
+    extract_matplotlib_figure,  # noqa: F401
+    file_fingerprint,  # noqa: F401
+    make_staged_suggestion_bundle,  # noqa: F401
+    observable_rows,
+    staged_suggestions_from_bundle,  # noqa: F401
+)
 from bo_forge.config import CampaignConfig, parse_campaign_config
 from bo_forge.errors import ConfigError
 from bo_forge.session import CampaignSession, _format_campaign_report
 
 if TYPE_CHECKING:
-    from matplotlib.figure import Figure
+    pass
 
 CONFIG_PATH_KEY = "bo_forge_config_path"
 LOG_PATH_KEY = "bo_forge_log_path"
@@ -190,72 +200,6 @@ def create_campaign_files(
             except OSError:
                 pass
         raise
-
-
-def file_fingerprint(path: str | Path) -> str:
-    """Return a SHA256 fingerprint for a file's current bytes."""
-    file_path = Path(path)
-    digest = hashlib.sha256()
-    with file_path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def dataframe_fingerprint(df: pd.DataFrame) -> str:
-    """Return a stable fingerprint for a DataFrame's display values and column order."""
-    normalized = df.copy(deep=True).reset_index(drop=True)
-    payload = normalized.to_csv(index=False, lineterminator="\n", na_rep="")
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def context_values_fingerprint(context_values: dict[str, object]) -> str:
-    """Return a stable fingerprint for staged contextual metadata."""
-    payload = json.dumps(
-        context_values,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def make_staged_suggestion_bundle(
-    suggestions: pd.DataFrame,
-    config_path: str | Path,
-    log_path: str | Path,
-    *,
-    stage: str | None = None,
-    context_values: dict[str, object] | None = None,
-    config_fingerprint: str | None = None,
-    log_fingerprint: str | None = None,
-) -> dict[str, object]:
-    """Create a staged suggestion bundle tied to the current config/log files."""
-    resolved_config_path = Path(config_path).expanduser().resolve()
-    resolved_log_path = Path(log_path).expanduser().resolve()
-    staged_suggestions = suggestions.copy(deep=True).reset_index(drop=True)
-    bundle: dict[str, object] = {
-        "suggestions": staged_suggestions,
-        "suggestions_fingerprint": dataframe_fingerprint(staged_suggestions),
-        "config_path": str(resolved_config_path),
-        "config_fingerprint": config_fingerprint
-        if config_fingerprint is not None
-        else file_fingerprint(resolved_config_path),
-        "log_path": str(resolved_log_path),
-        "log_fingerprint": log_fingerprint
-        if log_fingerprint is not None
-        else file_fingerprint(resolved_log_path),
-        "appended": False,
-    }
-    if stage is not None:
-        bundle["stage"] = stage
-    if context_values is not None:
-        staged_context_values = dict(context_values)
-        bundle["context_values"] = staged_context_values
-        bundle["context_values_fingerprint"] = context_values_fingerprint(
-            staged_context_values
-        )
-    return bundle
 
 
 def staged_bundle_invalidation_reason(
@@ -594,55 +538,6 @@ def observable_row_options(config: CampaignConfig, df: pd.DataFrame) -> dict[str
     return options
 
 
-def available_plot_kinds(config: CampaignConfig) -> list[str]:
-    """Return plot kinds supported by the current config."""
-    if config.is_multi_objective:
-        kinds = ["pareto", "hypervolume"]
-        if len(config.objectives) >= 3:
-            kinds.append("pareto_parallel")
-    else:
-        kinds = ["progress", "diagnostics"]
-        if config.fidelity is None and not config.is_structured_campaign:
-            kinds.append("model_diagnostics")
-            kinds.append("model_comparison")
-    if config.is_structured_campaign:
-        kinds.append("stage_diagnostics")
-    if config.fidelity is not None:
-        kinds.append("fidelity_diagnostics")
-        kinds.append("fidelity_progress")
-    if config.context is not None:
-        kinds.append("context_diagnostics")
-    if config.bo.acquisition == "qlog_nei":
-        kinds.append("qlog_nei_diagnostics")
-    if config.cost is not None:
-        kinds.append("cost_progress")
-    if config.replicates.enabled:
-        kinds.append("replicates")
-    return kinds
-
-
-def observable_rows(config: CampaignConfig, df: pd.DataFrame) -> pd.DataFrame:
-    """Return suggested rows that can be marked observed from the app."""
-    suggested = df["status"] == "suggested"
-    if config.review.enabled:
-        suggested = suggested & (df["review_status"] == "accepted")
-    return df.loc[suggested].copy()
-
-
-def export_staged_suggestions_csv(suggestions: pd.DataFrame, path: str | Path) -> Path:
-    """Atomically write staged suggestions to a standalone CSV without mutating app state."""
-    from bo_forge._campaign.exports import _publish_export_atomic
-
-    output_path = Path(path).expanduser()
-    staged = suggestions.copy(deep=True)
-    _publish_export_atomic(
-        output_path,
-        lambda prepared: staged.to_csv(prepared, index=False),
-        prefix=".suggestions-",
-    )
-    return output_path
-
-
 def campaign_report_text(campaign: CampaignSession) -> str:
     """Return the same deterministic report text used by CampaignSession.export_report."""
     return _format_campaign_report(campaign.report())
@@ -653,32 +548,6 @@ def default_export_path(log_path: Path, suffix: str, extension: str) -> Path:
     normalized_extension = extension.lstrip(".")
     stem = log_path.stem
     return Path("reports") / f"{stem}_{suffix}.{normalized_extension}"
-
-
-def extract_matplotlib_figure(plot_result: object) -> Figure:
-    """Extract the matplotlib Figure from a session plot return value."""
-    from matplotlib.figure import Figure
-
-    if isinstance(plot_result, Figure):
-        return plot_result
-    if isinstance(plot_result, (tuple, list)) and plot_result:
-        first = plot_result[0]
-        if isinstance(first, Figure):
-            return first
-    figure = getattr(plot_result, "figure", None)
-    if isinstance(figure, Figure):
-        return figure
-    raise ValueError("Could not extract a matplotlib Figure from plot result.")
-
-
-def staged_suggestions_from_bundle(bundle: dict[str, object] | None) -> pd.DataFrame:
-    """Return staged suggestions as a copy, or an empty DataFrame."""
-    if bundle is None:
-        return pd.DataFrame()
-    suggestions = bundle.get("suggestions")
-    if not isinstance(suggestions, pd.DataFrame):
-        return pd.DataFrame()
-    return suggestions.copy(deep=True)
 
 
 def mark_bundle_appended(bundle: dict[str, object]) -> dict[str, object]:

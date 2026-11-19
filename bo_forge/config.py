@@ -32,6 +32,7 @@ RESERVED_COLUMN_PREFIXES = ("predicted_mean_", "predicted_std_")
 FIDELITY_MATCH_REL_TOL = 1e-9
 FIDELITY_MATCH_ABS_TOL = 1e-9
 
+
 def fidelity_values_match(left: object, right: object) -> bool:
     """Return whether two fidelity values match under the public CSV tolerance."""
     try:
