@@ -84,6 +84,8 @@ are thin compatibility facades over focused ownership packages:
   replicate, and qMFKG candidate paths;
 - `_diagnostics/`: standard, Pareto, fidelity, contextual, model, structured,
   and replicate figure implementations;
+- `_expressions.py`: the restricted expression parser, validator, and evaluator
+  shared by constraints and cost models;
 - `application.py`: non-HTTP workflow coordination shared by app adapters.
 
 The compatibility facades and remaining focused modules include:
