@@ -14,6 +14,7 @@ from bo_forge._fit_metadata import attach_fit_metadata
 from bo_forge._optimization.common import (
     _candidate_batch_rejection_message,
     _empty_row,
+    _fallback_pool_candidate_batch,
     _populate_replicate_fields,
     _populate_review_fields,
 )
@@ -455,52 +456,24 @@ def _fallback_qlog_ehvi_candidate_batch(
     fixed_features_list: list[dict[int, float]],
     rejection_message: str,
 ) -> tuple[list[tuple[object, ...]], torch.Tensor]:
-    acquisition = build_qlog_ehvi_acquisition(
+    return _fallback_pool_candidate_batch(
         config=config,
-        model=model,
-        train_y_model=train_y_model,
-        ref_point=ref_point,
+        df=df,
+        acquisition=build_qlog_ehvi_acquisition(
+            config=config,
+            model=model,
+            train_y_model=train_y_model,
+            ref_point=ref_point,
+        ),
+        batch_size=batch_size,
+        fixed_features_list=fixed_features_list,
+        rejection_message=rejection_message,
+        seed_offset=104729,
+        failure_message=(
+            "Could not generate enough feasible, non-duplicate multi-objective suggestions"
+        ),
     )
-    assignments = fixed_features_list or [{}]
-    best_candidates: list[tuple[object, ...]] | None = None
-    best_value: torch.Tensor | None = None
-    best_scalar = -math.inf
-    model_dim = encoded_dimension(config)
-    pool_size = max(config.bo.raw_samples, 64)
 
-    for attempt in range(MAX_DECODE_RETRIES):
-        for assignment_index, fixed_features in enumerate(assignments):
-            engine = SobolEngine(
-                dimension=model_dim,
-                scramble=True,
-                seed=config.bo.random_seed + 104729 + attempt * 101 + assignment_index,
-            )
-            unit = engine.draw(pool_size * batch_size).to(dtype=torch.double)
-            candidate_batches = unit.reshape(pool_size, batch_size, model_dim)
-            for candidate_batch in candidate_batches:
-                for feature_index, value in fixed_features.items():
-                    candidate_batch[:, feature_index] = value
-                decoded_candidates = unit_cube_to_user_values(config, candidate_batch)
-                rejection = _candidate_batch_rejection_message(config, df, decoded_candidates)
-                if rejection is not None:
-                    rejection_message = rejection
-                    continue
-                repaired = values_to_unit_cube(config, decoded_candidates)
-                with torch.no_grad():
-                    value = acquisition(repaired).reshape(-1)[0]
-                scalar = float(value)
-                if math.isfinite(scalar) and scalar > best_scalar:
-                    best_candidates = decoded_candidates
-                    best_value = value.detach().reshape(1)
-                    best_scalar = scalar
-
-    if best_candidates is None or best_value is None:
-        raise SuggestionError(
-            "Could not generate enough feasible, non-duplicate multi-objective "
-            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
-            f"Last rejection: {rejection_message}"
-        )
-    return best_candidates, best_value
 
 def _fallback_qlog_nehvi_candidate_batch(
     *,
@@ -514,50 +487,19 @@ def _fallback_qlog_nehvi_candidate_batch(
     fixed_features_list: list[dict[int, float]],
     rejection_message: str,
 ) -> tuple[list[tuple[object, ...]], torch.Tensor]:
-    acquisition = build_qlog_nehvi_acquisition(
+    return _fallback_pool_candidate_batch(
         config=config,
-        model=model,
-        x_baseline=x_baseline,
-        ref_point=ref_point,
-        x_pending=x_pending,
+        df=df,
+        acquisition=build_qlog_nehvi_acquisition(
+            config=config,
+            model=model,
+            x_baseline=x_baseline,
+            ref_point=ref_point,
+            x_pending=x_pending,
+        ),
+        batch_size=batch_size,
+        fixed_features_list=fixed_features_list,
+        rejection_message=rejection_message,
+        seed_offset=130363,
+        failure_message="Could not generate enough feasible, non-duplicate qLogNEHVI suggestions",
     )
-    assignments = fixed_features_list or [{}]
-    best_candidates: list[tuple[object, ...]] | None = None
-    best_value: torch.Tensor | None = None
-    best_scalar = -math.inf
-    model_dim = encoded_dimension(config)
-    pool_size = max(config.bo.raw_samples, 64)
-
-    for attempt in range(MAX_DECODE_RETRIES):
-        for assignment_index, fixed_features in enumerate(assignments):
-            engine = SobolEngine(
-                dimension=model_dim,
-                scramble=True,
-                seed=config.bo.random_seed + 130363 + attempt * 101 + assignment_index,
-            )
-            unit = engine.draw(pool_size * batch_size).to(dtype=torch.double)
-            candidate_batches = unit.reshape(pool_size, batch_size, model_dim)
-            for candidate_batch in candidate_batches:
-                for feature_index, value in fixed_features.items():
-                    candidate_batch[:, feature_index] = value
-                decoded_candidates = unit_cube_to_user_values(config, candidate_batch)
-                rejection = _candidate_batch_rejection_message(config, df, decoded_candidates)
-                if rejection is not None:
-                    rejection_message = rejection
-                    continue
-                repaired = values_to_unit_cube(config, decoded_candidates)
-                with torch.no_grad():
-                    value = acquisition(repaired).reshape(-1)[0]
-                scalar = float(value)
-                if math.isfinite(scalar) and scalar > best_scalar:
-                    best_candidates = decoded_candidates
-                    best_value = value.detach().reshape(1)
-                    best_scalar = scalar
-
-    if best_candidates is None or best_value is None:
-        raise SuggestionError(
-            "Could not generate enough feasible, non-duplicate qLogNEHVI "
-            f"suggestions after {MAX_DECODE_RETRIES} retries. {_GENERATION_FAILURE_HINT} "
-            f"Last rejection: {rejection_message}"
-        )
-    return best_candidates, best_value

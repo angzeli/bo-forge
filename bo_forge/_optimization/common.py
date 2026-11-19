@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pandas as pd
 import torch
+from torch.quasirandom import SobolEngine
 
 from bo_forge.config import CampaignConfig
 from bo_forge.constraints import constraint_variable_names, constraint_violations_for_values
@@ -17,6 +18,7 @@ from bo_forge.costs import evaluate_cost
 from bo_forge.errors import SuggestionError
 from bo_forge.transforms import (
     encoded_dimension,
+    unit_cube_to_user_values,
     values_to_unit_cube,
 )
 from bo_forge.validation import (
@@ -50,6 +52,115 @@ SUGGESTION_QUALITY_COLUMNS = [
 
 class _CandidateGenerationExhausted(SuggestionError):
     """Internal signal for expected budget or design-space exhaustion."""
+
+
+def _fallback_pool_candidate_batch(
+    *,
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    acquisition,
+    batch_size: int,
+    fixed_features_list: list[dict[int, float]],
+    rejection_message: str,
+    seed_offset: int,
+    failure_message: str,
+    error_type: type[SuggestionError] = SuggestionError,
+) -> tuple[list[tuple[object, ...]], torch.Tensor]:
+    """Greedily select a valid batch from a Sobol pool after optimizer rejections.
+
+    Acquisition optimizers do not see campaign constraints, so when the unconstrained
+    optimum is infeasible every reseeded retry can land on the same rejected point.
+    Pool candidates that pass the constraint, existing-duplicate, and distance checks
+    are scored instead; each batch slot takes the candidate that maximizes the joint
+    acquisition value with the slots already chosen.
+    """
+    pool = _valid_fallback_pool(config, df, fixed_features_list, seed_offset)
+    if not pool:
+        raise error_type(
+            f"{failure_message} after {MAX_DECODE_RETRIES} retries. "
+            f"{_GENERATION_FAILURE_HINT} Last rejection: {rejection_message}"
+        )
+    pool_unit = values_to_unit_cube(config, pool)
+    selected: list[int] = []
+    for _ in range(batch_size):
+        available = [
+            index for index in range(len(pool))
+            if index not in selected
+            and _candidate_rejection_message(
+                config, df.iloc[0:0], pool[index], [pool[chosen] for chosen in selected],
+            ) is None
+        ]
+        best_index = _best_joint_candidate(acquisition, pool_unit, selected, available)
+        if best_index is None:
+            raise error_type(
+                f"{failure_message} after {MAX_DECODE_RETRIES} retries. "
+                f"{_GENERATION_FAILURE_HINT} Last rejection: no remaining pool candidate "
+                "is distinct from the already selected batch."
+            )
+        selected.append(best_index)
+    with torch.no_grad():
+        value = acquisition(pool_unit[selected]).reshape(-1)[0]
+    return [pool[index] for index in selected], value.detach().reshape(1)
+
+
+def _valid_fallback_pool(
+    config: CampaignConfig,
+    df: pd.DataFrame,
+    fixed_features_list: list[dict[int, float]],
+    seed_offset: int,
+) -> list[tuple[object, ...]]:
+    """Return decoded Sobol candidates that are valid against the existing log."""
+    assignments = fixed_features_list or [{}]
+    model_dim = encoded_dimension(config)
+    total = max(config.bo.raw_samples, 64) * MAX_DECODE_RETRIES
+    per_assignment = max(16, math.ceil(total / len(assignments)))
+    pool: list[tuple[object, ...]] = []
+    seen: set[tuple[object, ...]] = set()
+    for assignment_index, fixed_features in enumerate(assignments):
+        engine = SobolEngine(
+            dimension=model_dim,
+            scramble=True,
+            seed=config.bo.random_seed + seed_offset + assignment_index,
+        )
+        unit = engine.draw(per_assignment).to(dtype=torch.double)
+        for feature_index, value in fixed_features.items():
+            unit[:, feature_index] = value
+        for candidate in unit_cube_to_user_values(config, unit):
+            key = design_key_for_values(config, candidate)
+            if key in seen:
+                continue
+            seen.add(key)
+            if _candidate_rejection_message(config, df, candidate, []) is None:
+                pool.append(candidate)
+    return pool
+
+
+def _best_joint_candidate(
+    acquisition,
+    pool_unit: torch.Tensor,
+    selected: list[int],
+    available: list[int],
+    chunk_size: int = 256,
+) -> int | None:
+    """Return the available index whose addition maximizes the joint acquisition."""
+    best_index: int | None = None
+    best_scalar = -math.inf
+    prefix = pool_unit[selected]
+    for start in range(0, len(available), chunk_size):
+        chunk = available[start:start + chunk_size]
+        joint = torch.cat(
+            [
+                prefix.unsqueeze(0).expand(len(chunk), *prefix.shape),
+                pool_unit[chunk].unsqueeze(1),
+            ],
+            dim=1,
+        )
+        with torch.no_grad():
+            values = acquisition(joint).reshape(-1)
+        for index, value in zip(chunk, values.tolist(), strict=True):
+            if math.isfinite(value) and value > best_scalar:
+                best_index, best_scalar = index, value
+    return best_index
 
 
 def _suggest_structured_stage(

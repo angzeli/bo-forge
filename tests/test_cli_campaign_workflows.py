@@ -1,6 +1,7 @@
 """CLI campaign mutation, report, plot, and structured workflow tests."""
 
 from bo_forge._cli.errors import _hint_for_error
+from bo_forge.errors import SuggestionError
 from tests._cli_support import (
     CampaignConfig,
     LogBusyError,
@@ -288,6 +289,15 @@ def test_log_coordination_errors_have_specific_cli_hints() -> None:
     assert _hint_for_error(LogBusyError("busy")) == (
         "Hint: Another local writer is active; wait briefly and retry."
     )
+
+
+def test_candidate_exhaustion_hint_points_at_constraints_not_pending_rows() -> None:
+    hint = _hint_for_error(SuggestionError(
+        "Could not generate enough feasible, non-duplicate suggestions after 8 retries."
+    ))
+    assert hint is not None
+    assert "constraints" in hint
+    assert "Resolve pending suggestions" not in hint
 
 @pytest.mark.parametrize(
     "objective_args, expected_error",
