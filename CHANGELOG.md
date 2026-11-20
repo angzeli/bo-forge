@@ -1,6 +1,6 @@
 # 📝 BO Forge Changelog
 
-## Unreleased
+## v3.4.4 - Constraint Feasibility, Atomic Exports, And Starter Config
 
 ### Constrained suggestions
 

@@ -4,11 +4,12 @@ This roadmap is directional, not a release promise. The v3.x train focuses on
 assurance, reproducibility, scientific validation, and maintainability around
 the local YAML/CSV campaign model rather than primarily expanding features.
 
-Current prepared baseline: `v3.4.3`. The v3.4.x interface line is active.
-The v3.4.2 CLI decomposition is complete; v3.4.3 public Python typing is prepared,
-with local wheel/sdist acceptance passed on macOS/Python 3.12 and exact-commit
-Python 3.11/3.12 CI pending.
-The v3.4.4 API product-boundary disposition is deferred.
+Current prepared baseline: `v3.4.4`. The v3.4.x interface line is active.
+The v3.4.2 CLI decomposition is complete; v3.4.3 public Python typing is released,
+with required Python 3.11/3.12 CI passed on the tagged commit.
+The v3.4.4 maintenance patch (constraint-feasible suggestions, atomic exports, and
+the `init-config` starter command) is prepared, with exact-commit CI pending.
+The v3.4.5 API product-boundary disposition is deferred.
 Implementation is complete for v3.3.4 and
 the v3.3.x series. Performance acceptance passed: 156/156 processes completed
 and all 13 case pairs validated. The local release gate must pass before commit;
@@ -58,7 +59,8 @@ flowchart LR
     v341["v3.4.1<br/>Structured suggestion previews"]
     v342["v3.4.2<br/>CLI decomposition"]
     v343["v3.4.3<br/>Supported public Python typing"]
-    v344["v3.4.4<br/>API boundary disposition"]
+    v344["v3.4.4<br/>Constraint feasibility + atomic exports"]
+    v345["v3.4.5<br/>API boundary disposition"]
 
     v30 -.-> v300
     v30 -.-> v301
@@ -81,6 +83,7 @@ flowchart LR
     v34 -.-> v342
     v34 -.-> v343
     v34 -.-> v344
+    v34 -.-> v345
 
     class v30,v31,v32 majorDone
     class v33 majorDone
@@ -93,8 +96,9 @@ flowchart LR
     class v340 patchDone
     class v341 patchDone
     class v342 patchDone
-    class v343 patchActive
-    class v344 patchFuture
+    class v343 patchDone
+    class v344 patchActive
+    class v345 patchFuture
 
     classDef majorDone fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px,color:#111827;
     classDef majorActive fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#111827;
@@ -130,8 +134,9 @@ flowchart LR
 | `v3.4.0` | prepared | Schema-v1 JSON for 16 read-only CLI commands; text and BO contracts unchanged |
 | `v3.4.1` | prepared | Non-writing suggestion previews using the existing JSON envelope; append/export flags rejected before loading |
 | `v3.4.2` | implementation complete | CLI command ownership and compatibility hardening; external contracts unchanged |
-| `v3.4.3` | prepared | Supported public Python typing; local installed acceptance passed, exact-commit Python 3.11/3.12 CI pending |
-| `v3.4.4` | deferred | API product-boundary disposition; experimental adapter limits retained |
+| `v3.4.3` | prepared | Supported public Python typing; local installed acceptance passed, required Python 3.11/3.12 CI passed on the tagged commit |
+| `v3.4.4` | prepared | Constraint-feasible suggestions, atomic app/service/report exports, `init-config`, Python 3.14; exact-commit CI pending |
+| `v3.4.5` | deferred | API product-boundary disposition; experimental adapter limits retained |
 | `v3.4.x` | active | Structured automation interfaces and maintenance decisions |
 
 ## v3.0.x - Architecture And Release Assurance
@@ -509,7 +514,8 @@ Audit mapping: `MNT-001`.
 
 ### v3.4.3 - Supported Public Python Typing
 
-Status: prepared; local installed typing acceptance passed, exact-commit CI pending
+Status: prepared; local installed typing acceptance passed, required CI passed on
+the tagged commit
 
 Typed-package decision: **yes, for the documented core API**.
 
@@ -531,7 +537,23 @@ Audit mapping: `DX-002`.
   for narrower arguments or changed return meaning. No runtime, BO, schema, or
   CLI changes, full notebook reruns, or performance reruns belong to this patch.
 
-### v3.4.4 - API Product-Boundary Disposition
+### v3.4.4 - Constraint Feasibility And Maintenance
+
+Status: prepared; publication requires separate authorization and exact-commit CI
+
+- When constraints reject the acquisition optimum, select model-based
+  LogEI/qLogEI, qLogNEI, qLogEHVI, and qLogNEHVI suggestions from a bounded
+  feasible Sobol pool instead of failing after reseeded retries.
+- Publish staged-suggestion CSVs and campaign reports through a sibling temporary
+  file and an atomic replace, matching the CLI.
+- Add `bo-forge init-config`, a starter YAML for installations that do not include
+  the repository's `configs/` examples. This is the one additive CLI change; all
+  other parser contracts are unchanged.
+- Support CPython 3.14, harden campaign-log writes, and share one restricted
+  expression evaluator between constraints and cost models.
+- No YAML/CSV schema, provenance, or public Python API changes.
+
+### v3.4.5 - API Product-Boundary Disposition
 
 Status: deferred
 

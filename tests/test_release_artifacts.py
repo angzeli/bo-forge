@@ -278,7 +278,11 @@ def test_v3_docs_describe_current_fail_closed_provenance_resume() -> None:
     assert "## v3.3.2 - Multi-Objective And Multi-Fidelity Benchmark Evidence" in changelog
     assert "## v3.3.3 - Source-Archive Notebook Execution Assurance" in changelog
     assert "## v3.3.4 - Stable Performance Evidence" in changelog
-    assert f"## v{PROJECT_VERSION} - Supported Public Python Typing" in changelog
+    assert (
+        f"## v{PROJECT_VERSION} - Constraint Feasibility, Atomic Exports, And Starter Config"
+        in changelog
+    )
+    assert "## v3.4.3 - Supported Public Python Typing" in changelog
     assert "## v3.4.2 - CLI Decomposition And Compatibility Hardening" in changelog
     assert "## v3.4.1 - Structured Suggestion Dry-Runs" in changelog
     assert "## v3.4.0 - Versioned CLI JSON And Inspection Contracts" in changelog

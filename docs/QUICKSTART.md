@@ -80,7 +80,7 @@ See [CLI.md](CLI.md) for the full command reference.
 The local Streamlit app wraps the same `CampaignSession` workflow:
 
 ```bash
-pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.4"
 bo-forge-app
 ```
 
@@ -146,7 +146,7 @@ BO Forge includes an optional FastAPI probe around the internal app service
 layer:
 
 ```bash
-pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.4"
 bo-forge-api --root . --host 127.0.0.1 --port 8765
 ```
 

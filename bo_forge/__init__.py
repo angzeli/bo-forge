@@ -1,9 +1,9 @@
-"""BO Forge v3.4.3."""
+"""BO Forge v3.4.4."""
 
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-__version__ = "3.4.3"
+__version__ = "3.4.4"
 
 from bo_forge.config import (
     BOConfig,
