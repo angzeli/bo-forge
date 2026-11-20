@@ -121,7 +121,9 @@ The compatibility facades and remaining focused modules include:
 Internal CLI ownership lives under `_cli/`:
 
 - `inspection.py`: inspection registration, capability checks, and report exports.
-- `campaign.py`: initialization, suggestion previews/exports/appends, review, and observation.
+- `campaign.py`: starter config, initialization, suggestion previews/exports/appends, review,
+  and observation.
+- `starter_config.py`: the starter YAML text written by `init-config`.
 - `environment.py`: doctor checks and plot registration/export.
 - `common.py`: shared config/log arguments and lazy session loading.
 - `errors.py`: CLI-specific failures and error hints.
@@ -129,7 +131,8 @@ Internal CLI ownership lives under `_cli/`:
 - `provenance.py`, `provenance_lifecycle.py`, and `model_evaluate.py`: retained focused commands.
 
 Command owners depend on shared internal helpers, never back on `bo_forge.cli`.
-Composition preserves registration order, including doctor followed by init-log.
+Composition preserves registration order, including doctor followed by init-config
+and init-log.
 Internal helpers and private patch locations are not a public compatibility promise.
 This CLI-focused extraction leaves API stage storage, session internals, and
 validation ownership unchanged.

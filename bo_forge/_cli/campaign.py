@@ -22,6 +22,18 @@ if TYPE_CHECKING:
     from bo_forge.session import CampaignSession
 
 
+def _register_init_config_command(subparsers: argparse._SubParsersAction) -> None:
+    """Register the starter config ahead of init-log, in workflow order."""
+    init_config_parser = subparsers.add_parser(
+        "init-config",
+        help="Write a starter campaign YAML config to edit.",
+    )
+    init_config_parser.add_argument(
+        "--config", required=True, type=Path, help="New campaign YAML config path.",
+    )
+    init_config_parser.set_defaults(handler=_cmd_init_config)
+
+
 def _register_init_log_command(subparsers: argparse._SubParsersAction) -> None:
     """Register initialization separately to retain its position after doctor."""
     init_log_parser = subparsers.add_parser(
@@ -95,6 +107,29 @@ def _register_mutation_commands(subparsers: argparse._SubParsersAction) -> None:
         help="Optional observed experiment cost for cost-aware campaigns.",
     )
     mark_parser.set_defaults(handler=_cmd_mark_observed)
+
+
+def _cmd_init_config(args: argparse.Namespace) -> int:
+    from bo_forge._cli.starter_config import EXAMPLE_CONFIGS_URL, STARTER_CONFIG_YAML
+
+    config_path = Path(expanduser(args.config))
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Exclusive creation: a config a campaign already depends on is never replaced.
+            handle = config_path.open("x", encoding="utf-8")
+        except FileExistsError as exc:
+            raise _CLIOutputError(f"Config file already exists: {config_path}") from exc
+        with handle:
+            handle.write(STARTER_CONFIG_YAML)
+    except OSError as exc:
+        raise _CLIOutputError(f"Could not write config file {config_path}: {exc}") from exc
+    print(f"Created starter campaign config: {config_path}")
+    print("Edit the objective and variables, then create the campaign log:")
+    log_path = config_path.with_suffix(".csv")
+    print(f"  bo-forge init-log --config {config_path} --log {log_path}")
+    print(f"More example configs: {EXAMPLE_CONFIGS_URL}")
+    return 0
 
 
 def _cmd_init_log(args: argparse.Namespace) -> int:

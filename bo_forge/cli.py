@@ -6,7 +6,11 @@ import argparse
 from collections.abc import Sequence
 
 from bo_forge import __version__
-from bo_forge._cli.campaign import _register_init_log_command, _register_mutation_commands
+from bo_forge._cli.campaign import (
+    _register_init_config_command,
+    _register_init_log_command,
+    _register_mutation_commands,
+)
 from bo_forge._cli.common import _add_config_log_arguments
 from bo_forge._cli.dispatch import run_cli
 from bo_forge._cli.environment import _register_doctor_command, _register_plot_command
@@ -26,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Registration order is part of the terminal help contract.
     _register_doctor_command(subparsers)
+    _register_init_config_command(subparsers)
     _register_init_log_command(subparsers)
     _register_read_commands(subparsers)
     from bo_forge._cli.model_evaluate import register_model_evaluate_command

@@ -16,6 +16,15 @@
 - Replicate campaigns whose exploration fill was previously exhausted can now
   return a full batch instead of only the repeat rows.
 
+### Starter config
+
+- Add `bo-forge init-config --config PATH`, which writes a commented starter
+  campaign YAML (single objective; continuous, integer, and categorical variables)
+  and refuses to overwrite an existing file. A `pip` install does not include the
+  repository's `configs/` examples, so installed users previously had nothing to
+  start from. The parser baseline fixture is renamed to
+  `tests/fixtures/cli_parser_v344.json`; its only change is the added command.
+
 ### Atomic artifact exports
 
 - Publish staged-suggestion CSVs from the app service and Streamlit, and campaign
