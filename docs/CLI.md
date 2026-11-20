@@ -192,6 +192,15 @@ This is equivalent to running `bo-forge next-action ...` in a terminal, but it a
 
 ## 🔁 Basic Workflow
 
+Write a starter config when you do not have one yet. It is a commented
+single-objective YAML with one continuous, one integer, and one categorical
+variable; edit it before creating the log. The command refuses to overwrite an
+existing file:
+
+```bash
+bo-forge init-config --config configs/my_campaign.yaml
+```
+
 Create an empty canonical campaign log and provenance manifest from a config:
 
 ```bash
@@ -685,6 +694,7 @@ bo-forge plot \
 | `bo-forge --version` | Print the installed BO Forge version. |
 | `bo-forge doctor` | Check the active BO Forge environment and key imports. |
 | `python -m bo_forge --version` | Run the same CLI through a specific Python interpreter. |
+| `bo-forge init-config --config PATH` | Write a commented starter campaign YAML config; refuses to overwrite an existing file. |
 | `bo-forge init-log --config PATH --log PATH` | Create an empty canonical campaign CSV log and versioned provenance manifest. |
 | `bo-forge validate --config PATH --log PATH` | Validate a YAML config and CSV campaign log. |
 | `bo-forge summary --config PATH --log PATH` | Print campaign counts, status, and best observation as readable text. |
@@ -731,6 +741,7 @@ Most commands are read-only.
 
 The commands that can change files are:
 
+- `bo-forge init-config`: creates a new starter YAML config and refuses to overwrite an existing file.
 - `bo-forge init-log`: creates a new empty campaign log and provenance manifest and refuses to overwrite either file.
 - `bo-forge provenance-recover`: updates only a managed manifest to resolve a recoverable interrupted transaction.
 

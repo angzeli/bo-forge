@@ -39,6 +39,7 @@
         "nargs": "A...",
         "choices": [
           "doctor",
+          "init-config",
           "init-log",
           "validate",
           "summary",
@@ -74,7 +75,7 @@
       }
     ],
     "allow_abbrev": true,
-    "help": "usage: bo-forge [-h] [--version]\n                {doctor,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n                ...\n\nRun BO Forge campaign workflows from the terminal.\n\npositional arguments:\n  {doctor,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n    doctor              Check the active BO Forge environment.\n    init-log            Create an empty canonical campaign CSV log and\n                        provenance manifest.\n    validate            Validate a campaign CSV log.\n    summary             Print campaign summary.\n    status              Print campaign status.\n    next-action         Print the recommended next campaign action.\n    cost-summary        Print campaign cost and budget summary.\n    replicate-summary   Print observed replicate-group summary statistics.\n    stage-summary       Print structured-campaign stage summary fields.\n    fidelity-summary    Print multi-fidelity campaign summary fields.\n    fidelity-coverage   Print observed and active-suggestion coverage by\n                        fidelity value.\n    context-summary     Print contextual-campaign summary rows by context\n                        combination.\n    qlog-nei-summary    Print qLogNEI pending-state summary fields.\n    model-summary       Print model profile and fitting-input summary fields.\n    model-compare       Compare model profiles on current observed fitting\n                        rows.\n    pareto-front        Print nondominated observed rows for a multi-objective\n                        campaign.\n    pareto-summary      Print Pareto-front and hypervolume summary fields.\n    report              Print or export a campaign report.\n    model-evaluate      Evaluate model profiles using held-out predictions.\n    provenance          Print campaign provenance and integrity fields.\n    provenance-recover  Explicitly resolve an interrupted managed-campaign\n                        transaction.\n    provenance-adopt    Preview or explicitly apply provenance adopt.\n    provenance-migrate  Preview or explicitly apply provenance migrate.\n    provenance-accept-config\n                        Preview or explicitly apply provenance accept-config.\n    provenance-fork     Preview or explicitly apply provenance fork.\n    suggest             Generate campaign suggestions.\n    review              Accept, reject, or defer one suggested row.\n    mark-observed       Mark one pending suggestion as observed.\n    plot                Export one campaign plot.\n\noptions:\n  -h, --help            show this help message and exit\n  --version             show program's version number and exit\n"
+    "help": "usage: bo-forge [-h] [--version]\n                {doctor,init-config,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n                ...\n\nRun BO Forge campaign workflows from the terminal.\n\npositional arguments:\n  {doctor,init-config,init-log,validate,summary,status,next-action,cost-summary,replicate-summary,stage-summary,fidelity-summary,fidelity-coverage,context-summary,qlog-nei-summary,model-summary,model-compare,pareto-front,pareto-summary,report,model-evaluate,provenance,provenance-recover,provenance-adopt,provenance-migrate,provenance-accept-config,provenance-fork,suggest,review,mark-observed,plot}\n    doctor              Check the active BO Forge environment.\n    init-config         Write a starter campaign YAML config to edit.\n    init-log            Create an empty canonical campaign CSV log and\n                        provenance manifest.\n    validate            Validate a campaign CSV log.\n    summary             Print campaign summary.\n    status              Print campaign status.\n    next-action         Print the recommended next campaign action.\n    cost-summary        Print campaign cost and budget summary.\n    replicate-summary   Print observed replicate-group summary statistics.\n    stage-summary       Print structured-campaign stage summary fields.\n    fidelity-summary    Print multi-fidelity campaign summary fields.\n    fidelity-coverage   Print observed and active-suggestion coverage by\n                        fidelity value.\n    context-summary     Print contextual-campaign summary rows by context\n                        combination.\n    qlog-nei-summary    Print qLogNEI pending-state summary fields.\n    model-summary       Print model profile and fitting-input summary fields.\n    model-compare       Compare model profiles on current observed fitting\n                        rows.\n    pareto-front        Print nondominated observed rows for a multi-objective\n                        campaign.\n    pareto-summary      Print Pareto-front and hypervolume summary fields.\n    report              Print or export a campaign report.\n    model-evaluate      Evaluate model profiles using held-out predictions.\n    provenance          Print campaign provenance and integrity fields.\n    provenance-recover  Explicitly resolve an interrupted managed-campaign\n                        transaction.\n    provenance-adopt    Preview or explicitly apply provenance adopt.\n    provenance-migrate  Preview or explicitly apply provenance migrate.\n    provenance-accept-config\n                        Preview or explicitly apply provenance accept-config.\n    provenance-fork     Preview or explicitly apply provenance fork.\n    suggest             Generate campaign suggestions.\n    review              Accept, reject, or defer one suggested row.\n    mark-observed       Mark one pending suggestion as observed.\n    plot                Export one campaign plot.\n\noptions:\n  -h, --help            show this help message and exit\n  --version             show program's version number and exit\n"
   },
   "doctor": {
     "actions": [
@@ -96,6 +97,40 @@
     ],
     "allow_abbrev": true,
     "help": "usage: bo-forge doctor [-h]\n\noptions:\n  -h, --help  show this help message and exit\n"
+  },
+  "init-config": {
+    "actions": [
+      {
+        "options": [
+          "-h",
+          "--help"
+        ],
+        "dest": "help",
+        "action": "_HelpAction",
+        "default": "==SUPPRESS==",
+        "required": false,
+        "nargs": 0,
+        "choices": null,
+        "type": null,
+        "metavar": null,
+        "help": "show this help message and exit"
+      },
+      {
+        "options": [
+          "--config"
+        ],
+        "dest": "config",
+        "action": "_StoreAction",
+        "default": null,
+        "required": true,
+        "nargs": null,
+        "choices": null,
+        "type": "Path",
+        "metavar": null,
+        "help": "New campaign YAML config path."
+      }
+    ],
+    "allow_abbrev": true
   },
   "init-log": {
     "actions": [

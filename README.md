@@ -177,24 +177,28 @@ before using it beyond localhost.
 ## 🔁 Workflow
 
 A campaign is a loop: ask for suggestions, run the experiments, record the
-results, and ask again. Start from one of the bundled [`configs/`](https://github.com/angzeli/bo-forge/blob/main/configs)
-and adapt it to your variables and objectives.
+results, and ask again. `bo-forge init-config` writes a commented starter config
+to edit; the [`configs/`](https://github.com/angzeli/bo-forge/blob/main/configs)
+gallery has an example for every campaign type.
 
 ```bash
-# 1. Create a provenance-managed campaign log for your config
+# 1. Write a starter config, then edit its objective and variables
+bo-forge init-config --config configs/my_campaign.yaml
+
+# 2. Create a provenance-managed campaign log for your config
 bo-forge init-log --config configs/my_campaign.yaml --log work/campaign.csv
 
-# 2. Check the config and log
+# 3. Check the config and log
 bo-forge validate --config configs/my_campaign.yaml --log work/campaign.csv --require-provenance
 
-# 3. Generate suggestions and record them as pending rows
+# 4. Generate suggestions and record them as pending rows
 bo-forge suggest --config configs/my_campaign.yaml --log work/campaign.csv --append
 
-# 4. Run the experiment, then record its result using the printed row_id
+# 5. Run the experiment, then record its result using the printed row_id
 bo-forge mark-observed --config configs/my_campaign.yaml --log work/campaign.csv \
   --row-id ROW_ID --objective-value 0.82
 
-# 5. Check where the campaign stands, then repeat from step 3
+# 6. Check where the campaign stands, then repeat from step 4
 bo-forge status --config configs/my_campaign.yaml --log work/campaign.csv
 ```
 

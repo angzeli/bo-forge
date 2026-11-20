@@ -128,6 +128,10 @@ canonical CSV and its provenance manifest together:
 ./.venv/bin/python -m bo_forge init-log --config configs/01_simple_2d_maximise_logei.yaml --log examples/new_campaign_log.csv
 ```
 
+Without a config, `bo-forge init-config --config PATH` writes a commented starter
+YAML to edit first. This is the starting point for a `pip` install, which does not
+include the repository's `configs/` examples.
+
 See [PROVENANCE.md](PROVENANCE.md) for managed-versus-legacy behavior and
 explicit recovery details. Add `--require-provenance` to a campaign-loading CLI
 command when a missing manifest must fail instead of loading as legacy. See

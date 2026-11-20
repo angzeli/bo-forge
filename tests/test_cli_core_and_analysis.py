@@ -338,6 +338,54 @@ def test_init_log_missing_required_arguments_return_argparse_error(
     assert "usage:" in captured.err
     assert "required" in captured.err
 
+def test_init_config_writes_starter_that_starts_a_campaign(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "work" / "campaign.yaml"
+    log_path = config_path.with_suffix(".csv")
+
+    assert run(["init-config", "--config", str(config_path)]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert f"Created starter campaign config: {config_path}" in captured.out
+    assert f"bo-forge init-log --config {config_path} --log {log_path}" in captured.out
+    cfg = CampaignConfig.from_yaml(config_path)
+    assert [variable.type for variable in cfg.variables] == [
+        "continuous", "integer", "categorical",
+    ]
+    assert cfg.constraints == ()
+    assert run(["init-log", *base_args(config_path, log_path)]) == 0
+    assert run(["suggest", *base_args(config_path, log_path), "--append"]) == 0
+    assert len(load_campaign_log(log_path, cfg)) == cfg.bo.batch_size
+
+def test_init_config_refuses_to_overwrite_existing_file(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "campaign.yaml"
+    config_path.write_text("existing", encoding="utf-8")
+
+    assert run(["init-config", "--config", str(config_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: Config file already exists" in captured.err
+    assert config_path.read_text(encoding="utf-8") == "existing"
+
+def test_init_config_write_failure_returns_clear_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = output_under_file_parent(tmp_path, "campaign.yaml")
+
+    assert run(["init-config", "--config", str(config_path)]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Error: Could not write config file" in captured.err
+
 def test_validate_success_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     config_path = write_config(tmp_path / "campaign.yaml")
     log_path = write_log(tmp_path / "campaign.csv", config())

@@ -1,4 +1,7 @@
-"""Contracts captured before the v3.4.2 command-owner extraction."""
+"""Contracts captured before the v3.4.2 command-owner extraction.
+
+The parser baseline is the v3.4.1 capture plus the v3.4.4 ``init-config`` command.
+"""
 
 import argparse
 import json
@@ -16,7 +19,7 @@ from bo_forge._cli.errors import _CLIOutputError
 from bo_forge.session import CampaignSession
 from tests._cli_support import write_config, write_cost_review_config
 
-BASELINE = Path(__file__).parent / "fixtures" / "cli_parser_v341.json"
+BASELINE = Path(__file__).parent / "fixtures" / "cli_parser_v344.json"
 
 
 def parser_contract():
@@ -50,7 +53,7 @@ def _normalize_usage_wrapping(contract):
     return contract
 
 
-def test_parser_options_order_and_help_match_v341(monkeypatch):
+def test_parser_options_order_and_help_match_v344_baseline(monkeypatch):
     monkeypatch.setenv("COLUMNS", "80")
     baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
     current = parser_contract()
@@ -69,7 +72,7 @@ def test_every_command_dispatches_to_its_owner_and_lifecycle_operation():
 
     owners = {
         environment: ["doctor", "plot"],
-        campaign_commands: ["init-log", "suggest", "review", "mark-observed"],
+        campaign_commands: ["init-config", "init-log", "suggest", "review", "mark-observed"],
         inspection: ["validate", "summary", "status", "next-action", "cost-summary",
                      "replicate-summary", "stage-summary", "fidelity-summary", "fidelity-coverage",
                      "context-summary", "qlog-nei-summary", "model-summary", "model-compare",

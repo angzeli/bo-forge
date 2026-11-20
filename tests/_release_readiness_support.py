@@ -237,7 +237,7 @@ def _assert_sdist_contains_release_assets(sdist_path: Path) -> None:
         "tests/test_provenance_acceptance.py",
         "tests/test_provenance_closeout.py",
         "tests/fixtures/provenance_v1.json",
-        "tests/fixtures/cli_parser_v341.json",
+        "tests/fixtures/cli_parser_v344.json",
         "tests/test_provenance_lifecycle_hardening.py",
         "tests/__init__.py",
         "tests/_session_support.py",
