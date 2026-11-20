@@ -1,4 +1,4 @@
-# 🧪 BO Forge v3.4.3
+# 🧪 BO Forge v3.4.4
 
 BO Forge helps you run Bayesian optimisation campaigns for real experiments.
 You describe the variables, objectives, and constraints in a YAML config and keep
@@ -12,13 +12,11 @@ Streamlit interface, with no Git experience required.
 
 ## ✨ What's New
 
-**v3.4.3** adds [supported public Python typing](https://github.com/angzeli/bo-forge/blob/main/docs/PUBLIC_API.md#supported-public-python-typing)
-for the top-level exports, public configuration records, session methods,
-exceptions, and result records, with a `py.typed` marker. No runtime, BO,
-YAML/CSV schema, or CLI behavior changes.
-
-**On `main`, not yet released:** Python 3.14 support and campaign-log write
-hardening. See the [CHANGELOG](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md) for these and every earlier release.
+**v3.4.4** fixes model-based suggestions that failed when a constraint excluded
+the acquisition optimum, publishes app, service, and report exports atomically,
+and adds `bo-forge init-config` to write a starter campaign config. It also adds
+Python 3.14 support and campaign-log write hardening. YAML/CSV schemas are
+unchanged. See the [CHANGELOG](https://github.com/angzeli/bo-forge/blob/main/CHANGELOG.md) for details and every earlier release.
 
 ---
 
@@ -64,24 +62,24 @@ read-only, rejected, and deferred combination. The primary tested multi-objectiv
 ## 🧰 Install
 
 BO Forge is not published on PyPI. Install a tagged GitHub release as shown
-below; replace `v3.4.3` with another tag to pin a different release.
+below; replace `v3.4.4` with another tag to pin a different release.
 
 Install the backend package and CLI:
 
 ```bash
-pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge @ git+https://github.com/angzeli/bo-forge@v3.4.4"
 ```
 
 Install the local Streamlit workbench:
 
 ```bash
-pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[app] @ git+https://github.com/angzeli/bo-forge@v3.4.4"
 ```
 
 Install the experimental API probe:
 
 ```bash
-pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.3"
+pip install "bo-forge[api] @ git+https://github.com/angzeli/bo-forge@v3.4.4"
 ```
 
 For local development from a clone:

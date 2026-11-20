@@ -4,6 +4,16 @@ Preparing a release and publishing a release are separate operations. Required
 CI for the exact release commit is the authoritative gate. Local checks support
 that evidence but do not replace it.
 
+## v3.4.4 Maintenance Acceptance
+
+The v3.4.4 candidate fixes constrained model-based suggestions, publishes app,
+service, and report exports atomically, and adds `bo-forge init-config`. YAML/CSV
+schemas, provenance contracts, and the public Python API are unchanged.
+
+Acceptance is required Python 3.11/3.12/3.14 CI on the exact release commit,
+followed by the tag gate for `v3.4.4`, which reruns all 20 notebooks against the
+built sdist. No separate performance campaign rerun is claimed for this patch.
+
 ## v3.4.3 Public Typing Acceptance
 
 The v3.4.3 candidate prepares supported public Python typing without runtime,
@@ -544,4 +554,4 @@ used for a later manual release must come from the tag-gate run for that exact
 tag, never from a workstation's old `dist/` directory.
 
 Creating a tag, GitHub Release, final announcement, or registry upload requires
-separate explicit authorization. Preparing v3.4.3 does none of those actions.
+separate explicit authorization. Preparing v3.4.4 does none of those actions.
