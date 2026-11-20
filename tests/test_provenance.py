@@ -54,6 +54,11 @@ def _manifest(log_path: Path) -> tuple[Path, dict[str, object]]:
     return path, json.loads(path.read_text(encoding="utf-8"))
 
 
+# Spawned children re-import torch before they reach the barrier, which takes tens of
+# seconds on a loaded machine. The budget only bounds a hung run, so it is generous.
+_PROCESS_TIMEOUT_SECONDS = 180
+
+
 def _append_in_process(
     config_path: str,
     log_path: str,
@@ -64,7 +69,7 @@ def _append_in_process(
 ) -> None:
     cfg = CampaignConfig.from_yaml(config_path)
     try:
-        barrier.wait(timeout=10)
+        barrier.wait(timeout=_PROCESS_TIMEOUT_SECONDS)
         append_suggestions(log_path, _suggestion(cfg, row_id, x), config=cfg)
     except Exception as exc:
         results.put((row_id, type(exc).__name__, str(exc)))
@@ -876,12 +881,18 @@ def test_managed_process_appends_preserve_rows_and_event_sequences(tmp_path: Pat
 
     for process in processes:
         process.start()
-    for process in processes:
-        process.join(timeout=30)
-        assert process.exitcode == 0
-
-    outcomes = sorted(results.get(timeout=2) for _ in processes)
-    assert outcomes == [("process_1", "ok", ""), ("process_2", "ok", "")]
+    try:
+        # Outcomes first: a child that failed reports why, which an exit code cannot.
+        outcomes = sorted(results.get(timeout=_PROCESS_TIMEOUT_SECONDS) for _ in processes)
+        assert outcomes == [("process_1", "ok", ""), ("process_2", "ok", "")]
+        for process in processes:
+            process.join(timeout=_PROCESS_TIMEOUT_SECONDS)
+            assert process.exitcode == 0
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.kill()
+                process.join()
     _, manifest = _manifest(campaign.log_path)
     assert sorted(pd.read_csv(campaign.log_path)["row_id"].tolist()) == [
         "process_1",
