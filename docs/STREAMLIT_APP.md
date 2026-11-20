@@ -304,7 +304,10 @@ bo-forge-app --make-launcher ~/Desktop/BO-Forge.command
 ```
 
 The launcher records the current working directory so relative campaign paths
-remain predictable when double-clicked.
+remain predictable when double-clicked. It runs `python -m bo_forge_app` with the
+Python interpreter that created it, so it keeps using that environment even when
+another `bo-forge-app` is earlier on `PATH`. Recreate it after moving or rebuilding
+the environment.
 
 From a source checkout, the raw Streamlit command is available as a development
 fallback:

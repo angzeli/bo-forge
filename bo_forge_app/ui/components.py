@@ -22,7 +22,6 @@ else:
     ViewDataLike: TypeAlias = dict[str, Any]
 
 
-
 def _view_data_value(view_data: ViewDataLike, key: str, fallback: Any) -> Any:
     if key in view_data:
         return view_data[key]

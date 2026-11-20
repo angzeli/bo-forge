@@ -9,6 +9,8 @@ import torch
 from torch.quasirandom import SobolEngine
 
 from bo_forge._optimization.common import (
+    _GENERATION_FAILURE_HINT,
+    MAX_INITIAL_DESIGN_BATCHES,
     _candidate_rejection_message,
     _empty_row,
     _finite_design_space_size,
@@ -35,26 +37,6 @@ from bo_forge.validation import (
     design_tuples,
     next_iteration,
 )
-
-MAX_CATEGORICAL_COMBINATIONS = 64
-MAX_DECODE_RETRIES = 8
-MAX_INITIAL_DESIGN_BATCHES = 1000
-_GENERATION_FAILURE_HINT = (
-    "The feasible design space may be exhausted, constraints may be too restrictive, "
-    "or bo.min_normalized_distance may be too large."
-)
-SUGGESTION_QUALITY_COLUMNS = [
-    "row_id",
-    "is_feasible",
-    "violated_constraints",
-    "is_exact_duplicate",
-    "duplicate_allowed_by_replicates",
-    "nearest_existing_distance",
-    "nearest_batch_distance",
-    "passes_distance_threshold",
-]
-
-
 
 
 def _suggest_initial_design(

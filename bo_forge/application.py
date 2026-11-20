@@ -268,7 +268,6 @@ def staged_suggestions_from_bundle(bundle: dict[str, object] | None) -> pd.DataF
     return suggestions.copy(deep=True)
 
 
-
 # Preserve read-only render compatibility without exposing raw session mutators.
 _SESSION_READ_HELPERS = {
     "summary",

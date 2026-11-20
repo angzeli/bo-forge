@@ -35,6 +35,7 @@ LEGACY_PANEL_MAP = {
     "Reports": "Analyze",
 }
 
+
 def _current_paths(st: Any) -> tuple[Path, Path]:
     return Path(st.session_state[CONFIG_PATH_KEY]), Path(st.session_state[LOG_PATH_KEY])
 

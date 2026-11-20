@@ -109,6 +109,7 @@ def _resolve_campaign_paths(root: Path, request: CampaignRef) -> tuple[Path, Pat
         _resolve_under_root(root, request.log_path, "log_path"),
     )
 
+
 def _resolve_under_root(root: Path, value: str, field: str) -> Path:
     requested = Path(value)
     if requested.is_absolute():

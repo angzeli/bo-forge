@@ -39,23 +39,6 @@ from bo_forge.validation import (
     next_iteration,
 )
 
-MAX_CATEGORICAL_COMBINATIONS = 64
-MAX_DECODE_RETRIES = 8
-MAX_INITIAL_DESIGN_BATCHES = 1000
-_GENERATION_FAILURE_HINT = (
-    "The feasible design space may be exhausted, constraints may be too restrictive, "
-    "or bo.min_normalized_distance may be too large."
-)
-SUGGESTION_QUALITY_COLUMNS = [
-    "row_id",
-    "is_feasible",
-    "violated_constraints",
-    "is_exact_duplicate",
-    "duplicate_allowed_by_replicates",
-    "nearest_existing_distance",
-    "nearest_batch_distance",
-    "passes_distance_threshold",
-]
 
 def _suggest_uncertain_best_replicate(
     *,

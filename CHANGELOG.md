@@ -58,6 +58,16 @@
   constraints and cost models (`bo_forge/_expressions.py`), replacing two copies.
   Accepted syntax and every error message are unchanged. Parsed expressions are
   cached, so constraints are no longer re-parsed for each row and candidate.
+- Fix Streamlit fallback staged bundles for provenance-managed campaigns, which
+  omitted the manifest fingerprint and were reported stale immediately. The app
+  helpers now reuse the service-layer bundle, fingerprint, and export functions.
+- Write macOS launchers that run `python -m bo_forge_app` with the interpreter
+  that created them, instead of whichever `bo-forge-app` is first on `PATH`.
+- Raise dependency floors to versions that install and import together:
+  `gpytorch>=1.15.1`, `pyyaml>=6.0.1` (6.0 does not build on Python 3.12+), and
+  `starlette>=0.46` for the app and dev extras (Streamlit 1.57 needs it).
+- Define the optimization retry limits and messages once instead of in seven
+  modules, and normalize blank lines between top-level definitions.
 
 No public API, CLI, JSON, or YAML/CSV schema changes.
 

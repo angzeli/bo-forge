@@ -11,6 +11,7 @@ from bo_forge.config import CampaignConfig
 if TYPE_CHECKING:
     from bo_forge.session import CampaignSession
 
+
 def _base_report_tables(session: CampaignSession) -> dict[str, pd.DataFrame]:
     if session.config.is_multi_objective:
         return {
@@ -308,7 +309,6 @@ def _format_single_objective_report(tables: dict[str, pd.DataFrame]) -> str:
             ),
         ]
     )
-
 
 
 def _format_next_action(df: pd.DataFrame) -> str:

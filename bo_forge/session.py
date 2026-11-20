@@ -88,6 +88,7 @@ class CampaignSession:
         """Create an empty provenance-managed campaign and return its session."""
         from bo_forge._campaign.provenance import initialize_campaign_session
         return initialize_campaign_session(cls, config_path, log_path)
+
     @classmethod
     def from_files(
         cls,
@@ -489,6 +490,7 @@ class CampaignSession:
         if self.is_provenance_managed:
             tables["provenance"] = self.provenance_summary()
         return tables
+
     @property
     def is_provenance_managed(self) -> bool:
         """Return whether this session loaded as a provenance-managed campaign."""

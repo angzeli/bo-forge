@@ -49,7 +49,6 @@ SUGGESTION_QUALITY_COLUMNS = [
 ]
 
 
-
 class _CandidateGenerationExhausted(SuggestionError):
     """Internal signal for expected budget or design-space exhaustion."""
 

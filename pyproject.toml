@@ -33,11 +33,11 @@ classifiers = [
 dependencies = [
     "botorch>=0.17,<0.18",
     "filelock>=3.20.1,<4",
-    "gpytorch>=1.14",
+    "gpytorch>=1.15.1",
     "matplotlib>=3.8",
     "numpy>=1.26",
     "pandas>=2.2",
-    "pyyaml>=6.0",
+    "pyyaml>=6.0.1",
     "torch>=2.2",
 ]
 
@@ -54,6 +54,8 @@ Roadmap = "https://github.com/angzeli/bo-forge/blob/main/ROADMAP_V3_X.md"
 
 [project.optional-dependencies]
 app = [
+    # Streamlit 1.57 imports GZip symbols added in Starlette 0.46 but declares >=0.40.
+    "starlette>=0.46",
     "streamlit>=1.57",
 ]
 api = [
@@ -74,6 +76,7 @@ dev = [
     "pandas-stubs>=3.0,<3.1",
     "pytest>=8.0",
     "ruff>=0.8",
+    "starlette>=0.46",
     "streamlit>=1.57",
     "twine>=5.0",
     "uvicorn>=0.30",

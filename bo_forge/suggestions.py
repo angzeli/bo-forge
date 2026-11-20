@@ -55,6 +55,7 @@ _COMPATIBILITY_MODULES = (
     single_objective,
 )
 
+
 class _SuggestionsFacade(ModuleType):
     """Forward legacy test hooks to the internal function owner."""
 
@@ -68,5 +69,6 @@ class _SuggestionsFacade(ModuleType):
         super().__setattr__(name, value)
         for module in _PATCH_TARGETS.get(name, ()):
             setattr(module, name, value)
+
 
 sys.modules[__name__].__class__ = _SuggestionsFacade

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import shlex
-import shutil
 import socket
 import sys
 from importlib import resources
@@ -176,11 +175,13 @@ def write_macos_launcher(
         raise LauncherError(f"Launcher parent directory does not exist: {launcher_path.parent}")
     if launcher_path.exists():
         raise LauncherError(f"Refusing to overwrite existing launcher: {launcher_path}")
-    command = shutil.which("bo-forge-app")
-    if command is None:
-        raise LauncherError("Could not resolve installed 'bo-forge-app' executable.")
+    # The interpreter running this launcher is the one with BO Forge installed; a
+    # console script found on PATH could belong to a different environment.
+    interpreter = sys.executable
+    if not interpreter:
+        raise LauncherError("Could not resolve the running Python interpreter.")
 
-    command_args = _launcher_command_args(args, passthrough)
+    command_args = ["-m", "bo_forge_app", *_launcher_command_args(args, passthrough)]
     quoted_args = " ".join(shlex.quote(part) for part in command_args)
     cwd = Path.cwd().resolve()
     try:
@@ -188,7 +189,7 @@ def write_macos_launcher(
             "#!/bin/zsh\n"
             "set -e\n"
             f"cd {shlex.quote(str(cwd))}\n"
-            f"exec {shlex.quote(command)} {quoted_args}\n",
+            f"exec {shlex.quote(interpreter)} {quoted_args}\n",
             encoding="utf-8",
         )
         launcher_path.chmod(0o755)

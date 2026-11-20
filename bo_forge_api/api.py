@@ -305,7 +305,6 @@ def _register_mutation_routes(
         }
 
 
-
 def _register_provenance_recovery_route(app: FastAPI, root: Path) -> None:
     @app.post("/campaign/provenance/recover")
     def recover_campaign_provenance(
@@ -321,6 +320,7 @@ def _register_provenance_recovery_route(app: FastAPI, root: Path) -> None:
             "provenance": _table_payload(summary),
             "log_fingerprint": file_fingerprint(log_path),
         }
+
 
 def _register_error_handlers(app: FastAPI) -> None:
 
@@ -409,6 +409,7 @@ def _register_error_handlers(app: FastAPI) -> None:
                 },
             },
         )
+
 
 def _register_server_stage_routes(
     app: FastAPI,
@@ -560,6 +561,8 @@ def _load_service(root: Path, request: CampaignRef) -> CampaignAppService:
 
 def _provenance_policy(request: CampaignRef) -> str:
     return "required" if request.require_provenance else "compatible"
+
+
 def _server_stage_file_invalidation_reason(
     staged: StageValidationSnapshot | StageSnapshot,
     *,
@@ -637,12 +640,6 @@ def _prune_invalid_server_stages(stage_store: InMemoryStageStore) -> None:
         stale_reason = validate(staged)
         if stale_reason is not None:
             stage_store.mark_stale_if_active(staged.stage_id, stale_reason)
-
-
-
-
-
-
 
 
 def _safe_file_fingerprint(path: Path) -> str | None:

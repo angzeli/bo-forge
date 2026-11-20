@@ -183,7 +183,6 @@ def _render_fidelity_diagnostic_panels(
     )
 
 
-
 def _label_fidelity_diagnostic_panels(
     config: CampaignConfig,
     scatter_ax,
